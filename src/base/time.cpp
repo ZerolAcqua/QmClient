@@ -66,7 +66,7 @@ static tm time_localtime_threadlocal(time_t *time_data)
 	thread_local tm time_info_buf;
 	tm *time = localtime_r(time_data, &time_info_buf);
 #endif
-	dbg_assert(time != nullptr, "Failed to get local time for time data %" PRId64, (int64_t)time_data);
+	dbg_assert(time != nullptr, "Failed to get local time for time data %" PRId64, (int64_t)*time_data);
 	return *time;
 }
 

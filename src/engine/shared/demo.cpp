@@ -605,7 +605,8 @@ CDemoPlayer::EScanFileResult CDemoPlayer::ScanFile()
 	}
 
 	const auto &ResetToStartPosition = [&](EScanFileResult Result) -> EScanFileResult {
-		if(io_seek(m_File, StartPos, EIoSeekOrigin::START) != 0)
+		// Cannot play or seek without at least one keyframe, also when the scan stopped early
+		if(io_seek(m_File, StartPos, EIoSeekOrigin::START) != 0 || m_vKeyFrames.empty())
 		{
 			m_vKeyFrames.clear();
 			return EScanFileResult::ERROR_UNRECOVERABLE;
@@ -669,8 +670,7 @@ CDemoPlayer::EScanFileResult CDemoPlayer::ScanFile()
 		}
 	}
 
-	// Cannot start playback without at least one keyframe
-	return ResetToStartPosition(m_vKeyFrames.empty() ? EScanFileResult::ERROR_UNRECOVERABLE : EScanFileResult::SUCCESS);
+	return ResetToStartPosition(EScanFileResult::SUCCESS);
 }
 
 void CDemoPlayer::DoTick()

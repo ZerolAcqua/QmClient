@@ -988,6 +988,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 			SaveDraft();
 			m_Input.Clear();
 			m_pHistoryEntry = nullptr;
+			m_EditingNewLine = true;
 		}
 		else if(!g_Config.m_QmChatSaveDraft)
 		{
@@ -1012,6 +1013,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 		m_SavedInputPending = false;
 		m_aSavedInputText[0] = '\0';
 		m_pHistoryEntry = nullptr;
+		m_EditingNewLine = true;
 		DisableMode();
 		GameClient()->OnRelease();
 		m_Input.Clear();

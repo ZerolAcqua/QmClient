@@ -2897,6 +2897,8 @@ void CUi::SSelectionPopupContext::Reset()
 	m_Viewport = {};
 	m_PopupPolicy = {};
 	m_SpecialFontRenderMode = false;
+	m_pfnEntryCustomRender = nullptr;
+	m_pEntryCustomRenderContext = nullptr;
 }
 
 CUi::EPopupMenuFunctionResult CUi::PopupSelection(void *pContext, CUIRect View, bool Active)
@@ -2957,6 +2959,13 @@ CUi::EPopupMenuFunctionResult CUi::PopupSelection(void *pContext, CUIRect View, 
 			++VisibleEntries;
 			// 活动项与悬浮项使用同一种整行背景，避免左侧竖条与条目背景重叠。
 			const std::optional<ColorRGBA> ActiveColor = ActiveEntry ? std::optional<ColorRGBA>(pSelectionPopup->m_ActiveEntryColor) : std::nullopt;
+			// 条目背景先画（与悬浮/活动反馈同源），调用方再补画普通文本表达不了的前景
+			// （例：头衔动态风格预览的左半色板），最后由 DoButton_PopupMenu 压上条目文字。
+			if(pSelectionPopup->m_pfnEntryCustomRender != nullptr)
+			{
+				const SSelectionPopupContext::SEntryCustomRenderContext EntryCtx{Slot, pSelectionPopup->m_EntryPadding, pSelectionPopup->m_FontSize};
+				pSelectionPopup->m_pfnEntryCustomRender(pSelectionPopup->m_pEntryCustomRenderContext, EntryCtx, (int)Index, Entry.c_str());
+			}
 			if(pUI->DoButton_PopupMenu(&pSelectionPopup->m_vButtonContainers[Index], Entry.c_str(), &Slot, pSelectionPopup->m_FontSize, TEXTALIGN_ML, pSelectionPopup->m_EntryPadding, pSelectionPopup->m_TransparentButtons, true, ActiveColor))
 			{
 				pSelectionPopup->m_pSelection = &Entry;
@@ -3148,6 +3157,9 @@ int CUi::DoDropDown(CUIRect *pRect, int CurSelection, const char *const *pStrs, 
 		State.m_SelectionPopupContext.m_Props.m_BackgroundColor = DropDownProps.m_VisualStyle.m_PopupBackgroundColor;
 		State.m_SelectionPopupContext.m_ActiveEntryColor = DropDownProps.m_VisualStyle.m_ActiveEntryColor;
 		State.m_SelectionPopupContext.m_TransparentButtons = DropDownProps.m_VisualStyle.m_TransparentEntries;
+		// 自定义条目前景必须在弹层绘制前挂上：弹层内容在本帧稍后才渲染。
+		State.m_SelectionPopupContext.m_pfnEntryCustomRender = DropDownProps.m_pfnEntryCustomRender;
+		State.m_SelectionPopupContext.m_pEntryCustomRenderContext = DropDownProps.m_pEntryCustomRenderContext;
 		ShowPopupSelection(pRect->x, pRect->y, &State.m_SelectionPopupContext);
 		PopupOpen = IsPopupOpen(&State.m_SelectionPopupContext);
 		if(State.m_DropDownState.IsOpen() && !PopupOpen)

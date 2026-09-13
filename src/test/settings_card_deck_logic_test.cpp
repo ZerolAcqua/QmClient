@@ -297,12 +297,16 @@ TEST(CollisionHitboxLogic, CapsuleOutlineHandlesDegenerateAndAxisAlignedLasers)
 TEST(SettingsPageLayout, DynamicIslandHeightMatchesTheRenderedRowsAndColorRow)
 {
 	const SSettingsContentMetrics Metrics = ResolveSettingsContentMetrics(1000.0f);
-	const float OriginalHeight = ResolveQmHudDynamicIslandHeight(Metrics, true, 700.0f);
-	const float ExpandedHeight = ResolveQmHudDynamicIslandHeight(Metrics, false, 700.0f);
+	const float OriginalHeight = ResolveQmHudDynamicIslandHeight(Metrics, true, false, 700.0f);
+	const float ExpandedHeight = ResolveQmHudDynamicIslandHeight(Metrics, false, false, 700.0f);
+	const float CountdownHeight = ResolveQmHudDynamicIslandHeight(Metrics, true, true, 700.0f);
 	const CUIRect ColorRowView{0.0f, 0.0f, 700.0f, 0.0f};
 
-	EXPECT_FLOAT_EQ(OriginalHeight, 2.0f * Metrics.m_RowStep);
+	// 原始样式、显示队伍、钩子倒计时和开关倒计时四行常驻。
+	EXPECT_FLOAT_EQ(OriginalHeight, 4.0f * Metrics.m_RowStep);
 	EXPECT_FLOAT_EQ(ExpandedHeight - OriginalHeight, ResolveSettingsColorRowLayout(ColorRowView, Metrics, false).m_ConsumedHeight);
+	// 开关倒计时打开后只增加两个位置开关，不再预留「显示位置」标题。
+	EXPECT_FLOAT_EQ(CountdownHeight - OriginalHeight, 2.0f * Metrics.m_RowStep);
 }
 
 TEST(SettingsPageLayout, ContentRowFlowKeepsConditionalRowsAndMeasuredHeightInSync)

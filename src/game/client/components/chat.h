@@ -137,6 +137,8 @@ private:
 		std::shared_ptr<CManagedTeeRenderInfo> m_pManagedTeeRenderInfo;
 
 		float m_TextYOffset;
+		// 记录用于当前高度缓存的头衔浮动留白，配置变化后重新测量。
+		float m_QmTitleBobPadding = 0.0f;
 		// 当前消息实际占用的水平宽度，用于鼠标命中和选中高亮。
 		float m_ContentWidth;
 		float m_CutOffProgress;

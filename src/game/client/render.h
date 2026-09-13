@@ -12,6 +12,7 @@
 #include <generated/protocol.h>
 #include <generated/protocol7.h>
 
+#include <game/client/qm_title_effect.h>
 #include <game/client/skin.h>
 #include <game/client/ui_rect.h>
 
@@ -587,6 +588,11 @@ struct SQmTextEffectRenderStyle
 	float m_Time = 0.0f;
 };
 
+// QmClient：旧版 Calamity 语义的头衔绘制参数已移到 qm_title_effect.h（与「抛光」档同处一处，
+// 便于对比两套效果的差异）。描边是固定半径的 8 方向偏移（Calamity 的 ExoticRainbow / BurnishedAuric 用 2 像素）；
+// 辉光是沿圆周均布的加法混合副本，半径带 sin^5 呼吸、整圈随时间旋转，
+// 对应 Calamity 的 16 份 / 半径 4 + 16*sine。
+
 class CRenderTools
 {
 	class IGraphics *m_pGraphics;
@@ -615,6 +621,8 @@ public:
 	void RenderCursor(vec2 Center, float Size, float Alpha = 1.0f) const;
 	void RenderIcon(int ImageId, int SpriteId, const CUIRect *pRect, const ColorRGBA *pColor = nullptr) const;
 	void RenderTextContainerWithEffects(STextContainerIndex TextContainerIndex, const SQmTextEffectRenderStyle &Style, float X, float Y) const;
+	void RenderTitleContainerWithPolishedEffects(STextContainerIndex TextContainerIndex, const SQmTitlePolishStyle &Style, float X, float Y) const;
+	void RenderTitleContainerWithCalamityEffects(STextContainerIndex TextContainerIndex, const SQmTitleEffectStyle &Style, float X, float Y) const;
 
 	// larger rendering methods
 	static void GetRenderTeeBodySize(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 &BodyOffset, float &Width, float &Height);

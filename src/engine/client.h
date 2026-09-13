@@ -413,7 +413,7 @@ public:
 #endif
 
 	virtual std::optional<int> ShowMessageBox(const IGraphics::CMessageBox &MessageBox) = 0;
-	virtual void GetGpuInfoString(char (&aGpuInfo)[512]) = 0;
+	virtual void GetGpuInfoString(char (&aGpuInfo)[1024]) = 0;
 
 	// TClient
 	bool m_IsLocalFrozen = false;

@@ -536,6 +536,9 @@ Adjust verbosity in external console (-3 = none, -2 = errors only, -1 = warnings
 Advanced
 == 高阶
 
+Advanced mode
+== 高级模式
+
 Advanced options
 == 高级选项
 
@@ -688,6 +691,12 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == 拖动排序或布局重排时播放卡片位置过渡动画
+
+Animated styles override the fallback title color
+== 有动态风格时优先使用风格配色，无动态风格时使用此处配色
+
+Animated title style id
+== 头衔动态风格 ID
 
 Animation
 == 动画效果
@@ -1841,6 +1850,12 @@ Classic Pro
 Classic pro
 == 古典 pro
 
+Classic title glow
+== 经典效果光晕
+
+Classic title glow: 0 = off, 1 = subtle (6 draws), 2 = full Calamity (16 draws)
+== 经典头衔光晕：0 = 关闭，1 = 柔和（6 层），2 = 完整 Calamity（16 层）
+
 Clear
 == 清空
 
@@ -1966,9 +1981,6 @@ Collision Line Opacity
 
 Color
 == 颜色
-
-Color & opacity
-== 颜色与透明度
 
 Color of authenticated player names on scoreboard
 == 计分板中已认证玩家的名称颜色
@@ -2470,6 +2482,9 @@ Current: Score
 
 Current: Time
 == 当前：时间
+
+Cursed Flame
+== 咒焰·黑闪
 
 Custom
 == 自定义
@@ -3560,6 +3575,9 @@ Enable gun sound
 Enable highlighted chat sound
 == 启用聊天被提及消息提示音
 
+Enable hook countdown
+== 启用钩子倒计时
+
 Enable HUD animations
 == 启用 HUD 动画
 
@@ -4037,6 +4055,9 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == 回退后的简单降噪强度
 
+Fallback title color
+== 基础配色
+
 Fast input
 == 快速输入
 
@@ -4189,6 +4210,9 @@ Follow
 
 Follow server
 == 跟随服务器
+
+Follow Tee
+== 跟随 Tee
 
 Following
 == 当前
@@ -4561,6 +4585,9 @@ Go forward one tick
 
 Go forward the specified duration
 == 快进指定时长
+
+Golden Grace
+== 黄金·赐福
 
 Gores
 == 血腥模式
@@ -5620,6 +5647,9 @@ LibreTranslate API Key
 
 LibreTranslate endpoint
 == LibreTranslate 端点
+
+Light band (0 = style default)
+== 色带相位（0 = 风格默认）
 
 Limit information in spectator mode
 == 限制观战模式中的信息
@@ -7112,11 +7142,17 @@ Option color
 Optional authentication key for the DNSBL provider
 == 指定 DNSBL 提供商的可选身份验证密钥
 
+Original
+== 原版
+
 Other
 == 其他
 
 Other players' hook line width
 == 其他玩家的钩索辅助线宽度
+
+Other players' nameplate scope (0=All players 1=Friends only)
+== 他人铭牌范围（0=所有玩家 1=仅好友）
 
 Others
 == 他人
@@ -7198,6 +7234,9 @@ Overwrite clan even if empty
 
 Own hook line width
 == 自己的钩索辅助线宽度
+
+Own nameplate scope (0=Current character 1=All local characters)
+== 自身铭牌范围（0=当前角色 1=本机全部角色）
 
 p = Ping latency
 == p = Ping 延迟
@@ -7564,6 +7603,9 @@ Please wait…
 
 Points
 == 分数
+
+Polished
+== 抛光
 
 Popup animation
 == 弹出动画
@@ -9197,6 +9239,9 @@ Severe
 Shape
 == 形状
 
+Shimmer speed (polished)
+== 掠光速度（抛光档）
+
 Short server names
 == 短服务器名称
 
@@ -9220,6 +9265,9 @@ Show %s group
 
 Show a small view of the dummy
 == 显示分身小视图
+
+Show advanced title settings (collapsing keeps configured effects)
+== 显示头衔高级设置（收起后保留已设置效果）
 
 Show air jump indicator
 == 显示空中跳指示器
@@ -9526,6 +9574,9 @@ Show important server prompts and Echo messages as popups
 
 Show important server prompts as notifications
 == 重要服务器提示改走通知栏
+
+Show in Dynamic Island
+== 显示在灵动岛内
 
 Show in-game FPS
 == 显示游戏内 FPS
@@ -10262,6 +10313,12 @@ Smoothness of multi-view zoom (in ms, higher = slower)
 SMTC
 == 系统媒体控制
 
+Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
+== 浮动偏移吸附到整数像素（字体更锐利，但更顿挫）
+
+Snap wave to pixels
+== 波浪位移对齐整数像素
+
 Snapshot Age
 == 快照年龄
 
@@ -10354,6 +10411,9 @@ Space
 
 Spam protection: prevent spamming of team switching, chat, skin changes, emotes, votes
 == 刷屏保护：防止切换队伍、聊天、换皮肤、表情和投票的刷屏
+
+Spatial effect
+== 空间效果
 
 Speaker
 == 扬声器
@@ -10450,6 +10510,9 @@ Sphere
 
 Spin pop
 == 旋转弹出
+
+Spirit Light
+== 灵光·流萤
 
 Sponsor code
 == 认证码
@@ -10633,6 +10696,9 @@ Style kill, finish, and system messages
 
 Sub-Tick aiming
 == Sub-Tick 瞄准
+
+Subtle
+== 柔和
 
 Successfully saved the replay!
 == 成功保存短时回放！
@@ -10921,6 +10987,9 @@ Tee trail color
 
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee 轨迹颜色模式（1=纯色，2=当前 Tee 颜色，3=彩虹，4=按 Tee 速度着色，5=随机）
+
+Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
+== Tee 拖尾样式（0=原版，1=咒焰黑闪，2=紫电雷切，3=灵光流萤，4=虚空暗影，5=黄金赐福）
 
 Tee Trails
 == Tee 拖尾
@@ -11261,11 +11330,38 @@ Timer isn't displayed.
 Tiny Tee Size
 == 迷你 Tee 大小
 
-Title color
-== 头衔颜色
+Title bob angular speed in 1/100 rad/s
+== 头衔浮动角速度（1/100 弧度每秒）
+
+Title bob wavelength in pixels
+== 头衔浮动波长（像素）
+
+Title color (single color)
+== 头衔颜色（单色）
+
+Title light sweep speed in 1/100 row per second (0 = off)
+== 头衔掠光速度（每秒 1/100 行，0 = 关闭）
+
+Title opacity (custom color)
+== 透明度（自定义配色）
+
+Title per-character phase per pixel in 1/1000 px (0 = style default, 20 = visible light band)
+== 头衔逐字符相位（每像素，1/1000 像素；0 = 用风格默认值，20 = 可见光带）
+
+Title per-character vertical bob amplitude in pixels (0 = off)
+== 头衔逐字符垂直浮动幅度（像素，0 = 关闭）
+
+Title preview
+== 头衔成品预览
 
 Title server unavailable; retry
 == 头衔服务暂不可用，请重试
+
+Title spatial effect: 0 = polished, 1 = solid, 2 = classic Calamity, 3 = off
+== 头衔空间效果：0 = 抛光，1 = 实体，2 = 经典 Calamity，3 = 关闭
+
+Title style
+== 头衔风格
 
 Title too long or contains unsupported characters
 == 头衔过长或包含不支持的字符
@@ -11723,6 +11819,9 @@ Unknown parameter. Accepted values: default, gametimer, broadcast, both, none
 Unknown status
 == 未知状态
 
+Unknown title style
+== 未知的头衔风格
+
 Unlock a team
 == 解锁队伍
 
@@ -11816,6 +11915,9 @@ Use alternative antiping smoothing, incompatible with cl_antiping_smooth
 Use alternative world tick calculation making hooks behave as if all players have Strong.
 == 使用替代的世界 tick 计算，使钩索表现得像所有玩家都拥有强钩。
 
+Use animated title style (overrides qm_title_color_mode)
+== 使用头衔动态风格（覆盖 qm_title_color_mode）
+
 Use colored skins for frozen tees
 == 冻结 Tee 使用彩色皮肤
 
@@ -11842,6 +11944,9 @@ Use default voice input device
 
 Use default voice output device
 == 使用默认语音输出设备
+
+Use each Tee trail style's own palette instead of the trail color mode
+== 使用各 Tee 拖尾样式自带的配色，而不是拖尾颜色模式
 
 Use embedded HUD progress bar
 == 使用 HUD 内嵌进度条
@@ -11905,6 +12010,9 @@ Use skin color when Tee is frozen
 
 Use sounds
 == 开启声音
+
+Use style colors
+== 使用样式专属配色
 
 Use team colors for name plates
 == 用队伍颜色显示昵称
@@ -11998,6 +12106,9 @@ View the developers and contributors
 
 View the people supporting QmClient development
 == 查看支持 QmClient 开发的成员
+
+Violet Lightning
+== 紫电·雷切
 
 Virtual joystick which always uses fire.
 == 始终用于开火的虚拟摇杆。
@@ -12107,6 +12218,9 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == 语音白名单（逗号分隔）
 
+Void Shadow
+== 虚空·暗影
+
 Volume
 == 音量
 
@@ -12199,6 +12313,15 @@ Warn about team balance
 
 Warning
 == 警告
+
+Wave amount
+== 波浪幅度
+
+Wave speed (0.01 rad/s)
+== 波浪速度（0.01 弧度/秒）
+
+Wave wavelength
+== 波浪波长
 
 Weak hook
 == 弱钩
@@ -16954,6 +17077,22 @@ Others
 [Show name plates]
 Own
 == 自身
+
+[Show name plates scope]
+All
+== 所有
+
+[Show name plates scope]
+Current
+== 当前
+
+[Show name plates scope]
+Friends
+== 好友
+
+[Show name plates scope]
+Local
+== 本地
 
 [Show players' key presses]
 All

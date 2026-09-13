@@ -12,6 +12,7 @@
 #include <game/client/components/qmclient/settings_resource_preview.h>
 #include <game/client/components/qmclient/stutter_diagnostics.h>
 #include <game/client/components/settings_resource_jobs.h>
+#include <game/client/components/tclient/trails.h>
 #include <game/client/frame_scheduler.h>
 #include <game/client/ui.h>
 #include <game/client/ui_scrollregion.h>
@@ -20,6 +21,7 @@
 #include <test/test.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -1592,27 +1594,27 @@ TEST(QmMonitoringHelpers, TClientStableTextCandidateAuditIsEmptyExceptAllowlist)
 	const std::string Source = ReadRepoFile(pFile);
 	const std::vector<SStableTextCandidate> vCandidates = CollectRawStableTextCandidatesWithLines(Source);
 	const std::vector<SStableTextRawAllow> vAllowlist = {
-		{pFile, 3464, "user-generated"},
-		{pFile, 3803, "dynamic-value"},
-		{pFile, 3805, "localized-list-data"},
-		{pFile, 3933, "localized-list-data"},
-		{pFile, 3994, "localized-list-data"},
-		{pFile, 4106, "user-generated"},
-		{pFile, 4118, "user-generated"},
-		{pFile, 4180, "localized-list-data"},
-		{pFile, 4190, "dynamic-value"},
-		{pFile, 4222, "localized-list-data"},
-		{pFile, 4229, "dynamic-value"},
-		{pFile, 4283, "localized-list-data"},
-		{pFile, 4744, "dynamic-value"},
-		{pFile, 4747, "dynamic-value"},
-		{pFile, 4750, "dynamic-value"},
-		{pFile, 4755, "user-generated"},
-		{pFile, 4757, "user-generated"},
-		{pFile, 5126, "dynamic-value"},
-		{pFile, 5459, "localized-list-data"},
-		{pFile, 5496, "localized-list-data"},
+		{pFile, 3507, "user-generated"},
+		{pFile, 3857, "dynamic-value"},
+		{pFile, 3859, "localized-list-data"},
+		{pFile, 3986, "localized-list-data"},
+		{pFile, 4047, "localized-list-data"},
+		{pFile, 4159, "user-generated"},
+		{pFile, 4171, "user-generated"},
+		{pFile, 4233, "localized-list-data"},
+		{pFile, 4243, "dynamic-value"},
+		{pFile, 4275, "localized-list-data"},
+		{pFile, 4282, "dynamic-value"},
+		{pFile, 4336, "localized-list-data"},
+		{pFile, 4797, "dynamic-value"},
+		{pFile, 4800, "dynamic-value"},
+		{pFile, 4803, "dynamic-value"},
+		{pFile, 4808, "user-generated"},
+		{pFile, 4810, "user-generated"},
+		{pFile, 5179, "dynamic-value"},
 		{pFile, 5512, "localized-list-data"},
+		{pFile, 5549, "localized-list-data"},
+		{pFile, 5565, "localized-list-data"},
 	};
 	const std::vector<SStableTextCandidate> vUnexpected = FilterCandidatesNotCoveredByMenuPoolOrAllowlist(pFile, vCandidates, vAllowlist);
 	EXPECT_TRUE(vUnexpected.empty()) << JoinCandidates(vUnexpected);
@@ -1624,6 +1626,11 @@ TEST(QmMonitoringHelpers, QmClientStableTextCandidateAuditIsEmptyExceptAllowlist
 	const std::string Source = ReadRepoFile(pFile);
 	const std::vector<SStableTextCandidate> vCandidates = CollectRawStableTextCandidatesWithLines(Source);
 	const std::vector<SStableTextRawAllow> vAllowlist = {
+		{pFile, 1654, "stateful-new-label"},
+		{pFile, 1663, "stateful-new-label"},
+		{pFile, 1665, "stateful-new-label"},
+		// 赞助头衔卡片：头衔风格下拉的标签（配色档位、颜色行、重复的效果下拉已移除）
+		{pFile, 1711, "stateful-new-label"},
 		{pFile, 765, "stateful-new-label"},
 		{pFile, 757, "stateful-new-label"},
 		{pFile, 942, "animated-style"},
@@ -1644,26 +1651,26 @@ TEST(QmMonitoringHelpers, QmClientStableTextCandidateAuditIsEmptyExceptAllowlist
 		{pFile, 976, "animated-style"},
 		{pFile, 985, "animated-style"},
 		{pFile, 993, "animated-style"},
-		{pFile, 1989, "dynamic-value"},
-		{pFile, 2155, "icon-only"},
-		{pFile, 2482, "animated-style"},
-		{pFile, 2483, "status-message"},
-		{pFile, 2490, "animated-style"},
-		{pFile, 2491, "status-message"},
-		{pFile, 3461, "localized-list-data"},
-		{pFile, 4315, "localized-list-data"},
-		{pFile, 4677, "status-message"},
-		{pFile, 4681, "user-generated"},
-		{pFile, 4689, "user-generated"},
-		{pFile, 4954, "status-message"},
-		{pFile, 5185, "stateful-new-label"},
-		{pFile, 5181, "stateful-new-label"},
-		{pFile, 5193, "stateful-new-label"},
-		{pFile, 5771, "status-message"},
-		{pFile, 5767, "status-message"},
-		{pFile, 5779, "status-message"},
-		{pFile, 6259, "status-message"},
-		{pFile, 6260, "status-message"},
+		{pFile, 1991, "dynamic-value"},
+		{pFile, 2157, "icon-only"},
+		{pFile, 2484, "animated-style"},
+		{pFile, 2485, "status-message"},
+		{pFile, 2492, "animated-style"},
+		{pFile, 2493, "status-message"},
+		{pFile, 3463, "localized-list-data"},
+		{pFile, 4317, "localized-list-data"},
+		{pFile, 4679, "status-message"},
+		{pFile, 4683, "user-generated"},
+		{pFile, 4691, "user-generated"},
+		{pFile, 4956, "status-message"},
+		{pFile, 5187, "stateful-new-label"},
+		{pFile, 5183, "stateful-new-label"},
+		{pFile, 5195, "stateful-new-label"},
+		{pFile, 5773, "status-message"},
+		{pFile, 5769, "status-message"},
+		{pFile, 5781, "status-message"},
+		{pFile, 6261, "status-message"},
+		{pFile, 6262, "status-message"},
 		{pFile, 952, "animated-style"},
 		{pFile, 953, "animated-style"},
 		{pFile, 960, "animated-style"},
@@ -1675,11 +1682,11 @@ TEST(QmMonitoringHelpers, QmClientStableTextCandidateAuditIsEmptyExceptAllowlist
 		{pFile, 981, "animated-style"},
 		{pFile, 982, "animated-style"},
 		{pFile, 995, "animated-style"},
-		{pFile, 2501, "animated-style"},
-		{pFile, 2502, "animated-style"},
-		{pFile, 4700, "localized-list-data"},
-		{pFile, 5204, "stateful-new-label"},
-		{pFile, 5790, "status-message"},
+		{pFile, 2503, "animated-style"},
+		{pFile, 2504, "animated-style"},
+		{pFile, 4702, "localized-list-data"},
+		{pFile, 5206, "stateful-new-label"},
+		{pFile, 5792, "status-message"},
 		{pFile, 949, "animated-style"},
 		{pFile, 957, "animated-style"},
 		{pFile, 965, "animated-style"},
@@ -1688,79 +1695,79 @@ TEST(QmMonitoringHelpers, QmClientStableTextCandidateAuditIsEmptyExceptAllowlist
 		{pFile, 979, "animated-style"},
 		{pFile, 980, "animated-style"},
 		{pFile, 992, "animated-style"},
-		{pFile, 2611, "animated-style"},
-		{pFile, 2612, "user-generated"},
-		{pFile, 7204, "stateful-new-label"},
+		{pFile, 2613, "animated-style"},
+		{pFile, 2614, "user-generated"},
+		{pFile, 7206, "stateful-new-label"},
 		{pFile, 983, "dynamic-value"},
 		{pFile, 990, "dynamic-value"},
 		{pFile, 994, "dynamic-value"},
 		{pFile, 998, "dynamic-value"},
 		{pFile, 999, "dynamic-value"},
-		{pFile, 1001, "dynamic-value"},
-		{pFile, 1002, "dynamic-value"},
+		{pFile, 1003, "dynamic-value"},
+		{pFile, 1004, "dynamic-value"},
 		{pFile, 984, "dynamic-value"},
 		{pFile, 986, "dynamic-value"},
 		{pFile, 987, "dynamic-value"},
 		{pFile, 989, "dynamic-value"},
 		{pFile, 996, "dynamic-value"},
-		{pFile, 1000, "dynamic-value"},
-		{pFile, 1003, "dynamic-value"},
-		{pFile, 1004, "dynamic-value"},
-		{pFile, 1045, "dynamic-value"},
-		{pFile, 1046, "dynamic-value"},
-		{pFile, 1053, "dynamic-value"},
-		{pFile, 1057, "dynamic-value"},
-		{pFile, 1061, "dynamic-value"},
-		{pFile, 1062, "dynamic-value"},
-		{pFile, 1064, "dynamic-value"},
-		{pFile, 1065, "dynamic-value"},
+		{pFile, 1002, "dynamic-value"},
+		{pFile, 1005, "dynamic-value"},
+		{pFile, 1006, "dynamic-value"},
 		{pFile, 1047, "dynamic-value"},
 		{pFile, 1048, "dynamic-value"},
+		{pFile, 1055, "dynamic-value"},
+		{pFile, 1059, "dynamic-value"},
+		{pFile, 1063, "dynamic-value"},
+		{pFile, 1064, "dynamic-value"},
+		{pFile, 1066, "dynamic-value"},
+		{pFile, 1067, "dynamic-value"},
 		{pFile, 1049, "dynamic-value"},
 		{pFile, 1050, "dynamic-value"},
-		{pFile, 1054, "dynamic-value"},
+		{pFile, 1051, "dynamic-value"},
+		{pFile, 1052, "dynamic-value"},
 		{pFile, 1056, "dynamic-value"},
 		{pFile, 1058, "dynamic-value"},
 		{pFile, 1060, "dynamic-value"},
-		{pFile, 1063, "dynamic-value"},
-		{pFile, 1066, "dynamic-value"},
-		{pFile, 1067, "dynamic-value"},
+		{pFile, 1062, "dynamic-value"},
+		{pFile, 1065, "dynamic-value"},
 		{pFile, 1068, "dynamic-value"},
 		{pFile, 1069, "dynamic-value"},
-		{pFile, 1306, "dynamic-value"},
-		{pFile, 1307, "dynamic-value"},
-		{pFile, 1313, "dynamic-value"},
-		{pFile, 1317, "dynamic-value"},
-		{pFile, 1321, "dynamic-value"},
-		{pFile, 1322, "dynamic-value"},
-		{pFile, 1324, "dynamic-value"},
-		{pFile, 1325, "dynamic-value"},
+		{pFile, 1070, "dynamic-value"},
+		{pFile, 1071, "dynamic-value"},
 		{pFile, 1308, "dynamic-value"},
 		{pFile, 1309, "dynamic-value"},
 		{pFile, 1315, "dynamic-value"},
 		{pFile, 1319, "dynamic-value"},
 		{pFile, 1323, "dynamic-value"},
+		{pFile, 1324, "dynamic-value"},
 		{pFile, 1326, "dynamic-value"},
 		{pFile, 1327, "dynamic-value"},
-		{pFile, 1331, "dynamic-value"},
-		{pFile, 1332, "dynamic-value"},
+		{pFile, 1310, "dynamic-value"},
+		{pFile, 1311, "dynamic-value"},
+		{pFile, 1317, "dynamic-value"},
+		{pFile, 1321, "dynamic-value"},
+		{pFile, 1325, "dynamic-value"},
+		{pFile, 1328, "dynamic-value"},
+		{pFile, 1329, "dynamic-value"},
 		{pFile, 1333, "dynamic-value"},
-		{pFile, 1337, "dynamic-value"},
-		{pFile, 1338, "dynamic-value"},
-		{pFile, 1344, "dynamic-value"},
-		{pFile, 1345, "dynamic-value"},
+		{pFile, 1334, "dynamic-value"},
+		{pFile, 1335, "dynamic-value"},
+		{pFile, 1339, "dynamic-value"},
+		{pFile, 1340, "dynamic-value"},
 		{pFile, 1346, "dynamic-value"},
 		{pFile, 1347, "dynamic-value"},
-		{pFile, 1341, "dynamic-value"},
-		{pFile, 1342, "dynamic-value"},
 		{pFile, 1348, "dynamic-value"},
 		{pFile, 1349, "dynamic-value"},
+		{pFile, 1343, "dynamic-value"},
+		{pFile, 1344, "dynamic-value"},
 		{pFile, 1350, "dynamic-value"},
+		{pFile, 1351, "dynamic-value"},
 		{pFile, 1352, "dynamic-value"},
-		{pFile, 1356, "dynamic-value"},
-		{pFile, 1357, "dynamic-value"},
+		{pFile, 1354, "dynamic-value"},
+		{pFile, 1358, "dynamic-value"},
 		{pFile, 1359, "dynamic-value"},
-		{pFile, 1360, "dynamic-value"},
+		{pFile, 1361, "dynamic-value"},
+		{pFile, 1362, "dynamic-value"},
 	};
 	const std::vector<SStableTextCandidate> vUnexpected = FilterCandidatesNotCoveredByMenuPoolOrAllowlist(pFile, vCandidates, vAllowlist);
 	EXPECT_TRUE(vUnexpected.empty()) << JoinCandidates(vUnexpected);
@@ -1776,30 +1783,30 @@ TEST(QmMonitoringHelpers, BaseSettingsStableTextCandidateAuditIsEmptyExceptAllow
 	const std::vector<SStableTextCandidate> vCandidates = CollectRawStableTextCandidatesWithLines(Source);
 	const std::vector<SStableTextRawAllow> vAllowlist = {
 		{pFile, 472, "animated-style"},
-		{pFile, 1446, "input-text"},
-		{pFile, 1759, "dynamic-value"},
-		{pFile, 1790, "localized-list-data"},
-		{pFile, 1935, "localized-list-data"},
-		{pFile, 1971, "localized-list-data"},
-		{pFile, 1980, "localized-list-data"},
-		{pFile, 1989, "localized-list-data"},
-		{pFile, 2680, "search-result"},
-		{pFile, 3590, "localized-list-data"},
-		{pFile, 3644, "input-text"},
-		{pFile, 3648, "input-text"},
-		{pFile, 3838, "input-text"},
-		{pFile, 4135, "localized-list-data"},
-		{pFile, 4804, "status-message"},
-		{pFile, 4809, "status-message"},
-		{pFile, 6427, "input-text"},
-		{pFile, 474, "localized-list-data"},
+		{pFile, 1448, "input-text"},
 		{pFile, 1761, "dynamic-value"},
+		{pFile, 1792, "localized-list-data"},
+		{pFile, 1937, "localized-list-data"},
 		{pFile, 1973, "localized-list-data"},
 		{pFile, 1982, "localized-list-data"},
 		{pFile, 1991, "localized-list-data"},
-		{pFile, 4890, "status-message"},
-		{pFile, 4895, "status-message"},
-		{pFile, 6513, "input-text"},
+		{pFile, 2682, "search-result"},
+		{pFile, 3592, "localized-list-data"},
+		{pFile, 3646, "input-text"},
+		{pFile, 3650, "input-text"},
+		{pFile, 3840, "input-text"},
+		{pFile, 4137, "localized-list-data"},
+		{pFile, 4806, "status-message"},
+		{pFile, 4811, "status-message"},
+		{pFile, 6429, "input-text"},
+		{pFile, 474, "localized-list-data"},
+		{pFile, 1763, "dynamic-value"},
+		{pFile, 1975, "localized-list-data"},
+		{pFile, 1984, "localized-list-data"},
+		{pFile, 1993, "localized-list-data"},
+		{pFile, 4892, "status-message"},
+		{pFile, 4897, "status-message"},
+		{pFile, 6515, "input-text"},
 	};
 	const std::vector<SStableTextCandidate> vUnexpected = FilterCandidatesNotCoveredByMenuPoolOrAllowlist(pFile, vCandidates, vAllowlist);
 	EXPECT_TRUE(vUnexpected.empty()) << JoinCandidates(vUnexpected);
@@ -4136,19 +4143,47 @@ TEST(QmMonitoringHelpers, GraphicsDriverFaultSwitchesBackendToOpenGL)
 {
 	const std::string ClientSource = ReadRepoFile("src/engine/client/client.cpp");
 
-	const std::string RecoveryBody = ExtractSourceFunctionBody(ClientSource, "static bool ApplyQmSafeGraphicsRecovery(bool GraphicsDriverFault)");
+	const std::string RecoveryBody = ExtractSourceFunctionBody(ClientSource, "static bool ApplyQmSafeGraphicsRecovery(const char *pCrashedBackend, const char *pFailedBackends)");
 	ASSERT_FALSE(RecoveryBody.empty());
-	// 驱动故障时必须显式切到 OpenGL，否则下次启动还会走同一个后端再炸一次。
-	const size_t GuardPos = RecoveryBody.find("if(GraphicsDriverFault)");
-	ASSERT_NE(GuardPos, std::string::npos);
-	const size_t SwitchPos = RecoveryBody.find("str_copy(g_Config.m_GfxBackend, \"OpenGL\");", GuardPos);
-	ASSERT_NE(SwitchPos, std::string::npos);
-	const size_t FallbackMajorPos = RecoveryBody.find("const int FallbackGLMajor = 0;", SwitchPos);
+	// 驱动故障时必须换掉后端，否则下次启动还会走同一个后端再炸一次。
+	// 旧实现无条件切 OpenGL，崩在 wglSwapBuffers 上时等于把用户按回崩点，
+	// 因此这里只要求「换」这个动作存在，具体换到哪个由 SwitchQmGraphicsBackendAwayFrom 决定。
+	const size_t SwitchCallPos = RecoveryBody.find("Changed |= SwitchQmGraphicsBackendAwayFrom(pCrashedBackend, pFailedBackends);");
+	ASSERT_NE(SwitchCallPos, std::string::npos);
+	EXPECT_EQ(RecoveryBody.find("str_copy(g_Config.m_GfxBackend, \"OpenGL\");"), std::string::npos);
+	const size_t FallbackMajorPos = RecoveryBody.find("const int FallbackGLMajor = 0;", SwitchCallPos);
 	ASSERT_NE(FallbackMajorPos, std::string::npos);
-	EXPECT_LT(SwitchPos, FallbackMajorPos);
-	// 调用点必须把「是否驱动故障」传进去。
-	EXPECT_NE(ClientSource.find("ApplyQmSafeGraphicsRecovery(HasGraphicsDriverFault)"), std::string::npos);
+	EXPECT_LT(SwitchCallPos, FallbackMajorPos);
+
+	// 选择必须对称：崩在 OpenGL 家族上往 Vulkan 走，崩在 Vulkan 上才回 OpenGL。
+	const std::string SwitchBody = ExtractSourceFunctionBody(ClientSource, "static bool SwitchQmGraphicsBackendAwayFrom(const char *pCrashedBackend, const char *pFailedBackends)");
+	ASSERT_FALSE(SwitchBody.empty());
+	EXPECT_NE(SwitchBody.find("str_comp_nocase(pCrashedBackend, \"OpenGL\") == 0"), std::string::npos);
+	EXPECT_NE(SwitchBody.find("str_comp_nocase(pCrashedBackend, \"GLES\") == 0"), std::string::npos);
+	EXPECT_NE(SwitchBody.find("s_pFallback = \"Vulkan\""), std::string::npos);
+	EXPECT_NE(SwitchBody.find("str_copy(g_Config.m_GfxBackend, s_pFallback);"), std::string::npos);
+	// 两个备选都崩过就停手，不然就是 OpenGL/Vulkan 乒乓。
+	EXPECT_NE(SwitchBody.find(">= 2"), std::string::npos);
+	EXPECT_NE(SwitchBody.find("instead of switching back and forth"), std::string::npos);
+
+	// 调用点必须把报告里记录的实际崩溃后端 + 已崩后端计数传进去。
+	EXPECT_NE(ClientSource.find("ApplyQmSafeGraphicsRecovery(aCrashedBackend, pFailedState)"), std::string::npos);
+	EXPECT_NE(ClientSource.find("ParseQmCrashReportGraphicsBackend(pCrashReport, aCrashedBackend, sizeof(aCrashedBackend))"), std::string::npos);
 	EXPECT_EQ(ClientSource.find("ApplyQmSafeGraphicsRecovery()"), std::string::npos);
+	EXPECT_EQ(ClientSource.find("ApplyQmSafeGraphicsRecovery(HasGraphicsDriverFault)"), std::string::npos);
+
+	// 只认「Exception module:」那一行、且偏移非零，否则 Loaded modules 清单里的同名 DLL 会误判。
+	const std::string DetectorBody = ExtractSourceFunctionBody(ClientSource, "static bool QmCrashTextExceptionModuleIsGraphicsDriver(const char *pText)");
+	ASSERT_FALSE(DetectorBody.empty());
+	EXPECT_NE(DetectorBody.find("str_startswith(aLine, gs_pQmCrashReportModulePrefix)"), std::string::npos);
+	EXPECT_NE(DetectorBody.find("str_toint_base(pOffset, 16) == 0"), std::string::npos);
+
+	// 状态文件指纹只比前半段：后面挂着崩溃计数，整串比较在追加计数后永远不相等，
+	// 会让「已经自愈过」永远为假。
+	const std::string WasRecoveredBody = ExtractSourceFunctionBody(ClientSource, "static bool WasQmGraphicsCrashReportRecovered(IStorage *pStorage, const SQmLatestCrashReport &Report, const char *pCrashedBackend)");
+	ASSERT_FALSE(WasRecoveredBody.empty());
+	EXPECT_NE(WasRecoveredBody.find("str_startswith(pState, aFingerprint)"), std::string::npos);
+	EXPECT_EQ(WasRecoveredBody.find("str_comp(pState, aFingerprint) == 0"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, GraphicsDeviceRecycleInvalidatesStaleResources)
@@ -9778,6 +9813,38 @@ TEST(QmMonitoringHelpers, DropdownPopupUsesComputedGeometrySize)
 	EXPECT_EQ(Body.find("DoPopupMenu(pContext, X, Y, pContext->m_Width, PopupHeight, pContext, PopupSelection, pContext->m_Props);"), std::string::npos);
 }
 
+// 下拉弹层支持「条目自定义前景」：调用方补画普通文本表达不了的内容（例：头衔风格预览）。
+// 钩子必须逐条可见项调用、画在条目背景之后条目文字之前，且不改变既有条目按钮契约。
+TEST(QmMonitoringHelpers, DropdownPopupSupportsPerEntryCustomForeground)
+{
+	const std::string Ui = ReadRepoFile("src/game/client/ui.cpp");
+	const std::string UiHeader = ReadRepoFile("src/game/client/ui.h");
+	const std::string PopupSelection = ExtractSourceFunctionBody(Ui, "CUi::EPopupMenuFunctionResult CUi::PopupSelection(void *pContext, CUIRect View, bool Active)");
+	const std::string DoDropDown = ExtractSourceFunctionBody(Ui, "int CUi::DoDropDown(CUIRect *pRect, int CurSelection, const char *const *pStrs, int Num, SDropDownState &State, const SDropDownProperties &DropDownProps)");
+	const std::string SelectionReset = ExtractSourceFunctionBody(Ui, "void CUi::SSelectionPopupContext::Reset()");
+	ASSERT_FALSE(PopupSelection.empty());
+	ASSERT_FALSE(DoDropDown.empty());
+	ASSERT_FALSE(SelectionReset.empty());
+
+	EXPECT_NE(UiHeader.find("typedef void (*FEntryCustomRenderCallback)(void *pContext, const SEntryCustomRenderContext &EntryCtx, int Index, const char *pEntry);"), std::string::npos);
+	EXPECT_NE(UiHeader.find("FEntryCustomRenderCallback m_pfnEntryCustomRender = nullptr;"), std::string::npos);
+	// 钩子只在条目真正可见（过裁剪）之后调用，且调用点必须在条目按钮之前
+	const size_t AddRect = PopupSelection.find("if(pScrollRegion->AddRect(Slot, QmDropdownActiveItemShouldScrollIntoView");
+	const size_t Hook = PopupSelection.find("pSelectionPopup->m_pfnEntryCustomRender(pSelectionPopup->m_pEntryCustomRenderContext, EntryCtx, (int)Index, Entry.c_str());");
+	const size_t EntryButton = PopupSelection.find("if(pUI->DoButton_PopupMenu(&pSelectionPopup->m_vButtonContainers[Index], Entry.c_str(), &Slot");
+	ASSERT_NE(AddRect, std::string::npos);
+	ASSERT_NE(Hook, std::string::npos);
+	ASSERT_NE(EntryButton, std::string::npos);
+	EXPECT_LT(AddRect, Hook);
+	EXPECT_LT(Hook, EntryButton);
+	// 弹层的滚动裁剪与条目按钮契约保持不变
+	EXPECT_NE(PopupSelection.find("pSelectionPopup->m_TransparentButtons, true, ActiveColor"), std::string::npos);
+	// 钩子必须每帧挂载（弹层内容在当帧稍后才渲染），并且在 Reset 里清空
+	EXPECT_NE(DoDropDown.find("State.m_SelectionPopupContext.m_pfnEntryCustomRender = DropDownProps.m_pfnEntryCustomRender;"), std::string::npos);
+	EXPECT_NE(SelectionReset.find("m_pfnEntryCustomRender = nullptr;"), std::string::npos);
+	EXPECT_NE(SelectionReset.find("m_pEntryCustomRenderContext = nullptr;"), std::string::npos);
+}
+
 TEST(QmMonitoringHelpers, ColorPickerUsesModalPointerInputAndFullGradientHitAreas)
 {
 	const std::string Ui = ReadRepoFile("src/game/client/ui.cpp");
@@ -10665,4 +10732,221 @@ TEST(QmMonitoringHelpers, EntitiesBackgroundExplicitlyDrawsConfiguredColor)
 	EXPECT_NE(RenderColor.find("Graphics()->DrawRect("), std::string::npos);
 	EXPECT_LT(Render.find("RenderBackgroundColor();"), Render.find("if(!m_Loaded)"));
 	EXPECT_LT(RenderCustom.find("RenderBackgroundColor();"), RenderCustom.find("if(!m_Loaded)"));
+}
+
+namespace
+{
+	std::vector<CTrailPart> MakeStyleTestTrail()
+	{
+		std::vector<CTrailPart> vTrail(20);
+		for(int i = 0; i < (int)vTrail.size(); ++i)
+		{
+			vTrail[i].m_Pos = vec2(200.0f - i * 8.0f, 100.0f + std::sin(i * 0.25f) * 12.0f);
+			vTrail[i].m_Tick = 100 - i;
+			vTrail[i].m_Width = 15.0f;
+			vTrail[i].m_Col = ColorRGBA(0.2f, 0.8f, 0.3f, 0.7f);
+		}
+		return vTrail;
+	}
+}
+
+TEST(QmTeeTrailStyles, FiveEffectsHaveDifferentGeometryEvenWithTheSameColor)
+{
+	const auto vTrail = MakeStyleTestTrail();
+	std::vector<qm_tee_trail::SQuad> avShapes[qm_tee_trail::STYLE_COUNT];
+	for(int Style = 1; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+	{
+		qm_tee_trail::BuildEffect(vTrail, Style, false, 100.5, 25, 0, avShapes[Style]);
+		ASSERT_FALSE(avShapes[Style].empty());
+		for(int Previous = 1; Previous < Style; ++Previous)
+		{
+			bool Different = avShapes[Style].size() != avShapes[Previous].size();
+			for(size_t i = 0; !Different && i < avShapes[Style].size(); ++i)
+				for(int Vertex = 0; Vertex < 4; ++Vertex)
+					Different |= avShapes[Style][i].m_aPos[Vertex] != avShapes[Previous][i].m_aPos[Vertex];
+			EXPECT_TRUE(Different) << Style << " vs " << Previous;
+		}
+	}
+}
+
+// 五套样式必须是「不同形态」，而不是同一骨架换五种配色：
+// 这里用同一份纯色拖尾分别构建，把每个四边形按面积累加到轨迹包围盒的 6x6 网格上，
+// 得到一个与配色无关的结构指纹；五套之间必须两两不同。
+TEST(QmTeeTrailStyles, StylesAreStructurallyDifferentNotPaletteSwaps)
+{
+	const auto vTrail = MakeStyleTestTrail();
+	float MinX = vTrail[0].m_Pos.x;
+	float MaxX = vTrail[0].m_Pos.x;
+	float MinY = vTrail[0].m_Pos.y;
+	float MaxY = vTrail[0].m_Pos.y;
+	for(const auto &Part : vTrail)
+	{
+		MinX = std::min(MinX, Part.m_Pos.x);
+		MaxX = std::max(MaxX, Part.m_Pos.x);
+		MinY = std::min(MinY, Part.m_Pos.y);
+		MaxY = std::max(MaxY, Part.m_Pos.y);
+	}
+	constexpr int CELLS = 6;
+
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	std::vector<std::array<double, CELLS * CELLS>> vFingerprints;
+	for(int Style = 1; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+	{
+		// 关闭样式专属配色：五套拿到完全相同的颜色输入，指纹只反映形态。
+		qm_tee_trail::BuildEffect(vTrail, Style, false, 100.5, 25, 0, vQuads);
+		ASSERT_FALSE(vQuads.empty()) << Style;
+
+		std::array<double, CELLS * CELLS> Fingerprint{};
+		for(const auto &Quad : vQuads)
+		{
+			// 面积（鞋带公式）作为权重：只有「真正画出来的形状」才进入指纹。
+			double TwiceArea = 0.0;
+			double WeightedX = 0.0;
+			double WeightedY = 0.0;
+			for(int i = 0; i < 4; ++i)
+			{
+				const vec2 &A = Quad.m_aPos[i];
+				const vec2 &B = Quad.m_aPos[(i + 1) % 4];
+				const double Cross = (double)A.x * (double)B.y - (double)B.x * (double)A.y;
+				TwiceArea += Cross;
+				WeightedX += ((double)A.x + (double)B.x) * Cross;
+				WeightedY += ((double)A.y + (double)B.y) * Cross;
+			}
+			const double Area = std::abs(TwiceArea) * 0.5;
+			if(Area <= 0.0)
+				continue;
+			const double CenterX = WeightedX / (3.0 * TwiceArea);
+			const double CenterY = WeightedY / (3.0 * TwiceArea);
+			const int CellX = std::clamp((int)((CenterX - MinX) / (MaxX - MinX + 1.0f) * CELLS), 0, CELLS - 1);
+			const int CellY = std::clamp((int)((CenterY - MinY) / (MaxY - MinY + 1.0f) * CELLS), 0, CELLS - 1);
+			Fingerprint[(size_t)(CellY * CELLS + CellX)] += Area;
+		}
+
+		for(int Previous = 1; Previous < Style; ++Previous)
+		{
+			const auto &Other = vFingerprints[(size_t)(Previous - 1)];
+			bool Different = false;
+			for(size_t Cell = 0; Cell < Fingerprint.size() && !Different; ++Cell)
+				Different = std::abs(Fingerprint[Cell] - Other[Cell]) > 1.0;
+			EXPECT_TRUE(Different) << "样式 " << Style << " 与样式 " << Previous << " 的空间分布几乎相同";
+		}
+		vFingerprints.push_back(Fingerprint);
+	}
+}
+
+TEST(QmTeeTrailStyles, StationaryExpiredInvisibleAndTeleportTrailsDoNotEmit)
+{
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	for(int Style = 1; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+	{
+		auto vTrail = MakeStyleTestTrail();
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 150.0, 25, 0, vQuads);
+		EXPECT_TRUE(vQuads.empty());
+		for(auto &Part : vTrail)
+			Part.m_Col.a = 0.0f;
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 0, vQuads);
+		EXPECT_TRUE(vQuads.empty());
+		vTrail = MakeStyleTestTrail();
+		for(auto &Part : vTrail)
+			Part.m_Pos = vec2(0.0f, 0.0f);
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 0, vQuads);
+		EXPECT_TRUE(vQuads.empty());
+		vTrail.resize(2);
+		vTrail[1].m_Pos = vec2(2000.0f, 0.0f);
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 0, vQuads);
+		EXPECT_TRUE(vQuads.empty());
+	}
+}
+
+TEST(QmTeeTrailStyles, GeometryIsFiniteBoundedAndFadesWithAge)
+{
+	const auto vTrail = MakeStyleTestTrail();
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	for(int Style = 1; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+	{
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 0, vQuads);
+		float FreshAlpha = 0.0f;
+		for(const auto &Quad : vQuads)
+			for(int i = 0; i < 4; ++i)
+			{
+				EXPECT_TRUE(std::isfinite(Quad.m_aPos[i].x));
+				EXPECT_TRUE(std::isfinite(Quad.m_aPos[i].y));
+				EXPECT_GE(Quad.m_aColor[i].a, 0.0f);
+				EXPECT_LE(Quad.m_aColor[i].a, 0.7f);
+				FreshAlpha = std::max(FreshAlpha, Quad.m_aColor[i].a);
+			}
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 118.5, 25, 0, vQuads);
+		float AgedAlpha = 0.0f;
+		for(const auto &Quad : vQuads)
+			for(const auto &Color : Quad.m_aColor)
+				AgedAlpha = std::max(AgedAlpha, Color.a);
+		EXPECT_LT(AgedAlpha, FreshAlpha);
+		EXPECT_LE(vQuads.size(), qm_tee_trail::MAX_QUADS);
+	}
+}
+
+TEST(QmTeeTrailStyles, AnimationIsRepeatableAndPaletteDoesNotChangeShape)
+{
+	const auto vTrail = MakeStyleTestTrail();
+	std::vector<qm_tee_trail::SQuad> vPreset, vCustom, vAgain, vLater;
+	for(int Style = 1; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+	{
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 7, vPreset);
+		qm_tee_trail::BuildEffect(vTrail, Style, false, 100.5, 25, 7, vCustom);
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 7, vAgain);
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 101.0, 25, 7, vLater);
+		ASSERT_EQ(vPreset.size(), vCustom.size());
+		ASSERT_EQ(vPreset.size(), vAgain.size());
+		bool ColorChanged = false;
+		bool Animated = vPreset.size() != vLater.size();
+		for(size_t i = 0; i < vPreset.size(); ++i)
+			for(int Vertex = 0; Vertex < 4; ++Vertex)
+			{
+				EXPECT_EQ(vPreset[i].m_aPos[Vertex], vCustom[i].m_aPos[Vertex]);
+				EXPECT_EQ(vPreset[i].m_aPos[Vertex], vAgain[i].m_aPos[Vertex]);
+				EXPECT_EQ(vPreset[i].m_aColor[Vertex], vAgain[i].m_aColor[Vertex]);
+				ColorChanged |= vPreset[i].m_aColor[Vertex] != vCustom[i].m_aColor[Vertex];
+				if(i < vLater.size())
+					Animated |= vPreset[i].m_aPos[Vertex] != vLater[i].m_aPos[Vertex];
+			}
+		EXPECT_TRUE(ColorChanged);
+		EXPECT_TRUE(Animated);
+	}
+}
+
+TEST(QmTeeTrailStyles, OriginalAndInvalidStylesLeaveLegacyRenderingInCharge)
+{
+	const auto vTrail = MakeStyleTestTrail();
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	for(const int Style : {-1, 0, (int)qm_tee_trail::STYLE_COUNT, 999})
+	{
+		EXPECT_EQ(qm_tee_trail::ResolveStyle(Style), qm_tee_trail::STYLE_ORIGINAL);
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 0, vQuads);
+		EXPECT_TRUE(vQuads.empty());
+	}
+}
+
+// 刚起步、刚停下时采样点可能只有 3~4 个；这条用例锁住极短拖尾不会越界也不会画出非有限坐标。
+TEST(QmTeeTrailStyles, VeryShortTrailsStayBoundedAndFinite)
+{
+	std::vector<CTrailPart> vTrail(3);
+	for(int i = 0; i < 3; ++i)
+	{
+		vTrail[i].m_Pos = vec2(100.0f - i * 2.0f, 100.0f + i * 1.5f);
+		vTrail[i].m_Tick = 100 - i;
+		vTrail[i].m_Width = 15.0f;
+		vTrail[i].m_Col = ColorRGBA(0.2f, 0.8f, 0.3f, 0.7f);
+	}
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	for(int Style = 1; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+	{
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 3, vQuads);
+		EXPECT_LE(vQuads.size(), qm_tee_trail::MAX_QUADS);
+		for(const auto &Quad : vQuads)
+			for(const vec2 &Pos : Quad.m_aPos)
+			{
+				EXPECT_TRUE(std::isfinite(Pos.x)) << Style;
+				EXPECT_TRUE(std::isfinite(Pos.y)) << Style;
+			}
+	}
 }

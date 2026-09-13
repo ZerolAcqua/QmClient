@@ -163,6 +163,8 @@ static constexpr int64_t gs_HangTimeoutSeconds = 10;
 static constexpr const char *gs_pQmCrashDumpDir = "dumps/QmClient_Crash";
 static constexpr const char *gs_pQmLifecycleMarkerFile = "qmclient/lifecycle_pending.marker";
 static constexpr const char *gs_pQmGraphicsRecoveryStateFile = "qmclient/graphics_recovery.marker";
+static constexpr const char *gs_pQmCrashReportBackendPrefix = "Graphics backend: ";
+static constexpr const char *gs_pQmCrashReportModulePrefix = "Exception module: ";
 
 struct SQmLatestCrashReport
 {
@@ -225,36 +227,177 @@ static bool ReadQmLifecycleMarkerStartedAt(IStorage *pStorage, int64_t &StartedA
 	return StartedAt > 0;
 }
 
-static void FormatQmGraphicsCrashReportFingerprint(const SQmLatestCrashReport &Report, char *pBuf, size_t BufSize)
+static void FormatQmGraphicsCrashReportFingerprint(const SQmLatestCrashReport &Report, const char *pCrashedBackend, char *pBuf, size_t BufSize)
 {
-	str_format(pBuf, BufSize, "%lld\n%s", (long long)Report.m_TimeModified, Report.m_aPath);
+	// 带上崩溃后端：同一次会话换过后端再崩时，指纹不同才会再次自愈。
+	str_format(pBuf, BufSize, "%lld\n%s\n%s", (long long)Report.m_TimeModified, Report.m_aPath,
+		pCrashedBackend != nullptr ? pCrashedBackend : "");
 }
 
-static bool WasQmGraphicsCrashReportRecovered(IStorage *pStorage, const SQmLatestCrashReport &Report)
+// 恢复状态文件在指纹之后追加每个后端各崩过几次，用来判断「还有没有没试过的后端」。
+// 不记这个的话，两个后端都崩过时会来回乒乓：崩 OpenGL 换 Vulkan、崩 Vulkan 换回 OpenGL。
+static int ParseQmGraphicsRecoveryFailedBackendCount(const char *pState, const char *pBackend)
+{
+	if(pState == nullptr || pBackend == nullptr || pBackend[0] == '\0')
+		return 0;
+
+	char aNeedle[96];
+	str_format(aNeedle, sizeof(aNeedle), "\n%s ", pBackend);
+	char *pMatch = const_cast<char *>(str_find(pState, aNeedle));
+	if(pMatch == nullptr)
+		return 0;
+	const int Count = str_toint(pMatch + str_length(aNeedle));
+	return Count > 0 ? Count : 0;
+}
+
+static bool WasQmGraphicsCrashReportRecovered(IStorage *pStorage, const SQmLatestCrashReport &Report, const char *pCrashedBackend)
 {
 	char *pState = pStorage->ReadFileStr(gs_pQmGraphicsRecoveryStateFile, IStorage::TYPE_SAVE);
 	if(pState == nullptr)
 		return false;
 
 	char aFingerprint[IO_MAX_PATH_LENGTH + 64];
-	FormatQmGraphicsCrashReportFingerprint(Report, aFingerprint, sizeof(aFingerprint));
-	const bool Recovered = str_comp(pState, aFingerprint) == 0;
+	FormatQmGraphicsCrashReportFingerprint(Report, pCrashedBackend, aFingerprint, sizeof(aFingerprint));
+	// 只比指纹部分：状态文件后面挂着各后端的崩溃计数，整串比较在追加计数后永远不相等。
+	const bool FingerprintMatches = str_startswith(pState, aFingerprint) != nullptr && pState[str_length(aFingerprint)] == '\n';
 	free(pState);
-	return Recovered;
+	return FingerprintMatches;
 }
 
-static bool MarkQmGraphicsCrashReportRecovered(IStorage *pStorage, const SQmLatestCrashReport &Report)
+static bool MarkQmGraphicsCrashReportRecovered(IStorage *pStorage, const SQmLatestCrashReport &Report, const char *pCrashedBackend)
 {
 	pStorage->CreateFolder("qmclient", IStorage::TYPE_SAVE);
+
+	// 先把旧的计数读出来，否则每崩一次都会把「已经崩过的后端」丢掉，乒乓又回来了。
+	char *pPrevious = pStorage->ReadFileStr(gs_pQmGraphicsRecoveryStateFile, IStorage::TYPE_SAVE);
+	int OpenGLCrashes = ParseQmGraphicsRecoveryFailedBackendCount(pPrevious, "OpenGL");
+	int GlesCrashes = ParseQmGraphicsRecoveryFailedBackendCount(pPrevious, "GLES");
+	int VulkanCrashes = ParseQmGraphicsRecoveryFailedBackendCount(pPrevious, "Vulkan");
+	if(pPrevious != nullptr)
+		free(pPrevious);
+
+	if(str_comp_nocase(pCrashedBackend, "OpenGL") == 0)
+		++OpenGLCrashes;
+	else if(str_comp_nocase(pCrashedBackend, "GLES") == 0)
+		++GlesCrashes;
+	else if(str_comp_nocase(pCrashedBackend, "Vulkan") == 0)
+		++VulkanCrashes;
+
+	char aFingerprint[IO_MAX_PATH_LENGTH + 64];
+	FormatQmGraphicsCrashReportFingerprint(Report, pCrashedBackend, aFingerprint, sizeof(aFingerprint));
+
+	char aState[IO_MAX_PATH_LENGTH + 256];
+	str_format(aState, sizeof(aState), "%s\nOpenGL %d\nGLES %d\nVulkan %d", aFingerprint, OpenGLCrashes, GlesCrashes, VulkanCrashes);
+
 	IOHANDLE File = pStorage->OpenFile(gs_pQmGraphicsRecoveryStateFile, IOFLAG_WRITE, IStorage::TYPE_SAVE);
 	if(!File)
 		return false;
 
-	char aFingerprint[IO_MAX_PATH_LENGTH + 64];
-	FormatQmGraphicsCrashReportFingerprint(Report, aFingerprint, sizeof(aFingerprint));
-	const bool Success = io_write(File, aFingerprint, str_length(aFingerprint)) == str_length(aFingerprint);
+	const bool Success = io_write(File, aState, str_length(aState)) == str_length(aState);
 	io_close(File);
 	return Success;
+}
+
+// 取出报告里记录的实际生效后端（crashdump 在初始化成功时写入）。
+// 老报告可能没有这一行，此时返回 false，由调用方退回读当前配置。
+static bool ParseQmCrashReportGraphicsBackend(const char *pCrashReport, char *pBackend, size_t BackendSize)
+{
+	pBackend[0] = '\0';
+	if(pCrashReport == nullptr)
+		return false;
+
+	const char *pLine = str_find(pCrashReport, gs_pQmCrashReportBackendPrefix);
+	if(pLine == nullptr)
+		return false;
+
+	pLine += str_length(gs_pQmCrashReportBackendPrefix);
+	str_copy(pBackend, pLine, BackendSize);
+	char *pEnd = const_cast<char *>(str_find(pBackend, "\r\n"));
+	if(pEnd == nullptr)
+		pEnd = const_cast<char *>(str_find(pBackend, "\n"));
+	if(pEnd != nullptr)
+		*pEnd = '\0';
+	str_utf8_trim_right(pBackend);
+	return pBackend[0] != '\0';
+}
+
+static bool QmGraphicsDriverModuleNameIsKnown(const char *pName)
+{
+	static constexpr const char *s_apGraphicsDriverModuleNames[] = {
+		"nvoglv64.dll",
+		"nvd3dumx.dll",
+		"nvwgf2umx.dll",
+		"amdvlk64.dll",
+		"atio6axx.dll",
+		"ig9icd64.dll",
+		"igvk64.dll",
+		"opengl32.dll",
+		"vulkan-1.dll",
+		"D3D12Core.dll",
+		"d3d12.dll",
+		"dxgi.dll",
+	};
+	for(const char *pModuleName : s_apGraphicsDriverModuleNames)
+	{
+		if(str_comp_nocase(pName, pModuleName) == 0)
+			return true;
+	}
+	return false;
+}
+
+// 取「Exception module:」后面的模块名与偏移。栈帧归因写的是
+// 「Exception module: nvoglv64.dll + 0x...」，符号化后的报告写的是「模块名!符号」。
+// 只看这一行、不看整份报告，避免把「Loaded modules」清单里恰好列到的驱动 DLL 当成崩溃模块。
+static bool QmCrashTextExceptionModuleIsGraphicsDriver(const char *pText)
+{
+	char aLine[512];
+	const char *pCursor = pText;
+	while((pCursor = str_next_token(pCursor, "\r\n", aLine, sizeof(aLine))) != nullptr)
+	{
+		const char *pModule = str_startswith(aLine, gs_pQmCrashReportModulePrefix);
+		if(pModule == nullptr)
+			continue;
+
+		while(*pModule == ' ')
+			++pModule;
+		if(str_comp_nocase_num(pModule, "(unknown-module)", str_length("(unknown-module)")) == 0 ||
+			str_comp_nocase_num(pModule, "unresolved", str_length("unresolved")) == 0)
+		{
+			return false;
+		}
+
+		// 偏移为 0 表示落在模块首地址上，不是「这一帧调用了驱动」的证据。
+		const char *pSeparator = str_find(pModule, " + 0x");
+		if(pSeparator != nullptr)
+		{
+			const char *pOffset = pSeparator + str_length(" + 0x");
+			if(str_toint_base(pOffset, 16) == 0)
+				return false;
+
+			char aName[128];
+			const size_t NameLength = (size_t)(pSeparator - pModule);
+			if(NameLength >= sizeof(aName))
+				return false;
+			for(size_t Index = 0; Index < NameLength; ++Index)
+				aName[Index] = pModule[Index];
+			aName[NameLength] = '\0';
+			return QmGraphicsDriverModuleNameIsKnown(aName);
+		}
+
+		// 符号化形式：模块名后紧跟 '!'。
+		const char *pBang = str_find(pModule, "!");
+		if(pBang == nullptr)
+			return false;
+		char aName[128];
+		const size_t NameLength = (size_t)(pBang - pModule);
+		if(NameLength >= sizeof(aName))
+			return false;
+		for(size_t Index = 0; Index < NameLength; ++Index)
+			aName[Index] = pModule[Index];
+		aName[NameLength] = '\0';
+		return QmGraphicsDriverModuleNameIsKnown(aName);
+	}
+	return false;
 }
 
 static bool QmCrashTextHasGraphicsDriverFault(const char *pText)
@@ -293,25 +436,99 @@ static bool QmCrashTextHasGraphicsDriverFault(const char *pText)
 		if(str_find_nocase(pText, pNeedle) != nullptr)
 			return true;
 	}
-	return false;
+
+	// 「Exception module:」只在异常地址落在模块内时才写。跳 NULL 这类崩溃（本次 nvoglv64
+	// 就是 call 0x0）拿不到那一行，栈帧归因改成写「Exception module: nvoglv64.dll + 0x...」，
+	// 上面那批前缀匹配不到，这里按行单独解析一次。
+	return QmCrashTextExceptionModuleIsGraphicsDriver(pText);
 }
 
-static bool ApplyQmSafeGraphicsRecovery(bool GraphicsDriverFault)
+// 配置里的字符串即启动意图（Vulkan / OpenGL / GLES），空值交给编译期默认。
+static const char *QmConfiguredGraphicsBackend()
 {
-	bool Changed = false;
-	// 崩溃报告指向图形驱动时，继续留在 Vulkan/GLES 上只会重复故障：
-	// 显式切到 OpenGL 并让版本回到自动探测。
-	if(GraphicsDriverFault)
+	if(str_comp_nocase(g_Config.m_GfxBackend, "Vulkan") == 0)
+		return "Vulkan";
+	if(str_comp_nocase(g_Config.m_GfxBackend, "OpenGL") == 0)
+		return "OpenGL";
+	if(str_comp_nocase(g_Config.m_GfxBackend, "GLES") == 0)
+		return "GLES";
+#if !defined(CONF_ARCH_IA32) && !defined(CONF_PLATFORM_MACOS) && !defined(CONF_PLATFORM_ANDROID) && !defined(CONF_PLATFORM_EMSCRIPTEN)
+	return "Vulkan";
+#else
+	return "OpenGL";
+#endif
+}
+
+// 亚克力 / 灵动岛背景模糊的硬前提：缺任何一项都会静默降级成「不模糊的半透明板」，
+// 游戏里完全看不出来，所以启动时与崩溃报告里都要能看到这行。
+static void QmGpuCapabilityString(IEngineGraphics *pGraphics, char *pBuffer, int BufferSize)
+{
+	if(pGraphics == nullptr)
 	{
-#if !defined(CONF_PLATFORM_ANDROID) && !defined(CONF_PLATFORM_EMSCRIPTEN) && (defined(CONF_BACKEND_OPENGL) || defined(CONF_BACKEND_OPENGL_ES) || defined(CONF_BACKEND_OPENGL_ES3))
-		if(str_comp_nocase(g_Config.m_GfxBackend, "OpenGL") != 0 && str_comp_nocase(g_Config.m_GfxBackend, "GLES") != 0)
+		str_copy(pBuffer, "graphics backend not initialized", BufferSize);
+		return;
+	}
+	str_format(pBuffer, BufferSize,
+		"render target: %d, RT Gaussian blur: %d, backbuffer capture: %d, media island SDF: %d (%s)",
+		(int)(pGraphics->IsRenderTargetSupported() ? 1 : 0),
+		(int)(pGraphics->IsRenderTargetGaussianBlurSupported() ? 1 : 0),
+		(int)(pGraphics->IsBackbufferCaptureSupported() ? 1 : 0),
+		(int)(pGraphics->HasMediaIslandSdf() ? 1 : 0),
+		pGraphics->RenderTargetSupportReason());
+}
+
+// 换到另一个后端。重点不是「必须换到某个特定后端」，而是绝不能把用户留在
+// 刚刚崩过的那个后端上：崩在 OpenGL 时再无条件切 OpenGL，等于每次启动都自动跳回崩点。
+// 两个备选都崩过至少两次时不再换 —— 否则就是 OpenGL/Vulkan 来回乒乓，永远进不去。
+static bool SwitchQmGraphicsBackendAwayFrom(const char *pCrashedBackend, const char *pFailedBackends)
+{
+	const char *pCurrent = QmConfiguredGraphicsBackend();
+	if(pCrashedBackend == nullptr || pCrashedBackend[0] == '\0')
+		pCrashedBackend = pCurrent;
+
+	// 崩在 OpenGL 系：有 Vulkan 就用 Vulkan（本次故障正是 wglSwapBuffers 路径）。
+	if(str_comp_nocase(pCrashedBackend, "OpenGL") == 0 || str_comp_nocase(pCrashedBackend, "GLES") == 0)
+	{
+#if defined(CONF_BACKEND_VULKAN)
+		static constexpr const char *s_pFallback = "Vulkan";
+		if(str_comp_nocase(pCurrent, s_pFallback) == 0)
+			return false;
+		// Vulkan 已经崩过两次：再切过去只是换一种崩法。
+		if(ParseQmGraphicsRecoveryFailedBackendCount(pFailedBackends, s_pFallback) >= 2)
 		{
-			log_warn("client", "previous graphics driver fault, switching gfx_backend from '%s' to OpenGL", g_Config.m_GfxBackend);
-			str_copy(g_Config.m_GfxBackend, "OpenGL");
-			Changed = true;
+			log_warn("client", "graphics backend '%s' already crashed repeatedly; keeping '%s' instead of switching back and forth", s_pFallback, pCurrent);
+			return false;
 		}
+		log_warn("client", "previous graphics driver fault on '%s', switching gfx_backend from '%s' to '%s'", pCrashedBackend, pCurrent, s_pFallback);
+		str_copy(g_Config.m_GfxBackend, s_pFallback);
+		return true;
+#else
+		return false;
 #endif
 	}
+
+	// 崩在 Vulkan：退回 OpenGL 自动探测。
+#if !defined(CONF_PLATFORM_ANDROID) && !defined(CONF_PLATFORM_EMSCRIPTEN) && (defined(CONF_BACKEND_OPENGL) || defined(CONF_BACKEND_OPENGL_ES) || defined(CONF_BACKEND_OPENGL_ES3))
+	static constexpr const char *s_pOpenGLFallback = "OpenGL";
+	if(str_comp_nocase(pCurrent, s_pOpenGLFallback) == 0)
+		return false;
+	if(ParseQmGraphicsRecoveryFailedBackendCount(pFailedBackends, s_pOpenGLFallback) >= 2)
+	{
+		log_warn("client", "graphics backend '%s' already crashed repeatedly; keeping '%s' instead of switching back and forth", s_pOpenGLFallback, pCurrent);
+		return false;
+	}
+	log_warn("client", "previous graphics driver fault on '%s', switching gfx_backend from '%s' to '%s'", pCrashedBackend, pCurrent, s_pOpenGLFallback);
+	str_copy(g_Config.m_GfxBackend, s_pOpenGLFallback);
+	return true;
+#else
+	return false;
+#endif
+}
+
+static bool ApplyQmSafeGraphicsRecovery(const char *pCrashedBackend, const char *pFailedBackends)
+{
+	bool Changed = false;
+	Changed |= SwitchQmGraphicsBackendAwayFrom(pCrashedBackend, pFailedBackends);
 	const int FallbackGLMajor = 0;
 	const int FallbackGLMinor = 0;
 	if(g_Config.m_GfxGLMajor != FallbackGLMajor || g_Config.m_GfxGLMinor != FallbackGLMinor || g_Config.m_GfxGLPatch != 0)
@@ -361,28 +578,37 @@ static void RecoverQmGraphicsSettingsAfterDriverCrash(IStorage *pStorage)
 	SQmLatestCrashReport Latest;
 	Latest.m_MinTimeModified = (time_t)SessionStartedAt;
 	pStorage->ListDirectoryInfo(IStorage::TYPE_SAVE, gs_pQmCrashDumpDir, FindLatestQmCrashReportCallback, &Latest);
-	if(Latest.m_aPath[0] == '\0' || WasQmGraphicsCrashReportRecovered(pStorage, Latest))
+	if(Latest.m_aPath[0] == '\0')
 		return;
 
 	char *pCrashReport = pStorage->ReadFileStr(Latest.m_aPath, IStorage::TYPE_SAVE);
 	if(pCrashReport == nullptr)
 		return;
 
+	// 后端要在读完报告之后才 free，指纹里要带它；崩过的后端计数也一起喂给切换决策。
+	char aCrashedBackend[64] = "";
+	ParseQmCrashReportGraphicsBackend(pCrashReport, aCrashedBackend, sizeof(aCrashedBackend));
 	const bool HasGraphicsDriverFault = QmCrashTextHasGraphicsDriverFault(pCrashReport);
 	free(pCrashReport);
+
 	if(!HasGraphicsDriverFault)
 		return;
+	if(WasQmGraphicsCrashReportRecovered(pStorage, Latest, aCrashedBackend))
+		return;
 
-	const bool Changed = ApplyQmSafeGraphicsRecovery(HasGraphicsDriverFault);
+	char *pFailedState = pStorage->ReadFileStr(gs_pQmGraphicsRecoveryStateFile, IStorage::TYPE_SAVE);
+	const bool Changed = ApplyQmSafeGraphicsRecovery(aCrashedBackend, pFailedState);
+	if(pFailedState != nullptr)
+		free(pFailedState);
 	if(Changed)
 	{
-		log_warn("client", "previous crash report '%s' points to the graphics driver; resetting safe graphics settings in windowed mode without FSAA", Latest.m_aPath);
+		log_warn("client", "previous crash report '%s' (graphics backend '%s') points to the graphics driver; switching backend and resetting safe graphics settings in windowed mode without FSAA", Latest.m_aPath, aCrashedBackend[0] != '\0' ? aCrashedBackend : "unknown");
 	}
 	else
 	{
 		log_info("client", "previous crash report '%s' points to the graphics driver; safe graphics settings are already active", Latest.m_aPath);
 	}
-	if(!MarkQmGraphicsCrashReportRecovered(pStorage, Latest))
+	if(!MarkQmGraphicsCrashReportRecovered(pStorage, Latest, aCrashedBackend))
 		log_warn("client", "failed to remember recovered graphics crash report '%s'", Latest.m_aPath);
 }
 
@@ -4087,6 +4313,15 @@ void CClient::Run()
 	Graphics()->Clear(0, 0, 0);
 	Graphics()->Swap();
 
+	// 启动时打一次图形能力自检：亚克力 / 灵动岛背景模糊全靠这几项能力，缺任何一项都会
+	// 静默降级成「不模糊的半透明板」，玩家在游戏里完全看不出来，只能靠这一行定位。
+	if(m_pConsole != nullptr)
+	{
+		char aGpuCapabilities[256];
+		QmGpuCapabilityString(m_pGraphics, aGpuCapabilities, sizeof(aGpuCapabilities));
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "graphics", aGpuCapabilities);
+	}
+
 	// init localization first, making sure all errors during init can be localized
 	GameClient()->InitializeLanguage();
 
@@ -5522,7 +5757,7 @@ bool CClient::HandleQmGraphicsFatalError()
 	m_QmGraphicsRecoveryAttempted = true;
 
 	const char *pFatalError = Graphics()->GetFatalError();
-	char aGpuInfo[512];
+	char aGpuInfo[1024];
 	GetGpuInfoString(aGpuInfo);
 	char aDate[64];
 	str_timestamp(aDate, sizeof(aDate));
@@ -6257,7 +6492,7 @@ int main(int argc, const char **argv)
 			str_copy(aOsVersionString, "unknown");
 		}
 
-		char aGpuInfo[512];
+		char aGpuInfo[1024];
 		pClient->GetGpuInfoString(aGpuInfo);
 
 		char aMessage[2048];
@@ -7029,7 +7264,7 @@ std::optional<int> CClient::ShowMessageBox(const IGraphics::CMessageBox &Message
 	return Result;
 }
 
-void CClient::GetGpuInfoString(char (&aGpuInfo)[512])
+void CClient::GetGpuInfoString(char (&aGpuInfo)[1024])
 {
 #if defined(CONF_HEADLESS_CLIENT)
 	if(m_pGraphics == nullptr || !m_pGraphics->IsBackendInitialized())
@@ -7054,19 +7289,25 @@ void CClient::GetGpuInfoString(char (&aGpuInfo)[512])
 	}
 	else
 	{
+		// 这几项能力是「亚克力 / 灵动岛背景模糊」的硬前提，任何一项缺失都会静默降级成
+		// 不模糊的半透明板 —— 玩家侧看不出来，所以必须能在这里一眼看到。
+		char aCapabilities[256];
+		QmGpuCapabilityString(m_pGraphics, aCapabilities, sizeof(aCapabilities));
 		str_format(aGpuInfo, std::size(aGpuInfo),
 			"Configured graphics backend: %s %d.%d.%d\n"
 			"GPU: %s - %s - %s\n"
 			"Texture: %.2f MiB, "
 			"Buffer: %.2f MiB, "
 			"Streamed: %.2f MiB, "
-			"Staging: %.2f MiB",
+			"Staging: %.2f MiB\n"
+			"%s",
 			g_Config.m_GfxBackend, g_Config.m_GfxGLMajor, g_Config.m_GfxGLMinor, g_Config.m_GfxGLPatch,
 			m_pGraphics->GetVendorString(), m_pGraphics->GetRendererString(), m_pGraphics->GetVersionString(),
 			m_pGraphics->TextureMemoryUsage() / 1024.0 / 1024.0,
 			m_pGraphics->BufferMemoryUsage() / 1024.0 / 1024.0,
 			m_pGraphics->StreamedMemoryUsage() / 1024.0 / 1024.0,
-			m_pGraphics->StagingMemoryUsage() / 1024.0 / 1024.0);
+			m_pGraphics->StagingMemoryUsage() / 1024.0 / 1024.0,
+			aCapabilities);
 	}
 #endif
 }

@@ -9,6 +9,7 @@
 #include "voting.h"
 
 #include <base/color.h>
+#include <base/log.h>
 #include <base/str.h>
 
 #include <engine/graphics.h>
@@ -985,6 +986,7 @@ CHud::CHud()
 	m_SwitchCountdownAnimState.Reset();
 	ResetSwitchCountdownRings();
 	m_SwitchCountdownTracker.Reset();
+	m_HookCountdownRing.Reset();
 	m_MediaIslandMuteState.Reset();
 	m_vTextInfoLayoutChildrenScratch.reserve(2);
 	m_vLocalTimeLayoutChildrenScratch.resize(1);
@@ -1077,6 +1079,7 @@ void CHud::ResetHudContainers()
 	m_SwitchCountdownAnimState.Reset();
 	ResetSwitchCountdownRings();
 	m_SwitchCountdownTracker.Reset();
+	m_HookCountdownRing.Reset();
 }
 
 void CHud::OnWindowResize()
@@ -3401,6 +3404,164 @@ void CHud::RenderFollowSwitchCountdowns()
 	Graphics()->MapScreen(SavedScreenX0, SavedScreenY0, SavedScreenX1, SavedScreenY1);
 }
 
+void CHud::ResetHookCountdownRing()
+{
+	m_HookCountdownRing.Reset();
+}
+
+void CHud::UpdateHookCountdownTracker()
+{
+	SHudHookCountdownRingState &Ring = m_HookCountdownRing;
+	if(!g_Config.m_QmHookCountdown)
+	{
+		ResetHookCountdownRing();
+		return;
+	}
+
+	const int TickSpeed = Client()->GameTickSpeed();
+	if(TickSpeed <= 0)
+	{
+		ResetHookCountdownRing();
+		return;
+	}
+
+	// 只跟当前正在操作的那个 Tee：m_ClDummy 指向的 local id 就是本地玩家当下控制的分身。
+	const int Connection = std::clamp(g_Config.m_ClDummy, 0, NUM_DUMMIES - 1);
+	const int ClientId = GameClient()->m_aLocalIds[Connection];
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+	{
+		ResetHookCountdownRing();
+		return;
+	}
+
+	// 只在钩住**玩家**（含自己的分身）时起环：钩墙 / 钩地形不出。
+	// HOOK_GRABBED 表示钩链已咬住，m_HookedPlayer >= 0 才说明咬住的是人；
+	// 钩地形时 m_HookedPlayer 恒为 -1（gamecore.cpp:378 附近只改 m_HookState）。
+	// 收回阶段（HOOK_RETRACT_START..HOOK_RETRACTED）仍算同一轮，环继续走到淡出。
+	// 注意 m_pLocalCharacter 不一定是本地 Tee（观战时指向被观战者），所以这里按 local id 自己取。
+	const CNetObj_Character &Character = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
+	const bool HookActive = Character.m_HookState == HOOK_GRABBED && Character.m_HookedPlayer >= 0;
+	// 钩住的还是不是上一次那个人：变了就说明中途重咬了（rehook）。
+	// 松钩时不更新这个字段，才能把上一次的目标留到下一次咬住时做比较。
+	const bool FreshGrab = !Ring.m_Tracking || Character.m_HookedPlayer != Ring.m_HookedPlayer;
+
+	// 只要这一刻还跟着同一个 Tee，环就是「该画」的：不引入额外的可见性标志位，
+	// 免得漏设一次就整轮钩子都不显示。
+	if(Ring.m_ClientId != ClientId || Ring.m_Connection != Connection)
+	{
+		// 换了控制对象（切分身 / 换观战目标）就重来一圈，避免把上一个 Tee 的进度接着画。
+		Ring.Reset();
+		Ring.m_ClientId = ClientId;
+		Ring.m_Connection = Connection;
+	}
+	Ring.m_Seen = true;
+
+	const int CurTick = Client()->GameTick(Connection);
+	if(!HookActive)
+	{
+		Ring.m_Tracking = false;
+		return;
+	}
+
+	if(FreshGrab)
+	{
+		// 新的一钩：重新计时。
+		Ring.m_GrabTick = CurTick;
+		Ring.m_HookDurationSeconds = GameClient()->m_aTuning[Connection].m_HookDuration;
+		Ring.m_Progress = 1.0f;
+		// 环不重建、位置与弹簧速度都不动：上一钩留下的环（还在淡出）原地拉回满格续上，
+		// 靠弹簧追上新的跟随点。观感是「环留在原地重新开始，然后跟着人跑」。
+		Ring.m_Alpha = 1.0f;
+		Ring.m_HookedPlayer = Character.m_HookedPlayer;
+		Ring.m_Tracking = true;
+	}
+
+	const float HeldSeconds = (CurTick - Ring.m_GrabTick) / static_cast<float>(TickSpeed);
+	Ring.m_Progress = QmHudHookCountdownProgress(Ring.m_HookDurationSeconds, HeldSeconds, Ring.m_Progress);
+}
+
+void CHud::RenderFollowHookCountdown()
+{
+	SHudHookCountdownRingState &Ring = m_HookCountdownRing;
+	if(!g_Config.m_QmHookCountdown)
+	{
+		ResetHookCountdownRing();
+		return;
+	}
+	const int TickSpeed = Client()->GameTickSpeed();
+	if(TickSpeed <= 0 || !Ring.m_Seen)
+		return;
+
+	// 钩子环固定在开关环正上方：取侧沿用开关环那套（宠物对面），纵向再多抬一段。
+	const vec2 TeePosition = GameClient()->m_aClients[Ring.m_ClientId].m_RenderPos;
+	const bool PetVisible = g_Config.m_TcPetShow > 0 && GameClient()->m_Pet.IsVisibleForClient(Ring.m_ClientId);
+	const vec2 PetPosition = PetVisible ? GameClient()->m_Pet.Position() : vec2();
+	const int Side = QmHudSwitchCountdownFollowSide(TeePosition.x, PetVisible, PetPosition.x);
+	const float Now = Client()->GameTick(Ring.m_Connection) / static_cast<float>(TickSpeed);
+	const vec2 Target = QmHudHookCountdownFollowTarget(TeePosition, Side, Now);
+
+	float SavedScreenX0, SavedScreenY0, SavedScreenX1, SavedScreenY1;
+	Graphics()->GetScreen(&SavedScreenX0, &SavedScreenY0, &SavedScreenX1, &SavedScreenY1);
+	Graphics()->MapScreenToGameInterface(GameClient()->m_Camera.m_Center.x, GameClient()->m_Camera.m_Center.y, GameClient()->m_Camera.m_Zoom);
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
+	// 卫星半径/环宽与开关环保持一致，只有颜色不同（见 QmHudHookCountdownColor）。
+	constexpr float SatelliteRadius = 9.0f + 2.5f * 0.5f;
+	constexpr float RingRadius = SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_RADIUS_SCALE;
+	const float RingThickness = std::max(QmHudMediaIslandScaled(1.25f), SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_THICKNESS_SCALE);
+	const float ScreenPixelSize = std::max(
+		(ScreenX1 - ScreenX0) / std::max(1, Graphics()->ScreenWidth()),
+		(ScreenY1 - ScreenY0) / std::max(1, Graphics()->ScreenHeight()));
+
+	const float Delta = Client()->RenderFrameTime();
+	if(!Ring.m_Initialized)
+	{
+		Ring.m_Position = Target;
+		Ring.m_Velocity = vec2();
+		Ring.m_Initialized = true;
+	}
+	QmTClientPetAdvanceSpring(Ring.m_Position, Ring.m_Velocity, Target, Delta);
+	// 透明度只有两态：钩着就是满格，松钩后匀速淡出。
+	// 不做渐入 —— 钩子可能只挂一两帧，渐入会让整轮都是半透明的，看起来比开关环「消失得快」；
+	// 淡出速率与开关环一致，两个环的收尾观感才对得上。
+	if(!Ring.m_Tracking)
+	{
+		Ring.m_Alpha = std::max(0.0f, Ring.m_Alpha - Delta);
+		if(Ring.m_Alpha <= 0.0f)
+		{
+			ResetHookCountdownRing();
+			Graphics()->MapScreen(SavedScreenX0, SavedScreenY0, SavedScreenX1, SavedScreenY1);
+			return;
+		}
+	}
+	else
+	{
+		Ring.m_Alpha = 1.0f;
+	}
+	if(!in_range(Ring.m_Position.x, ScreenX0 - SatelliteRadius, ScreenX1 + SatelliteRadius) ||
+		!in_range(Ring.m_Position.y, ScreenY0 - SatelliteRadius, ScreenY1 + SatelliteRadius))
+	{
+		Graphics()->MapScreen(SavedScreenX0, SavedScreenY0, SavedScreenX1, SavedScreenY1);
+		return;
+	}
+
+	ColorRGBA BackgroundColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_QmHudIslandBgColor));
+	BackgroundColor.a = std::clamp(g_Config.m_QmHudIslandBgOpacity / 100.0f, 0.0f, 1.0f);
+	DrawMediaIslandCountdownSatellite(
+		Graphics(),
+		Ring.m_Position,
+		SatelliteRadius,
+		RingRadius,
+		RingThickness,
+		Ring.m_Progress,
+		Ring.m_Alpha,
+		ScreenPixelSize,
+		BackgroundColor,
+		QmHudHookCountdownColor());
+	Graphics()->MapScreen(SavedScreenX0, SavedScreenY0, SavedScreenX1, SavedScreenY1);
+}
+
 void CHud::RenderConnectionWarning()
 {
 	if(Client()->ConnectionProblems())
@@ -4871,7 +5032,18 @@ void CHud::RenderMediaIsland()
 	CurrentSdfState.m_OuterShadowOpacity = MEDIA_ISLAND_OUTER_SHADOW_OPACITY * EntrancePose.m_BackgroundColor.a;
 	CurrentSdfState.m_Rect = QmHudMediaIslandSdfOuterRect(CurrentSdfState);
 	IGraphics::CRenderTargetHandle Backdrop;
-	if(PrepareMediaIslandBlur())
+	const bool BlurPrepared = PrepareMediaIslandBlur();
+	if(!m_QmMediaIslandBlurProbeDone)
+	{
+		// 一次性诊断：背板模糊是静默降级型特性，被跳过后只在岛里少一层模糊，玩家看不出来。
+		// 这一行写清每个门槛的实测值，用来区分「没准备模糊」与「准备了但纹理是空的」。
+		m_QmMediaIslandBlurProbeDone = true;
+		log_info("hud", "media island backdrop probe: prepared=%d handle_valid=%d gaussian_blur=%d opacity=%d original_style=%d sdf=%d capture_supported=%d rt_blur_supported=%d",
+			(int)BlurPrepared, (int)m_MediaIslandBlurTarget.IsValid(), g_Config.m_QmGaussianBlur, g_Config.m_QmHudIslandBgOpacity,
+			g_Config.m_QmHudIslandUseOriginalStyle, (int)Graphics()->HasMediaIslandSdf(),
+			(int)Graphics()->IsBackbufferCaptureSupported(), (int)Graphics()->IsRenderTargetGaussianBlurSupported());
+	}
+	if(BlurPrepared)
 	{
 		Backdrop = m_MediaIslandBlurTarget;
 		const CUIRect BackdropScreenRect = {
@@ -7148,6 +7320,7 @@ void CHud::OnRender()
 	m_MovementInfoBoxValid = false;
 	m_LegacyMediaInfoRendered = false;
 	UpdateSwitchCountdownTracker();
+	UpdateHookCountdownTracker();
 	const bool ShowMediaIsland = HasVisibleMediaIsland();
 	if(!ShowMediaIsland)
 	{
@@ -7247,6 +7420,7 @@ void CHud::OnRender()
 		RenderTextInfo();
 		GameClient()->m_TClient.RenderCenterLines();
 		RenderFollowSwitchCountdowns();
+		RenderFollowHookCountdown();
 		if(ShowMediaIsland)
 			RenderMediaIsland();
 		else

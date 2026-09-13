@@ -544,8 +544,10 @@ void CSpotifyIntegration::PollTokenPipeline()
 	{
 		std::shared_ptr<CHttpRequest> pRequest = m_pImpl->m_pTokenRequest;
 		m_pImpl->m_pTokenRequest.reset();
-		const int Status = pRequest->StatusCode();
-		if(pRequest->State() == EHttpState::DONE && Status == 200)
+		// 超时等传输失败也会让 Done() 为真，此时没有 HTTP 结果，不能取 StatusCode()。
+		const bool Done = pRequest->State() == EHttpState::DONE;
+		const int Status = Done ? pRequest->StatusCode() : 0;
+		if(Done && Status == 200)
 		{
 			unsigned char *pData = nullptr;
 			size_t DataLength = 0;
@@ -620,8 +622,9 @@ void CSpotifyIntegration::PollSongPipeline()
 		return;
 	std::shared_ptr<CHttpRequest> pRequest = m_pImpl->m_pSearchRequest;
 	m_pImpl->m_pSearchRequest.reset();
-	const int Status = pRequest->StatusCode();
-	if(pRequest->State() == EHttpState::DONE && Status == 200)
+	const bool Done = pRequest->State() == EHttpState::DONE;
+	const int Status = Done ? pRequest->StatusCode() : 0;
+	if(Done && Status == 200)
 	{
 		unsigned char *pData = nullptr;
 		size_t DataLength = 0;
@@ -684,8 +687,9 @@ void CSpotifyIntegration::PollSongPipelineLyrics()
 		return;
 	std::shared_ptr<CHttpRequest> pRequest = m_pImpl->m_pLyricsRequest;
 	m_pImpl->m_pLyricsRequest.reset();
-	const int Status = pRequest->StatusCode();
-	if(pRequest->State() == EHttpState::DONE && Status == 200)
+	const bool Done = pRequest->State() == EHttpState::DONE;
+	const int Status = Done ? pRequest->StatusCode() : 0;
+	if(Done && Status == 200)
 	{
 		unsigned char *pData = nullptr;
 		size_t DataLength = 0;

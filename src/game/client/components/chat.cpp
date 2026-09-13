@@ -25,6 +25,7 @@
 #include <game/client/components/qmclient/colored_parts.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_title_color.h>
+#include <game/client/components/qmclient/qm_title_render.h>
 #include <game/client/components/scoreboard.h>
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
@@ -378,6 +379,7 @@ void CChat::CLine::Reset(CChat &This)
 	m_aQmTitle[0] = '\0';
 	m_ChatEmoji = EQmChatEmoji::NONE;
 	m_ChatEmojiRect = {};
+	m_QmTitleBobPadding = 0.0f;
 	m_aYOffset[0] = -1.0f;
 	m_aYOffset[1] = -1.0f;
 	m_TextYOffset = 0.0f;
@@ -2068,6 +2070,12 @@ void CChat::OnPrepareLines(float y)
 	// [] 内头衔的本地配色：默认档不改变既有表现，聊天继续沿用玩家名色。
 	// 颜色烘焙在文本容器里，设置变化时由设置页调用 RebuildChat() 重建。
 	const SQmTitleColorStyle QmTitleColorStyle = ResolveQmTitleColorStyle(g_Config.m_QmTitleColorMode, g_Config.m_QmTitleColor, g_Config.m_QmTitleOpacity, false);
+	// 所有作者共用本帧时间与名牌掠光配置，合并消息中的头衔也保持同步。
+	const float TitleAnimationTime = (float)GameClient()->m_QmClient.TitleAnimationTime();
+	const SQmTitleShimmer TitleShimmer = QmTitleShimmerFromConfig();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+	const float PixelSize = (ScreenY1 - ScreenY0) / Graphics()->ScreenHeight();
 
 	for(int i = m_BacklogCurLine; i < MAX_LINES; i++)
 	{
@@ -2100,14 +2108,37 @@ void CChat::OnPrepareLines(float y)
 				TitleHidden = true;
 			}
 		}
-		if(TitleHidden)
+		const bool MergedPlayerMessages = Line.m_TimesRepeated > 0 && !Line.m_vMergedAuthors.empty();
+		// 取实际显示作者的最大浮动范围；相位只改变顶点，不改变每帧的行高。
+		bool LineHasDynamicTitle = false;
+		float TitleBobPadding = 0.0f;
+		const auto IncludeTitleLayout = [&](const char *pTitle, int AuthorId) {
+			if(pTitle[0] == '\0')
+				return;
+			const SQmTitleRenderStyle Style = QmTitleResolveRenderStyle(GameClient()->m_QmClient.PlayerTitleStyle(AuthorId));
+			if(Style.m_pStyle != nullptr)
+			{
+				LineHasDynamicTitle = true;
+				TitleBobPadding = maximum(TitleBobPadding, QmTitleStyleBobPadding(Style.m_Bob, PixelSize));
+			}
+		};
+		if(MergedPlayerMessages)
+		{
+			for(const auto &Author : Line.m_vMergedAuthors)
+				IncludeTitleLayout(Author.m_aQmTitle, Author.m_ClientId);
+		}
+		else
+			IncludeTitleLayout(Line.m_aQmTitle, Line.m_ClientId);
+
+		if(TitleHidden || TitleBobPadding != Line.m_QmTitleBobPadding)
 		{
 			TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
 			Line.m_ChatEmojiRect = {};
 			Line.m_aYOffset[0] = -1.0f;
 			Line.m_aYOffset[1] = -1.0f;
+			Line.m_QmTitleBobPadding = TitleBobPadding;
 		}
-		const bool LinePrepared = RenderChatEmoji ? Line.m_ChatEmojiRect.w > 0.0f : Line.m_TextContainerIndex.Valid() && Line.m_ChatEmojiRect.w <= 0.0f;
+		const bool LinePrepared = (RenderChatEmoji ? Line.m_ChatEmojiRect.w > 0.0f : Line.m_TextContainerIndex.Valid() && Line.m_ChatEmojiRect.w <= 0.0f) && !LineHasDynamicTitle;
 		if(LinePrepared && !ForceRecreate)
 		{
 			// 已有容器也必须消耗相同的垂直预算，
@@ -2125,7 +2156,6 @@ void CChat::OnPrepareLines(float y)
 		TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
 		Graphics()->DeleteQuadContainer(Line.m_QuadContainerIndex);
 		Line.m_ChatEmojiRect = {};
-		const bool MergedPlayerMessages = Line.m_TimesRepeated > 0 && !Line.m_vMergedAuthors.empty();
 		const bool MultipleAuthors = Line.m_vMergedAuthors.size() > 1;
 
 		char aClientId[16] = "";
@@ -2192,6 +2222,7 @@ void CChat::OnPrepareLines(float y)
 			MeasureCursor.m_FontSize = FontSize;
 			MeasureCursor.m_Flags = 0;
 			MeasureCursor.m_LineWidth = LineWidth;
+			MeasureCursor.m_LineSpacing = 2.0f * TitleBobPadding;
 
 			if(!MultipleAuthors && Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
 			{
@@ -2238,7 +2269,7 @@ void CChat::OnPrepareLines(float y)
 			if(RenderChatEmoji)
 			{
 				const SQmChatEmojiCursorLayout EmojiLayout = LayoutQmChatEmoji(AppendCursor, QmChatEmojiChatDisplaySize(FontSize));
-				Line.m_aYOffset[OffsetType] = maximum(AppendCursor.Height(), EmojiLayout.m_RequiredHeight) + RealMsgPaddingY;
+				Line.m_aYOffset[OffsetType] = maximum(AppendCursor.Height(), EmojiLayout.m_RequiredHeight + 2.0f * TitleBobPadding) + RealMsgPaddingY;
 			}
 			else if(pTranslatedText)
 			{
@@ -2288,9 +2319,11 @@ void CChat::OnPrepareLines(float y)
 
 		// reset the cursor
 		CTextCursor LineCursor;
-		LineCursor.SetPosition(vec2(TextBegin, Line.m_TextYOffset));
+		// 行距包含上下两份留白，本体从上留白后开始；消息背景仍使用原来的锚点。
+		LineCursor.SetPosition(vec2(TextBegin, Line.m_TextYOffset + TitleBobPadding));
 		LineCursor.m_FontSize = FontSize;
 		LineCursor.m_LineWidth = LineWidth;
+		LineCursor.m_LineSpacing = 2.0f * TitleBobPadding;
 
 		// Message is from valid player
 		if(!MultipleAuthors && Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
@@ -2316,8 +2349,18 @@ void CChat::OnPrepareLines(float y)
 			NameColor = PlayerNameColor(Line.m_ClientId, Line.m_NameColor, Line.m_Team);
 
 		// [] 内头衔单独上色；自定义档结束后必须回到调用方原本的颜色。
-		const auto AppendQmTitle = [&](const char *pTitle, const ColorRGBA &FallbackColor) {
+		const auto AppendQmTitle = [&](const char *pTitle, const ColorRGBA &FallbackColor, int AuthorId) {
 			const bool CustomColor = pTitle[0] != '\0' && QmTitleColorStyle.m_Mode != EQmTitleColorMode::FOLLOW_SERVER;
+			// 保留完整的逐字浮动与掠光，行高已在测量时预留最大浮动范围。
+			const SQmTitleRenderStyle TitleRenderStyle = QmTitleResolveRenderStyle(GameClient()->m_QmClient.PlayerTitleStyle(AuthorId));
+			if(pTitle[0] != '\0' && TitleRenderStyle.m_pStyle != nullptr)
+			{
+				QmTitleRenderFillCursor(TextRender(), LineCursor, pTitle, LineCursor.m_FontSize, TitleRenderStyle, TitleAnimationTime, 1.0f, TitleShimmer);
+				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, pTitle);
+				LineCursor.m_vColorSplits.clear();
+				LineCursor.m_vCharOffsets.clear();
+				return;
+			}
 			if(CustomColor && QmTitleColorStyle.m_Rainbow)
 			{
 				QmAddTitleRainbowSplits(LineCursor, pTitle, QmTitleColorStyle.m_Alpha);
@@ -2341,7 +2384,7 @@ void CChat::OnPrepareLines(float y)
 				TextRender()->TextColor(Line.m_vMergedAuthors[i].m_NameColor);
 				if(i > 0)
 					TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, ",");
-				AppendQmTitle(Line.m_vMergedAuthors[i].m_aQmTitle, Line.m_vMergedAuthors[i].m_NameColor);
+				AppendQmTitle(Line.m_vMergedAuthors[i].m_aQmTitle, Line.m_vMergedAuthors[i].m_NameColor, Line.m_vMergedAuthors[i].m_ClientId);
 				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, Line.m_vMergedAuthors[i].m_aName);
 			}
 			NameColor = Line.m_vMergedAuthors.back().m_NameColor;
@@ -2350,7 +2393,7 @@ void CChat::OnPrepareLines(float y)
 		{
 			TextRender()->TextColor(NameColor);
 			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, aClientId);
-			AppendQmTitle(Line.m_aQmTitle, NameColor);
+			AppendQmTitle(Line.m_aQmTitle, NameColor, Line.m_ClientId);
 			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, Line.m_aName);
 		}
 
@@ -2960,7 +3003,7 @@ void CChat::OnRender()
 
 				vec2 OffsetToMid;
 				CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeRenderInfo, OffsetToMid);
-				vec2 TeeRenderPos(x + AnimOffsetX + (RealMsgPaddingX + TeeSize) / 2.0f, RenderY + OffsetTeeY + FullHeightMinusTee / 2.0f + OffsetToMid.y);
+				vec2 TeeRenderPos(x + AnimOffsetX + (RealMsgPaddingX + TeeSize) / 2.0f, RenderY + Line.m_QmTitleBobPadding + OffsetTeeY + FullHeightMinusTee / 2.0f + OffsetToMid.y);
 				RenderTools()->RenderTee(pIdleState, &TeeRenderInfo, EMOTE_NORMAL, vec2(1, 0.1f), TeeRenderPos, AnimAlpha);
 			}
 

@@ -79,6 +79,20 @@ enum EQmHookStrongWeakScope
 	QM_HOOK_STRONG_WEAK_SCOPE_ALL = 4,
 };
 
+// 昵称显示范围的二级选项：一级（无 / 自身 / 他人 / 全体）决定显示自身还是他人，
+// 二级决定自身的范围（当前操控角色 / 本机全部角色）与他人的范围（所有玩家 / 仅好友）。
+enum EQmNameplateOwnScope
+{
+	QM_NAMEPLATE_OWN_SCOPE_CURRENT = 0,
+	QM_NAMEPLATE_OWN_SCOPE_LOCAL = 1,
+};
+
+enum EQmNameplateOthersScope
+{
+	QM_NAMEPLATE_OTHERS_SCOPE_ALL = 0,
+	QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS = 1,
+};
+
 enum EQmNameplateTextPlayingScope
 {
 	QM_NAMEPLATE_TEXT_PLAYING_SCOPE_OFF = 0,
@@ -120,6 +134,7 @@ int GoresRestoreWeaponAfterHammer(int PreHammerWeapon, bool HasPreHammerWeapon);
 bool ShouldPulseGoresHammerOnFire(bool GoresCycleActive, bool FireJustPressed, bool CurrentWeaponIsHammer, bool FreezeWakeupActive);
 bool ShouldRestoreGoresWeaponAfterHammer(bool CurrentWeaponIsHammer, bool HasPreHammerWeapon);
 bool ShouldShowQmHookStrongWeakScope(int Scope, bool Self, bool Strong, bool Weak);
+bool ShouldShowQmNameplateName(int OwnScope, int OthersScope, bool ShowOwn, bool ShowOthers, bool IsCurrentChar, bool IsLocalClient, bool IsFriend);
 bool ShouldUseQmNameplateTextEffects(int PlayingScope, int SpectateScope, int DemoMode, int DemoTarget, bool DemoPlayback, bool Spectating, bool Self, bool Friend, bool SpectateTarget, int ClientId);
 
 bool ShouldHideGoresGuide(bool GoresEnabled, bool HideGuidesEnabled, bool ManualGuideVisible);

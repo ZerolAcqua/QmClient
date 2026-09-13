@@ -303,12 +303,14 @@ bool IsValidQmTitle(const char *pTitle)
 	return true;
 }
 
-std::vector<SQmTitlePresence> ParseQmTitlePresences(const json_value *pRoot, const char *pServerAddress)
+std::vector<SQmTitlePresence> ParseQmTitlePresences(const json_value *pRoot, const char *pServerAddress, int64_t *pOutServerTime)
 {
 	std::vector<SQmTitlePresence> Result;
 	int64_t Now;
 	if(!pServerAddress || !JsonReadInteger(JsonObjectField(pRoot, "server_time"), Now) || Now <= 0)
 		return Result;
+	if(pOutServerTime != nullptr)
+		*pOutServerTime = Now;
 	const json_value *pEntries = JsonObjectField(pRoot, "presences");
 	if(pEntries->type != json_array)
 		return Result;
@@ -318,6 +320,9 @@ std::vector<SQmTitlePresence> ParseQmTitlePresences(const json_value *pRoot, con
 		const json_value *pServer = JsonObjectField(pEntry, "server_address");
 		const json_value *pName = JsonObjectField(pEntry, "player_name");
 		const json_value *pTitle = JsonObjectField(pEntry, "title");
+		// style 是可选字段：老服务端不返回它，此时留空并由客户端回退到本地配置。
+		const json_value *pStyle = JsonObjectField(pEntry, "style");
+		const char *pStyleId = pStyle->type == json_string ? pStyle->u.string.ptr : "";
 		int64_t Id, Issued, Expires;
 		if(pServer->type != json_string || str_comp(pServer->u.string.ptr, pServerAddress) != 0 ||
 			pName->type != json_string || !pName->u.string.ptr[0] || pName->u.string.length >= MAX_NAME_LENGTH ||
@@ -326,7 +331,7 @@ std::vector<SQmTitlePresence> ParseQmTitlePresences(const json_value *pRoot, con
 			!JsonReadInteger(JsonObjectField(pEntry, "issued_at"), Issued) || Issued > Now ||
 			!JsonReadInteger(JsonObjectField(pEntry, "expires_at"), Expires) || Expires <= Now)
 			continue;
-		Result.push_back({(int)Id, pName->u.string.ptr, pTitle->u.string.ptr, std::min<int64_t>(Expires - Now, 15)});
+		Result.push_back({(int)Id, pName->u.string.ptr, pTitle->u.string.ptr, std::min<int64_t>(Expires - Now, 15), pStyleId});
 	}
 	return Result;
 }

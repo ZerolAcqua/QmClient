@@ -15,6 +15,7 @@
 #include <game/client/components/qmclient/chat_emoji.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_title_color.h>
+#include <game/client/components/qmclient/qm_title_render.h>
 #include <game/client/components/qmclient/qmclient_utils.h>
 #include <game/client/gameclient.h>
 #include <game/client/prediction/entities/character.h>
@@ -322,6 +323,8 @@ public:
 	bool m_ShowFriendMark;
 	char m_aQmTitle[64] = "";
 	SQmTitleColorStyle m_TitleColorStyle;
+	// QmClient：动态风格（逐字符颜色与浮动），未启用时 m_pStyle 为 nullptr。
+	SQmTitleRenderStyle m_TitleRenderStyle;
 	bool m_ShowClientId;
 	int m_ClientId;
 	float m_FontSizeClientId;
@@ -355,26 +358,6 @@ public:
 // Part Types
 
 static constexpr float DEFAULT_PADDING = 5.0f;
-// 名牌文字按"当前屏幕映射密度"栅格化字形：密度变化超过容差、且缩放已停稳时才重建文字容器。
-// 每帧最多重建的文本部件数量用于摊平重建（字形栅格化/上传）开销。
-// 注意口径是"文本部件"而非"玩家"：每个玩家的铭牌有名字/队标/ID/坐标等多个文字部件，
-// 满员 64 人时上百个部件都可能同时需要重建，预算过小会让排在后面的玩家长期停留在旧密度上（发虚）。
-static constexpr int NAMEPLATE_TEXT_REBUILD_BUDGET_PER_FRAME = 64;
-static int s_NameplateTextRebuildBudget = NAMEPLATE_TEXT_REBUILD_BUDGET_PER_FRAME;
-
-// 当前屏幕映射对应的字形栅格化密度。它在同一次渲染内对所有铭牌部件都是同一个值
-// （部件内部临时切到 MapScreenToGameInterface 是在读取之后才发生的），因此由
-// CNamePlates::OnRender 每帧算一次即可，避免每个文本部件各自重复 GetScreen 与密度计算：
-// 满员 128 人 × 12 个文本部件 ≈ 1536 次/帧。
-// 注意：各部件自己的 m_ZoomStability.RecordDensity() 仍必须按部件调用，不能一起外提。
-static float s_NameplateRasterizationDensity = 0.0f;
-
-static float ComputeNameplateRasterizationDensity(CGameClient &This)
-{
-	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	This.Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
-	return QmNameplateTextRasterizationDensity(This.Graphics()->ScreenHeight(), ScreenY1 - ScreenY0);
-}
 
 class CNamePlatePart
 {
@@ -408,15 +391,15 @@ class CNamePlatePartText : public CNamePlatePart
 protected:
 	STextContainerIndex m_TextContainerIndex;
 	vec2 m_RenderSize = vec2(0.0f, 0.0f);
-	// 上次栅格化字形所用的屏幕映射密度（像素/世界单位）；仅当密度变化超过容差才重建
-	SQmNameplateTextRasterization m_Rasterization;
-	// 缩放稳定判定：平滑缩放动画期间不重建，停稳后补齐一次
-	SQmNameplateTextZoomStability m_ZoomStability;
 	virtual bool UpdateNeeded(CGameClient &This, const CNamePlateData &Data) = 0;
 	virtual void UpdateText(CGameClient &This, const CNamePlateData &Data) = 0;
 	ColorRGBA m_Color = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 	bool m_UseTextEffects = false;
 	virtual ColorRGBA GetRenderTextColor() const { return m_Color; }
+	// QmClient：动画文本每帧重写顶点，保留已分配的 GPU 缓冲，避免逐帧销毁重建。
+	bool m_ReuseTextContainer = false;
+	// QmClient：渲染尺寸之外需要额外预留的垂直空间（例如逐字符浮动的幅度）。
+	virtual float ExtraVerticalPadding() const { return 0.0f; }
 
 	CNamePlatePartText(CGameClient &This) :
 		CNamePlatePart(This)
@@ -427,31 +410,12 @@ protected:
 public:
 	void Update(CGameClient &This, const CNamePlateData &Data) override
 	{
-		// 名字牌文字在世界映射下栅格化。字形按"当前屏幕映射密度"的像素数栅格化，
-		// 绘制时又按同一映射缩放回去，因此始终是 1:1 采样：任何相机缩放下都清晰。
-		// 注意：不能按"相机缩放档位"取整密度——档位与实际缩放最多相差 12%，
-		// 那会让字形被放大后采样，表现为整条名字发虚。
-		bool NeedsTextUpdate = UpdateNeeded(This, Data);
-		const float DensityNow = Data.m_InGame ? s_NameplateRasterizationDensity : 0.0f;
-		if(Data.m_InGame)
-		{
-			// 平滑缩放动画期间密度每帧都在变，此时绝不能重建：否则动画期间每帧都要重排
-			// 所有玩家的文字容器（实测为严重卡顿）。只在缩放停下来后补齐一次。
-			const bool ZoomSettled = m_ZoomStability.RecordDensity(DensityNow);
-			if(!NeedsTextUpdate && ZoomSettled && QmNameplateTextNeedsRebake(m_Rasterization, DensityNow))
-			{
-				// 缩放停止后密度已固定：预算内立即重建，预算耗尽则顺延到后续帧，摊平字形栅格化开销
-				if(s_NameplateTextRebuildBudget > 0)
-				{
-					NeedsTextUpdate = true;
-					--s_NameplateTextRebuildBudget;
-				}
-			}
-		}
-		if(!NeedsTextUpdate)
+		const bool NeedsTextUpdate = UpdateNeeded(This, Data);
+		if(!NeedsTextUpdate && m_TextContainerIndex.Valid())
 		{
 			const float EffectPadding = m_UseTextEffects ? QmNameplateTextEffectPadding(g_Config.m_QmNameplateTextEffects, g_Config.m_QmNameplateTextBorderRange, g_Config.m_QmNameplateTextGlowRange) : 0.0f;
-			m_Size = m_RenderSize + vec2(EffectPadding * 2.0f, EffectPadding * 2.0f);
+			const float ExtraPadding = ExtraVerticalPadding();
+			m_Size = m_RenderSize + vec2(EffectPadding * 2.0f, EffectPadding * 2.0f + ExtraPadding * 2.0f);
 			return;
 		}
 
@@ -468,11 +432,13 @@ public:
 		float ScreenX0 = 0.0f, ScreenY0 = 0.0f, ScreenX1 = 0.0f, ScreenY1 = 0.0f;
 		if(Data.m_InGame)
 		{
-			// 切到当前真实缩放的映射再栅格化，保证字形密度与绘制密度一致
+			// 官方行为：在标准缩放（zoom=1）的界面映射下烘焙文字，绘制时再随当前相机映射缩放。
 			This.Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
-			This.Graphics()->MapScreenToGameInterface(This.m_Camera.m_Center.x, This.m_Camera.m_Center.y, This.m_Camera.m_Zoom);
+			This.Graphics()->MapScreenToGameInterface(This.m_Camera.m_Center.x, This.m_Camera.m_Center.y);
 		}
-		This.TextRender()->DeleteTextContainer(m_TextContainerIndex);
+		// QmClient：动画文本保留已分配的 GPU 缓冲，只重写顶点。
+		if(!m_ReuseTextContainer)
+			This.TextRender()->DeleteTextContainer(m_TextContainerIndex);
 		UpdateText(This, Data);
 		if(Data.m_InGame)
 			This.Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
@@ -482,22 +448,18 @@ public:
 		if(!m_TextContainerIndex.Valid())
 		{
 			m_Visible = false;
-			m_Rasterization = SQmNameplateTextRasterization();
 			return;
 		}
-
-		// 记录本次栅格化采用的密度，供密度变化时判断是否需要重建
-		m_Rasterization = Data.m_InGame ? QmNameplateTextRasterizationAfterRebake(DensityNow) : SQmNameplateTextRasterization();
 
 		const STextBoundingBox Container = This.TextRender()->GetBoundingBoxTextContainer(m_TextContainerIndex);
 		m_RenderSize = vec2(Container.m_W, Container.m_H);
 		const float EffectPadding = m_UseTextEffects ? QmNameplateTextEffectPadding(g_Config.m_QmNameplateTextEffects, g_Config.m_QmNameplateTextBorderRange, g_Config.m_QmNameplateTextGlowRange) : 0.0f;
-		m_Size = m_RenderSize + vec2(EffectPadding * 2.0f, EffectPadding * 2.0f);
+		const float ExtraPadding = ExtraVerticalPadding();
+		m_Size = m_RenderSize + vec2(EffectPadding * 2.0f, EffectPadding * 2.0f + ExtraPadding * 2.0f);
 	}
 	void Reset(CGameClient &This) override
 	{
 		This.TextRender()->DeleteTextContainer(m_TextContainerIndex);
-		m_Rasterization = SQmNameplateTextRasterization();
 	}
 	void Render(CGameClient &This, vec2 Pos) const override
 	{
@@ -706,27 +668,67 @@ private:
 	float m_FontSize = -INFINITY;
 	float m_Alpha = 1.0f;
 	SQmTitleColorStyle m_TitleColorStyle;
+	SQmTitleRenderStyle m_TitleRenderStyle;
 
 protected:
 	bool UpdateNeeded(CGameClient &This, const CNamePlateData &Data) override
 	{
 		m_Visible = Data.m_aQmTitle[0] != '\0';
 		if(!m_Visible)
+		{
+			m_ReuseTextContainer = false;
 			return false;
+		}
 		// 跟随服务器档沿用名牌整体淡入淡出的透明度，自定义档改用本地透明度。
 		m_Alpha = Data.m_TitleColorStyle.m_Mode == EQmTitleColorMode::FOLLOW_SERVER ? Data.m_Color.a : Data.m_TitleColorStyle.m_Alpha;
 		const float FontSize = Data.m_FontSize * ms_FontSizeScale;
+
+		// QmClient：动态风格的颜色与浮动逐帧变化，必须每帧重写顶点；
+		// 复用已分配的 GPU 缓冲（RecreateTextContainerSoft）比重建容器便宜得多。
+		if(Data.m_TitleRenderStyle.m_pStyle != nullptr)
+		{
+			m_ReuseTextContainer = m_TextContainerIndex.Valid();
+			return true;
+		}
+
+		m_ReuseTextContainer = false;
 		return m_FontSize != FontSize || m_TitleColorStyle != Data.m_TitleColorStyle || str_comp(m_aText, Data.m_aQmTitle) != 0;
+	}
+
+	float ExtraVerticalPadding() const override
+	{
+		if(m_TitleRenderStyle.m_pStyle == nullptr)
+			return 0.0f;
+		// 浮动幅度 + 抛光/辉光最大外扩半径，避免与相邻名板行重叠。
+		float Padding = m_TitleRenderStyle.m_Bob.m_Amplitude;
+		if(g_Config.m_QmTitleEffect == (int)EQmTitleEffect::QM_TITLE_EFFECT_CLASSIC)
+		{
+			if(g_Config.m_QmTitleBloom > 0)
+				Padding += 4.0f + 16.0f * 0.28f;
+		}
+		else if(g_Config.m_QmTitleEffect == (int)EQmTitleEffect::QM_TITLE_EFFECT_POLISHED)
+		{
+			Padding += 2.0f + 1.5f;
+		}
+		return Padding;
 	}
 
 	void UpdateText(CGameClient &This, const CNamePlateData &Data) override
 	{
 		m_FontSize = Data.m_FontSize * ms_FontSizeScale;
 		m_TitleColorStyle = Data.m_TitleColorStyle;
+		m_TitleRenderStyle = Data.m_TitleRenderStyle;
 		str_copy(m_aText, Data.m_aQmTitle);
+
 		CTextCursor Cursor;
 		Cursor.m_FontSize = m_FontSize;
-		if(m_TitleColorStyle.m_Rainbow)
+		if(m_TitleRenderStyle.m_pStyle != nullptr)
+		{
+			// 透明度统一由 Render 施加，色段只负责颜色与浮动。
+			// 这里没有 CComponent 继承链，GameClient() 不可用，改用传入的 This。
+			QmTitleRenderFillCursor(This.TextRender(), Cursor, m_aText, m_FontSize, m_TitleRenderStyle, (float)This.m_QmClient.TitleAnimationTime(), 1.0f, QmTitleShimmerFromConfig());
+		}
+		else if(m_TitleColorStyle.m_Rainbow)
 		{
 			// 透明度统一由 Render 施加，色段只负责色相。
 			QmAddTitleRainbowSplits(Cursor, m_aText, 1.0f);
@@ -735,18 +737,28 @@ protected:
 		{
 			Cursor.m_vColorSplits.emplace_back(0, -1, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
 		}
-		This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
+
+		// 动态风格复用已分配的 GPU 缓冲，只重写顶点；其它情况沿用原有重建路径。
+		if(m_ReuseTextContainer && m_TextContainerIndex.Valid())
+			This.TextRender()->RecreateTextContainerSoft(m_TextContainerIndex, &Cursor, m_aText);
+		else
+			This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
 	}
 
 	void Render(CGameClient &This, vec2 Pos) const override
 	{
 		if(!m_TextContainerIndex.Valid())
 			return;
+		const bool DynamicStyle = m_TitleRenderStyle.m_pStyle != nullptr;
 		const bool CustomColor = m_TitleColorStyle.m_Mode != EQmTitleColorMode::FOLLOW_SERVER;
+		// FOLLOW_SERVER 且无动态风格时，颜色来自名牌文本色而非本部件配置。
+		const bool VertexColored = DynamicStyle || m_TitleColorStyle.m_Rainbow || !CustomColor;
+		const int Effect = std::clamp(g_Config.m_QmTitleEffect, 0, 3);
 		ColorRGBA Color(0.0f, 0.0f, 0.0f, m_Alpha);
 		ColorRGBA OutlineColor(0.85f, 0.85f, 0.85f, m_Alpha);
-		if(m_TitleColorStyle.m_Rainbow)
+		if(VertexColored)
 		{
+			// 颜色已经烘焙进顶点色，uniform 必须是白色，否则会被二次染色。
 			Color = ColorRGBA(1.0f, 1.0f, 1.0f, m_Alpha);
 			OutlineColor = s_OutlineColor.WithMultipliedAlpha(m_Alpha);
 		}
@@ -756,6 +768,55 @@ protected:
 			// 自定义颜色无法预判明暗，统一使用彩虹档的深色描边。
 			OutlineColor = s_OutlineColor.WithMultipliedAlpha(m_Alpha);
 		}
+
+		// 抛光档：用本体色派生柔光、浮雕与投影，任何颜色都不会被固定深色描边压脏。
+		if(Effect == (int)EQmTitleEffect::QM_TITLE_EFFECT_POLISHED || Effect == (int)EQmTitleEffect::QM_TITLE_EFFECT_SOLID)
+		{
+			SQmTitlePolishStyle PolishStyle;
+			PolishStyle.m_TextColor = Color;
+			PolishStyle.m_TextAlpha = m_Alpha;
+			if(Effect == (int)EQmTitleEffect::QM_TITLE_EFFECT_SOLID)
+			{
+				PolishStyle.m_GlowAlpha = 0.0f;
+				PolishStyle.m_HighlightAlpha = 0.0f;
+			}
+			// 顶点色档（动态风格、彩虹、跟随服务器）的 uniform 基色恒为白，按白色派生的柔光与浮雕
+			// 会变成一层白光；此时只保留投影，逐字符颜色动画照常显示。
+			if(VertexColored)
+			{
+				PolishStyle.m_GlowAlpha = 0.0f;
+				PolishStyle.m_HighlightAlpha = 0.0f;
+			}
+			This.RenderTools()->RenderTitleContainerWithPolishedEffects(m_TextContainerIndex, PolishStyle, Pos.x - Size().x / 2.0f, Pos.y - Size().y / 2.0f);
+			return;
+		}
+
+		if(DynamicStyle && Effect == (int)EQmTitleEffect::QM_TITLE_EFFECT_CLASSIC)
+		{
+			// Calamity 风格绘制：固定 2 像素的 8 方向描边 + 加法混合辉光。
+			SQmTitleEffectStyle EffectStyle;
+			EffectStyle.m_TextColor = Color;
+			EffectStyle.m_OutlineColor = OutlineColor;
+			EffectStyle.m_OutlineRadius = 2.0f;
+			if(g_Config.m_QmTitleBloom > 0)
+			{
+				// 与 Calamity 的 ExoticRainbow 同构：
+				//   sine = sin(t * 2 / Pi)；sine = Lerp(sine, 0, 0.35)^5；半径 = 4 + 16 * sine
+				// 相位用服务端对齐后的时间，保证所有人看到的呼吸与旋转同步。
+				const float BloomTime = (float)This.m_QmClient.TitleAnimationTime();
+				const float Sine = std::sin(BloomTime * 2.0f / pi);
+				const float Breathe = std::pow(Sine * 0.65f, 5.0f);
+				EffectStyle.m_BloomRadius = 4.0f;
+				EffectStyle.m_BloomPulse = 16.0f * Breathe;
+				EffectStyle.m_BloomRotation = BloomTime * 1.7f;
+				EffectStyle.m_BloomAlpha = g_Config.m_QmTitleBloom >= 2 ? 0.28f : 0.18f;
+				EffectStyle.m_BloomDraws = g_Config.m_QmTitleBloom >= 2 ? 16 : 6;
+			}
+			This.RenderTools()->RenderTitleContainerWithCalamityEffects(m_TextContainerIndex, EffectStyle, Pos.x - Size().x / 2.0f, Pos.y - Size().y / 2.0f);
+			return;
+		}
+
+		// 关闭档，以及经典档下的静态文字（经典档只对动态风格有意义）。
 		This.TextRender()->RenderTextContainer(m_TextContainerIndex, Color, OutlineColor, Pos.x - Size().x / 2.0f, Pos.y - Size().y / 2.0f);
 	}
 
@@ -1805,7 +1866,16 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 
 	const bool HideIdentity = GameClient()->ShouldHideStreamerIdentity(ClientId);
 
-	Data.m_ShowName = pPlayerInfo->m_Local ? g_Config.m_ClNamePlatesOwn : g_Config.m_ClNamePlates;
+	// 一级「显示昵称」决定自身/他人，二级决定自身取当前角色还是本机全部角色、
+	// 他人取所有玩家还是仅好友。
+	Data.m_ShowName = ShouldShowQmNameplateName(
+		g_Config.m_QmNameplateOwnScope,
+		g_Config.m_QmNameplateOthersScope,
+		g_Config.m_ClNamePlatesOwn != 0,
+		g_Config.m_ClNamePlates != 0,
+		pPlayerInfo->m_Local,
+		IsAnyLocalClient,
+		ClientData.m_Friend);
 	GameClient()->FormatStreamerName(ClientId, Data.m_aName, sizeof(Data.m_aName));
 	str_copy(Data.m_aQmTitle, Data.m_ShowName ? GameClient()->m_QmClient.PlayerTitle(ClientId) : "");
 	Data.m_TitleColorStyle = ResolveQmTitleColorStyle(
@@ -1813,6 +1883,7 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 		g_Config.m_QmTitleColor,
 		g_Config.m_QmTitleOpacity,
 		Data.m_aQmTitle[0] != '\0' && GameClient()->IsQmDeveloperRainbow(ClientId));
+	Data.m_TitleRenderStyle = QmTitleResolveRenderStyle(GameClient()->m_QmClient.PlayerTitleStyle(ClientId));
 	const bool DemoPlayback = Client()->State() == IClient::STATE_DEMOPLAYBACK;
 	const bool Spectating = !DemoPlayback && GameClient()->m_Snap.m_SpecInfo.m_Active;
 	const bool SpectateTarget = GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId == ClientId;
@@ -2003,6 +2074,7 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 			g_Config.m_QmTitleColor,
 			g_Config.m_QmTitleOpacity,
 			FrameData.m_aQmTitle[0] != '\0' && GameClient()->IsQmDeveloperRainbow(ClientId));
+		FrameData.m_TitleRenderStyle = QmTitleResolveRenderStyle(GameClient()->m_QmClient.PlayerTitleStyle(ClientId));
 		FrameData.m_ShowClientId = FrameData.m_ShowName && (g_Config.m_Debug || g_Config.m_ClNamePlatesIds) && !HideIdentity;
 		FrameData.m_ShowClan = FrameData.m_ShowName && g_Config.m_ClNamePlatesClan && !HideIdentity;
 		const bool FrameShowLocalAlignedCoordX = CoordModuleAllowsCoords && CoordXAlignHintEnabled && LocalCoordXAligned;
@@ -2729,11 +2801,6 @@ void CNamePlates::OnRender()
 {
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
-
-	// 每帧重置名牌文字重建预算，把缩放档位变化带来的重建开销摊平到多帧
-	s_NameplateTextRebuildBudget = NAMEPLATE_TEXT_REBUILD_BUDGET_PER_FRAME;
-	// 栅格化密度每帧只算一次，供所有文本部件读取
-	s_NameplateRasterizationDensity = ComputeNameplateRasterizationDensity(*GameClient());
 
 	int ShowDirection = g_Config.m_ClShowDirection;
 #if defined(CONF_VIDEORECORDER)

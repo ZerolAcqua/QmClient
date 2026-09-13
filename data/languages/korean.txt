@@ -536,6 +536,9 @@ Adjust verbosity in external console (-3 = none, -2 = errors only, -1 = warnings
 Advanced
 == 고급
 
+Advanced mode
+== 고급 모드
+
 Advanced options
 == 고급 옵션
 
@@ -688,6 +691,12 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == 설정 카드 정렬 및 레이아웃 재배치에 애니메이션 적용
+
+Animated styles override the fallback title color
+== 애니메이션 스타일의 색상이 기본 칭호 색상보다 우선합니다
+
+Animated title style id
+== 칭호 애니메이션 스타일 ID
 
 Animation
 == 애니메이션
@@ -1841,6 +1850,12 @@ Classic Pro
 Classic pro
 == 클래식 pro
 
+Classic title glow
+== 클래식 칭호 광채
+
+Classic title glow: 0 = off, 1 = subtle (6 draws), 2 = full Calamity (16 draws)
+== 클래식 칭호 광채: 0 = 끔, 1 = 은은함 (6겹), 2 = 전체 Calamity (16겹)
+
 Clear
 == 지우기
 
@@ -1966,9 +1981,6 @@ Collision Line Opacity
 
 Color
 == 색상
-
-Color & opacity
-== 색상 및 불투명도
 
 Color of authenticated player names on scoreboard
 == 점수판에 인증된 플레이어 이름 색상
@@ -2470,6 +2482,9 @@ Current: Score
 
 Current: Time
 == 현재: 시간
+
+Cursed Flame
+== 저주 화염·흑섬
 
 Custom
 == 사용자 정의
@@ -3560,6 +3575,9 @@ Enable gun sound
 Enable highlighted chat sound
 == 강조 표시된 채팅 사운드 활성화
 
+Enable hook countdown
+== 훅 카운트다운 활성화
+
 Enable HUD animations
 == HUD 애니메이션 활성화
 
@@ -4037,6 +4055,9 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == 대체 단순 노이즈 감소 강도
 
+Fallback title color
+== 기본 칭호 색상
+
 Fast input
 == 빠른 입력
 
@@ -4189,6 +4210,9 @@ Follow
 
 Follow server
 == 서버 설정 따르기
+
+Follow Tee
+== Tee 따라가기
 
 Following
 == 현재
@@ -4561,6 +4585,9 @@ Go forward one tick
 
 Go forward the specified duration
 == 지정된 시간만큼 앞으로 가기
+
+Golden Grace
+== 황금·축복
 
 Gores
 == 고어스
@@ -5620,6 +5647,9 @@ LibreTranslate API Key
 
 LibreTranslate endpoint
 == LibreTranslate 엔드포인트
+
+Light band (0 = style default)
+== 색상 위상 (0 = 스타일 기본값)
 
 Limit information in spectator mode
 == 관전자 모드에서 정보 제한
@@ -7112,11 +7142,17 @@ Option color
 Optional authentication key for the DNSBL provider
 == DNSBL 제공자의 선택적 인증 키
 
+Original
+== 기본
+
 Other
 == 기타
 
 Other players' hook line width
 == 다른 플레이어의 갈고리 선 너비
+
+Other players' nameplate scope (0=All players 1=Friends only)
+== 타인 이름표 범위 (0=모든 플레이어 1=친구만)
 
 Others
 == 다른 사람
@@ -7198,6 +7234,9 @@ Overwrite clan even if empty
 
 Own hook line width
 == 자신의 갈고리 선 너비
+
+Own nameplate scope (0=Current character 1=All local characters)
+== 자신 이름표 범위 (0=현재 캐릭터 1=로컬 모든 캐릭터)
 
 p = Ping latency
 == p = Ping 지연 시간
@@ -7564,6 +7603,9 @@ Please wait…
 
 Points
 == 점수
+
+Polished
+== 광택
 
 Popup animation
 == 팝업 애니메이션
@@ -9197,6 +9239,9 @@ Severe
 Shape
 == 모양
 
+Shimmer speed (polished)
+== 빛 이동 속도 (광택)
+
 Short server names
 == 짧은 서버 이름
 
@@ -9220,6 +9265,9 @@ Show %s group
 
 Show a small view of the dummy
 == 더미의 작은 화면 표시
+
+Show advanced title settings (collapsing keeps configured effects)
+== 고급 칭호 설정 표시 (접어도 설정한 효과 유지)
 
 Show air jump indicator
 == 공중 점프 표시기 표시
@@ -9526,6 +9574,9 @@ Show important server prompts and Echo messages as popups
 
 Show important server prompts as notifications
 == 중요한 서버 프롬프트를 알림으로 표시
+
+Show in Dynamic Island
+== Dynamic Island에 표시
 
 Show in-game FPS
 == 게임 내 FPS 표시
@@ -10262,6 +10313,12 @@ Smoothness of multi-view zoom (in ms, higher = slower)
 SMTC
 == SMTC
 
+Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
+== 흔들림 오프셋을 정수 픽셀에 맞춤 (글자는 선명, 움직임은 끊김)
+
+Snap wave to pixels
+== 물결 변위를 정수 픽셀에 맞추기
+
 Snapshot Age
 == 스냅샷 경과 시간
 
@@ -10354,6 +10411,9 @@ Space
 
 Spam protection: prevent spamming of team switching, chat, skin changes, emotes, votes
 == 스팸 방지: 팀 전환, 채팅, 스킨 변경, 이모트, 투표 스팸 방지
+
+Spatial effect
+== 입체 효과
 
 Speaker
 == 스피커
@@ -10450,6 +10510,9 @@ Sphere
 
 Spin pop
 == 회전 팝
+
+Spirit Light
+== 영광·반딧불
 
 Sponsor code
 == 인증 코드
@@ -10633,6 +10696,9 @@ Style kill, finish, and system messages
 
 Sub-Tick aiming
 == Sub-Tick 조준
+
+Subtle
+== 은은함
 
 Successfully saved the replay!
 == 리플레이를 성공적으로 저장했습니다!
@@ -10921,6 +10987,9 @@ Tee trail color
 
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee 궤적 색상 모드 (1=단색, 2=현재 Tee 색상, 3=무지개, 4=Tee 속도, 5=무작위)
+
+Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
+== Tee 궤적 스타일 (0=기본, 1=저주 화염·흑섬, 2=보랏빛 번개, 3=영광·반딧불, 4=공허·그림자, 5=황금·축복)
 
 Tee Trails
 == Tee 궤적
@@ -11261,11 +11330,38 @@ Timer isn't displayed.
 Tiny Tee Size
 == 아주 작은 Tee 크기
 
-Title color
-== 칭호 색상
+Title bob angular speed in 1/100 rad/s
+== 칭호 흔들림 각속도 (1/100 rad/s)
+
+Title bob wavelength in pixels
+== 칭호 흔들림 파장 (픽셀)
+
+Title color (single color)
+== 칭호 색상 (단색)
+
+Title light sweep speed in 1/100 row per second (0 = off)
+== 칭호 빛 이동 속도 (초당 1/100줄, 0 = 끔)
+
+Title opacity (custom color)
+== 불투명도 (사용자 지정 색상)
+
+Title per-character phase per pixel in 1/1000 px (0 = style default, 20 = visible light band)
+== 칭호 글자별 위상 (픽셀당 1/1000 px, 0 = 스타일 기본값, 20 = 빛 띠 보임)
+
+Title per-character vertical bob amplitude in pixels (0 = off)
+== 칭호 글자별 상하 흔들림 진폭 (픽셀, 0 = 끔)
+
+Title preview
+== 칭호 완성 미리보기
 
 Title server unavailable; retry
 == 칭호 서버에 연결할 수 없습니다. 다시 시도하세요
+
+Title spatial effect: 0 = polished, 1 = solid, 2 = classic Calamity, 3 = off
+== 칭호 입체 효과: 0 = 광택, 1 = 솔리드, 2 = 클래식 Calamity, 3 = 끔
+
+Title style
+== 칭호 스타일
 
 Title too long or contains unsupported characters
 == 칭호가 너무 길거나 지원하지 않는 문자가 있습니다
@@ -11723,6 +11819,9 @@ Unknown parameter. Accepted values: default, gametimer, broadcast, both, none
 Unknown status
 == 알 수 없는 상태
 
+Unknown title style
+== 알 수 없는 칭호 스타일
+
 Unlock a team
 == 팀 잠금 해제
 
@@ -11816,6 +11915,9 @@ Use alternative antiping smoothing, incompatible with cl_antiping_smooth
 Use alternative world tick calculation making hooks behave as if all players have Strong.
 == 모든 플레이어가 Strong을 가진 것처럼 갈고리가 작동하도록 대체 월드 틱 계산 사용
 
+Use animated title style (overrides qm_title_color_mode)
+== 칭호 애니메이션 스타일 사용 (qm_title_color_mode 덮어씀)
+
 Use colored skins for frozen tees
 == 얼어붙은 티에 컬러 스킨 사용
 
@@ -11842,6 +11944,9 @@ Use default voice input device
 
 Use default voice output device
 == 기본 음성 출력 장치 사용
+
+Use each Tee trail style's own palette instead of the trail color mode
+== Tee 궤적 색상 모드 대신 각 스타일 고유의 색상을 사용
 
 Use embedded HUD progress bar
 == 내장 HUD 진행 표시줄 사용
@@ -11905,6 +12010,9 @@ Use skin color when Tee is frozen
 
 Use sounds
 == 사운드 사용
+
+Use style colors
+== 스타일 고유 색상 사용
 
 Use team colors for name plates
 == 이름표에 팀 색상 사용
@@ -11998,6 +12106,9 @@ View the developers and contributors
 
 View the people supporting QmClient development
 == View the people supporting QmClient development
+
+Violet Lightning
+== 보랏빛 번개
 
 Virtual joystick which always uses fire.
 == 항상 발사를 사용하는 가상 조이스틱입니다.
@@ -12107,6 +12218,9 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == 음성 화이트리스트 (쉼표로 구분)
 
+Void Shadow
+== 공허·그림자
+
 Volume
 == 볼륨
 
@@ -12199,6 +12313,15 @@ Warn about team balance
 
 Warning
 == 경고
+
+Wave amount
+== 파도 크기
+
+Wave speed (0.01 rad/s)
+== 물결 속도 (0.01 rad/s)
+
+Wave wavelength
+== 물결 파장
 
 Weak hook
 == 약한 갈고리
@@ -13050,6 +13173,22 @@ Others
 [Show name plates]
 Own
 == 자신
+
+[Show name plates scope]
+All
+== 모두
+
+[Show name plates scope]
+Current
+== 현재
+
+[Show name plates scope]
+Friends
+== 친구
+
+[Show name plates scope]
+Local
+== 로컬
 
 [Show players' key presses]
 All

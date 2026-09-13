@@ -102,6 +102,45 @@ namespace ui_widget
 		DrawRoundedSurface(Ctx, Indicator, Style.m_IndicatorColor, ColorRGBA(), ui_token::radius::PILL);
 	}
 
+	void NestedSegmentChrome(const IUiContext &Ctx, const uint64_t GroupId, const CUIRect &ContainerRect, const CUIRect *pMainSlot, const CUIRect *pSubSlot, const SNestedSegmentStyle &Style)
+	{
+		if(Ctx.m_pUi == nullptr || ContainerRect.w <= 0.0f || ContainerRect.h <= 0.0f)
+			return;
+		// 预热 / 文字计划收集帧只跑逻辑不落绘制，也不推进滑块弹簧，否则预热帧会把滑块
+		// 直接推到目标位置，下一帧切换就看不到滑动。
+		if(Ctx.m_pUi->RenderOnly())
+			return;
+
+		DrawRoundedSurface(Ctx, ContainerRect, Style.m_ContainerColor, ColorRGBA(), ui_token::radius::PILL);
+
+		// 主滑块与次级滑块各占一条弹簧轨道（节点索引 0 / 1），互不干扰。
+		const auto DrawIndicator = [&](const CUIRect *pSlot, const float Inset, const ColorRGBA &Fill, const ColorRGBA &Border, const int TrackIndex) {
+			if(pSlot == nullptr)
+				return;
+			CUIRect Target;
+			pSlot->Margin(Inset, &Target);
+			if(Target.w <= 0.0f || Target.h <= 0.0f)
+				return;
+
+			CUIRect Indicator = Target;
+			if(Ctx.m_pAnim != nullptr)
+			{
+				// 滑块弹簧：欠阻尼一点点（ζ≈0.93），切换选项时带速度续接地滑过去，
+				// 落到目标附近再收住，不会来回弹。
+				static constexpr SUiSpringConfig s_IndicatorSpring{1.0f, 420.0f, 38.0f, 0.05f, 0.4f};
+				const uint64_t NodeKey = BuildUiAnimNodeKey(GroupId, TrackIndex);
+				Indicator.x = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_X, Target.x, s_IndicatorSpring, 2);
+				Indicator.y = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_Y, Target.y, s_IndicatorSpring, 2);
+				Indicator.w = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::WIDTH, Target.w, s_IndicatorSpring, 2);
+				Indicator.h = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::HEIGHT, Target.h, s_IndicatorSpring, 2);
+			}
+			const bool HasBorder = Border.a > 0.0f;
+			DrawRoundedSurface(Ctx, Indicator, Fill, Border, ui_token::radius::PILL, HasBorder ? Ctx.m_pUi->PixelSize() : 0.0f);
+		};
+		DrawIndicator(pMainSlot, Style.m_IndicatorInset, Style.m_MainIndicatorColor, ColorRGBA(), 0);
+		DrawIndicator(pSubSlot, Style.m_SubIndicatorInset, Style.m_SubIndicatorColor, Style.m_SubIndicatorBorderColor, 1);
+	}
+
 	bool ListItem(const IUiContext &Ctx, const void *pId, const char *pText, const CUIRect &Rect, const SListItemProps &Props)
 	{
 		if(Ctx.m_pUi == nullptr)

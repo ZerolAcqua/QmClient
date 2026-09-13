@@ -329,6 +329,31 @@ TEST(QmNameplateHookStrongWeak, ScopeFiltersExpectedPlayers)
 	EXPECT_FALSE(ShouldShowQmHookStrongWeakScope(99, false, true, false));
 }
 
+TEST(QmNameplateNameScope, OwnScopeSelectsCurrentCharacterOrAllLocalCharacters)
+{
+	// 自身·当前：只有当前操控角色显示自己的昵称（= 旧 cl_nameplates_own 行为）。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_ALL, true, true, true, true, false));
+	// 自身·当前：分身（本机但非当前角色）不显示。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_ALL, true, true, false, true, false));
+	// 自身·本地：主号与分身都显示。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_LOCAL, QM_NAMEPLATE_OTHERS_SCOPE_ALL, true, true, false, true, false));
+	// 总开关关掉自身时，二级范围不能反过来点亮昵称。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_LOCAL, QM_NAMEPLATE_OTHERS_SCOPE_ALL, false, true, false, true, false));
+}
+
+TEST(QmNameplateNameScope, OthersScopeFiltersAllPlayersOrFriendsOnly)
+{
+	// 他人·所有：任何非本机玩家都显示（= 旧 cl_nameplates 行为）。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_ALL, true, true, false, false, false));
+	// 他人·好友：非好友隐藏，好友显示。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS, true, true, false, false, false));
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS, true, true, false, false, true));
+	// 总开关关掉他人时，好友也不能显示。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS, true, false, false, false, true));
+	// 自身范围与好友过滤互不干扰：别人是否好友不影响自身的昵称。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS, true, true, true, true, false));
+}
+
 TEST(QmNameplateTextEffects, PlayingScopeSupportsSelfOthersFriendsAndAll)
 {
 	EXPECT_TRUE(ShouldUseQmNameplateTextEffects(QM_NAMEPLATE_TEXT_PLAYING_SCOPE_SELF, QM_NAMEPLATE_TEXT_SPECTATE_SCOPE_OFF, QM_NAMEPLATE_TEXT_DEMO_MODE_OFF, -1, false, false, true, false, false, 0));

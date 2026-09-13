@@ -1146,9 +1146,22 @@ public:
 
 	struct SSelectionPopupContext : public SPopupMenuId
 	{
+		// 条目自定义前景：弹层在「条目背景之上、条目文字之下」逐条调用，
+		// 供调用方补画普通文本表达不了的效果（例：头衔动态风格的实时预览）。
+		// 绘制坐标已是屏幕坐标，回调内不要再叠加卡片/滚动偏移。
+		struct SEntryCustomRenderContext
+		{
+			const CUIRect &m_RowRect; // 整个条目矩形，与 PopupSelection 的 slot 同源
+			float m_Padding; // 条目按钮自身的内边距，自定义前景应避让
+			float m_FontSize; // 条目文字字号，供预览按同一字号对齐
+		};
+		typedef void (*FEntryCustomRenderCallback)(void *pContext, const SEntryCustomRenderContext &EntryCtx, int Index, const char *pEntry);
+
 		CUi *m_pUI; // set by CUi when popup is shown
 		CScrollRegion *m_pScrollRegion;
 		SPopupMenuProperties m_Props;
+		FEntryCustomRenderCallback m_pfnEntryCustomRender = nullptr;
+		void *m_pEntryCustomRenderContext = nullptr;
 		char m_aMessage[256];
 		std::vector<std::string> m_vEntries;
 		std::vector<CButtonContainer> m_vButtonContainers;
@@ -1241,6 +1254,9 @@ public:
 		const CUIRect *m_pAnchorViewport;
 		const CUIRect *m_pPopupViewport;
 		SQmDropdownVisualStyle m_VisualStyle;
+		// 弹层条目的自定义前景绘制。上下文必须比本帧的弹层绘制活得更久（调用方通常用 static）。
+		SSelectionPopupContext::FEntryCustomRenderCallback m_pfnEntryCustomRender = nullptr;
+		void *m_pEntryCustomRenderContext = nullptr;
 	};
 	int DoDropDown(CUIRect *pRect, int CurSelection, const char *const *pStrs, int Num, SDropDownState &State, const SDropDownProperties &DropDownProps = {});
 	int DoDropDown(CUIRect *pRect, int CurSelection, const char *const *pStrs, int Num, SDropDownState &State, bool Enabled);

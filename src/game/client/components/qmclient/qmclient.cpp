@@ -30,6 +30,7 @@
 
 #include <game/client/animstate.h>
 #include <game/client/components/chat.h>
+#include <game/client/components/qmclient/qm_title_style.h>
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
 #include <game/client/ui.h>
@@ -2257,7 +2258,7 @@ void CQmClient::RefreshTitleProfile()
 	m_pTitleStatus = Localizable("Contacting title server");
 }
 
-void CQmClient::SaveTitleProfile(const char *pTitle, const char *pBoundName)
+void CQmClient::SaveTitleProfile(const char *pTitle, const char *pBoundName, const char *pStyle)
 {
 	if(TitleBusy() || !m_TitleAuthenticated)
 		return;
@@ -2266,12 +2267,21 @@ void CQmClient::SaveTitleProfile(const char *pTitle, const char *pBoundName)
 		m_pTitleStatus = Localizable("Title too long or contains unsupported characters");
 		return;
 	}
+	// 只上传服务端认得的风格 id，避免把本地拼写错误写进账号。
+	const char *pStyleId = pStyle != nullptr ? pStyle : "";
+	if(pStyleId[0] != '\0' && QmTitleStyleById(pStyleId) == nullptr)
+	{
+		m_pTitleStatus = Localizable("Unknown title style");
+		return;
+	}
 	CJsonStringWriter Writer;
 	Writer.BeginObject();
 	Writer.WriteAttribute("title");
 	Writer.WriteStrValue(pTitle);
 	Writer.WriteAttribute("bound_name");
 	Writer.WriteStrValue(pBoundName);
+	Writer.WriteAttribute("style");
+	Writer.WriteStrValue(pStyleId);
 	Writer.EndObject();
 	StartTitleRequest("profile", Writer.GetOutputString().c_str(), m_pTitleOperation);
 	m_pTitleStatus = Localizable("Contacting title server");
@@ -2300,6 +2310,22 @@ const char *CQmClient::PlayerTitle(int ClientId) const
 	return "";
 }
 
+const char *CQmClient::PlayerTitleStyle(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_aClients[ClientId].m_Active || GameClient()->ShouldHideStreamerIdentity(ClientId))
+		return "";
+	// 与 PlayerTitle 使用同一套有效期与绑定名校验，避免出现「有风格但没有头衔」的状态。
+	if(m_aTitleExpires[ClientId] <= time_get() || str_comp(m_aaTitleNames[ClientId], GameClient()->m_aClients[ClientId].m_aName) != 0)
+		return "";
+	return m_aaPlayerStyles[ClientId];
+}
+
+double CQmClient::TitleAnimationTime() const
+{
+	// 对齐服务端时间后再取模，保证所有客户端在同一时刻得到相同相位。
+	return QmTitleAnimationTime((double)Client()->GlobalTime(), m_ServerTimeOffset, m_ServerTimeOffsetValid);
+}
+
 void CQmClient::UpdateTitleAuthentication()
 {
 	if(m_pTitleOperation && m_pTitleOperation->Done())
@@ -2320,6 +2346,7 @@ void CQmClient::UpdateTitleAuthentication()
 			m_TitleAuthenticated = true;
 			str_copy(m_aTitleText, pTitle);
 			str_copy(m_aTitleBoundName, pName);
+			str_copy(m_aTitleProfileStyle, TitleJsonString(pRoot, "style"));
 			++m_TitleRevision;
 			m_pTitleStatus = Localizable("Permanent sponsor verified");
 			ResetTitlePresences();
@@ -2347,9 +2374,12 @@ void CQmClient::UpdateTitleAuthentication()
 	}
 	if(m_pTitleReport && m_pTitleReport->Done())
 	{
-		if(m_pTitleReport->StatusCode() == 409)
+		// 超时等传输失败也会让 Done() 为真，但此时没有 HTTP 结果，StatusCode() 会断言。
+		const bool Done = m_pTitleReport->State() == EHttpState::DONE;
+		const int StatusCode = Done ? m_pTitleReport->StatusCode() : 0;
+		if(StatusCode == 409)
 			m_pTitleStatus = Localizable("Four IP addresses are already online");
-		else if(m_pTitleReport->StatusCode() == 200 && !TitleBusy())
+		else if(StatusCode == 200 && !TitleBusy())
 			m_pTitleStatus = Localizable("Permanent sponsor verified");
 		m_pTitleReport.reset();
 	}
@@ -2362,11 +2392,21 @@ void CQmClient::UpdateTitleAuthentication()
 		if(m_pTitleList->State() == EHttpState::DONE && m_pTitleList->StatusCode() == 200 && str_comp(aServer, m_aTitlePendingServer) == 0)
 		{
 			json_value *pRoot = m_pTitleList->ResultJson();
-			for(const auto &Presence : ParseQmTitlePresences(pRoot, aServer))
+			int64_t ServerTime = 0;
+			for(const auto &Presence : ParseQmTitlePresences(pRoot, aServer, &ServerTime))
 			{
 				str_copy(m_aaTitleNames[Presence.m_PlayerId], Presence.m_PlayerName.c_str());
 				str_format(m_aaPlayerTitles[Presence.m_PlayerId], sizeof(m_aaPlayerTitles[Presence.m_PlayerId]), "[%s]", Presence.m_Title.c_str());
+				str_copy(m_aaPlayerStyles[Presence.m_PlayerId], Presence.m_Style.c_str());
 				m_aTitleExpires[Presence.m_PlayerId] = time_get() + Presence.m_RemainingSeconds * time_freq();
+			}
+			// 用服务端时间对齐动画相位：各客户端据此得到一致的时间基准，
+			// 否则同一时刻不同人看到的颜色相位会因本机时钟偏差而错开。
+			if(ServerTime > 0)
+			{
+				const double Measured = (double)ServerTime - (double)Client()->GlobalTime();
+				m_ServerTimeOffset = QmTitleUpdateServerTimeOffset(m_ServerTimeOffset, m_ServerTimeOffsetValid, Measured);
+				m_ServerTimeOffsetValid = true;
 			}
 			json_value_free(pRoot);
 		}

@@ -41,8 +41,15 @@ private:
 	char m_aTitleToken[65] = "";
 	char m_aTitleText[64] = "";
 	char m_aTitleBoundName[64] = "";
+	// 账号上已保存的自选头衔风格 id（空表示未自选，由服务端每局派生）。
+	char m_aTitleProfileStyle[64] = "";
 	char m_aTitlePendingServer[NETADDR_MAXSTRSIZE] = "";
 	char m_aaPlayerTitles[MAX_CLIENTS][64] = {};
+	// 服务端分配的头衔动态风格 id，与 m_aaPlayerTitles 同时刷新。
+	char m_aaPlayerStyles[MAX_CLIENTS][64] = {};
+	// 服务端时间与本地 GlobalTime 的偏移（秒），用于让所有客户端的动画相位对齐。
+	double m_ServerTimeOffset = 0.0;
+	bool m_ServerTimeOffsetValid = false;
 	char m_aaTitleNames[MAX_CLIENTS][MAX_NAME_LENGTH] = {};
 	int64_t m_aTitleExpires[MAX_CLIENTS] = {};
 	int64_t m_TitleLastSync = 0;
@@ -161,15 +168,20 @@ private:
 
 public:
 	void RedeemTitleCode(const char *pCode);
-	void SaveTitleProfile(const char *pTitle, const char *pBoundName);
+	void SaveTitleProfile(const char *pTitle, const char *pBoundName, const char *pStyle);
 	void RefreshTitleProfile();
 	bool TitleBusy() const { return m_pTitleOperation != nullptr; }
 	bool TitleAuthenticated() const { return m_TitleAuthenticated; }
 	const char *TitleStatus() const { return m_pTitleStatus; }
 	const char *TitleText() const { return m_aTitleText; }
 	const char *TitleBoundName() const { return m_aTitleBoundName; }
+	const char *TitleProfileStyle() const { return m_aTitleProfileStyle; }
 	int TitleRevision() const { return m_TitleRevision; }
 	const char *PlayerTitle(int ClientId) const;
+	// 该玩家头衔的动态风格 id；未分配或已过期时返回空串。
+	const char *PlayerTitleStyle(int ClientId) const;
+	// 头衔动画的相位基准（秒，已对齐服务端时间并取模）。服务端不可用时退回本地时间。
+	double TitleAnimationTime() const;
 	int Sizeof() const override { return sizeof(*this); }
 	void OnInit() override;
 	void OnShutdown() override;

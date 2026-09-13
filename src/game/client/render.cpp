@@ -234,6 +234,121 @@ void CRenderTools::RenderTextContainerWithEffects(STextContainerIndex TextContai
 	TextRender()->RenderTextContainer(TextContainerIndex, TextColor, OutlineColor, X, Y);
 }
 
+void CRenderTools::RenderTitleContainerWithPolishedEffects(STextContainerIndex TextContainerIndex, const SQmTitlePolishStyle &Style, float X, float Y) const
+{
+	if(!TextContainerIndex.Valid())
+		return;
+
+	const float TextAlpha = std::clamp(Style.m_TextAlpha, 0.0f, 1.0f);
+	const ColorRGBA Base = ColorRGBA(Style.m_TextColor.r, Style.m_TextColor.g, Style.m_TextColor.b, 1.0f);
+	const ColorRGBA EmptyOutline(0.0f, 0.0f, 0.0f, 0.0f);
+	auto DrawPass = [&](const ColorRGBA &Color, const float OffsetX, const float OffsetY) {
+		TextRender()->RenderTextContainer(TextContainerIndex, Color, EmptyOutline, X + OffsetX, Y + OffsetY);
+	};
+
+	// 注意：所有效果层都必须用空描边绘制。引擎的 RenderTextContainer 会在文字背后补画四个 1 像素
+	// 偏移的描边副本，若逐层都带描边，深色边会被叠加十几遍，正是旧档「糊一圈黑」的来源。
+	if(TextAlpha <= 0.0f)
+		return;
+
+	// 1) 投影：低位深色副本。强度与文字亮度成正比——白色文字拿到最清晰的轮廓，
+	//    本来就深的文字不需要额外压暗，因此不会出现「黑字再加黑边」的糊团。
+	if(Style.m_ShadowAlpha > 0.0f)
+	{
+		const float Luminance = std::clamp((Base.r + Base.g + Base.b) / 3.0f, 0.0f, 1.0f);
+		const ColorRGBA Shadow(
+			Style.m_ShadowColor.r,
+			Style.m_ShadowColor.g,
+			Style.m_ShadowColor.b,
+			Style.m_ShadowAlpha * Luminance * TextAlpha);
+		DrawPass(Shadow, Style.m_ShadowOffset.x, Style.m_ShadowOffset.y);
+	}
+
+	// 2) 同色柔光：本体色向四方向小半径散开，观感是「自发光」而不是灰边。
+	//    浅色文字同时拿到一层很淡的暗色晕，浅色背景上也不会糊掉；深色文字这层自然趋近于零。
+	if(Style.m_GlowAlpha > 0.0f && Style.m_GlowRadius > 0.0f)
+	{
+		static constexpr vec2 s_aGlowDirections[] = {
+			vec2(1.0f, 0.0f),
+			vec2(-1.0f, 0.0f),
+			vec2(0.0f, 1.0f),
+			vec2(0.0f, -1.0f),
+		};
+		const ColorRGBA TintedGlow(Base.r, Base.g, Base.b, Style.m_GlowAlpha * TextAlpha);
+		const float DarkGlowAlpha = Style.m_GlowAlpha * 0.85f * std::clamp(0.5f * (Base.r + Base.g + Base.b), 0.0f, 1.0f);
+		const ColorRGBA DarkGlow(0.0f, 0.0f, 0.0f, DarkGlowAlpha * TextAlpha);
+		for(int Pass = 0; Pass < 2; ++Pass)
+		{
+			// 内圈更亮、外圈更淡，两层叠加后近似高斯衰减，避免出现一圈硬边。
+			const float Radius = Style.m_GlowRadius * (float)(Pass + 1) * 0.5f;
+			const float Fade = Pass == 0 ? 1.0f : 0.6f;
+			for(const vec2 &Dir : s_aGlowDirections)
+			{
+				DrawPass(DarkGlow.WithMultipliedAlpha(Fade), Dir.x * Radius, Dir.y * Radius);
+				DrawPass(TintedGlow.WithMultipliedAlpha(Fade), Dir.x * Radius, Dir.y * Radius);
+			}
+		}
+	}
+
+	// 3) 高光浮雕：本体色向白色插值后向上偏移一像素，字形顶缘得到一条亮边，像抛光过的水晶切面。
+	//    偏移固定一像素，因此不需要额外预留边界。
+	if(Style.m_HighlightAlpha > 0.0f)
+	{
+		const ColorRGBA Highlight(
+			Base.r + (1.0f - Base.r) * 0.72f,
+			Base.g + (1.0f - Base.g) * 0.72f,
+			Base.b + (1.0f - Base.b) * 0.72f,
+			Style.m_HighlightAlpha * TextAlpha);
+		DrawPass(Highlight, 0.0f, -1.0f);
+	}
+
+	// 4) 本体：逐字符颜色（以及掠光提亮）都在顶点色里，uniform 只负责整体透明度。
+	DrawPass(ColorRGBA(Style.m_TextColor.r, Style.m_TextColor.g, Style.m_TextColor.b, TextAlpha), 0.0f, 0.0f);
+}
+
+void CRenderTools::RenderTitleContainerWithCalamityEffects(STextContainerIndex TextContainerIndex, const SQmTitleEffectStyle &Style, float X, float Y) const
+{
+	if(!TextContainerIndex.Valid())
+		return;
+
+	const ColorRGBA EmptyText(0.0f, 0.0f, 0.0f, 0.0f);
+	const ColorRGBA EmptyOutline(0.0f, 0.0f, 0.0f, 0.0f);
+
+	// 8 方向固定半径描边：Calamity 用 new Vector2(2, 0).RotatedBy(f) 绕一圈共 8 个方向。
+	if(Style.m_OutlineRadius > 0.0f && Style.m_OutlineColor.a > 0.0f)
+	{
+		static constexpr vec2 s_aTitleOutlineDirections[] = {
+			vec2(1.0f, 0.0f),
+			vec2(-1.0f, 0.0f),
+			vec2(0.0f, 1.0f),
+			vec2(0.0f, -1.0f),
+			vec2(0.70710677f, 0.70710677f),
+			vec2(-0.70710677f, 0.70710677f),
+			vec2(0.70710677f, -0.70710677f),
+			vec2(-0.70710677f, -0.70710677f),
+		};
+		for(const vec2 &Dir : s_aTitleOutlineDirections)
+			TextRender()->RenderTextContainer(TextContainerIndex, EmptyText, Style.m_OutlineColor, X + Dir.x * Style.m_OutlineRadius, Y + Dir.y * Style.m_OutlineRadius);
+	}
+
+	// 辉光：沿圆周均布的加法混合副本。用填充层叠加，顶点色里携带的逐字符颜色会一起发光，
+	// 因此得到彩色的辉光而不是单色轮廓光。
+	if(Style.m_BloomDraws > 0 && Style.m_BloomAlpha > 0.0f && Style.m_BloomColor.a > 0.0f)
+	{
+		const ColorRGBA Bloom = Style.m_BloomColor.WithAlpha(Style.m_BloomAlpha);
+		const float Radius = Style.m_BloomRadius + Style.m_BloomPulse;
+		Graphics()->BlendAdditive();
+		for(int Index = 0; Index < Style.m_BloomDraws; ++Index)
+		{
+			const float Angle = 2.0f * pi * (float)Index / (float)Style.m_BloomDraws + Style.m_BloomRotation;
+			TextRender()->RenderTextContainer(TextContainerIndex, Bloom, EmptyOutline, X + std::cos(Angle) * Radius, Y + std::sin(Angle) * Radius);
+		}
+		Graphics()->BlendNormal();
+	}
+
+	TextRender()->RenderTextContainer(TextContainerIndex, Style.m_TextColor, Style.m_OutlineColor, X, Y);
+}
+
 void CRenderTools::GetRenderTeeAnimScaleAndBaseSize(const CTeeRenderInfo *pInfo, float &AnimScale, float &BaseSize)
 {
 	AnimScale = pInfo->m_Size * 1.0f / 64.0f;

@@ -177,6 +177,7 @@ Adjust the opacity of entities belonging to other teams, such as tees and name p
 Adjust trails rendered behind Tees
 Adjust verbosity in external console (-3 = none, -2 = errors only, -1 = warnings, 0 = info, 1 = debug, 2 = trace).
 Advanced
+Advanced mode
 Advanced options
 AFR
 After hammer fly, whether dummy switches back to previous weapon
@@ -228,6 +229,8 @@ Animate lists when entering a page
 Animate settings card expand and collapse height changes
 Animate settings card lists when entering a page
 Animate settings card reorder and layout reflow
+Animated styles override the fallback title color
+Animated title style id
 Animation
 Animation duration
 Animation range
@@ -612,6 +615,8 @@ Classic Nut
 Classic nut
 Classic Pro
 Classic pro
+Classic title glow
+Classic title glow: 0 = off, 1 = subtle (6 draws), 2 = full Calamity (16 draws)
 Clear
 Clear all favorite maps
 Clear all history
@@ -654,7 +659,6 @@ Close window after changing settings
 Collision hitbox
 Collision Line Opacity
 Color
-Color & opacity
 Color of authenticated player names on scoreboard
 Color of hook collision line tip segment
 Color of hook line hitting hookable tile
@@ -822,6 +826,7 @@ Current time: %s\n- Uptime and playtime are calculated from official JSON data\n
 Current: Ranks
 Current: Score
 Current: Time
+Cursed Flame
 Custom
 custom
 Custom API key
@@ -1185,6 +1190,7 @@ Enable Gores mode
 Enable Gores mode (King of Gores helper tools)
 Enable gun sound
 Enable highlighted chat sound
+Enable hook countdown
 Enable HUD animations
 Enable HUD rainbow colors
 Enable in-game touch controls
@@ -1344,6 +1350,7 @@ Failed to read saves file
 Failed to write PNG export.
 Fake CTF flags
 Fallback simple noise reduction strength
+Fallback title color
 Fast input
 Fast input (reduce visual latency)
 Fast input others
@@ -1395,6 +1402,7 @@ Folder
 Folder Link
 Follow
 Follow server
+Follow Tee
 Following
 Font cursor
 Font size
@@ -1519,6 +1527,7 @@ Go back the specified duration
 Go forward one marker
 Go forward one tick
 Go forward the specified duration
+Golden Grace
 Gores
 Gores Actor
 Gores actor
@@ -1872,6 +1881,7 @@ Lht.
 LibreTranslate
 LibreTranslate API Key
 LibreTranslate endpoint
+Light band (0 = style default)
 Limit information in spectator mode
 Limiter threshold (percent)
 Line width
@@ -2369,8 +2379,10 @@ Opt out of spectator count and hide auth status to non-authed players (1 = hidde
 Optimistic prediction along stable direction
 Option color
 Optional authentication key for the DNSBL provider
+Original
 Other
 Other players' hook line width
+Other players' nameplate scope (0=All players 1=Friends only)
 Others
 Others only
 Outgoing language
@@ -2398,6 +2410,7 @@ Override Selected
 Overview
 Overwrite clan even if empty
 Own hook line width
+Own nameplate scope (0=Current character 1=All local characters)
 p = Ping latency
 Pack name
 Panel opacity
@@ -2520,6 +2533,7 @@ Please use %s as friend name
 Please use a different filename
 Please wait…
 Points
+Polished
 Popup animation
 Port for client to server connection (0=random, >=1024 sets manual port)
 Port for dummy connection to server (0=random, >=1024 sets manual port)
@@ -3064,6 +3078,7 @@ Settings file
 Settings page right panel opacity
 Severe
 Shape
+Shimmer speed (polished)
 Short server names
 Shotgun
 Shotgun Laser Inner Color
@@ -3072,6 +3087,7 @@ Shotgun Laser Outline Color
 Shotgun laser outline color
 Show %s group
 Show a small view of the dummy
+Show advanced title settings (collapsing keeps configured effects)
 Show air jump indicator
 Show all
 Show all buttons
@@ -3174,6 +3190,7 @@ Show important messages when rendering video
 Show important server prompts
 Show important server prompts and Echo messages as popups
 Show important server prompts as notifications
+Show in Dynamic Island
 Show in-game FPS
 Show in-game HUD
 Show in-game HUD (checkpoint time diff)
@@ -3419,6 +3436,8 @@ Smooth scroll animation duration in menu/editor (ms, 0=off)
 Smooth zoom animation time in editor (in ms, 0=off)
 Smoothness of multi-view zoom (in ms, higher = slower)
 SMTC
+Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
+Snap wave to pixels
 Snapshot Age
 Snapshot age
 Snapshot Latency
@@ -3450,6 +3469,7 @@ Source file is empty.
 Source language code for translation (auto=auto-detect)
 Space
 Spam protection: prevent spamming of team switching, chat, skin changes, emotes, votes
+Spatial effect
 Speaker
 Specifies whether zoom should be limited in game (0 = unlimited)
 Specify command accessibility for given access level
@@ -3482,6 +3502,7 @@ Speedrun timer seconds
 Speedrun timer time (MM:SS, legacy)
 Sphere
 Spin pop
+Spirit Light
 Sponsor code
 Sponsor code already claimed
 Sponsor reminder
@@ -3543,6 +3564,7 @@ Strong Weak Hook
 Style chat names, text, and message colors
 Style kill, finish, and system messages
 Sub-Tick aiming
+Subtle
 Successfully saved the replay!
 Sudden Death
 Suicides
@@ -3639,6 +3661,7 @@ Tee size
 Tee status bar
 Tee trail color
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
+Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
 Tee Trails
 Tee trails
 Teeworlds 0.7 difficulty level (0 = Casual, 1 = Normal, 2 = Competitive).
@@ -3752,8 +3775,17 @@ Timeout seed
 Timer is displayed in %s
 Timer isn't displayed.
 Tiny Tee Size
-Title color
+Title bob angular speed in 1/100 rad/s
+Title bob wavelength in pixels
+Title color (single color)
+Title light sweep speed in 1/100 row per second (0 = off)
+Title opacity (custom color)
+Title per-character phase per pixel in 1/1000 px (0 = style default, 20 = visible light band)
+Title per-character vertical bob amplitude in pixels (0 = off)
+Title preview
 Title server unavailable; retry
+Title spatial effect: 0 = polished, 1 = solid, 2 = classic Calamity, 3 = off
+Title style
 Title too long or contains unsupported characters
 To save all players in your team have to be alive and not in '/spec'
 Toast uses UiTokens + QmMotion slide
@@ -3906,6 +3938,7 @@ Unknown argument. Check '/rescuemode list'
 Unknown emote. Use /emote to see available emotes.
 Unknown parameter. Accepted values: default, gametimer, broadcast, both, none
 Unknown status
+Unknown title style
 Unlock a team
 Unmute
 Unmute emoticons
@@ -3937,6 +3970,7 @@ Use 12-hour clock for local time
 Use a fixed prediction margin while frozen
 Use alternative antiping smoothing, incompatible with cl_antiping_smooth
 Use alternative world tick calculation making hooks behave as if all players have Strong.
+Use animated title style (overrides qm_title_color_mode)
 Use colored skins for frozen tees
 Use compact list view for config variables
 Use current map as background
@@ -3946,6 +3980,7 @@ Use default input
 Use default output
 Use default voice input device
 Use default voice output device
+Use each Tee trail style's own palette instead of the trail color mode
 Use embedded HUD progress bar
 Use emote
 Use enemy color instead of frozen color
@@ -3967,6 +4002,7 @@ Use pre-input to predict other players for more accurate input prediction
 Use skin color for frozen Tee's feet
 Use skin color when Tee is frozen
 Use sounds
+Use style colors
 Use team colors for name plates
 Use Tee icons instead of circles
 Use the mouse wheel on a hovered module to scale it by 5%
@@ -3998,6 +4034,7 @@ View switch found (at offset) with given number
 View tele found (at offset) with given number
 View the developers and contributors
 View the people supporting QmClient development
+Violet Lightning
 Virtual joystick which always uses fire.
 Virtual joystick which always uses hook.
 Virtual joystick which only aims without using an action.
@@ -4034,6 +4071,7 @@ Voice stereo output
 Voice stereo width (percent)
 Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
+Void Shadow
 Volume
 Vote a map by name
 Vote command
@@ -4065,6 +4103,9 @@ Warmup
 Warmup time before round (in seconds)
 Warn about team balance
 Warning
+Wave amount
+Wave speed (0.01 rad/s)
+Wave wavelength
 Weak hook
 Weak hook color
 Weak network test: server receive extra reorder probability percentage
@@ -5304,6 +5345,10 @@ Zoom to current mouse target
 [Show name plates]	None
 [Show name plates]	Others
 [Show name plates]	Own
+[Show name plates scope]	All
+[Show name plates scope]	Current
+[Show name plates scope]	Friends
+[Show name plates scope]	Local
 [Show players' key presses]	All
 [Show players' key presses]	None
 [Show players' key presses]	Others

@@ -6481,6 +6481,8 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 	const float HeadlineHeight = AppearanceMetrics.m_LineHeight + AppearanceMetrics.m_LineSpacing * 2.0f;
 	const float MarginSmall = AppearanceMetrics.m_LineSpacing;
 	const float MarginBetweenViews = AppearanceMetrics.m_SectionGap * 2.0f;
+	// 胶囊两级分段行的槽位内缩：容器胶囊与槽位之间留出这圈边距，滑块才像浮在轨道里。
+	const float CapsuleSegmentInset = std::clamp(2.0f * AppearanceMetrics.m_UiScale, 1.0f, 2.0f);
 
 	CUIRect ContentView = MainView;
 	auto DoAppearanceHeading = [this](CUIRect &View, const char *pTextId, const char *pText, float FontSize, float LineHeight) {
@@ -7151,11 +7153,18 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 				const auto RadioHeight = [&](const int OptionCount) {
 					return ResolveSettingsRadioRowLayout({0.0f, 0.0f, ContentWidth, LineSize * 2.0f + MarginSmall}, OptionCount, AppearanceMetrics).m_Height;
 				};
+				// 「显示昵称」在新 UI 下是固定两行的胶囊两级行（标签一行 + 控件一行），
+				// 高度与一级选择无关，所以这里不需要跟着 m_ClNamePlates* 重算。
+				const auto ShowNameRowHeight = [&]() {
+					if(g_Config.m_QmNewUi != 0)
+						return ResolveSettingsNestedRadioRowLayout({0.0f, 0.0f, ContentWidth, LineSize * 2.0f + MarginSmall}, AppearanceMetrics).m_Height;
+					return RadioHeight(4);
+				};
 				const bool ClanEnabled = g_Config.m_ClNamePlatesClan != 0;
 				const bool IdsEnabled = g_Config.m_ClNamePlatesIds != 0;
 				const bool SeparateIds = IdsEnabled && g_Config.m_ClNamePlatesIdsSeparateLine != 0;
 				const int GeneralRows = 7 + (ClanEnabled ? 1 : 0) + (IdsEnabled ? 1 : 0) + (SeparateIds ? 1 : 0);
-				const float GeneralContentHeight = RadioHeight(4) + MarginSmall + GeneralRows * (LineSize + MarginSmall);
+				const float GeneralContentHeight = ShowNameRowHeight() + MarginSmall + GeneralRows * (LineSize + MarginSmall);
 				float HookContentHeight = NamePlateSectionHeaderHeight + LineSize + MarginSmall;
 				if(NamePlateStrongEnabled())
 				{
@@ -7178,13 +7187,73 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 				// General name plate settings
 				{
 					int Pressed = (g_Config.m_ClNamePlates ? 2 : 0) + (g_Config.m_ClNamePlatesOwn ? 1 : 0);
-					if(DoSettingsLine_RadioMenu(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, APPEARANCE_TAB_NAME_PLATE, LeftView, "appearance-show-name-plates-label", Localize("Show name plates"),
-						   m_vButtonContainersNamePlateShow,
-						   {"appearance-show-name-plates-none", "appearance-show-name-plates-own", "appearance-show-name-plates-others", "appearance-show-name-plates-all"},
-						   {Localize("None", "Show name plates"), Localize("Own", "Show name plates"), Localize("Others", "Show name plates"), Localize("All", "Show name plates")},
-						   {0, 1, 2, 3},
-						   Pressed,
-						   AppearanceMetrics))
+					if(g_Config.m_QmNewUi != 0)
+					{
+						// 胶囊两级分段：一级主滑块标记显示范围（无 / 自身 / 他人 / 全体）；
+						// 一级项带子级时它的一级标签被二级菜单整段替换 —— 主滑块盖住子级区域，
+						// 次级滑块再在主滑块之上标出当前子项（自身的「当前 / 本地」、他人的「所有 / 好友」）。
+						// 「无」与「全体」没有子级，各自沿用最近一次的子级选择。
+						const char *apMainLabels[] = {Localize("None", "Show name plates"), Localize("Own", "Show name plates"), Localize("Others", "Show name plates"), Localize("All", "Show name plates")};
+						const char *apMainTextIds[] = {"appearance-show-name-plates-none", "appearance-show-name-plates-own", "appearance-show-name-plates-others", "appearance-show-name-plates-all"};
+						const int aMainValues[] = {0, 1, 2, 3};
+						// 二级选项按当前一级项就地展开：只有自身与他人带子级。
+						const char *apSubLabels[] = {Localize("Current", "Show name plates scope"), Localize("Local", "Show name plates scope"), Localize("All", "Show name plates scope"), Localize("Friends", "Show name plates scope")};
+						const char *apSubTextIds[] = {
+							"appearance-show-name-plates-own-scope-current", "appearance-show-name-plates-own-scope-local",
+							"appearance-show-name-plates-others-scope-all", "appearance-show-name-plates-others-scope-friends"};
+						const int aOwnScopeValues[] = {QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OWN_SCOPE_LOCAL};
+						const int aOthersScopeValues[] = {QM_NAMEPLATE_OTHERS_SCOPE_ALL, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS};
+						const bool OwnRow = Pressed == 1;
+						const bool OthersRow = Pressed == 2;
+						const int SubCount = (OwnRow || OthersRow) ? 2 : 0;
+						const int SubOffset = OwnRow ? 0 : 2;
+						const int *pSubValues = OwnRow ? aOwnScopeValues : aOthersScopeValues;
+						std::vector<CButtonContainer> &vSubButtons = OwnRow ? m_vButtonContainersNamePlateOwnScope : m_vButtonContainersNamePlateOthersScope;
+						int *pSubConfig = OwnRow ? &g_Config.m_QmNameplateOwnScope : &g_Config.m_QmNameplateOthersScope;
+						const int SubActive = SubCount > 0 ? std::clamp(*pSubConfig, 0, 1) : 0;
+						const bool ShowSubMenu = SubCount > 0;
+						const SSettingsNestedRadioRowLayout ShowNameRow = ResolveSettingsNestedRadioRowLayout(LeftView, AppearanceMetrics);
+						LeftView.HSplitTop(ShowNameRow.m_Height, nullptr, &LeftView);
+						DoSettingsLabel(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, "appearance-show-name-plates-label", &ShowNameRow.m_LabelRect, Localize("Show name plates"), AppearanceBodySize, TEXTALIGN_ML);
+						const SSettingsNestedRadioSlots ShowNameSlots = ResolveSettingsNestedRadioSlots(ShowNameRow.m_ContainerRect, std::size(aMainValues), Pressed, SubCount, CapsuleSegmentInset);
+						// 容器与滑块必须先于文字绘制，滑块压在文字之下才不会在滑动时盖住标签。
+						const uint64_t ShowNameGroup = BuildUiAnimNodeKey(MakeUiScopeHash("appearance_name_plate_show_capsule"), reinterpret_cast<uint64_t>(m_vButtonContainersNamePlateShow.data()));
+						const bool MainSlotValid = Pressed >= 0 && Pressed < ShowNameSlots.m_MainCount;
+						const ui_widget::SNestedSegmentStyle ShowNameStyle = SettingsNestedSegmentStyle();
+						ui_widget::NestedSegmentChrome(TabBarUiContext(), ShowNameGroup, ShowNameRow.m_ContainerRect,
+							MainSlotValid ? &ShowNameSlots.m_aMain[Pressed] : nullptr,
+							ShowNameSlots.m_SubCount > 0 ? &ShowNameSlots.m_aSub[SubActive] : nullptr,
+							ShowNameStyle);
+						int NewPressed = Pressed;
+						for(int i = 0; i < (int)std::size(aMainValues); ++i)
+						{
+							// 带子级的激活项：一级标签已被二级菜单替换，这一段不再画文字也不再接手点击。
+							if(ShowSubMenu && i == Pressed)
+								continue;
+							if(DoSettingsButton_CapsuleSegment(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, APPEARANCE_TAB_NAME_PLATE, &m_vButtonContainersNamePlateShow[i], apMainTextIds[i], apMainLabels[i], Pressed == aMainValues[i], &ShowNameSlots.m_aMain[i], AppearanceBodySize))
+								NewPressed = aMainValues[i];
+						}
+						if(NewPressed != Pressed)
+						{
+							Pressed = NewPressed;
+							g_Config.m_ClNamePlates = Pressed & 2 ? 1 : 0;
+							g_Config.m_ClNamePlatesOwn = Pressed & 1 ? 1 : 0;
+						}
+						for(int s = 0; s < ShowNameSlots.m_SubCount; ++s)
+						{
+							// 子级压在主滑块上：字号小一档，字色与 hover 用主滑块上的实色。
+							const ColorRGBA SubLabelColor = SubActive == s ? ShowNameStyle.m_SubActiveLabelColor : ShowNameStyle.m_SubInactiveLabelColor;
+							if(DoSettingsButton_CapsuleSegment(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, APPEARANCE_TAB_NAME_PLATE, &vSubButtons[s], apSubTextIds[SubOffset + s], apSubLabels[SubOffset + s], SubActive == s, &ShowNameSlots.m_aSub[s], AppearanceMetrics.m_SmallSize, &SubLabelColor, &ShowNameStyle.m_SubHoverColor))
+								*pSubConfig = pSubValues[s];
+						}
+					}
+					else if(DoSettingsLine_RadioMenu(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, APPEARANCE_TAB_NAME_PLATE, LeftView, "appearance-show-name-plates-label", Localize("Show name plates"),
+							m_vButtonContainersNamePlateShow,
+							{"appearance-show-name-plates-none", "appearance-show-name-plates-own", "appearance-show-name-plates-others", "appearance-show-name-plates-all"},
+							{Localize("None", "Show name plates"), Localize("Own", "Show name plates"), Localize("Others", "Show name plates"), Localize("All", "Show name plates")},
+							{0, 1, 2, 3},
+							Pressed,
+							AppearanceMetrics))
 					{
 						g_Config.m_ClNamePlates = Pressed & 2 ? 1 : 0;
 						g_Config.m_ClNamePlatesOwn = Pressed & 1 ? 1 : 0;
@@ -7398,7 +7467,9 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 				(static_cast<uint64_t>(g_Config.m_ClNamePlatesIds != 0) << 1) |
 				(static_cast<uint64_t>(g_Config.m_ClNamePlatesIdsSeparateLine != 0) << 2) |
 				(static_cast<uint64_t>(g_Config.m_ClNamePlatesStrong != 0) << 3) |
-				(static_cast<uint64_t>(g_Config.m_ClShowDirection > 0) << 4);
+				(static_cast<uint64_t>(g_Config.m_ClShowDirection > 0) << 4) |
+				// 「显示昵称」在旧 UI / 新 UI 下是两种行高不同的控件，UI 模式换了必须重量。
+				(static_cast<uint64_t>(g_Config.m_QmNewUi != 0) << 5);
 			vCards.back().m_PreLayoutInput = [this, LineSize, MarginSmall, AppearanceMetrics, NamePlateSectionHeaderHeight, NamePlateColorPickerHeight, NamePlateStrongEnabled](CUIRect Content) {
 				if(m_MenuTextPlanCollecting)
 					return false;
@@ -7419,7 +7490,12 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 					*pValue ^= 1;
 					return true;
 				};
-				ConsumeRadio(4);
+				// 「显示昵称」：新 UI 是固定两行的胶囊两级行（标签一行 + 控件一行），
+				// 旧 UI 是随宽度换行的分段行，两者行高必须与绘制阶段用同一个解析结果。
+				if(g_Config.m_QmNewUi != 0)
+					LeftView.HSplitTop(ResolveSettingsNestedRadioRowLayout(LeftView, AppearanceMetrics).m_Height, nullptr, &LeftView);
+				else
+					ConsumeRadio(4);
 				LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 				ConsumeRow();
 				ConsumeRow();

@@ -2067,6 +2067,8 @@ public:
 		bool GotNewLineLast = false;
 
 		int ColorOption = 0;
+		// QmClient：逐字符顶点偏移的游标，按字符顺序消费 m_vCharOffsets。
+		int OffsetOption = 0;
 
 		while(pCurrent < pEnd && pCurrent != pEllipsis)
 		{
@@ -2235,11 +2237,16 @@ public:
 
 					// Check if we have any color split
 					ColorRGBA Color = m_Color;
+					// QmClient：字符内横向渐变的右边缘色，未启用渐变时与 Color 相同。
+					ColorRGBA ColorEnd = m_Color;
 					if(ColorOption < (int)pCursor->m_vColorSplits.size())
 					{
 						STextColorSplit &Split = pCursor->m_vColorSplits.at(ColorOption);
 						if(PrevCharCount >= Split.m_CharIndex && (Split.m_Length == -1 || PrevCharCount < Split.m_CharIndex + Split.m_Length))
+						{
 							Color = Split.m_Color;
+							ColorEnd = Split.m_ColorEnd;
+						}
 						if(Split.m_Length != -1 && PrevCharCount >= (Split.m_CharIndex + Split.m_Length - 1))
 						{
 							ColorOption++;
@@ -2247,9 +2254,27 @@ public:
 							{ // Handle splits that are
 								Split = pCursor->m_vColorSplits.at(ColorOption);
 								if(PrevCharCount >= Split.m_CharIndex)
+								{
 									Color = Split.m_Color;
+									ColorEnd = Split.m_ColorEnd;
+								}
 							}
 						}
+					}
+
+					// QmClient：逐字符顶点偏移（波浪浮动）。即使该字符不渲染也要消费游标，避免与字符错位。
+					float CharOffsetX = 0.0f;
+					float CharOffsetY = 0.0f;
+					// 跳过序号已经落后的条目：调用方可能为换行等不产生顶点的字符也建了条目，
+					// 若不跳过，游标会永久卡住，之后所有字符的偏移恒为 0。
+					while(OffsetOption < (int)pCursor->m_vCharOffsets.size() && pCursor->m_vCharOffsets.at(OffsetOption).m_CharIndex < PrevCharCount)
+						++OffsetOption;
+					if(OffsetOption < (int)pCursor->m_vCharOffsets.size() && pCursor->m_vCharOffsets.at(OffsetOption).m_CharIndex == PrevCharCount)
+					{
+						const STextCharOffset &CharOffset = pCursor->m_vCharOffsets.at(OffsetOption);
+						CharOffsetX = CharOffset.m_XOffset;
+						CharOffsetY = CharOffset.m_YOffset;
+						++OffsetOption;
 					}
 
 					// don't add text that isn't drawn, the color overwrite is used for that
@@ -2258,8 +2283,8 @@ public:
 						TextContainer.m_StringInfo.m_vCharacterQuads.emplace_back();
 						STextCharQuad &TextCharQuad = TextContainer.m_StringInfo.m_vCharacterQuads.back();
 
-						TextCharQuad.m_aVertices[0].m_X = CharX;
-						TextCharQuad.m_aVertices[0].m_Y = CharY;
+						TextCharQuad.m_aVertices[0].m_X = CharX + CharOffsetX;
+						TextCharQuad.m_aVertices[0].m_Y = CharY + CharOffsetY;
 						TextCharQuad.m_aVertices[0].m_U = pGlyph->m_aUVs[0];
 						TextCharQuad.m_aVertices[0].m_V = pGlyph->m_aUVs[3];
 						TextCharQuad.m_aVertices[0].m_Color.r = (unsigned char)(Color.r * 255.f);
@@ -2267,26 +2292,26 @@ public:
 						TextCharQuad.m_aVertices[0].m_Color.b = (unsigned char)(Color.b * 255.f);
 						TextCharQuad.m_aVertices[0].m_Color.a = (unsigned char)(Color.a * 255.f);
 
-						TextCharQuad.m_aVertices[1].m_X = CharX + CharWidth;
-						TextCharQuad.m_aVertices[1].m_Y = CharY;
+						TextCharQuad.m_aVertices[1].m_X = CharX + CharWidth + CharOffsetX;
+						TextCharQuad.m_aVertices[1].m_Y = CharY + CharOffsetY;
 						TextCharQuad.m_aVertices[1].m_U = pGlyph->m_aUVs[2];
 						TextCharQuad.m_aVertices[1].m_V = pGlyph->m_aUVs[3];
-						TextCharQuad.m_aVertices[1].m_Color.r = (unsigned char)(Color.r * 255.f);
-						TextCharQuad.m_aVertices[1].m_Color.g = (unsigned char)(Color.g * 255.f);
-						TextCharQuad.m_aVertices[1].m_Color.b = (unsigned char)(Color.b * 255.f);
-						TextCharQuad.m_aVertices[1].m_Color.a = (unsigned char)(Color.a * 255.f);
+						TextCharQuad.m_aVertices[1].m_Color.r = (unsigned char)(ColorEnd.r * 255.f);
+						TextCharQuad.m_aVertices[1].m_Color.g = (unsigned char)(ColorEnd.g * 255.f);
+						TextCharQuad.m_aVertices[1].m_Color.b = (unsigned char)(ColorEnd.b * 255.f);
+						TextCharQuad.m_aVertices[1].m_Color.a = (unsigned char)(ColorEnd.a * 255.f);
 
-						TextCharQuad.m_aVertices[2].m_X = CharX + CharWidth;
-						TextCharQuad.m_aVertices[2].m_Y = CharY - CharHeight;
+						TextCharQuad.m_aVertices[2].m_X = CharX + CharWidth + CharOffsetX;
+						TextCharQuad.m_aVertices[2].m_Y = CharY - CharHeight + CharOffsetY;
 						TextCharQuad.m_aVertices[2].m_U = pGlyph->m_aUVs[2];
 						TextCharQuad.m_aVertices[2].m_V = pGlyph->m_aUVs[1];
-						TextCharQuad.m_aVertices[2].m_Color.r = (unsigned char)(Color.r * 255.f);
-						TextCharQuad.m_aVertices[2].m_Color.g = (unsigned char)(Color.g * 255.f);
-						TextCharQuad.m_aVertices[2].m_Color.b = (unsigned char)(Color.b * 255.f);
-						TextCharQuad.m_aVertices[2].m_Color.a = (unsigned char)(Color.a * 255.f);
+						TextCharQuad.m_aVertices[2].m_Color.r = (unsigned char)(ColorEnd.r * 255.f);
+						TextCharQuad.m_aVertices[2].m_Color.g = (unsigned char)(ColorEnd.g * 255.f);
+						TextCharQuad.m_aVertices[2].m_Color.b = (unsigned char)(ColorEnd.b * 255.f);
+						TextCharQuad.m_aVertices[2].m_Color.a = (unsigned char)(ColorEnd.a * 255.f);
 
-						TextCharQuad.m_aVertices[3].m_X = CharX;
-						TextCharQuad.m_aVertices[3].m_Y = CharY - CharHeight;
+						TextCharQuad.m_aVertices[3].m_X = CharX + CharOffsetX;
+						TextCharQuad.m_aVertices[3].m_Y = CharY - CharHeight + CharOffsetY;
 						TextCharQuad.m_aVertices[3].m_U = pGlyph->m_aUVs[0];
 						TextCharQuad.m_aVertices[3].m_V = pGlyph->m_aUVs[1];
 						TextCharQuad.m_aVertices[3].m_Color.r = (unsigned char)(Color.r * 255.f);

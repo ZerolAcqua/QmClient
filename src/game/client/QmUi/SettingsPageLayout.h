@@ -570,6 +570,80 @@ inline SSettingsRadioRowLayout ResolveSettingsRadioRowLayout(const CUIRect &View
 	return Layout;
 }
 
+// 两级分段选择行（例：昵称显示范围）：一级选项等宽排布，激活的一级选项按子项数加宽，
+// 子级菜单就在同一行内、紧跟在激活的一级标签右侧 —— 对应设计稿的「主滑块 + 子级菜单」。
+// 行高固定为「标签一行 + 控件一行」：一级选项带不带子级都不改行高，卡片高度因此不随选择跳动。
+struct SSettingsNestedRadioRowLayout
+{
+	CUIRect m_LabelRect{};
+	CUIRect m_ContainerRect{};
+	float m_Height = 0.0f;
+};
+
+inline SSettingsNestedRadioRowLayout ResolveSettingsNestedRadioRowLayout(const CUIRect &View, const SSettingsContentMetrics &Metrics)
+{
+	SSettingsNestedRadioRowLayout Layout;
+	if(View.w <= 0.0f)
+		return Layout;
+
+	Layout.m_LabelRect = {View.x, View.y, View.w, Metrics.m_LineHeight};
+	Layout.m_ContainerRect = {View.x, View.y + Metrics.m_LineHeight + Metrics.m_LineSpacing, View.w, Metrics.m_ButtonHeight};
+	Layout.m_Height = Metrics.m_LineHeight + Metrics.m_LineSpacing + Metrics.m_ButtonHeight;
+	return Layout;
+}
+
+// 两级分段行的槽位表：一级槽位与子级槽位都不含动画，动画只发生在滑块胶囊上，
+// 这样文字宽度稳定、文本缓存键不会每帧变化。
+// 激活的一级项带子级时，它的一级槽位整段让给子级菜单（一级标签被替换掉，不再绘制），
+// 主滑块因此盖住整段子级区域，次级滑块再在主滑块之上标出当前子项。
+struct SSettingsNestedRadioSlots
+{
+	static constexpr int MAX_SLOTS = 8;
+	CUIRect m_aMain[MAX_SLOTS]{};
+	CUIRect m_aSub[MAX_SLOTS]{};
+	int m_MainCount = 0;
+	int m_SubCount = 0;
+};
+
+inline SSettingsNestedRadioSlots ResolveSettingsNestedRadioSlots(const CUIRect &Container, const int OptionCount, const int ActiveIndex, const int SubOptionCount, const float Inset)
+{
+	SSettingsNestedRadioSlots Slots;
+	if(OptionCount <= 0 || Container.w <= 0.0f)
+		return Slots;
+
+	CUIRect Inner = Container;
+	Inner.Margin(Inset, &Inner);
+	if(Inner.w <= 0.0f || Inner.h <= 0.0f)
+		return Slots;
+
+	const int MainCount = std::clamp(OptionCount, 0, SSettingsNestedRadioSlots::MAX_SLOTS);
+	const bool SubInline = ActiveIndex >= 0 && ActiveIndex < MainCount;
+	const int SubCount = SubInline ? std::clamp(SubOptionCount, 0, SSettingsNestedRadioSlots::MAX_SLOTS - 1) : 0;
+	// 激活项不再占一个单位（标签被子级替换），所以单位数是「其它一级项 + 子项」。
+	const int UnitCount = std::max(1, MainCount + (SubCount > 0 ? SubCount - 1 : 0));
+	const float UnitWidth = Inner.w / (float)UnitCount;
+	CUIRect Remainder = Inner;
+	for(int i = 0; i < MainCount; ++i)
+	{
+		const bool Expanded = i == ActiveIndex && SubCount > 0;
+		const int Span = Expanded ? SubCount : 1;
+		CUIRect Slot;
+		Remainder.VSplitLeft(UnitWidth * Span, &Slot, &Remainder);
+		Slots.m_aMain[i] = Slot;
+		if(!Expanded)
+			continue;
+		for(int s = 0; s < SubCount; ++s)
+		{
+			CUIRect SubSlot;
+			Slot.VSplitLeft(Slot.w / (float)(SubCount - s), &SubSlot, &Slot);
+			Slots.m_aSub[s] = SubSlot;
+		}
+		Slots.m_SubCount = SubCount;
+	}
+	Slots.m_MainCount = MainCount;
+	return Slots;
+}
+
 inline float ResolveSettingsControllerAxisPickerHeight(const int AxisCount, const int MaxAxisCount, const float RowHeight, const float RowSpacing)
 {
 	return (std::clamp(AxisCount, 0, std::max(0, MaxAxisCount)) + 1) * (std::max(0.0f, RowHeight) + std::max(0.0f, RowSpacing));
@@ -665,14 +739,17 @@ inline float ResolveQmHudDummyMiniViewHeight(const SSettingsContentMetrics &Metr
 	return Expanded ? 4.0f * Metrics.m_RowStep + PreviewGap : Metrics.m_RowStep;
 }
 
-inline float ResolveQmHudDynamicIslandHeight(const SSettingsContentMetrics &Metrics, const bool OriginalStyle, const float ContentWidth)
+inline float ResolveQmHudDynamicIslandHeight(const SSettingsContentMetrics &Metrics, const bool OriginalStyle, const bool SwitchCountdownEnabled, const float ContentWidth)
 {
-	float Height = 2.0f * Metrics.m_RowStep;
+	// 常驻行：原始样式、显示队伍、钩子倒计时和开关倒计时。
+	float Height = 4.0f * Metrics.m_RowStep;
 	if(!OriginalStyle)
 	{
 		const CUIRect ColorRowView{0.0f, 0.0f, std::max(0.0f, ContentWidth), 0.0f};
 		Height += ResolveSettingsColorRowLayout(ColorRowView, Metrics, false).m_ConsumedHeight;
 	}
+	// 开关倒计时启用时增加跟随 Tee / 灵动岛两个位置开关，不再保留位置标题行。
+	Height += (SwitchCountdownEnabled ? 2.0f : 0.0f) * Metrics.m_RowStep;
 	return Height;
 }
 

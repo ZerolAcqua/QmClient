@@ -451,6 +451,51 @@ TEST(GraphicsRenderTargetDualBlur, FrontendUsesDownsampledBlurAndUpsample)
 	EXPECT_NE(Body.find("DrawRenderTarget(DownsampleBlurred"), std::string::npos);
 }
 
+// 两次重采样都必须铺满各自的纹理，并在下一次可能失败的调用前恢复 HUD 映射。
+TEST(GraphicsRenderTargetDualBlur, ResamplingRestoresHudMappingBeforeEveryFailureBoundary)
+{
+	const std::string Body = ExtractFunctionBody(ReadFile("src/engine/client/graphics_threaded.cpp"), "bool CGraphics_Threaded::DualBlurRenderTarget");
+	const size_t SaveTopLeft = Body.find("const vec2 SavedScreenTL = m_State.m_ScreenTL;");
+	const size_t SaveBottomRight = Body.find("const vec2 SavedScreenBR = m_State.m_ScreenBR;");
+	const size_t BeginDownsample = Body.find("if(!BeginRenderTarget(Downsample");
+	const size_t Blur = Body.find("if(!GaussianBlurRenderTarget(");
+	const size_t BeginUpsample = Body.find("if(!BeginRenderTarget(Destination");
+	ASSERT_NE(SaveTopLeft, std::string::npos);
+	ASSERT_NE(SaveBottomRight, std::string::npos);
+	ASSERT_NE(BeginDownsample, std::string::npos);
+	ASSERT_NE(Blur, std::string::npos);
+	ASSERT_NE(BeginUpsample, std::string::npos);
+	EXPECT_LT(SaveTopLeft, BeginDownsample);
+	EXPECT_LT(SaveBottomRight, BeginDownsample);
+
+	const std::array<const char *, 2> apMappings = {
+		"MapScreen(0.0f, 0.0f, (float)DownsampleSize.x, (float)DownsampleSize.y);",
+		"MapScreen(0.0f, 0.0f, (float)SourceSize.x, (float)SourceSize.y);",
+	};
+	const std::array<const char *, 2> apDraws = {"DrawRenderTarget(Source,", "DrawRenderTarget(DownsampleBlurred,"};
+	const std::array<size_t, 2> aBegins = {BeginDownsample, BeginUpsample};
+	const std::array<size_t, 2> aNextBoundaries = {Blur, Body.rfind("return true;")};
+	for(size_t i = 0; i < apMappings.size(); ++i)
+	{
+		const size_t Mapping = Body.find(apMappings[i]);
+		const size_t Draw = Body.find(apDraws[i]);
+		ASSERT_NE(Mapping, std::string::npos);
+		ASSERT_NE(Draw, std::string::npos);
+		const size_t End = Body.find("EndRenderTarget();", Draw);
+		const size_t Restore = Body.find("MapScreen(SavedScreenTL.x, SavedScreenTL.y, SavedScreenBR.x, SavedScreenBR.y);", End);
+		ASSERT_NE(End, std::string::npos);
+		ASSERT_NE(Restore, std::string::npos);
+		ASSERT_NE(aNextBoundaries[i], std::string::npos);
+		EXPECT_LT(aBegins[i], Mapping);
+		EXPECT_LT(Mapping, Draw);
+		EXPECT_LT(Draw, End);
+		EXPECT_LT(End, Restore);
+		EXPECT_LT(Restore, aNextBoundaries[i]);
+		// 临时映射期间不得提前返回，否则游戏 HUD 会继承纹理像素坐标。
+		EXPECT_EQ(Body.substr(Mapping, Restore - Mapping).find("return"), std::string::npos);
+	}
+}
+
 TEST(GraphicsRenderTargetDualBlur, MediaIslandUsesHalfResolutionIntermediateTargets)
 {
 	const std::string Source = ReadFile("src/game/client/components/hud.cpp");

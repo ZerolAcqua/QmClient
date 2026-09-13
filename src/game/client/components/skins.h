@@ -214,6 +214,14 @@ public:
 		{
 			return (OldState == EState::NOT_FOUND) != (NewState == EState::NOT_FOUND);
 		}
+		/**
+		 * 皮肤已确定无法解析（不存在或加载失败）。
+		 * 排队与加载中的状态不算：那时回退会用 default 皮肤覆盖掉稍后加载完成的真实皮肤。
+		 */
+		static bool IsUnresolved(EState State)
+		{
+			return State == EState::NOT_FOUND || State == EState::ERROR;
+		}
 		static EStatusIndicator StatusIndicator(EState State)
 		{
 			switch(State)
@@ -252,6 +260,10 @@ public:
 		bool m_AlwaysLoaded;
 
 		EState m_State = EState::UNLOADED;
+		/**
+		 * 已就本次失败状态通知过调用方（用于未知皮肤回退）。状态一旦变化即复位，避免每次皮肤更新都重复回调。
+		 */
+		bool m_UnresolvedNotified = false;
 		ESettingsResourcePriority m_LoadPriority = ESettingsResourcePriority::BACKGROUND;
 		std::unique_ptr<CSkin> m_pSkin = nullptr;
 		std::shared_ptr<CAbstractSkinLoadJob> m_pLoadJob = nullptr;
@@ -496,6 +508,11 @@ public:
 	bool PrewarmPlayerPreviewReady(int Dummy, int MaxEntries, bool ProgressiveListReady = false);
 
 	const CSkinContainer *FindContainerOrNullptr(const char *pName);
+	/**
+	 * 只读查找皮肤容器：未登记的皮肤名返回 nullptr，不会新建容器、不会发起加载请求。
+	 * 用于判断“皮肤名已知但资源解析失败”，因为 FindContainerOrNullptr 会重新请求加载。
+	 */
+	const CSkinContainer *LookupContainerOrNullptr(const char *pName) const;
 	const CSkin *FindOrNullptr(const char *pName);
 	const CSkin *Find(const char *pName);
 
@@ -842,6 +859,7 @@ private:
 	bool ReclaimBackgroundSkinForPriorityRequest(const char *pRequesterName, int CountFuseLimit);
 	void UpdateStartLoading(CSkinLoadingStats &Stats);
 	void UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseconds StartTime, std::chrono::nanoseconds MaxTime);
+	void CollectUnresolvedSkins();
 	size_t LoadedSkinLimit() const;
 	void QueueSkinDirectoryScanJob();
 	void ProcessSkinDirectoryScanJob();
@@ -884,6 +902,11 @@ private:
 
 	std::unordered_map<std::string, std::unique_ptr<CSkinContainer>> m_Skins;
 	std::optional<std::chrono::nanoseconds> m_ContainerUpdateTime;
+	/**
+	 * 本帧内状态落到 NOT_FOUND/ERROR 的皮肤名。皮肤的加载是异步的，调用方第一次解析时皮肤通常还在
+	 * LOADING，因此必须在解析彻底失败后重新通知一次，回退皮肤才会生效。
+	 */
+	std::vector<std::string> m_vSkinsUnresolvedThisFrame;
 	/**
 	 * Sorted from most recently to least recently used. Must be kept synchronized with the skin containers.
 	 * Contains prioritized skins in pending/loading/loaded states so visible items can be started and finished first.

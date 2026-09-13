@@ -3109,6 +3109,10 @@ if(CLIENT)
     components/qmclient/qm_markdown.cpp
     components/qmclient/qm_markdown.h
     components/qmclient/qm_music_hook_registry.h
+    components/qmclient/qm_title_render.cpp
+    components/qmclient/qm_title_render.h
+    components/qmclient/qm_title_style.cpp
+    components/qmclient/qm_title_style.h
     components/qmclient/qmclient.cpp
     components/qmclient/qmclient.h
     components/qmclient/qmclient_utils.cpp
@@ -3194,6 +3198,8 @@ if(CLIENT)
     components/tclient/pet.h
     components/tclient/player_indicator.cpp
     components/tclient/player_indicator.h
+    components/tclient/qm_tee_trail.cpp
+    components/tclient/qm_tee_trail.h
     components/tclient/rainbow.cpp
     components/tclient/rainbow.h
     components/tclient/skinprofiles.cpp
@@ -3978,6 +3984,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     qm_spotify_parser_test.cpp
     qm_modes_test.cpp
     qm_tee_hue_cycle_test.cpp
+    qm_title_style_test.cpp
     qm_weapon_trajectory_test.cpp
     qmclient_update_version_test.cpp
     qmclient_update_manifest_test.cpp
@@ -4028,6 +4035,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/game/client/race_parse.cpp
     src/game/client/skin.cpp
     src/game/client/components/tclient/map_history.cpp
+    src/game/client/components/tclient/qm_tee_trail.cpp
     src/game/client/components/tclient/swap_countdown_message.cpp
     src/test/render_tee_offset_helpers.cpp
     src/game/client/components/section_loader.cpp
@@ -4080,6 +4088,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/game/client/components/qmclient/update_version.cpp
     src/game/client/components/qmclient/update_manifest.cpp
     src/game/client/components/qmclient/qmclient_utils.cpp
+    src/game/client/components/qmclient/qm_title_style.cpp
     src/game/client/components/qmclient/translate/translate_parse.cpp
     src/game/client/components/qmclient/voice/voice_capture_pipeline.cpp
     src/game/client/components/qmclient/voice/voice_utils.cpp

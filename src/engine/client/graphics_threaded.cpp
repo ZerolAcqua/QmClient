@@ -1,6 +1,7 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 
+#include <base/crashdump.h>
 #include <base/detect.h>
 #include <base/log.h>
 #include <base/math.h>
@@ -1218,25 +1219,34 @@ bool CGraphics_Threaded::DualBlurRenderTarget(CRenderTargetHandle Source, CRende
 		m_vRenderTargetSizes[Destination.Id()] != SourceSize || DownsampleSize.x > SourceSize.x || DownsampleSize.y > SourceSize.y)
 		return false;
 
+	// 重采样顶点使用纹理像素尺寸，不能沿用 HUD 编辑器缩放、平移后的屏幕映射。
+	// 每次绘制后立即恢复，保证后续阶段失败返回时也不会污染 HUD 坐标。
+	const vec2 SavedScreenTL = m_State.m_ScreenTL;
+	const vec2 SavedScreenBR = m_State.m_ScreenBR;
+
 	// 普通渲染目标绘制使用线性过滤，因此无需新增 shader 即可完成低成本降采样和柔和升采样。
 	if(!BeginRenderTarget(Downsample, ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f)))
 		return false;
+	MapScreen(0.0f, 0.0f, (float)DownsampleSize.x, (float)DownsampleSize.y);
 	SRenderTargetDrawParams DownsampleParams;
 	DownsampleParams.m_W = (float)DownsampleSize.x;
 	DownsampleParams.m_H = (float)DownsampleSize.y;
 	DrawRenderTarget(Source, DownsampleParams);
 	EndRenderTarget();
+	MapScreen(SavedScreenTL.x, SavedScreenTL.y, SavedScreenBR.x, SavedScreenBR.y);
 
 	if(!GaussianBlurRenderTarget(Downsample, DownsampleTemporary, DownsampleBlurred, Params))
 		return false;
 
 	if(!BeginRenderTarget(Destination, ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f)))
 		return false;
+	MapScreen(0.0f, 0.0f, (float)SourceSize.x, (float)SourceSize.y);
 	SRenderTargetDrawParams UpsampleParams;
 	UpsampleParams.m_W = (float)SourceSize.x;
 	UpsampleParams.m_H = (float)SourceSize.y;
 	DrawRenderTarget(DownsampleBlurred, UpsampleParams);
 	EndRenderTarget();
+	MapScreen(SavedScreenTL.x, SavedScreenTL.y, SavedScreenBR.x, SavedScreenBR.y);
 	return true;
 }
 
@@ -3822,6 +3832,14 @@ void CGraphics_Threaded::AddBackEndWarningIfExists()
 	}
 }
 
+// 崩溃报告里要写「实际跑起来」的后端，而不是配置里写的那个：
+// Vulkan 初始化失败后 InitWindow 会把配置改成 OpenGL 再重试，
+// 只看配置会把崩溃归因到根本没跑起来的后端上。
+void CGraphics_Threaded::SetGraphicsBackendForCrashReport(const char *pBackendName)
+{
+	crashdump_set_graphics_backend(pBackendName);
+}
+
 int CGraphics_Threaded::InitWindow()
 {
 	const bool VulkanRequested = str_comp_nocase(g_Config.m_GfxBackend, "Vulkan") == 0;
@@ -4022,7 +4040,13 @@ int CGraphics_Threaded::Init()
 
 	m_pBackend = CreateGraphicsBackend(Localize);
 	if(InitWindow() != 0)
+	{
+		// 失败时把半初始化的 backend 一并收掉：否则 Init() 返回 -1 之后它仍留在
+		// m_pBackend 上，等 CClient::Run 的错误路径再调 Shutdown() 时就会对着已释放的
+		// 对象做虚调用，表现为「启动即崩」而不是那句初始化失败提示。
+		Shutdown();
 		return -1;
+	}
 
 	for(auto &FakeMode : g_aFakeModes)
 	{

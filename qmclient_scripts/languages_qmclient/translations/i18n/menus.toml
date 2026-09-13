@@ -19724,6 +19724,74 @@ turkish = "Kendi"
 polish = "Własny"
 
 [[message]]
+key = "Current"
+context = "Show name plates scope"
+[message.translations]
+simplified_chinese = "当前"
+traditional_chinese = "當前"
+japanese = "現在"
+korean = "현재"
+russian = "Текущий"
+german = "Aktuell"
+spanish = "Actual"
+french = "Actuel"
+brazilian_portuguese = "Atual"
+portuguese = "Atual"
+turkish = "Geçerli"
+polish = "Bieżący"
+
+[[message]]
+key = "Local"
+context = "Show name plates scope"
+[message.translations]
+simplified_chinese = "本地"
+traditional_chinese = "本地"
+japanese = "ローカル"
+korean = "로컬"
+russian = "Локальный"
+german = "Lokal"
+spanish = "Local"
+french = "Local"
+brazilian_portuguese = "Local"
+portuguese = "Local"
+turkish = "Yerel"
+polish = "Lokalny"
+
+[[message]]
+key = "All"
+context = "Show name plates scope"
+[message.translations]
+simplified_chinese = "所有"
+traditional_chinese = "所有"
+japanese = "すべて"
+korean = "모두"
+russian = "Все"
+german = "Alle"
+spanish = "Todos"
+french = "Tous"
+brazilian_portuguese = "Todos"
+portuguese = "Todos"
+turkish = "Tümü"
+polish = "Wszyscy"
+
+[[message]]
+key = "Friends"
+context = "Show name plates scope"
+[message.translations]
+simplified_chinese = "好友"
+traditional_chinese = "好友"
+japanese = "フレンド"
+korean = "친구"
+russian = "Друзья"
+german = "Freunde"
+spanish = "Amigos"
+french = "Amis"
+brazilian_portuguese = "Amigos"
+portuguese = "Amigos"
+turkish = "Arkadaşlar"
+polish = "Znajomi"
+
+[[message]]
 key = "All"
 context = "Show players' key presses"
 [message.translations]

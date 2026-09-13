@@ -536,6 +536,9 @@ Adjust verbosity in external console (-3 = none, -2 = errors only, -1 = warnings
 Advanced
 == Avancé
 
+Advanced mode
+== Mode avancé
+
 Advanced options
 == Options avancées
 
@@ -688,6 +691,12 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == Animer la réorganisation et le réagencement des cartes de paramètres
+
+Animated styles override the fallback title color
+== Les styles animés ont priorité sur la couleur de base du titre
+
+Animated title style id
+== Identifiant du style de titre animé
 
 Animation
 == Animation
@@ -1841,6 +1850,12 @@ Classic Pro
 Classic pro
 == Classique pro
 
+Classic title glow
+== Lueur classique
+
+Classic title glow: 0 = off, 1 = subtle (6 draws), 2 = full Calamity (16 draws)
+== Lueur classique du titre : 0 = désactivée, 1 = discrète (6 couches), 2 = Calamity complet (16 couches)
+
 Clear
 == Effacer
 
@@ -1966,9 +1981,6 @@ Collision Line Opacity
 
 Color
 == Couleur
-
-Color & opacity
-== Couleur et opacité
 
 Color of authenticated player names on scoreboard
 == Couleur des noms des joueurs authentifiés sur le tableau des scores
@@ -2470,6 +2482,9 @@ Current: Score
 
 Current: Time
 == Actuel : Temps
+
+Cursed Flame
+== Flamme maudite
 
 Custom
 == Personnalisé
@@ -3560,6 +3575,9 @@ Enable gun sound
 Enable highlighted chat sound
 == Activer le son de chat surligné
 
+Enable hook countdown
+== Activer le compte à rebours du grappin
+
 Enable HUD animations
 == Activer les animations du HUD
 
@@ -4037,6 +4055,9 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == Force de réduction de bruit simple de repli
 
+Fallback title color
+== Couleur de base du titre
+
 Fast input
 == Entrée rapide
 
@@ -4189,6 +4210,9 @@ Follow
 
 Follow server
 == Suivre le serveur
+
+Follow Tee
+== Suivre le Tee
 
 Following
 == Suivi
@@ -4561,6 +4585,9 @@ Go forward one tick
 
 Go forward the specified duration
 == Avancer de la durée spécifiée
+
+Golden Grace
+== Grâce dorée
 
 Gores
 == Gores
@@ -5620,6 +5647,9 @@ LibreTranslate API Key
 
 LibreTranslate endpoint
 == Point de terminaison LibreTranslate
+
+Light band (0 = style default)
+== Phase des couleurs (0 = style)
 
 Limit information in spectator mode
 == Limiter les informations en mode spectateur
@@ -7112,11 +7142,17 @@ Option color
 Optional authentication key for the DNSBL provider
 == Clé d'authentification optionnelle pour le fournisseur DNSBL
 
+Original
+== Original
+
 Other
 == Autre
 
 Other players' hook line width
 == Largeur de la ligne de crochet des autres joueurs
+
+Other players' nameplate scope (0=All players 1=Friends only)
+== Portée des nametags des autres (0=Tous les joueurs 1=Amis uniquement)
 
 Others
 == Autres
@@ -7198,6 +7234,9 @@ Overwrite clan even if empty
 
 Own hook line width
 == Largeur de sa propre ligne de crochet
+
+Own nameplate scope (0=Current character 1=All local characters)
+== Portée de son propre nametag (0=Personnage actuel 1=Tous les personnages locaux)
 
 p = Ping latency
 == p = Latence de ping
@@ -7564,6 +7603,9 @@ Please wait…
 
 Points
 == Points
+
+Polished
+== Poli
 
 Popup animation
 == Animation contextuelle
@@ -9197,6 +9239,9 @@ Severe
 Shape
 == Forme
 
+Shimmer speed (polished)
+== Vitesse du reflet (poli)
+
 Short server names
 == Noms de serveur courts
 
@@ -9220,6 +9265,9 @@ Show %s group
 
 Show a small view of the dummy
 == Afficher une petite vue du Dummy
+
+Show advanced title settings (collapsing keeps configured effects)
+== Afficher les réglages avancés du titre (les replier conserve les effets)
 
 Show air jump indicator
 == Afficher l'indicateur de saut aérien
@@ -9526,6 +9574,9 @@ Show important server prompts and Echo messages as popups
 
 Show important server prompts as notifications
 == Afficher les messages serveur importants comme notifications
+
+Show in Dynamic Island
+== Afficher dans Dynamic Island
 
 Show in-game FPS
 == Afficher les FPS en jeu
@@ -10262,6 +10313,12 @@ Smoothness of multi-view zoom (in ms, higher = slower)
 SMTC
 == SMTC
 
+Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
+== Aligner le décalage de l'oscillation sur des pixels entiers (glyphes plus nets, mouvement plus saccadé)
+
+Snap wave to pixels
+== Aligner l’onde sur des pixels entiers
+
 Snapshot Age
 == Âge du snapshot
 
@@ -10354,6 +10411,9 @@ Space
 
 Spam protection: prevent spamming of team switching, chat, skin changes, emotes, votes
 == Protection anti-spam : empêche le spam de changement d'équipe, de chat, de skins, d'émoticônes et de votes
+
+Spatial effect
+== Effet de relief
 
 Speaker
 == Haut-parleur
@@ -10450,6 +10510,9 @@ Sphere
 
 Spin pop
 == Popup tournante
+
+Spirit Light
+== Lumière spirituelle
 
 Sponsor code
 == Code de soutien
@@ -10633,6 +10696,9 @@ Style kill, finish, and system messages
 
 Sub-Tick aiming
 == Visée Sub-Tick
+
+Subtle
+== Discret
 
 Successfully saved the replay!
 == Rediffusion sauvegardée avec succès !
@@ -10921,6 +10987,9 @@ Tee trail color
 
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Mode de couleur de la traînée de Tee (1=Uni, 2=Couleur actuelle du Tee, 3=Arc-en-ciel, 4=Vitesse du Tee, 5=Aléatoire)
+
+Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
+== Style de traînée de Tee (0=Original, 1=Flamme maudite, 2=Foudre violette, 3=Lumière spirituelle, 4=Ombre du vide, 5=Grâce dorée)
 
 Tee Trails
 == Traînées de tee
@@ -11261,11 +11330,38 @@ Timer isn't displayed.
 Tiny Tee Size
 == Taille du mini tee
 
-Title color
-== Couleur du titre
+Title bob angular speed in 1/100 rad/s
+== Vitesse angulaire de l'oscillation du titre (1/100 rad/s)
+
+Title bob wavelength in pixels
+== Longueur d'onde de l'oscillation du titre en pixels
+
+Title color (single color)
+== Couleur du titre (unie)
+
+Title light sweep speed in 1/100 row per second (0 = off)
+== Vitesse du balayage lumineux du titre en 1/100 de ligne par seconde (0 = désactivé)
+
+Title opacity (custom color)
+== Opacité (couleur perso.)
+
+Title per-character phase per pixel in 1/1000 px (0 = style default, 20 = visible light band)
+== Phase par caractère et pixel en 1/1000 px (0 = valeur du style, 20 = bande lumineuse visible)
+
+Title per-character vertical bob amplitude in pixels (0 = off)
+== Amplitude d'oscillation verticale par caractère en pixels (0 = désactivé)
+
+Title preview
+== Aperçu du titre
 
 Title server unavailable; retry
 == Serveur de titres indisponible ; réessayez
+
+Title spatial effect: 0 = polished, 1 = solid, 2 = classic Calamity, 3 = off
+== Effet de relief du titre : 0 = poli, 1 = solide, 2 = Calamity classique, 3 = désactivé
+
+Title style
+== Style du titre
 
 Title too long or contains unsupported characters
 == Titre trop long ou caractères non pris en charge
@@ -11723,6 +11819,9 @@ Unknown parameter. Accepted values: default, gametimer, broadcast, both, none
 Unknown status
 == Statut inconnu
 
+Unknown title style
+== Style de titre inconnu
+
 Unlock a team
 == Déverrouiller une équipe
 
@@ -11816,6 +11915,9 @@ Use alternative antiping smoothing, incompatible with cl_antiping_smooth
 Use alternative world tick calculation making hooks behave as if all players have Strong.
 == Utiliser un calcul alternatif du tick mondial faisant en sorte que les crochets se comportent comme si tous les joueurs avaient Strong.
 
+Use animated title style (overrides qm_title_color_mode)
+== Utiliser le style de titre animé (remplace qm_title_color_mode)
+
 Use colored skins for frozen tees
 == Utiliser des skins colorés pour les tees gelés
 
@@ -11842,6 +11944,9 @@ Use default voice input device
 
 Use default voice output device
 == Utiliser le périphérique de sortie vocale par défaut
+
+Use each Tee trail style's own palette instead of the trail color mode
+== Utiliser la palette propre au style de traînée de Tee au lieu du mode de couleur
 
 Use embedded HUD progress bar
 == Utiliser la barre de progression HUD intégrée
@@ -11905,6 +12010,9 @@ Use skin color when Tee is frozen
 
 Use sounds
 == Utiliser les sons
+
+Use style colors
+== Utiliser les couleurs du style
 
 Use team colors for name plates
 == Utiliser les couleurs d'équipe pour les plaques de nom
@@ -11998,6 +12106,9 @@ View the developers and contributors
 
 View the people supporting QmClient development
 == View the people supporting QmClient development
+
+Violet Lightning
+== Foudre violette
 
 Virtual joystick which always uses fire.
 == Joystick virtuel qui utilise toujours le tir.
@@ -12107,6 +12218,9 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == Liste blanche vocale (séparée par des virgules)
 
+Void Shadow
+== Ombre du vide
+
 Volume
 == Volume
 
@@ -12199,6 +12313,15 @@ Warn about team balance
 
 Warning
 == Avertissement
+
+Wave amount
+== Amplitude de l'onde
+
+Wave speed (0.01 rad/s)
+== Vitesse de l’onde (0,01 rad/s)
+
+Wave wavelength
+== Longueur d’onde
 
 Weak hook
 == Grappin faible
@@ -13050,6 +13173,22 @@ Others
 [Show name plates]
 Own
 == Propre
+
+[Show name plates scope]
+All
+== Tous
+
+[Show name plates scope]
+Current
+== Actuel
+
+[Show name plates scope]
+Friends
+== Amis
+
+[Show name plates scope]
+Local
+== Local
 
 [Show players' key presses]
 All

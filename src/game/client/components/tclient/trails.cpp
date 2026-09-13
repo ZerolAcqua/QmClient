@@ -340,6 +340,30 @@ void CTrails::OnRender()
 		if((int)s_Trail.size() < 3)
 			continue;
 
+		// 新样式拖尾：交给 qm_tee_trail 做纯几何构建，形态 / 运动 / 消散都由样式自己决定；
+		// 原版样式继续走下面的既有渲染路径，两条路径不会同时出图。
+		const int TrailStyle = qm_tee_trail::ResolveStyle(g_Config.m_TcTeeTrailStyle);
+		if(TrailStyle != qm_tee_trail::STYLE_ORIGINAL)
+		{
+			static std::vector<qm_tee_trail::SQuad> s_vStyleQuads;
+			// 线模式（宽度 0）下采样点自带半宽为 0，给新样式一个可用的基础半宽，
+			// 否则整套特效会退化成几乎看不见的发丝。
+			const float StyleWidth = Width > 0.0f ? Width : 4.0f;
+			qm_tee_trail::BuildEffect(s_Trail, TrailStyle, g_Config.m_TcTeeTrailStyleColors != 0,
+				(float)StartTick + IntraTick, StyleWidth, ClientId * 131 + 17, s_vStyleQuads);
+			Graphics()->QuadsBegin();
+			for(const qm_tee_trail::SQuad &Quad : s_vStyleQuads)
+			{
+				// 自由形变四边形的顶点顺序是 (v0, v1, v3, v2)，对应 SetColor4 的
+				// (C0, C1, C2, C3)，因此这里按 CFreeformItem(P0, P1, P3, P2) 传入。
+				Graphics()->SetColor4(Quad.m_aColor[0], Quad.m_aColor[1], Quad.m_aColor[2], Quad.m_aColor[3]);
+				const IGraphics::CFreeformItem FreeformItem(Quad.m_aPos[0], Quad.m_aPos[1], Quad.m_aPos[3], Quad.m_aPos[2]);
+				Graphics()->QuadsDrawFreeform(&FreeformItem, 1);
+			}
+			Graphics()->QuadsEnd();
+			continue;
+		}
+
 		// Calculate the widths
 		for(int i = 0; i < (int)s_Trail.size(); i++)
 		{

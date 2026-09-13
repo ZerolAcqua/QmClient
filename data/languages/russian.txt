@@ -536,6 +536,9 @@ Adjust verbosity in external console (-3 = none, -2 = errors only, -1 = warnings
 Advanced
 == Расширенные
 
+Advanced mode
+== Расширенный режим
+
 Advanced options
 == Расширенные настройки
 
@@ -688,6 +691,12 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == Анимировать сортировку и перестроение раскладки карточек настроек
+
+Animated styles override the fallback title color
+== Цвета анимированного стиля имеют приоритет над базовым цветом титула
+
+Animated title style id
+== Идентификатор анимированного стиля титула
 
 Animation
 == Анимация
@@ -1841,6 +1850,12 @@ Classic Pro
 Classic pro
 == Классический pro
 
+Classic title glow
+== Классическое свечение
+
+Classic title glow: 0 = off, 1 = subtle (6 draws), 2 = full Calamity (16 draws)
+== Классическое свечение титула: 0 = выкл., 1 = мягкое (6 слоёв), 2 = полное Calamity (16 слоёв)
+
 Clear
 == Очистить
 
@@ -1966,9 +1981,6 @@ Collision Line Opacity
 
 Color
 == Цвет
-
-Color & opacity
-== Цвет и прозрачность
 
 Color of authenticated player names on scoreboard
 == Цвет имён авторизованных игроков на табло
@@ -2470,6 +2482,9 @@ Current: Score
 
 Current: Time
 == Текущее: Время
+
+Cursed Flame
+== Проклятое пламя
 
 Custom
 == Пользовательский
@@ -3560,6 +3575,9 @@ Enable gun sound
 Enable highlighted chat sound
 == Включить звук упоминания в чате
 
+Enable hook countdown
+== Включить обратный отсчет крюка
+
 Enable HUD animations
 == Включить анимации HUD
 
@@ -4037,6 +4055,9 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == Запасная простая сила шумоподавления
 
+Fallback title color
+== Базовый цвет титула
+
 Fast input
 == Быстрый ввод
 
@@ -4189,6 +4210,9 @@ Follow
 
 Follow server
 == Как на сервере
+
+Follow Tee
+== Следовать за Tee
 
 Following
 == Следую
@@ -4561,6 +4585,9 @@ Go forward one tick
 
 Go forward the specified duration
 == Вперёд на указанную длительность
+
+Golden Grace
+== Золотая благодать
 
 Gores
 == Горы
@@ -5620,6 +5647,9 @@ LibreTranslate API Key
 
 LibreTranslate endpoint
 == Конечная точка LibreTranslate
+
+Light band (0 = style default)
+== Фаза цвета (0 = по стилю)
 
 Limit information in spectator mode
 == Ограничить информацию в режиме наблюдателя
@@ -7112,11 +7142,17 @@ Option color
 Optional authentication key for the DNSBL provider
 == Необязательный ключ аутентификации для провайдера DNSBL
 
+Original
+== Оригинал
+
 Other
 == Другое
 
 Other players' hook line width
 == Ширина линии крюка других игроков
+
+Other players' nameplate scope (0=All players 1=Friends only)
+== Область чужих табличек (0=Все игроки 1=Только друзья)
 
 Others
 == Другие
@@ -7198,6 +7234,9 @@ Overwrite clan even if empty
 
 Own hook line width
 == Ширина собственной линии крюка
+
+Own nameplate scope (0=Current character 1=All local characters)
+== Область своей таблички (0=Текущий персонаж 1=Все локальные персонажи)
 
 p = Ping latency
 == p = Пинг
@@ -7564,6 +7603,9 @@ Please wait…
 
 Points
 == Очки
+
+Polished
+== Глянец
 
 Popup animation
 == Анимация всплытия
@@ -9197,6 +9239,9 @@ Severe
 Shape
 == Форма
 
+Shimmer speed (polished)
+== Скорость блика (глянец)
+
 Short server names
 == Короткие названия серверов
 
@@ -9220,6 +9265,9 @@ Show %s group
 
 Show a small view of the dummy
 == Показать небольшой вид дамми
+
+Show advanced title settings (collapsing keeps configured effects)
+== Показать расширенные настройки титула (при сворачивании эффекты сохраняются)
 
 Show air jump indicator
 == Показывать индикатор прыжка в воздухе
@@ -9526,6 +9574,9 @@ Show important server prompts and Echo messages as popups
 
 Show important server prompts as notifications
 == Показывать важные подсказки сервера как уведомления
+
+Show in Dynamic Island
+== Показывать в Dynamic Island
 
 Show in-game FPS
 == Показывать FPS в игре
@@ -10262,6 +10313,12 @@ Smoothness of multi-view zoom (in ms, higher = slower)
 SMTC
 == Системное медиа-управление
 
+Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
+== Привязывать смещение покачивания к целым пикселям (чётче глифы, резче движение)
+
+Snap wave to pixels
+== Привязать волну к целым пикселям
+
 Snapshot Age
 == Возраст снапшота
 
@@ -10354,6 +10411,9 @@ Space
 
 Spam protection: prevent spamming of team switching, chat, skin changes, emotes, votes
 == Защита от спама: предотвращает спам при смене команды, в чате, смене скина, эмоциях и голосовании
+
+Spatial effect
+== Объёмный эффект
 
 Speaker
 == Динамик
@@ -10450,6 +10510,9 @@ Sphere
 
 Spin pop
 == Вращающееся появление
+
+Spirit Light
+== Свет духа
 
 Sponsor code
 == Код спонсора
@@ -10633,6 +10696,9 @@ Style kill, finish, and system messages
 
 Sub-Tick aiming
 == Прицеливание Sub-Tick
+
+Subtle
+== Мягкое
 
 Successfully saved the replay!
 == Повтор успешно сохранён!
@@ -10921,6 +10987,9 @@ Tee trail color
 
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Режим цвета следа Tee (1=Сплошной, 2=Текущий цвет Tee, 3=Радуга, 4=Скорость Tee, 5=Случайный)
+
+Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
+== Стиль следа Tee (0=Оригинал, 1=Проклятое пламя, 2=Лиловая молния, 3=Свет духа, 4=Тень пустоты, 5=Золотая благодать)
 
 Tee Trails
 == Следы ти
@@ -11261,11 +11330,38 @@ Timer isn't displayed.
 Tiny Tee Size
 == Размер мини-ти
 
-Title color
-== Цвет титула
+Title bob angular speed in 1/100 rad/s
+== Угловая скорость покачивания титула (1/100 рад/с)
+
+Title bob wavelength in pixels
+== Длина волны покачивания титула в пикселях
+
+Title color (single color)
+== Цвет титула (однотонный)
+
+Title light sweep speed in 1/100 row per second (0 = off)
+== Скорость блика титула в 1/100 строки в секунду (0 = выкл.)
+
+Title opacity (custom color)
+== Непрозрачность (свой цвет)
+
+Title per-character phase per pixel in 1/1000 px (0 = style default, 20 = visible light band)
+== Фаза на пиксель для символов титула в 1/1000 px (0 = по умолчанию стиля, 20 = заметная световая полоса)
+
+Title per-character vertical bob amplitude in pixels (0 = off)
+== Амплитуда вертикального покачивания символов титула в пикселях (0 = выкл.)
+
+Title preview
+== Предпросмотр титула
 
 Title server unavailable; retry
 == Сервер титулов недоступен; повторите попытку
+
+Title spatial effect: 0 = polished, 1 = solid, 2 = classic Calamity, 3 = off
+== Объёмный эффект титула: 0 = глянец, 1 = сплошной, 2 = классический Calamity, 3 = выкл.
+
+Title style
+== Стиль титула
 
 Title too long or contains unsupported characters
 == Титул слишком длинный или содержит недопустимые символы
@@ -11723,6 +11819,9 @@ Unknown parameter. Accepted values: default, gametimer, broadcast, both, none
 Unknown status
 == Неизвестный статус
 
+Unknown title style
+== Неизвестный стиль титула
+
 Unlock a team
 == Разблокировать команду
 
@@ -11816,6 +11915,9 @@ Use alternative antiping smoothing, incompatible with cl_antiping_smooth
 Use alternative world tick calculation making hooks behave as if all players have Strong.
 == Использовать альтернативный расчёт мирового тика, делающий крюки такими, будто у всех игроков есть Strong.
 
+Use animated title style (overrides qm_title_color_mode)
+== Использовать анимированный стиль титула (переопределяет qm_title_color_mode)
+
 Use colored skins for frozen tees
 == Использовать цветные скины для замороженных ти
 
@@ -11842,6 +11944,9 @@ Use default voice input device
 
 Use default voice output device
 == Использовать устройство вывода голоса по умолчанию
+
+Use each Tee trail style's own palette instead of the trail color mode
+== Использовать собственную палитру стиля следа Tee вместо режима цвета
 
 Use embedded HUD progress bar
 == Использовать встроенную шкалу прогресса HUD
@@ -11905,6 +12010,9 @@ Use skin color when Tee is frozen
 
 Use sounds
 == Использовать звуки
+
+Use style colors
+== Использовать цвета стиля
 
 Use team colors for name plates
 == Использовать цвета команды для табличек с именами
@@ -11998,6 +12106,9 @@ View the developers and contributors
 
 View the people supporting QmClient development
 == View the people supporting QmClient development
+
+Violet Lightning
+== Лиловая молния
 
 Virtual joystick which always uses fire.
 == Виртуальный джойстик, который всегда использует огонь.
@@ -12107,6 +12218,9 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == Белый список голосового чата (через запятую)
 
+Void Shadow
+== Тень пустоты
+
 Volume
 == Громкость
 
@@ -12199,6 +12313,15 @@ Warn about team balance
 
 Warning
 == Предупреждение
+
+Wave amount
+== Амплитуда волны
+
+Wave speed (0.01 rad/s)
+== Скорость волны (0,01 рад/с)
+
+Wave wavelength
+== Длина волны
 
 Weak hook
 == Слабый крюк
@@ -13050,6 +13173,22 @@ Others
 [Show name plates]
 Own
 == Свой
+
+[Show name plates scope]
+All
+== Все
+
+[Show name plates scope]
+Current
+== Текущий
+
+[Show name plates scope]
+Friends
+== Друзья
+
+[Show name plates scope]
+Local
+== Локальный
 
 [Show players' key presses]
 All

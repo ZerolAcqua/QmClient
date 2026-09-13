@@ -679,6 +679,8 @@ void CSkins::CSkinContainer::SetState(EState State, ESettingsResourcePriority Pr
 {
 	const EState OldState = m_State;
 	m_State = State;
+	if(State != OldState)
+		m_UnresolvedNotified = false;
 
 	if(m_State == EState::BACKGROUND_REQUESTED ||
 		m_State == EState::PENDING ||
@@ -1304,6 +1306,8 @@ void CSkins::OnUpdate()
 		UpdateSkinQueue(Now, Dummy);
 	}
 
+	m_vSkinsUnresolvedThisFrame.clear();
+
 	// Only update skins periodically to reduce FPS impact
 	const std::chrono::nanoseconds MaxTime = std::chrono::milliseconds(std::clamp(round_to_int(Client()->RenderFrameTime() * 50000.0f), 25, 500));
 	if(m_ContainerUpdateTime.has_value() && Now - m_ContainerUpdateTime.value() < MaxTime)
@@ -1328,6 +1332,15 @@ void CSkins::OnUpdate()
 	UpdateStartLoading(Stats);
 	UpdateFinishLoading(Stats, Now, MaxTime);
 	ProcessSkinListPlanJob();
+	CollectUnresolvedSkins();
+
+	// 皮肤加载失败后才通知，调用方才能把未知皮肤回退到 default 皮肤。
+	// 在循环外通知：OnSkinUpdate 会重新解析皮肤并创建皮肤容器，不能在遍历 m_Skins 时改动它。
+	for(const std::string &SkinName : m_vSkinsUnresolvedThisFrame)
+	{
+		GameClient()->OnSkinUpdate(SkinName.c_str());
+	}
+	m_vSkinsUnresolvedThisFrame.clear();
 }
 
 void CSkins::UpdateForSettingsWarmup()
@@ -2377,6 +2390,21 @@ void CSkins::Refresh(TSkinLoadedCallback &&SkinLoadedCallback)
 	QueueSkinDirectoryScanJob();
 }
 
+void CSkins::CollectUnresolvedSkins()
+{
+	// 复制皮肤名：OnSkinUpdate 会重新解析皮肤并可能新建皮肤容器，届时不能继续引用容器自身的数据。
+	// 每个失败状态只通知一次，否则每次皮肤更新都会重复触发回调。
+	for(auto &[_, pSkinContainer] : m_Skins)
+	{
+		if(!CSkinContainer::IsUnresolved(pSkinContainer->m_State) || pSkinContainer->m_UnresolvedNotified)
+		{
+			continue;
+		}
+		pSkinContainer->m_UnresolvedNotified = true;
+		m_vSkinsUnresolvedThisFrame.push_back(pSkinContainer->Name());
+	}
+}
+
 CSkins::CSkinLoadingStats CSkins::LoadingStats() const
 {
 	CSkinLoadingStats Stats;
@@ -2970,6 +2998,23 @@ const CSkins::CSkinContainer *CSkins::FindContainerImpl(const char *pName)
 	}
 	ExistingSkin->second->RequestLoad(true);
 	return ExistingSkin->second.get();
+}
+
+const CSkins::CSkinContainer *CSkins::LookupContainerOrNullptr(const char *pName) const
+{
+	const char *pSkinPrefix = SkinPrefix();
+	if(pSkinPrefix[0] != '\0')
+	{
+		char aNameWithPrefix[2 * MAX_SKIN_LENGTH + 2];
+		str_format(aNameWithPrefix, sizeof(aNameWithPrefix), "%s_%s", pSkinPrefix, pName);
+		const auto PrefixedSkin = m_Skins.find(aNameWithPrefix);
+		if(PrefixedSkin != m_Skins.end() && PrefixedSkin->second->State() == CSkinContainer::EState::LOADED)
+		{
+			return PrefixedSkin->second.get();
+		}
+	}
+	const auto ExistingSkin = m_Skins.find(pName);
+	return ExistingSkin == m_Skins.end() ? nullptr : ExistingSkin->second.get();
 }
 
 const CSkin *CSkins::FindOrNullptr(const char *pName)

@@ -1189,6 +1189,9 @@ private:
 	uint64_t m_CurFrame = 0;
 	std::vector<uint64_t> m_vImageLastFrameCheck;
 
+	// 背板捕获诊断只打一次（见 Cmd_RenderTarget_CaptureBackbuffer）。
+	bool m_CaptureBackbufferProbeDone = false;
+
 	uint32_t m_LastPresentedSwapChainImageIndex;
 
 	std::vector<SBufferObjectFrame> m_vBufferObjects;
@@ -7364,11 +7367,26 @@ public:
 		return SupportsRenderTargetReadback() && m_GaussianBlurPipelineValid;
 	}
 
+	[[nodiscard]] static bool IsEightBitRgbaFormat(VkFormat Format)
+	{
+		return Format == VK_FORMAT_R8G8B8A8_UNORM || Format == VK_FORMAT_R8G8B8A8_SRGB ||
+		       Format == VK_FORMAT_B8G8R8A8_UNORM || Format == VK_FORMAT_B8G8R8A8_SRGB;
+	}
+
+	// 背板捕获（灵动岛 / 亚克力背景模糊）的交换链格式判据。
+	// 与截图取回路径的区别：那边只认 UNORM，因为要走「RGBA 线性镜像」中转；
+	// 这里只是把交换链图像当作 blit 源，SRGB 变体同样合法（vkCmdBlitImage 在
+	// SRGB 源与 UNORM 目标之间做颜色空间转换），所以不能再把它排除在外，
+	// 否则 SRGB 交换链的机器上整个背景模糊都会静默失效。
+	[[nodiscard]] static bool IsBackbufferCaptureFormatSupported(VkFormat Format)
+	{
+		return IsEightBitRgbaFormat(Format);
+	}
+
 	[[nodiscard]] bool SupportsBackbufferCapture() const
 	{
 		// 截图路径只验证过单采样交换链；多采样附件虽可恢复，但读取流程仍保持保守限制。
-		const bool CompatibleFormat = m_VKSurfFormat.format == VK_FORMAT_B8G8R8A8_UNORM || m_VKSurfFormat.format == VK_FORMAT_R8G8B8A8_UNORM;
-		return SupportsRenderTargetReadback() && CompatibleFormat && m_OptimalSwapChainImageBlitting && m_OptimalRGBAImageBlitting;
+		return SupportsRenderTargetReadback() && IsBackbufferCaptureFormatSupported(m_VKSurfFormat.format) && m_OptimalSwapChainImageBlitting && m_OptimalRGBAImageBlitting;
 	}
 
 	[[nodiscard]] const char *RenderTargetReadbackSupportReason() const
@@ -8876,6 +8894,28 @@ public:
 
 	[[nodiscard]] bool Cmd_RenderTarget_CaptureBackbuffer(const CCommandBuffer::SCommand_RenderTarget_CaptureBackbuffer *pCommand)
 	{
+		// 背板捕获是「静默降级」型特性：被跳过后灵动岛/亚克力就只剩半透明板，玩家在
+		// 游戏里看不出来。所以第一次调用时把每个门槛的实测值记下来，失败时无论如何
+		// 打一行（dbg_graphs 关掉时也会打），成功时只在 dbg_graphs 下打。
+		if(!m_CaptureBackbufferProbeDone)
+		{
+			m_CaptureBackbufferProbeDone = true;
+			const bool FormatOk = IsBackbufferCaptureFormatSupported(m_VKSurfFormat.format);
+			const bool Supported = SupportsBackbufferCapture();
+			const bool Multisa = HasMultiSampling();
+			const bool CanCapture = !m_RenderingPaused && Supported && !Multisa && !m_RenderTargetActive && m_SwapRenderPassActive &&
+				pCommand->m_TargetId >= 0 && (size_t)pCommand->m_TargetId < m_vRenderTargets.size() && m_CurImageIndex < m_vSwapChainImages.size();
+			if(!CanCapture || g_Config.m_DbgGraphs != 0)
+			{
+				// 必须走 log_info：dbg_msg 在 Windows GUI 客户端里既进不了控制台也进不了
+				// 日志文件，而这条诊断的意义正是「事后能从日志里翻出来」。
+				log_info("gfx/vulkan", "backbuffer capture probe: %s (paused=%d supported=%d format=%d format_ok=%d swap_blit=%d rgba_blit=%d multisample=%d target_active=%d swap_pass=%d)",
+					CanCapture ? "active" : "skipped",
+					(int)m_RenderingPaused, (int)Supported, (int)m_VKSurfFormat.format, (int)FormatOk,
+					(int)m_OptimalSwapChainImageBlitting, (int)m_OptimalRGBAImageBlitting,
+					(int)Multisa, (int)m_RenderTargetActive, (int)m_SwapRenderPassActive);
+			}
+		}
 		if(m_RenderingPaused || !SupportsBackbufferCapture() || HasMultiSampling() || m_RenderTargetActive || !m_SwapRenderPassActive || pCommand->m_TargetId < 0 ||
 			(size_t)pCommand->m_TargetId >= m_vRenderTargets.size() || m_CurImageIndex >= m_vSwapChainImages.size())
 			return true;

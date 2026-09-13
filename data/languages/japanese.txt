@@ -536,6 +536,9 @@ Adjust verbosity in external console (-3 = none, -2 = errors only, -1 = warnings
 Advanced
 == 詳細設定
 
+Advanced mode
+== 詳細モード
+
 Advanced options
 == 詳細オプション
 
@@ -688,6 +691,12 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == 設定カードの並べ替えとレイアウト再配置をアニメーション化
+
+Animated styles override the fallback title color
+== アニメーションスタイルの色は基本のタイトル色より優先されます
+
+Animated title style id
+== タイトルのアニメーションスタイル ID
 
 Animation
 == アニメーション
@@ -1841,6 +1850,12 @@ Classic Pro
 Classic pro
 == クラシック pro
 
+Classic title glow
+== クラシックの光彩
+
+Classic title glow: 0 = off, 1 = subtle (6 draws), 2 = full Calamity (16 draws)
+== クラシックの光彩：0 = 無効、1 = 控えめ（6 層）、2 = 完全な Calamity（16 層）
+
 Clear
 == クリア
 
@@ -1966,9 +1981,6 @@ Collision Line Opacity
 
 Color
 == 色
-
-Color & opacity
-== 色と不透明度
 
 Color of authenticated player names on scoreboard
 == スコアボード上の認証済みプレイヤー名の色
@@ -2470,6 +2482,9 @@ Current: Score
 
 Current: Time
 == 現在：時間
+
+Cursed Flame
+== 呪焔・黒閃
 
 Custom
 == カスタム
@@ -3560,6 +3575,9 @@ Enable gun sound
 Enable highlighted chat sound
 == ハイライトチャットサウンドを有効化
 
+Enable hook countdown
+== フックのカウントダウンを有効化
+
 Enable HUD animations
 == HUD アニメーションを有効にする
 
@@ -4037,6 +4055,9 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == フォールバック簡易ノイズ低減強度
 
+Fallback title color
+== 基本のタイトル色
+
 Fast input
 == 高速入力
 
@@ -4189,6 +4210,9 @@ Follow
 
 Follow server
 == サーバーに従う
+
+Follow Tee
+== Tee に追従
 
 Following
 == フォロー中
@@ -4561,6 +4585,9 @@ Go forward one tick
 
 Go forward the specified duration
 == 指定時間だけ進む
+
+Golden Grace
+== 黄金・祝福
 
 Gores
 == ゴア
@@ -5620,6 +5647,9 @@ LibreTranslate API Key
 
 LibreTranslate endpoint
 == LibreTranslate エンドポイント
+
+Light band (0 = style default)
+== 色の位相（0 = スタイル既定値）
 
 Limit information in spectator mode
 == 観戦モードの情報を制限する
@@ -7112,11 +7142,17 @@ Option color
 Optional authentication key for the DNSBL provider
 == DNSBL プロバイダーのオプションの認証キー
 
+Original
+== オリジナル
+
 Other
 == その他
 
 Other players' hook line width
 == 他のプレイヤーのフックラインの幅
+
+Other players' nameplate scope (0=All players 1=Friends only)
+== 他人のネームプレート範囲（0=全プレイヤー 1=フレンドのみ）
 
 Others
 == 他人
@@ -7198,6 +7234,9 @@ Overwrite clan even if empty
 
 Own hook line width
 == 自分のフックラインの幅
+
+Own nameplate scope (0=Current character 1=All local characters)
+== 自分のネームプレート範囲（0=現在のキャラクター 1=ローカルの全キャラクター）
 
 p = Ping latency
 == p = Ping レイテンシ
@@ -7564,6 +7603,9 @@ Please wait…
 
 Points
 == ポイント
+
+Polished
+== 光沢
 
 Popup animation
 == ポップアップアニメーション
@@ -9197,6 +9239,9 @@ Severe
 Shape
 == 形状
 
+Shimmer speed (polished)
+== 光の走査速度（光沢）
+
 Short server names
 == 短いサーバー名
 
@@ -9220,6 +9265,9 @@ Show %s group
 
 Show a small view of the dummy
 == ダミーの小さなビューを表示
+
+Show advanced title settings (collapsing keeps configured effects)
+== タイトルの詳細設定を表示（閉じても設定した効果を維持）
 
 Show air jump indicator
 == 空中ジャンプインジケーターを表示
@@ -9526,6 +9574,9 @@ Show important server prompts and Echo messages as popups
 
 Show important server prompts as notifications
 == 重要なサーバープロンプトを通知として表示
+
+Show in Dynamic Island
+== Dynamic Island に表示
 
 Show in-game FPS
 == ゲーム内 FPS を表示
@@ -10262,6 +10313,12 @@ Smoothness of multi-view zoom (in ms, higher = slower)
 SMTC
 == システムメディアコントロール
 
+Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
+== 揺れのオフセットを整数ピクセルに合わせる（字形は鮮明、動きはぎこちない）
+
+Snap wave to pixels
+== 波の変位を整数ピクセルに合わせる
+
 Snapshot Age
 == スナップショット経過時間
 
@@ -10354,6 +10411,9 @@ Space
 
 Spam protection: prevent spamming of team switching, chat, skin changes, emotes, votes
 == スパム対策：チーム切り替え、チャット、スキン変更、エモート、投票のスパムを防止
+
+Spatial effect
+== 立体効果
 
 Speaker
 == スピーカー
@@ -10450,6 +10510,9 @@ Sphere
 
 Spin pop
 == スピンポップ
+
+Spirit Light
+== 霊光・蛍火
 
 Sponsor code
 == 認証コード
@@ -10633,6 +10696,9 @@ Style kill, finish, and system messages
 
 Sub-Tick aiming
 == Sub-Tick エイミング
+
+Subtle
+== 控えめ
 
 Successfully saved the replay!
 == リプレイの保存に成功しました！
@@ -10921,6 +10987,9 @@ Tee trail color
 
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee トレイルの色モード（1=単色、2=現在の Tee 色、3=虹色、4=Tee 速度、5=ランダム）
+
+Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
+== Tee トレイルのスタイル（0=オリジナル、1=呪焔黒閃、2=紫電雷切、3=霊光蛍火、4=虚空の影、5=黄金の祝福）
 
 Tee Trails
 == Tee トレイル
@@ -11261,11 +11330,38 @@ Timer isn't displayed.
 Tiny Tee Size
 == ミニ Tee のサイズ
 
-Title color
-== 称号の色
+Title bob angular speed in 1/100 rad/s
+== タイトルの角速度（1/100 rad/s）
+
+Title bob wavelength in pixels
+== タイトルの波長（ピクセル）
+
+Title color (single color)
+== タイトル色（単色）
+
+Title light sweep speed in 1/100 row per second (0 = off)
+== タイトルの光の走査速度（毎秒 1/100 行、0 = 無効）
+
+Title opacity (custom color)
+== 不透明度（カスタム色）
+
+Title per-character phase per pixel in 1/1000 px (0 = style default, 20 = visible light band)
+== タイトルの文字ごとの位相（1 ピクセルあたり 1/1000 px、0 = スタイル既定値、20 = 光の帯が見える）
+
+Title per-character vertical bob amplitude in pixels (0 = off)
+== タイトルの文字ごとの上下振幅（ピクセル、0 = 無効）
+
+Title preview
+== タイトルの仕上がりプレビュー
 
 Title server unavailable; retry
 == 称号サーバーに接続できません。再試行してください
+
+Title spatial effect: 0 = polished, 1 = solid, 2 = classic Calamity, 3 = off
+== タイトルの立体効果：0 = 光沢、1 = ソリッド、2 = クラシック Calamity、3 = 無効
+
+Title style
+== 称号スタイル
 
 Title too long or contains unsupported characters
 == 称号が長すぎるか使用できない文字を含んでいます
@@ -11723,6 +11819,9 @@ Unknown parameter. Accepted values: default, gametimer, broadcast, both, none
 Unknown status
 == 不明なステータス
 
+Unknown title style
+== 不明なタイトルスタイル
+
 Unlock a team
 == チームのロックを解除
 
@@ -11816,6 +11915,9 @@ Use alternative antiping smoothing, incompatible with cl_antiping_smooth
 Use alternative world tick calculation making hooks behave as if all players have Strong.
 == 代替ワールドティック計算を使用し、全プレイヤーが Strong を持っているかのようにフックを動作させる。
 
+Use animated title style (overrides qm_title_color_mode)
+== タイトルのアニメーションスタイルを使う（qm_title_color_mode を上書き）
+
 Use colored skins for frozen tees
 == 凍結 Tee にカラースキンを使用
 
@@ -11842,6 +11944,9 @@ Use default voice input device
 
 Use default voice output device
 == デフォルトの音声出力デバイスを使用
+
+Use each Tee trail style's own palette instead of the trail color mode
+== トレイルの色モードではなく、各スタイル固有の配色を使う
 
 Use embedded HUD progress bar
 == HUD 埋め込みプログレスバーを使用
@@ -11905,6 +12010,9 @@ Use skin color when Tee is frozen
 
 Use sounds
 == サウンドを使用
+
+Use style colors
+== スタイル固有の配色を使う
 
 Use team colors for name plates
 == ネームプレートにチームカラーを使用
@@ -11998,6 +12106,9 @@ View the developers and contributors
 
 View the people supporting QmClient development
 == View the people supporting QmClient development
+
+Violet Lightning
+== 紫電・雷切
 
 Virtual joystick which always uses fire.
 == 常に発射を使用するバーチャルジョイスティック。
@@ -12107,6 +12218,9 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == 音声ホワイトリスト（カンマ区切り）
 
+Void Shadow
+== 虚空・影
+
 Volume
 == 音量
 
@@ -12199,6 +12313,15 @@ Warn about team balance
 
 Warning
 == 警告
+
+Wave amount
+== 波の振幅
+
+Wave speed (0.01 rad/s)
+== 波の速度（0.01 rad/秒）
+
+Wave wavelength
+== 波の波長
 
 Weak hook
 == 弱いフック
@@ -13050,6 +13173,22 @@ Others
 [Show name plates]
 Own
 == 自身
+
+[Show name plates scope]
+All
+== すべて
+
+[Show name plates scope]
+Current
+== 現在
+
+[Show name plates scope]
+Friends
+== フレンド
+
+[Show name plates scope]
+Local
+== ローカル
 
 [Show players' key presses]
 All

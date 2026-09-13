@@ -316,6 +316,23 @@ ui_widget::SCapsuleTabBarStyle CMenus::SettingsCapsuleTabBarStyle() const
 	return CapsuleTabBarStyleFor(SettingsTabbarColor());
 }
 
+ui_widget::SNestedSegmentStyle CMenus::SettingsNestedSegmentStyle() const
+{
+	const ColorRGBA SurfaceColor = SettingsTabbarColor();
+	ui_widget::SNestedSegmentStyle Style;
+	Style.m_ContainerColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.16f);
+	Style.m_MainIndicatorColor = ui_widget::CapsuleTabBarIndicatorColor(SurfaceColor);
+	// 子级菜单整个压在主滑块上（一级标签被替换），所以次级滑块与子级文字都按
+	// 「主滑块明暗」推导：主滑块偏亮就用暗一档的次级滑块 + 深字，反之亦然。
+	const bool MainIndicatorIsDark = ui_widget::CapsuleTabBarSurfaceIsLight(SurfaceColor);
+	Style.m_SubIndicatorColor = MainIndicatorIsDark ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.18f) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f);
+	Style.m_SubIndicatorBorderColor = MainIndicatorIsDark ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.40f) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.40f);
+	Style.m_SubActiveLabelColor = ui_widget::CapsuleTabBarActiveLabelColor(SurfaceColor);
+	Style.m_SubInactiveLabelColor = MainIndicatorIsDark ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.55f) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.50f);
+	Style.m_SubHoverColor = MainIndicatorIsDark ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.08f);
+	return Style;
+}
+
 ui_widget::SCapsuleTabBarStyle CMenus::CapsuleTabBarStyleFor(const ColorRGBA &SurfaceColor) const
 {
 	ui_widget::SCapsuleTabBarStyle Style;
@@ -1657,6 +1674,38 @@ int CMenus::DoSettingsButton_Menu(int Page, int Tab, int Subtab, CButtonContaine
 int CMenus::DoSettingsButton_Menu(int Page, int Tab, int Subtab, CButtonContainer *pBC, const char *pTextId, const char *pText, int Checked, const CUIRect *pRect, const SSettingsContentMetrics &Metrics, int Flags, int Corners, float Rounding, const ColorRGBA &Color, float FontFactor)
 {
 	return DoSettingsButton_Menu(Page, Tab, Subtab, pBC, pTextId, pText, Checked, pRect, Flags, Corners, Rounding, Color, FontFactor, Metrics.m_BodySize);
+}
+
+int CMenus::DoSettingsButton_CapsuleSegment(int Page, int Tab, int Subtab, CButtonContainer *pBC, const char *pTextId, const char *pText, int Checked, const CUIRect *pRect, float BodySize, const ColorRGBA *pLabelColor, const ColorRGBA *pHoverColor)
+{
+	dbg_assert(pBC != nullptr, "capsule segment requires a stable button container");
+	const float ResolvedBodySize = BodySize > 0.0f ? BodySize : CurrentSettingsContentMetrics().m_BodySize;
+	// 胶囊分段不画自己的分块底色（容器与滑块由 NestedSegmentChrome 统一绘制），
+	// 只保留 hover 反馈与文字，所以边框圆角按胶囊给满。
+	const float Rounding = ui_token::radius::PILL;
+	// 压在主滑块上的次级分段：字色不能吃容器级自适应（容器上正常的字色压到主滑块上会看不见），
+	// 由调用方给出实色，并关掉 CapsuleTab 的强制字色。
+	const bool ExplicitLabelColor = pLabelColor != nullptr;
+	const bool CapsuleTab = !ExplicitLabelColor;
+	CUIRect Text = MenuButtonTextRect(pRect, 0.0f, 0.0f);
+	SLabelProperties Props;
+	Props.m_MaxWidth = Text.w;
+	const char *pResolvedTextId = pTextId != nullptr ? pTextId : "";
+	const SMenuTextStyleKey StyleKey = BuildMenuTextStyleKey(&Text, ResolvedBodySize, TEXTALIGN_MC, Props);
+	if(m_MenuTextPlanCollecting)
+	{
+		CollectMenuTextPlanItem(MENU_TEXT_SCOPE_SETTINGS, Page, Tab, Subtab, pResolvedTextId, pText, &Text, ResolvedBodySize, TEXTALIGN_MC, Props, StyleKey);
+		return 0;
+	}
+	CUIElement *pTextElement = pTextId != nullptr ? &MenuTextElement(MENU_TEXT_SCOPE_SETTINGS, Page, Tab, Subtab, pResolvedTextId, StyleKey) : nullptr;
+	const ColorRGBA Transparent = ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f);
+	const ColorRGBA PreviousLabelColor = TextRender()->GetTextColor();
+	if(ExplicitLabelColor)
+		TextRender()->TextColor(*pLabelColor);
+	const int Result = DoButton_MenuTab(pBC, pText, Checked, pRect, IGraphics::CORNER_ALL, nullptr, &Transparent, &Transparent, pHoverColor, Rounding, nullptr, pTextElement, ResolvedBodySize, CapsuleTab);
+	if(ExplicitLabelColor)
+		TextRender()->TextColor(PreviousLabelColor);
+	return Result;
 }
 
 bool CMenus::DoSettingsScrollbarOption(int Page, int Tab, const char *pTextId, const void *pId, int *pOption, const CUIRect *pRect, const char *pStr, int Min, int Max, const IScrollbarScale *pScale, unsigned Flags, const char *pSuffix, const char *pMaxText)

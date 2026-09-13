@@ -7802,6 +7802,18 @@ void CGameClient::RefreshSkin(const std::shared_ptr<CManagedTeeRenderInfo> &pMan
 	if(SkinDescriptor.m_Flags & CSkinDescriptor::FLAG_SIX)
 	{
 		const CSkin *pSkin = m_Skins.FindOrNullptr(CSkin::IsValidName(SkinDescriptor.m_aSkinName) ? SkinDescriptor.m_aSkinName : "default");
+		if(pSkin == nullptr && CSkin::IsValidName(SkinDescriptor.m_aSkinName))
+		{
+			// 皮肤名解析不到时要区分两种情况：仍在排队/下载中（保持现状，等它加载完），
+			// 以及已确定找不到或加载失败（回退到 default 皮肤）。
+			// 回退是必需的：6.x 侧留空后，0.7 分支仍会画出 standard 部件，呈现为白 Tee。
+			// 这里用不走 RequestLoad 的只读查找，否则每帧回退都会重新请求已经失败的皮肤下载。
+			const CSkins::CSkinContainer *pSkinContainer = m_Skins.LookupContainerOrNullptr(SkinDescriptor.m_aSkinName);
+			if(pSkinContainer != nullptr && CSkins::CSkinContainer::IsUnresolved(pSkinContainer->State()))
+			{
+				pSkin = m_Skins.FindOrNullptr("default");
+			}
+		}
 		if(pSkin != nullptr)
 		{
 			TeeInfo.Apply(pSkin);

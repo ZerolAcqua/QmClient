@@ -8288,6 +8288,159 @@ turkish = "Tee izi renk modu (1=Düz, 2=Geçerli Tee rengi, 3=Gökkuşağı, 4=T
 polish = "Tryb koloru śladu Tee (1=Jednolity, 2=Bieżący kolor Tee, 3=Tęcza, 4=Prędkość Tee, 5=Losowy)"
 
 [[message]]
+key = "Cursed Flame"
+[message.translations]
+simplified_chinese = "咒焰·黑闪"
+traditional_chinese = "咒焰·黑閃"
+japanese = "呪焔・黒閃"
+korean = "저주 화염·흑섬"
+russian = "Проклятое пламя"
+german = "Fluchflamme"
+spanish = "Llama maldita"
+french = "Flamme maudite"
+brazilian_portuguese = "Chama amaldiçoada"
+portuguese = "Chama amaldiçoada"
+turkish = "Lanetli alev"
+polish = "Przeklęty płomień"
+
+
+[[message]]
+key = "Golden Grace"
+[message.translations]
+simplified_chinese = "黄金·赐福"
+traditional_chinese = "黃金·賜福"
+japanese = "黄金・祝福"
+korean = "황금·축복"
+russian = "Золотая благодать"
+german = "Goldene Gnade"
+spanish = "Gracia dorada"
+french = "Grâce dorée"
+brazilian_portuguese = "Graça dourada"
+portuguese = "Graça dourada"
+turkish = "Altın lütuf"
+polish = "Złota łaska"
+
+
+[[message]]
+key = "Original"
+[message.translations]
+simplified_chinese = "原版"
+traditional_chinese = "原版"
+japanese = "オリジナル"
+korean = "기본"
+russian = "Оригинал"
+german = "Original"
+spanish = "Original"
+french = "Original"
+brazilian_portuguese = "Original"
+portuguese = "Original"
+turkish = "Özgün"
+polish = "Oryginalny"
+
+
+[[message]]
+key = "Spirit Light"
+[message.translations]
+simplified_chinese = "灵光·流萤"
+traditional_chinese = "靈光·流螢"
+japanese = "霊光・蛍火"
+korean = "영광·반딧불"
+russian = "Свет духа"
+german = "Geistlicht"
+spanish = "Luz espiritual"
+french = "Lumière spirituelle"
+brazilian_portuguese = "Luz espiritual"
+portuguese = "Luz espiritual"
+turkish = "Ruh ışığı"
+polish = "Światło ducha"
+
+
+[[message]]
+key = "Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)"
+[message.translations]
+simplified_chinese = "Tee 拖尾样式（0=原版，1=咒焰黑闪，2=紫电雷切，3=灵光流萤，4=虚空暗影，5=黄金赐福）"
+traditional_chinese = "Tee 拖尾樣式（0=原版，1=咒焰黑閃，2=紫電雷切，3=靈光流螢，4=虛空暗影，5=黃金賜福）"
+japanese = "Tee トレイルのスタイル（0=オリジナル、1=呪焔黒閃、2=紫電雷切、3=霊光蛍火、4=虚空の影、5=黄金の祝福）"
+korean = "Tee 궤적 스타일 (0=기본, 1=저주 화염·흑섬, 2=보랏빛 번개, 3=영광·반딧불, 4=공허·그림자, 5=황금·축복)"
+russian = "Стиль следа Tee (0=Оригинал, 1=Проклятое пламя, 2=Лиловая молния, 3=Свет духа, 4=Тень пустоты, 5=Золотая благодать)"
+german = "Tee-Spur-Stil (0=Original, 1=Fluchflamme, 2=Violetter Blitz, 3=Geistlicht, 4=Schatten der Leere, 5=Goldene Gnade)"
+spanish = "Estilo del rastro de Tee (0=Original, 1=Llama maldita, 2=Rayo violeta, 3=Luz espiritual, 4=Sombra del vacío, 5=Gracia dorada)"
+french = "Style de traînée de Tee (0=Original, 1=Flamme maudite, 2=Foudre violette, 3=Lumière spirituelle, 4=Ombre du vide, 5=Grâce dorée)"
+brazilian_portuguese = "Estilo do rastro do Tee (0=Original, 1=Chama amaldiçoada, 2=Raio violeta, 3=Luz espiritual, 4=Sombra do vazio, 5=Graça dourada)"
+portuguese = "Estilo do rasto do Tee (0=Original, 1=Chama amaldiçoada, 2=Relâmpago violeta, 3=Luz espiritual, 4=Sombra do vazio, 5=Graça dourada)"
+turkish = "Tee izi stili (0=Özgün, 1=Lanetli alev, 2=Mor şimşek, 3=Ruh ışığı, 4=Boşluk gölgesi, 5=Altın lütuf)"
+polish = "Styl śladu Tee (0=Oryginalny, 1=Przeklęty płomień, 2=Fioletowa błyskawica, 3=Światło ducha, 4=Cień pustki, 5=Złota łaska)"
+
+
+[[message]]
+key = "Use each Tee trail style's own palette instead of the trail color mode"
+[message.translations]
+simplified_chinese = "使用各 Tee 拖尾样式自带的配色，而不是拖尾颜色模式"
+traditional_chinese = "使用各 Tee 拖尾樣式自帶的配色，而不是拖尾顏色模式"
+japanese = "トレイルの色モードではなく、各スタイル固有の配色を使う"
+korean = "Tee 궤적 색상 모드 대신 각 스타일 고유의 색상을 사용"
+russian = "Использовать собственную палитру стиля следа Tee вместо режима цвета"
+german = "Die eigene Farbpalette des Tee-Spur-Stils statt des Spur-Farbmodus verwenden"
+spanish = "Usar la paleta propia de cada estilo de estela de Tee en lugar del modo de color"
+french = "Utiliser la palette propre au style de traînée de Tee au lieu du mode de couleur"
+brazilian_portuguese = "Usar a paleta própria de cada estilo de rastro do Tee em vez do modo de cor"
+portuguese = "Usar a paleta própria de cada estilo de rasto do Tee em vez do modo de cor"
+turkish = "Tee izi renk modu yerine her stilin kendi paletini kullan"
+polish = "Użyj własnej palety stylu śladu Tee zamiast trybu koloru"
+
+
+[[message]]
+key = "Use style colors"
+[message.translations]
+simplified_chinese = "使用样式专属配色"
+traditional_chinese = "使用樣式專屬配色"
+japanese = "スタイル固有の配色を使う"
+korean = "스타일 고유 색상 사용"
+russian = "Использовать цвета стиля"
+german = "Stilfarben verwenden"
+spanish = "Usar colores del estilo"
+french = "Utiliser les couleurs du style"
+brazilian_portuguese = "Usar cores do estilo"
+portuguese = "Usar cores do estilo"
+turkish = "Stil renklerini kullan"
+polish = "Użyj kolorów stylu"
+
+
+[[message]]
+key = "Violet Lightning"
+[message.translations]
+simplified_chinese = "紫电·雷切"
+traditional_chinese = "紫電·雷切"
+japanese = "紫電・雷切"
+korean = "보랏빛 번개"
+russian = "Лиловая молния"
+german = "Violetter Blitz"
+spanish = "Rayo violeta"
+french = "Foudre violette"
+brazilian_portuguese = "Raio violeta"
+portuguese = "Relâmpago violeta"
+turkish = "Mor şimşek"
+polish = "Fioletowa błyskawica"
+
+
+[[message]]
+key = "Void Shadow"
+[message.translations]
+simplified_chinese = "虚空·暗影"
+traditional_chinese = "虛空·暗影"
+japanese = "虚空・影"
+korean = "공허·그림자"
+russian = "Тень пустоты"
+german = "Schatten der Leere"
+spanish = "Sombra del vacío"
+french = "Ombre du vide"
+brazilian_portuguese = "Sombra do vazio"
+portuguese = "Sombra do vazio"
+turkish = "Boşluk gölgesi"
+polish = "Cień pustki"
+
+
+[[message]]
 key = "Tee Trails"
 [message.translations]
 simplified_chinese = "Tee 拖尾"

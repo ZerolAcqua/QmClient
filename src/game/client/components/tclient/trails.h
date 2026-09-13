@@ -6,6 +6,7 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/components/tclient/qm_tee_trail.h>
 
 class CTrailPart
 {

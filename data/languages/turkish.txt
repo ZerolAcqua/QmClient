@@ -536,6 +536,9 @@ Adjust verbosity in external console (-3 = none, -2 = errors only, -1 = warnings
 Advanced
 == Gelişmiş
 
+Advanced mode
+== Gelişmiş mod
+
 Advanced options
 == Gelişmiş seçenekler
 
@@ -688,6 +691,12 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == Ayar kartı sıralamasını ve düzen yeniden akışını canlandır
+
+Animated styles override the fallback title color
+== Animasyonlu stiller temel unvan renginden önceliklidir
+
+Animated title style id
+== Animasyonlu unvan stili kimliği
 
 Animation
 == Animasyon
@@ -1841,6 +1850,12 @@ Classic Pro
 Classic pro
 == Klasik profesyonel
 
+Classic title glow
+== Klasik unvan parıltısı
+
+Classic title glow: 0 = off, 1 = subtle (6 draws), 2 = full Calamity (16 draws)
+== Klasik unvan parıltısı: 0 = kapalı, 1 = hafif (6 katman), 2 = tam Calamity (16 katman)
+
 Clear
 == Temizle
 
@@ -1966,9 +1981,6 @@ Collision Line Opacity
 
 Color
 == Renk
-
-Color & opacity
-== Renk ve opaklık
 
 Color of authenticated player names on scoreboard
 == Skor tablosunda doğrulanmış oyuncu adlarının rengi
@@ -2470,6 +2482,9 @@ Current: Score
 
 Current: Time
 == Geçerli: Süre
+
+Cursed Flame
+== Lanetli alev
 
 Custom
 == Özel
@@ -3560,6 +3575,9 @@ Enable gun sound
 Enable highlighted chat sound
 == Vurgulanan sohbet sesini etkinleştir
 
+Enable hook countdown
+== Kanca geri sayımını etkinleştir
+
 Enable HUD animations
 == HUD animasyonlarını etkinleştir
 
@@ -4037,6 +4055,9 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == Yedek basit gürültü azaltma gücü
 
+Fallback title color
+== Temel unvan rengi
+
 Fast input
 == Hızlı giriş
 
@@ -4189,6 +4210,9 @@ Follow
 
 Follow server
 == Sunucuyu takip et
+
+Follow Tee
+== Tee'yi takip et
 
 Following
 == Takip Ediliyor
@@ -4561,6 +4585,9 @@ Go forward one tick
 
 Go forward the specified duration
 == Belirtilen süre kadar ileri git
+
+Golden Grace
+== Altın lütuf
 
 Gores
 == Gores
@@ -5620,6 +5647,9 @@ LibreTranslate API Key
 
 LibreTranslate endpoint
 == LibreTranslate uç noktası
+
+Light band (0 = style default)
+== Renk fazı (0 = stil varsayılanı)
 
 Limit information in spectator mode
 == Seyirci modunda bilgiyi sınırla
@@ -7112,11 +7142,17 @@ Option color
 Optional authentication key for the DNSBL provider
 == DNSBL sağlayıcısı için isteğe bağlı kimlik doğrulama anahtarı
 
+Original
+== Özgün
+
 Other
 == Diğer
 
 Other players' hook line width
 == Diğer oyuncuların kanca çizgisi genişliği
+
+Other players' nameplate scope (0=All players 1=Friends only)
+== Diğer oyuncuların isim levhası kapsamı (0=Tüm oyuncular 1=Yalnızca arkadaşlar)
 
 Others
 == Diğerleri
@@ -7198,6 +7234,9 @@ Overwrite clan even if empty
 
 Own hook line width
 == Kendi kanca çizgisi genişliği
+
+Own nameplate scope (0=Current character 1=All local characters)
+== Kendi isim levhası kapsamı (0=Geçerli karakter 1=Tüm yerel karakterler)
 
 p = Ping latency
 == p = Ping gecikmesi
@@ -7564,6 +7603,9 @@ Please wait…
 
 Points
 == Puanlar
+
+Polished
+== Cilalı
 
 Popup animation
 == Açılır animasyon
@@ -9197,6 +9239,9 @@ Severe
 Shape
 == Şekil
 
+Shimmer speed (polished)
+== Işık hızı (cilalı)
+
 Short server names
 == Kısa sunucu adları
 
@@ -9220,6 +9265,9 @@ Show %s group
 
 Show a small view of the dummy
 == Dummy'nin küçük bir görünümünü göster
+
+Show advanced title settings (collapsing keeps configured effects)
+== Gelişmiş unvan ayarlarını göster (daraltmak ayarlanan efektleri korur)
 
 Show air jump indicator
 == Havada zıplama göstergesini göster
@@ -9526,6 +9574,9 @@ Show important server prompts and Echo messages as popups
 
 Show important server prompts as notifications
 == Önemli sunucu uyarılarını bildirim olarak göster
+
+Show in Dynamic Island
+== Dynamic Island içinde göster
 
 Show in-game FPS
 == Oyunda FPS göster
@@ -10262,6 +10313,12 @@ Smoothness of multi-view zoom (in ms, higher = slower)
 SMTC
 == Sistem Medya Kontrolü
 
+Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
+== Salınım kaymasını tam piksele hizala (daha keskin glifler, daha kesik hareket)
+
+Snap wave to pixels
+== Dalgayı tam piksellere hizala
+
 Snapshot Age
 == Anlık görüntü yaşı
 
@@ -10354,6 +10411,9 @@ Space
 
 Spam protection: prevent spamming of team switching, chat, skin changes, emotes, votes
 == Spam koruması: takım değiştirme, sohbet, skin değiştirme, ifade ve oylama spamını önler
+
+Spatial effect
+== Uzamsal efekt
 
 Speaker
 == Hoparlör
@@ -10450,6 +10510,9 @@ Sphere
 
 Spin pop
 == Döndürerek aç
+
+Spirit Light
+== Ruh ışığı
 
 Sponsor code
 == Destekçi kodu
@@ -10633,6 +10696,9 @@ Style kill, finish, and system messages
 
 Sub-Tick aiming
 == Alt-Tik nişan alma
+
+Subtle
+== Hafif
 
 Successfully saved the replay!
 == Tekrar oynatma başarıyla kaydedildi!
@@ -10921,6 +10987,9 @@ Tee trail color
 
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee izi renk modu (1=Düz, 2=Geçerli Tee rengi, 3=Gökkuşağı, 4=Tee hızı, 5=Rastgele)
+
+Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
+== Tee izi stili (0=Özgün, 1=Lanetli alev, 2=Mor şimşek, 3=Ruh ışığı, 4=Boşluk gölgesi, 5=Altın lütuf)
 
 Tee Trails
 == Tee İzleri
@@ -11261,11 +11330,38 @@ Timer isn't displayed.
 Tiny Tee Size
 == Minik Tee Boyutu
 
-Title color
-== Unvan rengi
+Title bob angular speed in 1/100 rad/s
+== Unvan salınım açısal hızı (1/100 rad/s)
+
+Title bob wavelength in pixels
+== Unvan salınım dalga boyu (piksel)
+
+Title color (single color)
+== Unvan rengi (tek renk)
+
+Title light sweep speed in 1/100 row per second (0 = off)
+== Unvan ışık tarama hızı (saniyede 1/100 satır, 0 = kapalı)
+
+Title opacity (custom color)
+== Opaklık (özel renk)
+
+Title per-character phase per pixel in 1/1000 px (0 = style default, 20 = visible light band)
+== Karakter başına piksel başına faz (1/1000 px, 0 = stil varsayılanı, 20 = görünür ışık şeridi)
+
+Title per-character vertical bob amplitude in pixels (0 = off)
+== Karakter başına dikey salınım genliği (piksel, 0 = kapalı)
+
+Title preview
+== Unvan önizlemesi
 
 Title server unavailable; retry
 == Unvan sunucusu kullanılamıyor; tekrar dene
+
+Title spatial effect: 0 = polished, 1 = solid, 2 = classic Calamity, 3 = off
+== Unvan uzamsal efekti: 0 = cilalı, 1 = katı, 2 = klasik Calamity, 3 = kapalı
+
+Title style
+== Unvan stili
 
 Title too long or contains unsupported characters
 == Unvan çok uzun veya desteklenmeyen karakterler içeriyor
@@ -11723,6 +11819,9 @@ Unknown parameter. Accepted values: default, gametimer, broadcast, both, none
 Unknown status
 == Bilinmeyen durum
 
+Unknown title style
+== Bilinmeyen unvan stili
+
 Unlock a team
 == Bir takımın kilidini aç
 
@@ -11816,6 +11915,9 @@ Use alternative antiping smoothing, incompatible with cl_antiping_smooth
 Use alternative world tick calculation making hooks behave as if all players have Strong.
 == Tüm oyuncuların Güçlü özelliğine sahipmiş gibi kancaların davranmasını sağlayan alternatif dünya tick hesaplamasını kullan.
 
+Use animated title style (overrides qm_title_color_mode)
+== Animasyonlu unvan stili kullan (qm_title_color_mode'u geçersiz kılar)
+
 Use colored skins for frozen tees
 == Donmuş teeler için renkli görünümler kullan
 
@@ -11842,6 +11944,9 @@ Use default voice input device
 
 Use default voice output device
 == Varsayılan ses çıkış cihazını kullan
+
+Use each Tee trail style's own palette instead of the trail color mode
+== Tee izi renk modu yerine her stilin kendi paletini kullan
 
 Use embedded HUD progress bar
 == Gömülü HUD ilerleme çubuğunu kullan
@@ -11905,6 +12010,9 @@ Use skin color when Tee is frozen
 
 Use sounds
 == Sesleri kullan
+
+Use style colors
+== Stil renklerini kullan
 
 Use team colors for name plates
 == İsim plakaları için takım renklerini kullan
@@ -11998,6 +12106,9 @@ View the developers and contributors
 
 View the people supporting QmClient development
 == View the people supporting QmClient development
+
+Violet Lightning
+== Mor şimşek
 
 Virtual joystick which always uses fire.
 == Her zaman ateş kullanan sanal joystick.
@@ -12107,6 +12218,9 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == Ses Beyaz Listesi (Virgülle Ayrılmış)
 
+Void Shadow
+== Boşluk gölgesi
+
 Volume
 == Ses düzeyi
 
@@ -12199,6 +12313,15 @@ Warn about team balance
 
 Warning
 == Uyarı
+
+Wave amount
+== Dalga miktarı
+
+Wave speed (0.01 rad/s)
+== Dalga hızı (0,01 rad/sn)
+
+Wave wavelength
+== Dalga boyu
 
 Weak hook
 == Zayıf kanca
@@ -13050,6 +13173,22 @@ Others
 [Show name plates]
 Own
 == Kendi
+
+[Show name plates scope]
+All
+== Tümü
+
+[Show name plates scope]
+Current
+== Geçerli
+
+[Show name plates scope]
+Friends
+== Arkadaşlar
+
+[Show name plates scope]
+Local
+== Yerel
 
 [Show players' key presses]
 All

@@ -165,6 +165,61 @@ TEST(Skins, OnlyNotFoundTransitionsRequireSkinListRefresh)
 	EXPECT_TRUE(CSkins::CSkinContainer::StateChangeRequiresListRefresh(EState::NOT_FOUND, EState::PENDING));
 }
 
+TEST(Skins, UnresolvedSkinStatesAreOnlyMissingOrFailed)
+{
+	using EState = CSkins::CSkinContainer::EState;
+
+	// 只有“确定拿不到皮肤”的状态才算解析失败：这两种状态必须回退到 default 皮肤。
+	EXPECT_TRUE(CSkins::CSkinContainer::IsUnresolved(EState::NOT_FOUND));
+	EXPECT_TRUE(CSkins::CSkinContainer::IsUnresolved(EState::ERROR));
+
+	// 仍在排队/加载中的皮肤不能回退，否则会用 default 皮肤覆盖掉即将加载完成的真实皮肤。
+	EXPECT_FALSE(CSkins::CSkinContainer::IsUnresolved(EState::UNLOADED));
+	EXPECT_FALSE(CSkins::CSkinContainer::IsUnresolved(EState::BACKGROUND_REQUESTED));
+	EXPECT_FALSE(CSkins::CSkinContainer::IsUnresolved(EState::PENDING));
+	EXPECT_FALSE(CSkins::CSkinContainer::IsUnresolved(EState::LOADING));
+
+	// 已加载的皮肤自然不需要回退。
+	EXPECT_FALSE(CSkins::CSkinContainer::IsUnresolved(EState::LOADED));
+}
+
+TEST(Skins, UnknownSkinNameFallsBackToDefaultSkinOnlyWhenUnresolvable)
+{
+	const std::string GameClientSource = ReadTestSourceFile("src/game/client/gameclient.cpp");
+	const size_t RefreshSkinPos = GameClientSource.find("void CGameClient::RefreshSkin(const std::shared_ptr<CManagedTeeRenderInfo> &pManagedTeeRenderInfo)");
+	ASSERT_NE(RefreshSkinPos, std::string::npos);
+	const size_t RefreshSkinsPos = GameClientSource.find("void CGameClient::RefreshSkins(int SkinDescriptorFlags)", RefreshSkinPos);
+	ASSERT_NE(RefreshSkinsPos, std::string::npos);
+	const std::string RefreshSkinBody = GameClientSource.substr(RefreshSkinPos, RefreshSkinsPos - RefreshSkinPos);
+
+	// 名字未知时必须显式回退到 default 皮肤，不能静默留空后由 0.7 分支画出白 Tee。
+	EXPECT_NE(RefreshSkinBody.find("const CSkins::CSkinContainer *pSkinContainer = m_Skins.LookupContainerOrNullptr(SkinDescriptor.m_aSkinName);"), std::string::npos);
+	EXPECT_NE(RefreshSkinBody.find("CSkinContainer::IsUnresolved(pSkinContainer->State())"), std::string::npos);
+	EXPECT_NE(RefreshSkinBody.find("pSkin = m_Skins.FindOrNullptr(\"default\");"), std::string::npos);
+	// 回退路径不得走会重新发起加载请求的查找：否则每帧回退都在重试已经失败的皮肤下载。
+	EXPECT_EQ(RefreshSkinBody.find("m_Skins.FindContainerOrNullptr(SkinDescriptor.m_aSkinName)"), std::string::npos);
+	EXPECT_EQ(RefreshSkinBody.find("m_Skins.FindContainerImpl(SkinDescriptor.m_aSkinName)"), std::string::npos);
+	// 仍然禁止回退到 m_Skins.Find：它会返回占位皮肤，把还没加载完的皮肤覆盖成空贴图。
+	EXPECT_EQ(RefreshSkinBody.find("TeeInfo.Apply(m_Skins.Find("), std::string::npos);
+
+	const std::string SkinsSource = ReadTestSourceFile("src/game/client/components/skins.cpp");
+	// 下载失败/找不到是异步发生的：本次刷新时皮肤还在 LOADING，因此必须在状态落到 NOT_FOUND/ERROR
+	// 之后再次通知，否则回退永远不会生效。
+	EXPECT_NE(SkinsSource.find("CSkinContainer::IsUnresolved(pSkinContainer->m_State)"), std::string::npos);
+	EXPECT_NE(SkinsSource.find("m_vSkinsUnresolvedThisFrame.push_back(pSkinContainer->Name());"), std::string::npos);
+	EXPECT_NE(SkinsSource.find("for(const std::string &SkinName : m_vSkinsUnresolvedThisFrame)"), std::string::npos);
+	EXPECT_NE(SkinsSource.find("GameClient()->OnSkinUpdate(SkinName.c_str());"), std::string::npos);
+	// 每个失败状态只通知一次：否则每次皮肤更新都会重复回调，并反复重新请求已失败的皮肤。
+	EXPECT_NE(SkinsSource.find("|| pSkinContainer->m_UnresolvedNotified)"), std::string::npos);
+	EXPECT_NE(SkinsSource.find("pSkinContainer->m_UnresolvedNotified = true;"), std::string::npos);
+	EXPECT_NE(SkinsSource.find("if(State != OldState)\n\t\tm_UnresolvedNotified = false;"), std::string::npos);
+	const size_t OnUpdatePos = SkinsSource.find("void CSkins::OnUpdate()");
+	ASSERT_NE(OnUpdatePos, std::string::npos);
+	const size_t OnUpdateEnd = SkinsSource.find("CSkins::CSkinLoadingStats CSkins::LoadingStats() const", OnUpdatePos);
+	ASSERT_NE(OnUpdateEnd, std::string::npos);
+	EXPECT_NE(SkinsSource.substr(OnUpdatePos, OnUpdateEnd - OnUpdatePos).find("m_vSkinsUnresolvedThisFrame.clear();"), std::string::npos);
+}
+
 TEST(Skins, RegularStateTransitionsEnterAndLeaveUsageList)
 {
 	using EState = CSkins::CSkinContainer::EState;

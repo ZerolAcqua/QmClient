@@ -12,10 +12,7 @@
 
 // Log / 日志
 MACRO_CONFIG_INT(QmConsoleFilterMask, qm_console_filter_mask, 15, 0, 15, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Local console log category filter mask (bit flags)")
-MACRO_CONFIG_INT(QmPerfDebug, qm_perf_debug, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable main thread and render stage performance debug logging")
-MACRO_CONFIG_INT(QmPerfLogfile, qm_perf_logfile, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Write performance debug logs to dedicated file")
-MACRO_CONFIG_INT(QmPerfDebugThresholdMs, qm_perf_debug_threshold_ms, 4, 1, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Performance debug log threshold (ms)")
-MACRO_CONFIG_INT(QmPerfStutterDiagnostics, qm_perf_stutter_diagnostics, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable client stutter diagnostics at startup")
+MACRO_CONFIG_INT(QmPerfDebug, qm_perf_debug, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable performance debug logging and diagnostics")
 MACRO_CONFIG_INT(QmMacosGraphicsDiagnostics, qm_macos_graphics_diagnostics, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable macOS graphics diagnostics and Instruments signposts")
 MACRO_CONFIG_INT(QmVulkanApiVersion, qm_vulkan_api_version, 11, 11, 14, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Vulkan API version: 11=1.1 compatibility, 14=1.4 strict")
 MACRO_CONFIG_INT(QmProcessHighPriority, qm_process_high_priority, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Toggle client process normal/high priority on Windows")
@@ -203,6 +200,11 @@ MACRO_CONFIG_INT(QmSkinChangeTransitionIntensity, qm_skin_change_transition_inte
 MACRO_CONFIG_INT(QmCycleTeeHue, qm_cycle_tee_hue, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cycle custom Tee hue for main")
 MACRO_CONFIG_INT(QmCycleTeeHueDummy, qm_cycle_tee_hue_dummy, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cycle custom Tee hue for dummy simultaneously")
 MACRO_CONFIG_INT(QmCycleTeeHueSpeed, qm_cycle_tee_hue_speed, 72, 0, 360, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cycle custom Tee hue speed (deg/s)")
+MACRO_CONFIG_INT(QmSkinOutlineLocal, qm_skin_outline_local, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Skin outline for self and dummy")
+MACRO_CONFIG_INT(QmSkinOutlineOthers, qm_skin_outline_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Skin outline for other players")
+MACRO_CONFIG_COL(QmSkinOutlineColor, qm_skin_outline_color, 8388479, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Skin outline color")
+MACRO_CONFIG_INT(QmSkinOutlineWidth, qm_skin_outline_width, 2, 1, 6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Skin outline width")
+MACRO_CONFIG_INT(QmSkinOutlineAlpha, qm_skin_outline_alpha, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Skin outline opacity")
 MACRO_CONFIG_INT(QmRandomEmoteOnHit, qm_random_emote_on_hit, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Random emote when hit by hammer/grenade")
 MACRO_CONFIG_INT(QmEmoticonShadow, qm_emoticon_shadow, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Draw shadow behind emote")
 MACRO_CONFIG_INT(QmWeaponTrajectory, qm_weapon_trajectory, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Weapon trajectory helper mode (0=Off, 1=On key, 2=Always)")
@@ -349,8 +351,7 @@ MACRO_CONFIG_INT(QmNameplateCoordsOffsetY, qm_nameplate_coords_offset_y, 0, -300
 MACRO_CONFIG_INT(QmNameplateHookOffsetX, qm_nameplate_hook_offset_x, 0, -300, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Name plate strength line X offset")
 MACRO_CONFIG_INT(QmNameplateHookOffsetY, qm_nameplate_hook_offset_y, 0, -300, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Name plate strength line Y offset")
 MACRO_CONFIG_INT(QmNameplateHookStrongWeakScope, qm_nameplate_hook_strong_weak_scope, 1, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)")
-MACRO_CONFIG_INT(QmNameplateOwnScope, qm_nameplate_own_scope, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Own nameplate scope (0=Current character 1=All local characters)")
-MACRO_CONFIG_INT(QmNameplateOthersScope, qm_nameplate_others_scope, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Other players' nameplate scope (0=All players 1=Friends only)")
+MACRO_CONFIG_INT(QmNameplateShowScope, qm_nameplate_show_scope, 5, 0, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)")
 MACRO_CONFIG_COL(QmNameplateStrongHookColor, qm_nameplate_strong_hook_color, 6401973, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate strong hook icon color")
 MACRO_CONFIG_COL(QmNameplateWeakHookColor, qm_nameplate_weak_hook_color, 41131, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate weak hook icon color")
 MACRO_CONFIG_INT(QmNameplateTextEffects, qm_nameplate_text_effects, 1, 0, 15, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text effects (1=Border 2=Gradient 4=Rainbow 8=Glow)")
@@ -361,6 +362,12 @@ MACRO_CONFIG_COL(QmNameplateTextGlowColor, qm_nameplate_text_glow_color, 0x664CC
 MACRO_CONFIG_INT(QmNameplateTextGlowRange, qm_nameplate_text_glow_range, 4, 1, 12, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text glow range")
 MACRO_CONFIG_INT(QmNameplateTextPlayingScope, qm_nameplate_text_playing_scope, 5, 0, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text effects playing scope (0=Off 1=Own 2=Others 3=Friends 4=Own and friends 5=All players)")
 MACRO_CONFIG_INT(QmNameplateTextSpectateScope, qm_nameplate_text_spectate_scope, 1, 0, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text effects spectate scope (0=Off 1=Spectated player 2=Others 3=Friends 4=Spectated player and friends 5=All players)")
+// Demo 预览与视频导出共用的独立显示选项。
+MACRO_CONFIG_INT(QmDemoShowDirection, qm_demo_show_direction, 1, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Demo key presses (0=Off 1=Others 2=All 3=Own)")
+MACRO_CONFIG_INT(QmDemoShowStrongWeak, qm_demo_show_strong_weak, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Demo hook strength (0=Off 1=Icon 2=Icon and number)")
+MACRO_CONFIG_INT(QmDemoStrongWeakScope, qm_demo_strong_weak_scope, 4, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)")
+MACRO_CONFIG_INT(QmDemoShowHud, qm_demo_show_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show in-game HUD in demo preview and video")
+MACRO_CONFIG_INT(QmDemoShowChat, qm_demo_show_chat, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show chat in demo preview and video")
 MACRO_CONFIG_INT(QmNameplateTextDemoMode, qm_nameplate_text_demo_mode, 1, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text effects demo mode (0=Off 1=Smart 2=Manual target 3=Manual scope)")
 MACRO_CONFIG_INT(QmNameplateTextDemoTarget, qm_nameplate_text_demo_target, -1, -1, 63, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text effects demo manual target client ID (-1=None)")
 MACRO_CONFIG_INT(QmNameplateClanOffsetX, qm_nameplate_clan_offset_x, 0, -300, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Name plate clan line X offset")
@@ -620,3 +627,15 @@ MACRO_CONFIG_INT(QmJumpHintSize, qm_jump_hint_size, 10, 0, 50, CFGFLAG_CLIENT | 
 
 // Friends - 好友
 MACRO_CONFIG_INT(QmFriendAutoFollowDelay, qm_friend_auto_follow_delay, 3, 0, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto-follow friend server switch delay (seconds)")
+
+// Realtime WebSocket channel - 实时通道（WebSocket）
+// 进服后连接中心服实时通道，用服务端推送替代高频 HTTP 轮询（头衔名单等）。
+// 通道不可用时相关数据仍走原有 HTTP 轮询，功能不会因为通道断开而停摆。
+MACRO_CONFIG_INT(QmWebSocket, qm_websocket, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)")
+MACRO_CONFIG_STR(QmWebSocketUrl, qm_websocket_url, 256, "wss://qmclient.icu/ws", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)")
+MACRO_CONFIG_STR(QmWebSocketProtocol, qm_websocket_protocol, 64, "qmclient-json", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Sec-WebSocket-Protocol sent during the realtime handshake")
+MACRO_CONFIG_INT(QmWebSocketHeartbeat, qm_websocket_heartbeat, 15, 0, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Realtime channel heartbeat interval (seconds, 0 uses default)")
+MACRO_CONFIG_INT(QmWebSocketBackoffBaseMs, qm_websocket_backoff_base_ms, 1000, 100, 60000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Realtime channel reconnect backoff base (ms)")
+MACRO_CONFIG_INT(QmWebSocketBackoffMaxMs, qm_websocket_backoff_max_ms, 60000, 1000, 600000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Realtime channel reconnect backoff cap (ms)")
+MACRO_CONFIG_INT(QmWebSocketLog, qm_websocket_log, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Log realtime WebSocket channel events")
+MACRO_CONFIG_INT(QmWebSocketAllowInsecureTls, qm_websocket_allow_insecure_tls, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Legacy option: connections that skip TLS verification are rejected")

@@ -211,7 +211,7 @@ function CreateTitleService({ Directory, NowSec = () => Math.floor(Date.now() / 
 	};
 }
 
-function RegisterTitleRoutes(App, Service, { CheckRateLimit, ClientIp })
+function RegisterTitleRoutes(App, Service, { CheckRateLimit, ClientIp, OnChanged })
 {
 	for(const [Method, Route, Handle] of [
 		["post", "redeem", (Req) => Service.Redeem(Req.body)],
@@ -229,6 +229,7 @@ function RegisterTitleRoutes(App, Service, { CheckRateLimit, ClientIp })
 			{
 				const Reply = Handle(Req);
 				Res.status(Reply.statusCode).json(Reply.response);
+				if(Method === "post" && Reply.statusCode === 200 && OnChanged) OnChanged();
 			}
 			catch
 			{

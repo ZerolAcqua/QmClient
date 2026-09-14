@@ -24,6 +24,7 @@
 #include <game/client/QmUi/QmLayout.h>
 #include <game/client/QmUi/UiTokens.h>
 #include <game/client/animstate.h>
+#include <game/client/components/qmclient/demo_display.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_bind_status_hud.h>
 #include <game/client/components/scoreboard.h>
@@ -2914,10 +2915,7 @@ void CHud::UpdateSwitchCountdownTracker()
 
 		const int CurTick = Client()->GameTick(Connection);
 		const int Delay = Collision()->GetSwitchDelay(MapIndex);
-		m_SwitchCountdownTracker.m_aaEndTick[Team][SwitchNumber] = CurTick + 1 + Delay * TickSpeed;
-		m_SwitchCountdownTracker.m_aaTouchTick[Team][SwitchNumber] = CurTick;
-		m_SwitchCountdownTracker.m_aaClientId[Team][SwitchNumber] = ClientId;
-		m_SwitchCountdownTracker.m_aaConnection[Team][SwitchNumber] = Connection;
+		m_SwitchCountdownTracker.Track(Team, SwitchNumber, CurTick + 1 + Delay * TickSpeed, CurTick, ClientId, Connection);
 	};
 
 	UpdateSwitchCountdownFromClient(GameClient()->m_aLocalIds[0], 0, GameClient()->Predict());
@@ -2926,6 +2924,9 @@ void CHud::UpdateSwitchCountdownTracker()
 
 	for(int Team = 0; Team < NUM_DDRACE_TEAMS; ++Team)
 	{
+		// 未写入过的队伍没有可过期的倒计时，跳过整行空槽。
+		if(!m_SwitchCountdownTracker.m_aTouchedTeams[Team])
+			continue;
 		for(int SwitchNumber = 1; SwitchNumber < 256; ++SwitchNumber)
 		{
 			if(m_SwitchCountdownTracker.m_aaEndTick[Team][SwitchNumber] <= 0)
@@ -7330,10 +7331,11 @@ void CHud::OnRender()
 	}
 
 #if defined(CONF_VIDEORECORDER)
-	const bool MainHudVisible = (IVideo::Current() && g_Config.m_ClVideoShowhud) || (!IVideo::Current() && g_Config.m_ClShowhud);
+	const bool VideoRendering = IVideo::Current() != nullptr;
 #else
-	const bool MainHudVisible = g_Config.m_ClShowhud != 0;
+	const bool VideoRendering = false;
 #endif
+	const bool MainHudVisible = qm_demo_display::Resolve(g_Config, Client()->State() == IClient::STATE_DEMOPLAYBACK, VideoRendering).m_Hud;
 	const bool FocusSpectatorHudVisible = ShouldRenderFocusSpectatorHud(
 		GameClient()->m_Snap.m_SpecInfo.m_Active,
 		g_Config.m_ClShowhudSpectator != 0,

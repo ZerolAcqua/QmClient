@@ -45,6 +45,7 @@ public:
 		char m_aName[24];
 		IGraphics::CTextureHandle m_OriginalTexture;
 		IGraphics::CTextureHandle m_ColorableTexture;
+		std::shared_ptr<CQmSkinOutline> m_pQmSkinOutline;
 		ColorRGBA m_BloodColor;
 
 		void ApplyTo(CTeeRenderInfo::CSixup &SixupRenderInfo) const;

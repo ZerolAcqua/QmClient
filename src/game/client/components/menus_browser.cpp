@@ -17,6 +17,7 @@
 #include <engine/textrender.h>
 
 #include <game/client/QmUi/UiForms.h>
+#include <game/client/QmUi/UiMotion.h>
 #include <game/client/QmUi/UiNavigation.h>
 #include <game/client/QmUi/UiSurface.h>
 #include <game/client/animstate.h>
@@ -1440,8 +1441,8 @@ void CMenus::RenderServerbrowserFilters(CUIRect View)
 
 		if(s_ActiveTab != s_PrevFilterTab)
 		{
-			s_FilterTabDirection = s_ActiveTab > s_PrevFilterTab ? 1.0f : -1.0f;
-			TriggerUiSwitchAnimation(UiAnimNodeKey("browser_filter_tab_switch"), 0.18f);
+			s_FilterTabDirection = ResolveUiSwitchDirection(GameClient()->UiRuntimeV2()->AnimRuntime(), UiAnimNodeKey("browser_filter_tab_switch"), s_FilterTabDirection, s_ActiveTab > s_PrevFilterTab ? 1.0f : -1.0f);
+			TriggerUiSwitchAnimation(UiAnimNodeKey("browser_filter_tab_switch"), ui_token::motion::TAB_SWITCH.m_DurationSec);
 			s_PrevFilterTab = s_ActiveTab;
 		}
 		const float TransitionStrength = ReadUiSwitchAnimation(UiAnimNodeKey("browser_filter_tab_switch"));
@@ -4059,8 +4060,8 @@ void CMenus::RenderServerbrowserToolBox(CUIRect ToolBox)
 	static float s_ToolboxDirection = 0.0f;
 	if(g_Config.m_UiToolboxPage != s_PrevToolboxPage)
 	{
-		s_ToolboxDirection = g_Config.m_UiToolboxPage > s_PrevToolboxPage ? 1.0f : -1.0f;
-		TriggerUiSwitchAnimation(UiAnimNodeKey("browser_toolbox_tab_switch"), 0.18f);
+		s_ToolboxDirection = ResolveUiSwitchDirection(GameClient()->UiRuntimeV2()->AnimRuntime(), UiAnimNodeKey("browser_toolbox_tab_switch"), s_ToolboxDirection, g_Config.m_UiToolboxPage > s_PrevToolboxPage ? 1.0f : -1.0f);
+		TriggerUiSwitchAnimation(UiAnimNodeKey("browser_toolbox_tab_switch"), ui_token::motion::TAB_SWITCH.m_DurationSec);
 		s_PrevToolboxPage = g_Config.m_UiToolboxPage;
 	}
 
@@ -4208,7 +4209,8 @@ void CMenus::RenderServerbrowser(CUIRect MainView, bool DrawBackground)
 	float TransitionAlpha = UiSwitchAnimationAlpha(TransitionStrength);
 	if(DoClip)
 	{
-		TransitionOffset = TransitionStrength * std::clamp(View.w * 0.08f, 24.0f, 120.0f) * m_BrowserTabTransitionDirection;
+		CUIRect TransitionView = View;
+		TransitionOffset = ApplyUiSwitchOffset(TransitionView, TransitionStrength, m_BrowserTabTransitionDirection, false, 0.08f, 24.0f, 120.0f);
 	}
 
 	bool WasListboxItemActivated = false;

@@ -15,6 +15,7 @@
 #include <generated/protocol.h>
 #include <generated/protocol7.h>
 
+#include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/gameclient.h>
 #include <game/mapitems.h>
 
@@ -497,6 +498,32 @@ void CRenderTools::RenderTee7(const CAnimState *pAnim, const CTeeRenderInfo *pIn
 	vec2 Direction = Dir;
 	vec2 Position = Pos;
 	const bool IsBot = CTeeRenderInfo::IsDrawableTexture(pInfo->m_aSixup[g_Config.m_ClDummy].m_BotTexture);
+	if(pInfo->m_QmSkinOutlineWidth > 0 && Alpha > 0.0f)
+	{
+		const auto &Sixup = pInfo->m_aSixup[g_Config.m_ClDummy];
+		const float AnimScale = pInfo->m_Size / 64.0f;
+		const ColorRGBA Color = pInfo->m_QmSkinOutlineColor.WithAlpha(pInfo->m_QmSkinOutlineColor.a * Alpha);
+		if(HasTeePreviewLayer(pInfo->m_TeeRenderFlags, TEE_PREVIEW_LAYER_BODY_OUTLINE))
+		{
+			for(int Part : {protocol7::SKINPART_DECORATION, protocol7::SKINPART_BODY})
+			{
+				if(Sixup.m_apQmSkinOutlines[Part])
+					Sixup.m_apQmSkinOutlines[Part]->Render(Graphics(), Pos + vec2(pAnim->GetBody()->m_X, pAnim->GetBody()->m_Y) * AnimScale,
+						BodyScale * pInfo->m_Size, pAnim->GetBody()->m_Angle * pi * 2 + BodyAngle, Color, pInfo->m_QmSkinOutlineWidth);
+			}
+		}
+		if(Sixup.m_apQmSkinOutlines[protocol7::SKINPART_FEET])
+		{
+			for(int Front = 0; Front < 2; ++Front)
+			{
+				if(!HasTeePreviewLayer(pInfo->m_TeeRenderFlags, Front ? TEE_PREVIEW_LAYER_FRONT_FEET_OUTLINE : TEE_PREVIEW_LAYER_BACK_FEET_OUTLINE))
+					continue;
+				const CAnimKeyframe *pFoot = Front ? pAnim->GetFrontFoot() : pAnim->GetBackFoot();
+				Sixup.m_apQmSkinOutlines[protocol7::SKINPART_FEET]->Render(Graphics(), Pos + vec2(pFoot->m_X, pFoot->m_Y) * AnimScale,
+					FeetScale * (pInfo->m_Size / 2.1f), pFoot->m_Angle * pi * 2 + FeetAngle, Color, pInfo->m_QmSkinOutlineWidth);
+			}
+		}
+	}
 
 	// first pass we draw the outline
 	// second pass we draw the filling
@@ -747,6 +774,31 @@ void CRenderTools::RenderTee6(const CAnimState *pAnim, const CTeeRenderInfo *pIn
 	const CSkin *pWhiteFeetSkin = nullptr;
 	if(g_Config.m_TcWhiteFeet && pInfo->m_CustomColoredSkin)
 		pWhiteFeetSkin = GameClient()->m_Skins.FindOrNullptr(g_Config.m_TcWhiteFeetSkin);
+	if(pInfo->m_QmSkinOutlineWidth > 0 && Alpha > 0.0f)
+	{
+		const ColorRGBA Color = pInfo->m_QmSkinOutlineColor.WithAlpha(pInfo->m_QmSkinOutlineColor.a * Alpha);
+		const float BodySize = pInfo->m_Size * (TinyTee ? TinyBodyScale * SizeMultiplier : 1.0f);
+		float BodyRenderScale;
+		GetRenderTeeBodyScale(BodySize, BodyRenderScale);
+		if(pInfo->m_OriginalRenderSkin.m_pBodyOutline && HasTeePreviewLayer(pInfo->m_TeeRenderFlags, TEE_PREVIEW_LAYER_BODY_OUTLINE))
+			pInfo->m_OriginalRenderSkin.m_pBodyOutline->Render(Graphics(), Pos + vec2(pAnim->GetBody()->m_X, pAnim->GetBody()->m_Y) * (BodySize / 64.0f),
+				BodyScale * (64.0f * BodyRenderScale), pAnim->GetBody()->m_Angle * pi * 2 + BodyAngle, Color, pInfo->m_QmSkinOutlineWidth);
+		const auto &pFeetOutline = pWhiteFeetSkin != nullptr && CTeeRenderInfo::IsDrawableTexture(pWhiteFeetSkin->m_OriginalSkin.m_FeetOutline) ?
+						   pWhiteFeetSkin->m_OriginalSkin.m_pFeetOutline :
+						   pInfo->m_OriginalRenderSkin.m_pFeetOutline;
+		if(pFeetOutline)
+		{
+			const float FeetSize = pInfo->m_Size * (TinyTee ? TinyFeetScale * SizeMultiplier : 1.0f);
+			for(int Front = 0; Front < 2; ++Front)
+			{
+				if(!HasTeePreviewLayer(pInfo->m_TeeRenderFlags, Front ? TEE_PREVIEW_LAYER_FRONT_FEET_OUTLINE : TEE_PREVIEW_LAYER_BACK_FEET_OUTLINE))
+					continue;
+				const CAnimKeyframe *pFoot = Front ? pAnim->GetFrontFoot() : pAnim->GetBackFoot();
+				pFeetOutline->Render(Graphics(), Pos + vec2(pFoot->m_X, pFoot->m_Y) * (pInfo->m_Size / 64.0f),
+					vec2(FeetSize * FeetScale.x, FeetSize * 0.5f * FeetScale.y), pFoot->m_Angle * pi * 2 + FeetAngle, Color, pInfo->m_QmSkinOutlineWidth, Dir.x < 0 && pInfo->m_FeetFlipped);
+			}
+		}
+	}
 
 	// first pass we draw the outline
 	// second pass we draw the filling

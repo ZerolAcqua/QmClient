@@ -4,12 +4,17 @@
 #include <base/system.h>
 
 #include <engine/graphics.h>
+#include <engine/shared/jobs.h>
 
 #include <game/client/component.h>
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <utility>
 
 enum class EQmChatEmoji
 {
@@ -179,15 +184,34 @@ inline float QmChatEmojiBubbleDisplaySize(float FontSize)
 	return std::clamp(FontSize * 3.0f, 48.0f, 96.0f);
 }
 
+// 解码任务独立持有图像，渲染线程只在完成后接管像素所有权。
+class CQmChatEmojiLoadJob : public IJob
+{
+	std::function<void(CImageInfo &)> m_Load;
+	CImageInfo m_Image;
+	void Run() override { m_Load(m_Image); }
+
+public:
+	explicit CQmChatEmojiLoadJob(std::function<void(CImageInfo &)> Load) :
+		m_Load(std::move(Load)) {}
+	~CQmChatEmojiLoadJob() override { m_Image.Free(); }
+	CImageInfo *Image() { return State() == STATE_DONE ? &m_Image : nullptr; }
+};
+
 class CQmChatEmoji : public CComponent
 {
 	mutable std::array<IGraphics::CTextureHandle, QM_CHAT_EMOJI_COUNT> m_aTextures;
 	mutable std::array<bool, QM_CHAT_EMOJI_COUNT> m_aLoadAttempted{};
+	mutable std::deque<EQmChatEmoji> m_LoadQueue;
+	mutable std::shared_ptr<CQmChatEmojiLoadJob> m_pLoadJob;
+	mutable EQmChatEmoji m_LoadingEmoji = EQmChatEmoji::NONE;
 
 	void EnsureTextureLoaded(EQmChatEmoji Emoji) const;
+	void StartNextLoad() const;
 
 public:
 	int Sizeof() const override { return sizeof(*this); }
+	void OnUpdate() override;
 	void OnShutdown() override;
 
 	bool CanRender(EQmChatEmoji Emoji) const;

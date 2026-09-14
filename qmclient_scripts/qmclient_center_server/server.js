@@ -3,6 +3,7 @@
 
 const crypto = require("node:crypto");
 const https = require("node:https");
+const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const express = require("express");
@@ -13,6 +14,13 @@ const {
 } = require("./developer_auth");
 
 const { CreateTitleService, RegisterTitleRoutes } = require("./title_auth");
+const { CreateNewsService, RegisterNewsRoutes } = require("./news_auth");
+const { CreateRealtimeServer } = require("./realtime");
+const { CreateVoiceRealtime } = require("./voice_realtime");
+const { CreateEditorRealtimeServer } = require("./editor_realtime");
+let g_EditorRealtime = null;
+
+let g_Realtime = null;
 
 const app = express();
 const DefaultJsonParser = express.json({ limit: "32kb" });
@@ -310,6 +318,7 @@ function Cleanup()
 			if(Member.expiresAt <= Now)
 			{
 				Room.members.delete(ClientId);
+				g_EditorRealtime?.Notify(RoomCode);
 			}
 		}
 
@@ -341,11 +350,21 @@ const g_DeveloperPresenceService = CreateDeveloperPresenceService({
 	CredentialsFilePath: DEVELOPER_CREDENTIALS_FILE
 });
 RegisterDeveloperPresenceRoutes(app, g_DeveloperPresenceService, {
-	CheckRateLimit: (req) => CheckRateLimit(ClientIp(req))
+	CheckRateLimit: (req) => CheckRateLimit(ClientIp(req)),
+	OnChanged: (Address) => g_Realtime?.NotifyPresences(Address)
 });
 
 const g_TitleService = CreateTitleService({ Directory: process.env.TITLE_DATA_DIR || path.join(__dirname, "title_data") });
-RegisterTitleRoutes(app, g_TitleService, { CheckRateLimit, ClientIp });
+RegisterTitleRoutes(app, g_TitleService, { CheckRateLimit, ClientIp, OnChanged: () => g_Realtime?.NotifyTitles() });
+
+const NewsPublishers = (process.env.NEWS_PUBLISH_DEVELOPER_IDS || "").split(",").map((Value) => Value.trim()).filter(Boolean);
+const g_NewsService = CreateNewsService({
+	Directory: process.env.NEWS_DATA_DIR || path.join(__dirname, "news_data"),
+	Authenticate: (Authorization) => g_DeveloperPresenceService.Authenticate(Authorization),
+	CanPublish: (Credential) => NewsPublishers.includes(Credential.developer_id),
+	MaxMarkdownBytes: Number(process.env.NEWS_MAX_MARKDOWN_BYTES || 16 * 1024)
+});
+RegisterNewsRoutes(app, g_NewsService, { CheckRateLimit, ClientIp, OnChanged: () => g_Realtime?.NotifyNews() });
 
 function NewToken(Ip)
 {
@@ -611,6 +630,7 @@ function EditorCollabMembersJson(Room)
 
 function SendEditorCollabRoom(res, Room, Extra = {})
 {
+	res.CollabRoomCode = Room.code;
 	res.json({
 		ok: true,
 		room_code: Room.code,
@@ -626,7 +646,29 @@ app.get("/healthz", (_req, res) => {
 	res.json({ ok: true, ts: NowSec() });
 });
 
-app.post("/editor/collab/create", (req, res) => {
+// HTTP 兼容路由和 WS 共用同一套房间操作，保持地图与 revision 语义。
+const EditorCollabHandlers = new Map();
+function RegisterEditorCollab(Action, Handler)
+{
+    const Wrapped = (req, res) => {
+        Handler(req, res);
+        if(Action !== "pull") g_EditorRealtime?.Notify(NormalizeEditorCollabRoomCode(req.body?.room_code || res.CollabRoomCode));
+    };
+    EditorCollabHandlers.set(Action, Wrapped);
+    app[Action === "pull" ? "get" : "post"]("/editor/collab/" + Action, Wrapped);
+}
+function HandleEditorCollab(Action, Body)
+{
+    const Result = { status: 200, body: {} };
+    const Response = {
+        status(Code) { Result.status = Code; return this; },
+        json(Value) { Result.body = Value; this.CollabRoomCode = Value.room_code; return this; }
+    };
+    EditorCollabHandlers.get(Action)({ body: Body, query: Body }, Response);
+    return Result;
+}
+
+RegisterEditorCollab("create", (req, res) => {
 	Cleanup();
 	const Body = req.body || {};
 	const ClientId = NormalizeEditorCollabClientId(Body.client_id);
@@ -651,7 +693,7 @@ app.post("/editor/collab/create", (req, res) => {
 	SendEditorCollabRoom(res, Room);
 });
 
-app.post("/editor/collab/join", (req, res) => {
+RegisterEditorCollab("join", (req, res) => {
 	Cleanup();
 	const Body = req.body || {};
 	const RoomCode = NormalizeEditorCollabRoomCode(Body.room_code);
@@ -677,7 +719,7 @@ app.post("/editor/collab/join", (req, res) => {
 	SendEditorCollabRoom(res, Room, Room.map_base64 ? { map_base64: Room.map_base64 } : {});
 });
 
-app.post("/editor/collab/leave", (req, res) => {
+RegisterEditorCollab("leave", (req, res) => {
 	Cleanup();
 	const Body = req.body || {};
 	const RoomCode = NormalizeEditorCollabRoomCode(Body.room_code);
@@ -694,7 +736,7 @@ app.post("/editor/collab/leave", (req, res) => {
 	res.json({ ok: true, room_code: RoomCode, member_count: Room.members.size });
 });
 
-app.post("/editor/collab/push", (req, res) => {
+RegisterEditorCollab("push", (req, res) => {
 	Cleanup();
 	const Body = req.body || {};
 	const RoomCode = NormalizeEditorCollabRoomCode(Body.room_code);
@@ -724,7 +766,7 @@ app.post("/editor/collab/push", (req, res) => {
 	SendEditorCollabRoom(res, Room);
 });
 
-app.get("/editor/collab/pull", (req, res) => {
+RegisterEditorCollab("pull", (req, res) => {
 	Cleanup();
 	const RoomCode = NormalizeEditorCollabRoomCode(req.query.room_code);
 	const ClientId = NormalizeEditorCollabClientId(req.query.client_id);
@@ -877,150 +919,77 @@ app.get("/users.json", (_req, res) => {
 	res.json({ users: Users });
 });
 
-app.post("/playtime/start", (req, res) => {
-	Cleanup();
-	const Ip = ClientIp(req);
-	if(!CheckRateLimit(Ip))
-	{
-		res.status(429).json({ ok: false, error: "rate_limited" });
-		return;
-	}
-
-	const Body = req.body || {};
+// HTTP 主动操作与 WS 生命周期共用业务逻辑和同一时长数据库。
+function HandlePlaytime(Action, Body)
+{
 	const ClientId = Body.client_id;
 	const PlayerName = NormalizePlayerName(Body.player_name);
-
 	if(!IsValidClientId(ClientId))
-	{
-		res.status(400).json({ ok: false, error: "invalid_client_id" });
-		return;
-	}
-
+		return { statusCode: 400, response: { ok: false, error: "invalid_client_id" } };
 	const Now = NowSec();
-	const Record = GetOrCreatePlaytimeRecord(ClientId, Now);
-	const WasRunning = SafeInt(Record.active_since) > 0;
-
-	if(PlayerName !== "")
-	{
-		Record.player_name = PlayerName;
-	}
-	Record.updated_at = Now;
-	Record.last_seen_at = Now;
-
-	if(!WasRunning)
-	{
-		Record.active_since = Now;
-		Record.last_start_at = Now;
-	}
-
-	SavePlaytimeStore();
-	res.status(200).json({
-		ok: true,
-		action: "start",
-		already_running: WasRunning,
-		...PlaytimeSummary(Record, Now)
-	});
-});
-
-app.post("/playtime/stop", (req, res) => {
-	Cleanup();
-	const Ip = ClientIp(req);
-	if(!CheckRateLimit(Ip))
-	{
-		res.status(429).json({ ok: false, error: "rate_limited" });
-		return;
-	}
-
-	const Body = req.body || {};
-	const ClientId = Body.client_id;
-	const PlayerName = NormalizePlayerName(Body.player_name);
-	const RequestedStopAt = Number(Body.stop_at);
-
-	if(!IsValidClientId(ClientId))
-	{
-		res.status(400).json({ ok: false, error: "invalid_client_id" });
-		return;
-	}
-
-	const Now = NowSec();
-	const Record = GetOrCreatePlaytimeRecord(ClientId, Now);
-	const WasRunning = SafeInt(Record.active_since) > 0;
-	let EffectiveStopAt = Now;
-	if(Number.isFinite(RequestedStopAt))
-	{
-		EffectiveStopAt = Math.floor(RequestedStopAt);
-		if(EffectiveStopAt < 0)
-			EffectiveStopAt = 0;
-		if(EffectiveStopAt > Now)
-			EffectiveStopAt = Now;
-	}
-
-	if(PlayerName !== "")
-	{
-		Record.player_name = PlayerName;
-	}
-	if(WasRunning)
-	{
-		const ActiveSince = SafeInt(Record.active_since);
-		if(EffectiveStopAt < ActiveSince)
-			EffectiveStopAt = ActiveSince;
-		Record.total_seconds = SafeInt(Record.total_seconds) + (EffectiveStopAt - ActiveSince);
-		Record.active_since = 0;
-		Record.last_stop_at = EffectiveStopAt;
-	}
-	Record.updated_at = Now;
-	Record.last_seen_at = Now;
-
-	SavePlaytimeStore();
-	res.status(200).json({
-		ok: true,
-		action: "stop",
-		was_running: WasRunning,
-		...PlaytimeSummary(Record, Now)
-	});
-});
-
-app.post("/playtime/query", (req, res) => {
-	Cleanup();
-	const Ip = ClientIp(req);
-	if(!CheckRateLimit(Ip))
-	{
-		res.status(429).json({ ok: false, error: "rate_limited" });
-		return;
-	}
-
-	const Body = req.body || {};
-	const ClientId = Body.client_id;
-	const PlayerName = NormalizePlayerName(Body.player_name);
-
-	if(!IsValidClientId(ClientId))
-	{
-		res.status(400).json({ ok: false, error: "invalid_client_id" });
-		return;
-	}
-
-	const Now = NowSec();
-	const Record = g_Playtime.get(ClientId) || null;
+	const Record = Action === "query" ? g_Playtime.get(ClientId) || null : GetOrCreatePlaytimeRecord(ClientId, Now);
+	const WasRunning = !!(Record && SafeInt(Record.active_since) > 0);
 	if(Record)
 	{
-		if(PlayerName !== "")
-		{
-			Record.player_name = PlayerName;
-		}
+		if(PlayerName !== "") Record.player_name = PlayerName;
 		Record.updated_at = Now;
 		Record.last_seen_at = Now;
+		if(Action === "start" && !WasRunning)
+		{
+			Record.active_since = Now;
+			Record.last_start_at = Now;
+		}
+		else if(Action === "stop" && WasRunning)
+		{
+			const Requested = Number(Body.stop_at);
+			const StopAt = Math.max(SafeInt(Record.active_since), Number.isFinite(Requested) ? Math.max(0, Math.min(Now, Math.floor(Requested))) : Now);
+			Record.total_seconds = SafeInt(Record.total_seconds) + StopAt - SafeInt(Record.active_since);
+			Record.active_since = 0;
+			Record.last_stop_at = StopAt;
+		}
+		if(Action !== "query") SavePlaytimeStore();
 	}
+	return { statusCode: 200, response: { ok: true, action: Action, ts: Now,
+		...(Action === "start" ? { already_running: WasRunning } : {}),
+		...(Action === "stop" ? { was_running: WasRunning } : {}), ...PlaytimeSummary(Record, Now) } };
+}
 
-	res.status(200).json({
-		ok: true,
-		action: "query",
-		...PlaytimeSummary(Record, Now)
+for(const Action of ["start", "stop", "query"])
+{
+	app.post("/playtime/" + Action, (Req, Res) => {
+		Cleanup();
+		if(!CheckRateLimit(ClientIp(Req))) return Res.status(429).json({ ok: false, error: "rate_limited" });
+		try
+		{
+			const Result = HandlePlaytime(Action, Req.body || {});
+			Res.status(Result.statusCode).json(Result.response);
+		}
+		catch { Res.status(503).json({ ok: false, error: "storage_unavailable" }); }
 	});
-});
+}
 
 setInterval(Cleanup, 30 * 1000).unref();
 LoadPlaytimeStore();
 
-app.listen(PORT, "0.0.0.0", () => {
+const HttpServer = http.createServer(app);
+const Recognition = CreateVoiceRealtime(process.env.VOICE_REALTIME_URL || "ws://127.0.0.1:9987/qm/realtime");
+g_Realtime = CreateRealtimeServer(HttpServer, {
+	Recognition,
+	DeveloperService: g_DeveloperPresenceService,
+	TitleService: g_TitleService,
+	NewsService: g_NewsService,
+	Playtime: HandlePlaytime,
+	NowSec
+});
+g_EditorRealtime = CreateEditorRealtimeServer(HttpServer, {
+    Handle: HandleEditorCollab,
+    Renew(RoomCode, ClientId, PlayerName) {
+        const Room = g_EditorCollabRooms.get(RoomCode);
+        if(!Room || !Room.members.has(ClientId)) return false;
+        TouchEditorCollabMember(Room, ClientId, PlayerName);
+        return true;
+    }
+});
+HttpServer.listen(PORT, "0.0.0.0", () => {
 	console.log(`[qmclient-center-server] listening on :${PORT}`);
 });

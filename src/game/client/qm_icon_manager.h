@@ -140,6 +140,36 @@ struct SQmIconDiagnostics
 	uint64_t m_TextureUnloads = 0;
 };
 
+// 高频绘制计数按窗口汇总；资源加载、探测和失败事件仍即时记录。
+struct SQmIconDiagnosticsWindow
+{
+	SQmIconDiagnostics m_Total;
+	uint64_t m_Frames = 0;
+	uint64_t m_MaxAlphaDraws = 0;
+	uint64_t m_MaxMsdfDraws = 0;
+	bool Add(const SQmIconDiagnostics &Frame)
+	{
+		++m_Frames;
+		m_Total.m_AlphaIconDraws += Frame.m_AlphaIconDraws;
+		m_Total.m_MsdfIconDraws += Frame.m_MsdfIconDraws;
+		m_Total.m_MaxMsdfManagerCallRun = std::max(m_Total.m_MaxMsdfManagerCallRun, Frame.m_MaxMsdfManagerCallRun);
+		for(size_t i = 0; i < Frame.MSDF_RUN_BUCKET_COUNT; ++i)
+			m_Total.m_MsdfManagerCallRunBuckets[i] += Frame.m_MsdfManagerCallRunBuckets[i];
+		m_MaxAlphaDraws = std::max(m_MaxAlphaDraws, Frame.m_AlphaIconDraws);
+		m_MaxMsdfDraws = std::max(m_MaxMsdfDraws, Frame.m_MsdfIconDraws);
+		m_Total.m_ReloadAttempts += Frame.m_ReloadAttempts;
+		m_Total.m_ReloadSuccesses += Frame.m_ReloadSuccesses;
+		m_Total.m_AtlasSwaps += Frame.m_AtlasSwaps;
+		m_Total.m_MsdfProbes += Frame.m_MsdfProbes;
+		m_Total.m_MsdfProbeSuccesses += Frame.m_MsdfProbeSuccesses;
+		m_Total.m_TextureLoads += Frame.m_TextureLoads;
+		m_Total.m_TextureLoadFailures += Frame.m_TextureLoadFailures;
+		m_Total.m_TextureUnloads += Frame.m_TextureUnloads;
+		return Frame.m_ReloadAttempts || Frame.m_ReloadSuccesses || Frame.m_AtlasSwaps || Frame.m_MsdfProbes ||
+		       Frame.m_MsdfProbeSuccesses || Frame.m_TextureLoads || Frame.m_TextureLoadFailures || Frame.m_TextureUnloads;
+	}
+};
+
 inline bool QmIconTextureCanCommit(const bool IsValid, const bool IsNullTexture)
 {
 	return IsValid && !IsNullTexture;

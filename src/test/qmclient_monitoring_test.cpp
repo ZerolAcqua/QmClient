@@ -6,8 +6,12 @@
 
 #include <game/client/QmUi/QmCardRegistry.h>
 #include <game/client/QmUi/QmUiPerf.h>
+#include <game/client/components/player_points.h>
 #include <game/client/components/qmclient/monitoring/monitoring.h>
+#include <game/client/components/qmclient/music_app_watcher.h>
+#include <game/client/components/qmclient/perf_diagnostics.h>
 #include <game/client/components/qmclient/perf_logging.h>
+#include <game/client/components/qmclient/qm_music_hook_registry.h>
 #include <game/client/components/qmclient/settings_perf_windows.h>
 #include <game/client/components/qmclient/settings_resource_preview.h>
 #include <game/client/components/qmclient/stutter_diagnostics.h>
@@ -31,6 +35,7 @@
 #include <memory>
 #include <set>
 #include <sstream>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -1393,45 +1398,105 @@ TEST(QmMonitoringHelpers, DiskReadRateUsesMegabytesPerSecond)
 	EXPECT_FLOAT_EQ(QmComputeDiskReadMbPerSec(1024, 1000000000ull, 2048, 1000000000ull), -1.0f);
 }
 
-TEST(QmMonitoringHelpers, PerfConfigDefaultsUseLowThresholdWithoutJsonToggle)
+TEST(QmMonitoringHelpers, PerfSingleSwitchAndAutomaticThreshold)
 {
-	std::ifstream File(TestSourcePath("src/engine/shared/config_variables_qmclient.h"));
-	ASSERT_TRUE(File.good());
-	std::stringstream Buffer;
-	Buffer << File.rdbuf();
-	const std::string Source = Buffer.str();
-
-	EXPECT_NE(Source.find("MACRO_CONFIG_INT(QmPerfDebugThresholdMs, qm_perf_debug_threshold_ms, 4, 1, 1000"), std::string::npos);
-	EXPECT_EQ(Source.find("MACRO_CONFIG_INT(QmPerfJson, qm_perf_json, 0, 0, 1"), std::string::npos);
-}
-
-TEST(QmMonitoringHelpers, PerfDurationGateUsesConfiguredThreshold)
-{
-	const int OldThreshold = g_Config.m_QmPerfDebugThresholdMs;
-	const int OldStutterDiagnostics = g_Config.m_QmPerfStutterDiagnostics;
-	g_Config.m_QmPerfDebugThresholdMs = 4;
-	g_Config.m_QmPerfStutterDiagnostics = 0;
-
-	EXPECT_FALSE(QmPerfShouldLogDuration(3.999));
-	EXPECT_TRUE(QmPerfShouldLogDuration(4.0));
-	EXPECT_TRUE(QmPerfShouldLogDuration(0.0, true));
-
-	g_Config.m_QmPerfDebugThresholdMs = OldThreshold;
-	g_Config.m_QmPerfStutterDiagnostics = OldStutterDiagnostics;
-}
-
-TEST(QmStutterDiagnostics, PerfDurationGateUsesThreeHundredFpsBudgetWhileEnabled)
-{
-	const int OldThreshold = g_Config.m_QmPerfDebugThresholdMs;
-	const int OldStutterDiagnostics = g_Config.m_QmPerfStutterDiagnostics;
-	g_Config.m_QmPerfDebugThresholdMs = 4;
-	g_Config.m_QmPerfStutterDiagnostics = 1;
-
+	const int OldEnabled = g_Config.m_QmPerfDebug;
+	g_Config.m_QmPerfDebug = 0;
+	EXPECT_FALSE(QmPerfEnabled());
+	g_Config.m_QmPerfDebug = 1;
+	EXPECT_TRUE(QmPerfEnabled());
 	EXPECT_FALSE(QmPerfShouldLogDuration(QmStutterFrameBudgetMs() - 0.001));
 	EXPECT_TRUE(QmPerfShouldLogDuration(QmStutterFrameBudgetMs()));
+	EXPECT_TRUE(QmPerfShouldLogDuration(0.0, true));
+	g_Config.m_QmPerfDebug = OldEnabled;
+}
 
-	g_Config.m_QmPerfDebugThresholdMs = OldThreshold;
-	g_Config.m_QmPerfStutterDiagnostics = OldStutterDiagnostics;
+TEST(QmMonitoringHelpers, PerfDetailBudgetReportsDroppedRecords)
+{
+	CQmPerfDetailBudget Budget;
+	for(int i = 0; i < CQmPerfDetailBudget::LIMIT; ++i)
+		EXPECT_TRUE(Budget.Allow(1));
+	EXPECT_FALSE(Budget.Allow(1));
+	EXPECT_FALSE(Budget.Allow(1));
+	EXPECT_EQ(Budget.TakeDropped(), 2u);
+	EXPECT_EQ(Budget.TakeDropped(), 0u);
+	EXPECT_TRUE(Budget.Allow(2));
+}
+
+TEST(QmMonitoringHelpers, PerfConfigValuesKeepTypesAndRedactCredentials)
+{
+	int IntValue = 0;
+	SIntConfigVariable IntVar(nullptr, "tc_disabled", SConfigVariable::VAR_INT, CFGFLAG_CLIENT, "", "", &IntValue, 0, 0, 1);
+	const auto Value = QmPerfReadConfigValue(IntVar);
+	EXPECT_EQ(Value.m_Value, "0");
+	EXPECT_EQ(Value.m_Type, "int");
+	EXPECT_TRUE(Value.m_IsDefault);
+	unsigned ColorValue = 0;
+	SColorConfigVariable ColorVar(nullptr, "qm_color", SConfigVariable::VAR_COLOR, CFGFLAG_CLIENT, "", "", &ColorValue, 0xffffffffu);
+	EXPECT_EQ(QmPerfReadConfigValue(ColorVar).m_Value, "4294967295");
+	char aString[256] = "";
+	char aOldString[256] = "";
+	SStringConfigVariable StringVar(nullptr, "qm_voice_token", SConfigVariable::VAR_STRING, CFGFLAG_CLIENT, "", "", aString, "secret-value", sizeof(aString), aOldString);
+	EXPECT_TRUE(QmPerfReadConfigValue(StringVar).m_Redacted);
+	EXPECT_EQ(QmPerfReadConfigValue(StringVar).m_Value, "<redacted>");
+	for(const char *pName : {"password", "qm_spotify_sp_dc", "qm_translate_tc_secret_id", "qm_translate_tc_secret_key", "qm_translate_llm_key_openai", "qm_translate_libre_key"})
+		EXPECT_TRUE(QmPerfSensitiveConfig(pName));
+	EXPECT_FALSE(QmPerfSensitiveConfig("cl_showhud"));
+	EXPECT_FALSE(QmPerfSensitiveConfig("tc_show_key_presses"));
+}
+
+TEST(QmMonitoringHelpers, PerfConfigChunksPreserveLongUtf8Strings)
+{
+	std::string Value;
+	for(int i = 0; i < 400; ++i)
+		Value += "中文 \"\\";
+	const auto vChunks = QmPerfConfigChunks(Value);
+	ASSERT_GT(vChunks.size(), 1u);
+	std::string Restored;
+	for(const auto &Chunk : vChunks)
+	{
+		EXPECT_TRUE(str_utf8_check(Chunk.c_str()));
+		EXPECT_LE(Chunk.size(), 128u);
+		Restored += Chunk;
+	}
+	EXPECT_EQ(Restored, Value);
+	EXPECT_EQ(QmPerfConfigChunks("").size(), 1u);
+}
+
+TEST(QmMonitoringHelpers, PerfFrameBatchKeepsFastAndSlowFramesAndFlushesTail)
+{
+	CQmPerfFrameBatch Batch;
+	EXPECT_FALSE(Batch.Record(10, 0.5));
+	EXPECT_FALSE(Batch.Record(11, 20.0));
+	EXPECT_EQ(Batch.Count(), 2u);
+	const std::string Payload = Batch.TakeFields();
+	EXPECT_NE(Payload.find("\"frames\":[10,11]"), std::string::npos);
+	EXPECT_NE(Payload.find("\"durations_ms\":[0.500,20.000]"), std::string::npos);
+	EXPECT_EQ(Batch.Count(), 0u);
+	EXPECT_FALSE(Batch.Record(12, -1.0));
+	EXPECT_EQ(Batch.Count(), 0u);
+}
+
+TEST(QmMonitoringHelpers, PerfFrameBatchAutomaticallyFlushesCapacityAndElapsedTime)
+{
+	CQmPerfFrameBatch Batch;
+	for(uint64_t Frame = 1; Frame < 64; ++Frame)
+		EXPECT_FALSE(Batch.Record(Frame, 0.5));
+	EXPECT_TRUE(Batch.Record(64, 0.5));
+	EXPECT_EQ(Batch.Count(), 64u);
+	Batch.TakeFields();
+	EXPECT_TRUE(Batch.Record(65, 1000.0));
+	EXPECT_EQ(Batch.Count(), 1u);
+}
+
+TEST(QmMonitoringHelpers, PerfReopeningStartsIndependentSessions)
+{
+	const uint64_t Original = QmPerfSessionId();
+	QmPerfBeginSession();
+	const uint64_t First = QmPerfSessionId();
+	QmPerfBeginSession();
+	EXPECT_GT(First, Original);
+	EXPECT_GT(QmPerfSessionId(), First);
 }
 
 TEST(QmMonitoringHelpers, ProcessHighPriorityConfigExistsAndDefaultsOff)
@@ -7739,6 +7804,8 @@ TEST(QmMonitoringHelpers, QmClientContentOwnersPreserveInteractiveContracts)
 {
 	const std::string Source = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
 	const std::string KeyBinderSource = ReadRepoFile("src/game/client/components/key_binder.cpp");
+	const std::string ControlsSource = ReadRepoFile("src/game/client/components/menus_settings_controls.cpp");
+	const std::string ControlsInit = ExtractSourceFunctionBody(ControlsSource, "void CMenusSettingsControls::OnInterfacesInit(");
 	const std::string KeyBinds = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmFunctionKeyBindsContent(");
 	const std::string FriendNotify = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmFunctionFriendNotifyContent(");
 	const std::string FavoriteMaps = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmFunctionFavoriteMapsContent(");
@@ -7748,6 +7815,7 @@ TEST(QmMonitoringHelpers, QmClientContentOwnersPreserveInteractiveContracts)
 	const std::string NotificationsAdvanced = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmHudNotificationsAdvancedContent(");
 	const std::string FunctionDeck = ExtractSourceFunctionBody(Source, "void CMenus::RenderSettingsQmClientFunctionDeck(");
 	const std::string HudDeck = ExtractSourceFunctionBody(Source, "void CMenus::RenderSettingsQmClientHudDeck(");
+	ASSERT_FALSE(ControlsInit.empty());
 	ASSERT_FALSE(KeyBinds.empty());
 	ASSERT_FALSE(FriendNotify.empty());
 	ASSERT_FALSE(FavoriteMaps.empty());
@@ -7761,7 +7829,9 @@ TEST(QmMonitoringHelpers, QmClientContentOwnersPreserveInteractiveContracts)
 	EXPECT_NE(KeyBinderSource.find("if(!ReadOnly && m_pKeyReaderId == pReaderButton && m_Key.has_value())"), std::string::npos);
 
 	EXPECT_NE(KeyBinds.find("+toggle cl_dummy_hammer 1 0"), std::string::npos);
-	EXPECT_NE(KeyBinds.find("qm_timeout_disconnect"), std::string::npos);
+	EXPECT_EQ(KeyBinds.find("qm_timeout_disconnect"), std::string::npos);
+	EXPECT_NE(ControlsInit.find("{EBindOptionGroup::MISCELLANEOUS, Localizable(\"Active disconnect\"), \"qm_timeout_disconnect\"}"), std::string::npos);
+	EXPECT_NE(FunctionDeck.find("case EQmModuleId::KeyBinds: return Rows(7.0f);"), std::string::npos);
 	EXPECT_NE(FriendNotify.find("ui_widget::InputField"), std::string::npos);
 	EXPECT_NE(FriendNotify.find("m_QmFriendOnlineAutoRefresh"), std::string::npos);
 	EXPECT_NE(FriendNotify.find("m_QmFriendEnterAutoGreet"), std::string::npos);
@@ -10914,7 +10984,7 @@ TEST(QmTeeTrailStyles, AnimationIsRepeatableAndPaletteDoesNotChangeShape)
 	}
 }
 
-TEST(QmTeeTrailStyles, OriginalAndInvalidStylesLeaveLegacyRenderingInCharge)
+TEST(QmTeeTrailStyles, OriginalAndInvalidStylesUseTheSharedRibbonRenderer)
 {
 	const auto vTrail = MakeStyleTestTrail();
 	std::vector<qm_tee_trail::SQuad> vQuads;
@@ -10922,7 +10992,7 @@ TEST(QmTeeTrailStyles, OriginalAndInvalidStylesLeaveLegacyRenderingInCharge)
 	{
 		EXPECT_EQ(qm_tee_trail::ResolveStyle(Style), qm_tee_trail::STYLE_ORIGINAL);
 		qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, 25, 0, vQuads);
-		EXPECT_TRUE(vQuads.empty());
+		EXPECT_FALSE(vQuads.empty());
 	}
 }
 
@@ -10949,4 +11019,341 @@ TEST(QmTeeTrailStyles, VeryShortTrailsStayBoundedAndFinite)
 				EXPECT_TRUE(std::isfinite(Pos.y)) << Style;
 			}
 	}
+}
+
+TEST(QmTeeTrailStyles, BlackFlashKeepsBlackBodyAndEmissiveScarletCracks)
+{
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	qm_tee_trail::BuildEffect(MakeStyleTestTrail(), 1, true, 100.5, 15, 7, vQuads);
+	int DarkVertices = 0;
+	int BodyVertices = 0;
+	int ScarletVertices = 0;
+	for(const auto &Quad : vQuads)
+		for(const auto &Color : Quad.m_aColor)
+		{
+			if(!Quad.m_Additive && Color.a > 0.1f)
+			{
+				++BodyVertices;
+				DarkVertices += std::max({Color.r, Color.g, Color.b}) < 0.12f;
+			}
+			if(Quad.m_Additive && Color.a > 0.05f && Color.r > 0.65f && Color.g < 0.2f && Color.b < 0.3f)
+				++ScarletVertices;
+		}
+	EXPECT_GT(DarkVertices, BodyVertices / 2);
+	EXPECT_GT(ScarletVertices, 0);
+}
+
+namespace
+{
+	std::vector<CTrailPart> SampleTrailAtFps(int Fps, float Speed, double StartTime = 100.0)
+	{
+		qm_tee_trail::CTrailState State;
+		for(int Frame = 0; Frame <= Fps; ++Frame)
+		{
+			const double Time = Frame * 50.0 / Fps;
+			State.Update(vec2(float(Time * Speed), 100), StartTime + Time, Speed, 100);
+		}
+		std::vector<CTrailPart> vTrail;
+		State.Export(vTrail);
+		return vTrail;
+	}
+}
+
+TEST(QmTeeTrailSampling, DistanceSamplingMatchesAt60And240Fps)
+{
+	for(const float Speed : {0.5f, 8.0f, 36.0f, 140.0f})
+	{
+		const auto a = SampleTrailAtFps(60, Speed);
+		const auto b = SampleTrailAtFps(240, Speed);
+		ASSERT_EQ(a.size(), b.size()) << Speed;
+		ASSERT_GT(a.size(), 2u);
+		for(size_t i = 0; i < a.size(); ++i)
+		{
+			EXPECT_NEAR(a[i].m_Pos.x, b[i].m_Pos.x, 0.002f);
+			EXPECT_NEAR(a[i].m_Time, b[i].m_Time, 0.002);
+			EXPECT_NEAR(a[i].m_Distance, b[i].m_Distance, 0.002);
+		}
+	}
+}
+
+TEST(QmTeeTrailSampling, FastMovementFillsIntermediatePointsAndCapsHistory)
+{
+	const auto vTrail = SampleTrailAtFps(60, 140.0f);
+	ASSERT_GT(vTrail.size(), 180u);
+	EXPECT_LE(vTrail.size(), qm_tee_trail::MAX_POINTS + 1);
+	for(size_t i = 1; i < vTrail.size(); ++i)
+		EXPECT_LE(distance(vTrail[i - 1].m_Pos, vTrail[i].m_Pos), qm_tee_trail::SAMPLE_SPACING + 0.002f);
+}
+
+TEST(QmTeeTrailSampling, PauseAndRestDoNotRefreshTheLastMovingPoint)
+{
+	qm_tee_trail::CTrailState State;
+	State.Update(vec2(0, 0), 100, 8, 25);
+	State.Update(vec2(16, 0), 102, 8, 25);
+	std::vector<CTrailPart> vBefore, vAfter;
+	State.Export(vBefore);
+	for(int i = 0; i < 240; ++i)
+		State.Update(vec2(16, 0), 102, 8, 25);
+	State.Export(vAfter);
+	ASSERT_EQ(vBefore.size(), vAfter.size());
+	for(int i = 103; i < 111; ++i)
+		State.Update(vec2(16, 0), i, 0, 25);
+	State.Export(vAfter);
+	ASSERT_FALSE(vAfter.empty());
+	EXPECT_EQ(vBefore[0].m_Time, vAfter[0].m_Time);
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	qm_tee_trail::BuildEffect(vAfter, qm_tee_trail::STYLE_SPIRIT, true, 110, 15, 1, vQuads);
+	EXPECT_FALSE(vQuads.empty());
+	for(int i = 111; i < 141; ++i)
+		State.Update(vec2(16, 0), i, 0, 25);
+	State.Export(vAfter);
+	qm_tee_trail::BuildEffect(vAfter, qm_tee_trail::STYLE_SPIRIT, true, 140, 15, 1, vQuads);
+	EXPECT_TRUE(vQuads.empty());
+}
+
+TEST(QmTeeTrailSampling, TeleportRewindForwardSeekAndExplicitResetCannotBridge)
+{
+	for(int Case = 0; Case < 4; ++Case)
+	{
+		qm_tee_trail::CTrailState State;
+		State.Update(vec2(0, 0), 100, 10, 25);
+		State.Update(vec2(20, 0), 102, 10, 25);
+		const vec2 NewPos = Case == 0 ? vec2(1500, 0) : vec2(30, 0);
+		const double NewTime = Case == 1 ? 99 : (Case == 2 ? 140 : 103);
+		State.Update(NewPos, NewTime, 10, 25, Case == 3);
+		std::vector<CTrailPart> vTrail;
+		State.Export(vTrail);
+		ASSERT_EQ(vTrail.size(), 1u);
+		EXPECT_EQ(vTrail[0].m_Pos, NewPos);
+		State.Update(NewPos + vec2(10, 0), NewTime + 1, 10, 25);
+		State.Export(vTrail);
+		for(const auto &Point : vTrail)
+			EXPECT_LE(distance(Point.m_Pos, NewPos), 10.01f);
+	}
+}
+
+TEST(QmTeeTrailSampling, PlayerStatesAreIndependentAndIgnoreStationaryJitter)
+{
+	qm_tee_trail::CTrailState A, B;
+	A.Update(vec2(0, 0), 100, 10, 25);
+	B.Update(vec2(100, 0), 100, 0, 25);
+	for(int i = 1; i <= 10; ++i)
+	{
+		A.Update(vec2(i * 10, 0), 100 + i, 10, 25);
+		B.Update(vec2(100 + (i % 2) * 0.05f, 0), 100 + i, 0.05f, 25);
+	}
+	std::vector<CTrailPart> vA, vB;
+	A.Export(vA);
+	B.Export(vB);
+	EXPECT_GT(vA.size(), 10u);
+	EXPECT_LE(vB.size(), 1u);
+	B.Reset();
+	A.Export(vB);
+	EXPECT_EQ(vA.size(), vB.size());
+}
+
+TEST(QmTeeTrailSampling, LongSessionPreservesSubTickPrecision)
+{
+	const auto vTrail = SampleTrailAtFps(240, 8, 100000000);
+	ASSERT_GT(vTrail.size(), 2u);
+	EXPECT_NEAR(vTrail[1].m_Time - vTrail[2].m_Time, qm_tee_trail::SAMPLE_SPACING / 8.0, 0.001);
+}
+
+TEST(QmTeeTrailStyles, ZoomInAddsDetailWithoutExceedingBudget)
+{
+	const auto vTrail = SampleTrailAtFps(60, 8);
+	std::vector<qm_tee_trail::SQuad> vNormal, vZoom;
+	for(int Style = 0; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+	{
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 150, 15, 1, vNormal, 1);
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 150, 15, 1, vZoom, 0.125f);
+		EXPECT_GT(vZoom.size(), vNormal.size());
+		EXPECT_LE(vZoom.size(), qm_tee_trail::MAX_QUADS);
+		for(const auto &Quad : vZoom)
+			for(const auto &P : Quad.m_aPos)
+				EXPECT_TRUE(std::isfinite(P.x) && std::isfinite(P.y));
+	}
+}
+
+TEST(QmTeeTrailStyles, SpeedExtendsLifetimeAndSpiritLivesLonger)
+{
+	for(int Style = 1; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+		EXPECT_GT(qm_tee_trail::Lifetime(Style, 25, 30), qm_tee_trail::Lifetime(Style, 25, 1));
+	EXPECT_GT(qm_tee_trail::Lifetime(qm_tee_trail::STYLE_SPIRIT, 25, 10), qm_tee_trail::Lifetime(qm_tee_trail::STYLE_VOID, 25, 10));
+}
+
+TEST(QmTeeTrailStyles, SharpReversalZeroWidthAndFullHistoryStayFinite)
+{
+	auto vTrail = SampleTrailAtFps(60, 36);
+	for(size_t i = 0; i < vTrail.size(); ++i)
+		vTrail[i].m_Pos = vec2(float(i % 20 < 10 ? i % 10 : 10 - i % 10) * 6, float(i / 20));
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	for(int Style = 0; Style < qm_tee_trail::STYLE_COUNT; ++Style)
+	{
+		qm_tee_trail::BuildEffect(vTrail, Style, true, 150, 0, 9, vQuads, 0.125f);
+		EXPECT_LE(vQuads.size(), qm_tee_trail::MAX_QUADS);
+		for(const auto &Quad : vQuads)
+			for(int i = 0; i < 4; ++i)
+			{
+				EXPECT_TRUE(std::isfinite(Quad.m_aPos[i].x));
+				EXPECT_TRUE(std::isfinite(Quad.m_aPos[i].y));
+				EXPECT_GE(Quad.m_aColor[i].a, 0);
+				EXPECT_LE(Quad.m_aColor[i].a, 1);
+			}
+	}
+}
+
+TEST(QmTeeTrailStyles, HighRefreshRateKeepsTheSameBlackFlashCrackGeometry)
+{
+	const auto a = SampleTrailAtFps(60, 12);
+	const auto b = SampleTrailAtFps(240, 12);
+	std::vector<qm_tee_trail::SQuad> vA, vB;
+	qm_tee_trail::BuildEffect(a, qm_tee_trail::STYLE_BLACK_FLASH, true, 150, 15, 17, vA);
+	qm_tee_trail::BuildEffect(b, qm_tee_trail::STYLE_BLACK_FLASH, true, 150, 15, 17, vB);
+	ASSERT_EQ(vA.size(), vB.size());
+	for(size_t i = 0; i < vA.size(); ++i)
+		for(int j = 0; j < 4; ++j)
+		{
+			EXPECT_NEAR(vA[i].m_aPos[j].x, vB[i].m_aPos[j].x, 0.01f);
+			EXPECT_NEAR(vA[i].m_aPos[j].y, vB[i].m_aPos[j].y, 0.01f);
+			EXPECT_NEAR(vA[i].m_aColor[j].a, vB[i].m_aColor[j].a, 0.001f);
+		}
+}
+
+TEST(QmTeeTrailStyles, InfernoHarmonicsDoNotCreatePeriodicCracks)
+{
+	const auto vTrail = SampleTrailAtFps(240, 12);
+	std::vector<qm_tee_trail::SQuad> vQuads;
+	qm_tee_trail::BuildEffect(vTrail, qm_tee_trail::STYLE_INFERNO, true, 150, 15, 17, vQuads, 0.25f);
+	ASSERT_FALSE(vQuads.empty());
+	// 比较主体的相邻截面：放大细分后不能因周期相位跳变跨越一个完整采样间距。
+	for(const auto &Quad : vQuads)
+	{
+		if(Quad.m_Additive)
+			continue;
+		EXPECT_LT(distance(Quad.m_aPos[0], Quad.m_aPos[1]), qm_tee_trail::SAMPLE_SPACING);
+		EXPECT_LT(distance(Quad.m_aPos[2], Quad.m_aPos[3]), qm_tee_trail::SAMPLE_SPACING);
+	}
+}
+
+// 同一进程快照匹配全部注册项，大小写、重复子进程和多应用并行不改变位掩码。
+TEST(QmMusicAppWatcher, SingleProcessSnapshotCombinesAllRegisteredApplications)
+{
+	const SQmMusicHookEntry aHooks[] = {
+		{nullptr, "a", "a", L"cloudmusic.exe"},
+		{nullptr, "b", "b", L"SodaMusic.exe"},
+		{nullptr, "c", "c", L"Spotify.exe"},
+		{nullptr, "d", "d", nullptr},
+	};
+	uint64_t Mask = 0;
+	for(const wchar_t *pName : {L"explorer.exe", L"CLOUDMUSIC.EXE", L"spotify.exe", L"Spotify.exe"})
+		Mask |= QmMusicHookMaskForProcess(pName, aHooks, std::size(aHooks));
+	EXPECT_EQ(Mask, uint64_t(5));
+	EXPECT_EQ(QmMusicHookMaskForProcess(L"sodamusic.exe", aHooks, std::size(aHooks)), uint64_t(2));
+	EXPECT_EQ(QmMusicHookMaskForProcess(L"cloudmusic.exe.bak", aHooks, std::size(aHooks)), uint64_t(0));
+	EXPECT_EQ(QmMusicHookMaskForProcess(L"", aHooks, std::size(aHooks)), uint64_t(0));
+}
+
+TEST(QmMusicAppWatcher, PendingProcessScanDoesNotWaitOrExposePartialResult)
+{
+	CSemaphore Started;
+	CSemaphore FinishScan;
+	CJobPool Pool;
+	Pool.Init(1);
+	auto pScan = std::make_shared<CQmMusicAppScanJob>([&] {
+		Started.Signal();
+		FinishScan.Wait();
+		return uint64_t(5);
+	});
+	uint64_t Mask = 99;
+	EXPECT_FALSE(pScan->TryGetResult(Mask));
+	EXPECT_EQ(Mask, uint64_t(99));
+	Pool.Add(pScan);
+	Started.Wait();
+	// worker 仍在枚举时，主线程轮询必须直接返回，且不能发布未完成的数据。
+	EXPECT_FALSE(pScan->TryGetResult(Mask));
+	EXPECT_EQ(Mask, uint64_t(99));
+	FinishScan.Signal();
+	Pool.Shutdown();
+	ASSERT_TRUE(pScan->TryGetResult(Mask));
+	EXPECT_EQ(Mask, uint64_t(5));
+}
+
+TEST(QmMusicAppWatcher, ProcessScanOutlivesWatcherReferenceWithoutCallback)
+{
+	CSemaphore Started;
+	CSemaphore FinishScan;
+	std::atomic<bool> Completed = false;
+	CJobPool Pool;
+	Pool.Init(1);
+	auto pScan = std::make_shared<CQmMusicAppScanJob>([&] {
+		Started.Signal();
+		FinishScan.Wait();
+		Completed = true;
+		return uint64_t(0);
+	});
+	Pool.Add(pScan);
+	Started.Wait();
+	// 模拟组件退出时释放引用；后台任务只写自己的结果，无需访问组件。
+	pScan.reset();
+	FinishScan.Signal();
+	Pool.Shutdown();
+	EXPECT_TRUE(Completed.load());
+}
+
+TEST(QmBackgroundParsing, PlayerPointsUsesACompletedBackgroundParseJob)
+{
+	const std::string Source = ReadRepoFile("src/game/client/components/player_points.cpp");
+	EXPECT_NE(Source.find("class CPlayerPointsParseJob"), std::string::npos);
+	EXPECT_NE(Source.find("Engine()->AddJob"), std::string::npos);
+	EXPECT_NE(Source.find("ResultJson()"), std::string::npos);
+	EXPECT_EQ(Source.find("m_aPartialData"), std::string::npos);
+	EXPECT_EQ(Source.find("MAX_READ_BYTES"), std::string::npos);
+}
+
+TEST(QmBackgroundParsing, PlayerPointsParserKeepsAcceptedJsonShapes)
+{
+	const auto Parse = [](std::string_view Json) {
+		json_value *pRoot = JsonParse(Json.data(), Json.size());
+		const auto Result = ExtractPlayerPointsJson(pRoot);
+		if(pRoot)
+			json_value_free(pRoot);
+		return Result;
+	};
+	const auto Valid = Parse(R"({"points":{"points":123}})");
+	ASSERT_TRUE(Valid.m_JsonParsed);
+	ASSERT_TRUE(Valid.m_PointsFound);
+	EXPECT_EQ(Valid.m_Points, 123);
+
+	const auto Missing = Parse(R"({})");
+	ASSERT_TRUE(Missing.m_JsonParsed);
+	EXPECT_TRUE(Missing.m_PointsFound);
+	EXPECT_EQ(Missing.m_Points, 0);
+
+	const auto NonInteger = Parse(R"({"points":{"points":"123"}})");
+	ASSERT_TRUE(NonInteger.m_JsonParsed);
+	EXPECT_TRUE(NonInteger.m_PointsFound);
+}
+
+TEST(QmBackgroundParsing, SodaLyricsLoadIsSingleFlightAndIdentityBound)
+{
+	const std::string Source = ReadRepoFile("src/game/client/components/qmclient/music_lyrics/music_lyrics_integration.cpp");
+	EXPECT_NE(Source.find("class CSodaLyricLoadJob"), std::string::npos);
+	EXPECT_NE(Source.find("m_pLyricLoadJob"), std::string::npos);
+	EXPECT_NE(Source.find("m_LyricLoadSongId"), std::string::npos);
+	EXPECT_NE(Source.find("m_LyricLoadGeneration"), std::string::npos);
+	EXPECT_NE(Source.find("LYRIC_LOAD_RETRY_DELAY_MS"), std::string::npos);
+	EXPECT_EQ(Source.find("std::ifstream Stream(pPath"), std::string::npos);
+}
+
+TEST(QmBackgroundParsing, SpotifySpDcNormalizationIsConfigChangeDriven)
+{
+	const std::string Source = ReadRepoFile("src/game/client/components/qmclient/music_lyrics/qm_spotify_integration.cpp");
+	const size_t OnUpdate = Source.find("void CSpotifyIntegration::OnUpdate()");
+	ASSERT_NE(OnUpdate, std::string::npos);
+	const size_t RawCache = Source.find("m_LastRawSpDc", OnUpdate);
+	const size_t Normalize = Source.find("NormalizeSpDc", OnUpdate);
+	ASSERT_NE(RawCache, std::string::npos);
+	ASSERT_NE(Normalize, std::string::npos);
+	EXPECT_LT(RawCache, Normalize);
 }

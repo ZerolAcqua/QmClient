@@ -24,6 +24,7 @@
 #include <generated/protocol7.h>
 #include <generated/protocolglue.h>
 
+#include <game/client/components/qmclient/qm_hook_coll_candidates.h>
 #include <game/client/prediction/gameworld.h>
 #include <game/client/race.h>
 #include <game/collision.h>
@@ -325,7 +326,7 @@ private:
 		CQmStutterSampleSeries m_Render;
 	};
 
-	void ProcessQmStutterFrame();
+	void ProcessQmStutterFrame(double FrameMs);
 	void RecordComponentUpdate(size_t ComponentIndex, double DurationMs);
 	void RecordComponentRender(size_t ComponentIndex, double DurationMs);
 	void CaptureQmStutterFeatureSnapshot();
@@ -924,6 +925,8 @@ public:
 	int OnSnapInput(int *pData, bool Dummy, bool Force) override;
 	void PrepareInputForSend(int *pData, int Size, bool Dummy) override;
 	void OnShutdown() override;
+	void OnQmPerfFrame(double FrameMs) override;
+	void OnQmPerfStop(bool Shutdown) override;
 	void OnEnterGame() override;
 	void OnRconType(bool UsernameReq) override;
 	void OnRconLine(const char *pLine) override;
@@ -1015,6 +1018,7 @@ public:
 		bool m_HookHitDisabled;
 	};
 	SHookCollTarget m_aHookCollTargets[MAX_CLIENTS] = {};
+	CQmHookCollCandidates m_HookCollCandidates;
 	void UpdateHookCollTargets();
 
 	int IntersectCharacter(vec2 HookPos, vec2 NewPos, vec2 &NewPos2, int OwnId, vec2 *pPlayerPosition = nullptr);

@@ -447,27 +447,6 @@ class CHud : public CComponent
 		}
 	};
 	std::array<SHudSwitchCountdownRingState, SWITCH_COUNTDOWN_MAX_LINES> m_aSwitchCountdownRings{};
-	struct SHudSwitchCountdownTracker
-	{
-		int m_aaEndTick[NUM_DDRACE_TEAMS][256] = {};
-		int m_aaTouchTick[NUM_DDRACE_TEAMS][256] = {};
-		int m_aaClientId[NUM_DDRACE_TEAMS][256] = {};
-		int m_aaConnection[NUM_DDRACE_TEAMS][256] = {};
-
-		void Reset()
-		{
-			for(int t = 0; t < NUM_DDRACE_TEAMS; ++t)
-			{
-				for(int i = 0; i < 256; ++i)
-				{
-					m_aaEndTick[t][i] = 0;
-					m_aaTouchTick[t][i] = 0;
-					m_aaClientId[t][i] = -1;
-					m_aaConnection[t][i] = -1;
-				}
-			}
-		}
-	};
 	SHudSwitchCountdownTracker m_SwitchCountdownTracker;
 	struct SHudHookCountdownRingState
 	{

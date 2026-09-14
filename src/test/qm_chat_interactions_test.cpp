@@ -3,6 +3,7 @@
 
 #include <game/client/components/chat.h>
 #include <game/client/components/console.h>
+#include <game/client/components/qmclient/local_saves.h>
 #include <game/client/components/qmclient/red_packet_auto_claim.h>
 #include <game/client/components/tclient/fast_practice.h>
 #include <game/client/components/tclient/warlist.h>
@@ -10,6 +11,7 @@
 #include <gtest/gtest.h>
 #include <test/test.h>
 
+#include <array>
 #include <iterator>
 #include <string>
 
@@ -983,9 +985,236 @@ TEST(QmRedPacketAutoClaim, DedicatedSendPathAllowsWhitespaceOnlyPassword)
 
 	EXPECT_NE(SendChatOnConn.find("pLine == nullptr || pLine[0] == '\\0'"), std::string::npos);
 	EXPECT_NE(SendChatOnConn.find("!AllowWhitespaceOnly && *str_utf8_skip_whitespaces(pLine) == '\\0'"), std::string::npos);
-	const size_t LocalSaveGuard = SendChatOnConn.find("if(HandleLocalSaveForLoadCommand)");
-	const size_t LocalSaveRemoval = SendChatOnConn.find("TryRemoveLocalSaveForLoadCommand(pLine)");
+	const size_t LocalSaveGuard = SendChatOnConn.find("if(HandleLocalSaveForLoadCommand && SendResult == 0)");
+	const size_t LocalSaveTracking = SendChatOnConn.find("TrackLocalSaveLoadCommand(Conn, pLine)");
 	ASSERT_NE(LocalSaveGuard, std::string::npos);
-	ASSERT_NE(LocalSaveRemoval, std::string::npos);
-	EXPECT_LT(LocalSaveGuard, LocalSaveRemoval);
+	ASSERT_NE(LocalSaveTracking, std::string::npos);
+	EXPECT_LT(LocalSaveGuard, LocalSaveTracking);
+}
+
+TEST(QmLocalSaves, RepliesAreLocalCaseInsensitiveAndUseOneBasedIndices)
+{
+	using namespace QmLocalSaves;
+	EXPECT_EQ(ParseReply("/qm Yes").m_Kind, EReply::YES);
+	EXPECT_EQ(ParseReply(" /QM yEs 2 ").m_Index, 2);
+	EXPECT_EQ(ParseReply("/qm Yes").m_Index, 1);
+	EXPECT_EQ(ParseReply("/qm No").m_Kind, EReply::NO);
+	for(const char *pText : {"/qm", "/qm Yes 0", "/qm Yes -1", "/qm Yes 2147483648", "/qm Yes 1 extra", "/qm No 1"})
+		EXPECT_EQ(ParseReply(pText).m_Kind, EReply::INVALID) << pText;
+	EXPECT_EQ(ParseReply("/qmore Yes").m_Kind, EReply::NONE);
+	EXPECT_EQ(ParseReply("hello /qm Yes").m_Kind, EReply::NONE);
+}
+
+TEST(QmLocalSaves, CsvAndRemovalPreserveUnrelatedRecordsExactly)
+{
+	using namespace QmLocalSaves;
+	const std::string Text = "Time,Players,Map,Code\r\n2026-09-12,\"A, B\",Map,code\r\n"
+				 "2026-09-13,\"C, D\",Other,code\r\nmalformed,keep\r\n"
+				 "2026-09-14,\"A, B\",Map,code\r\n";
+	const auto Entries = ParseEntries(Text);
+	ASSERT_EQ(Entries.size(), 3u);
+	EXPECT_EQ(Entries[0].m_Players, "A, B");
+	std::string Output;
+	EXPECT_TRUE(RemoveEntries(Text, "Map", "code", Output));
+	EXPECT_EQ(Output, "Time,Players,Map,Code\r\n2026-09-13,\"C, D\",Other,code\r\nmalformed,keep\r\n");
+	EXPECT_FALSE(RemoveEntries(Text, "Missing", "code", Output));
+	EXPECT_EQ(Output, Text);
+	const auto Escaped = ParseEntries("Time,Players,Map,Code\nnow,\"A\"\"x, B\",Map,\"two, words\"\n");
+	ASSERT_EQ(Escaped.size(), 1u);
+	EXPECT_EQ(Escaped[0].m_Players, "A\"x, B");
+	EXPECT_EQ(Escaped[0].m_Code, "two, words");
+}
+
+TEST(QmLocalSaves, CandidatesAreNewestFirstDeduplicatedAndOnlyCompletePairs)
+{
+	using namespace QmLocalSaves;
+	const auto Entries = ParseEntries("Time,Players,Map,Code\n2026-09-12,\"A, B\",Map,older\n"
+					  "2026-09-14,\"A, B\",Map,newest\n2026-09-14,\"A, B\",Map,newest\n"
+					  "2026-09-15,Solo,Map,single\n2026-09-16,\"A, B, C\",Map,triple\n"
+					  "2026-09-17,\"C, D\",Other,foreign\n");
+	const auto Selected = Candidates(Entries, "Map");
+	ASSERT_EQ(Selected.size(), 2u);
+	EXPECT_EQ(Selected[0].m_Code, "newest");
+	EXPECT_EQ(Selected[1].m_Code, "older");
+	EXPECT_TRUE(Candidates(ParseEntries("Time,Player,Map,Code\nnow,\"A, B\",Map,legacy\n"), "Map").empty());
+}
+
+TEST(QmLocalSaves, NameAssignmentKeepsMatchesAndOtherwiseUsesStoredOrder)
+{
+	using namespace QmLocalSaves;
+	const std::array<std::string, 2> Stored = {"A", "B"};
+	EXPECT_EQ(AssignNames(Stored, {"B", "A"}), (std::array<std::string, 2>{"B", "A"}));
+	EXPECT_EQ(AssignNames(Stored, {"new", "A"}), (std::array<std::string, 2>{"B", "A"}));
+	EXPECT_EQ(AssignNames(Stored, {"new", "other"}), Stored);
+	std::array<std::string, 2> Names;
+	EXPECT_FALSE(ParseNames("A, A", Names));
+	EXPECT_FALSE(ParseNames("A, B, C", Names));
+	EXPECT_FALSE(ParseNames("1234567890123456, B", Names));
+}
+
+TEST(QmLocalSaves, LoadCommandsRoundTripQuotesAndDoNotTruncateCodes)
+{
+	using namespace QmLocalSaves;
+	const std::string Code = "two \\\"words";
+	EXPECT_EQ(LoadCode(LoadCommand(Code)), Code);
+	EXPECT_EQ(LoadCode(" /load three word code "), "three word code");
+	EXPECT_TRUE(LoadCode("/loadother code").empty());
+	EXPECT_TRUE(LoadCode("/load \"unterminated").empty());
+	EXPECT_TRUE(LoadCode("/load \"code\" garbage").empty());
+}
+
+TEST(QmLocalSaves, ConfirmationRejectsFailurePlayerChatWrongMapAndExpiredReplies)
+{
+	using namespace QmLocalSaves;
+	CConfirmation Pending;
+	Pending.Track({"Map", "code", 0, 7, 1000, false, 30000});
+	EXPECT_TRUE(Pending.Active());
+	EXPECT_EQ(Pending.Message(0, 3, "Loading successfully done", "Map", 7, 1), EResult::NONE);
+	EXPECT_EQ(Pending.Message(0, -1, "Loading successfully done", "Other", 7, 1), EResult::NONE);
+	EXPECT_EQ(Pending.Message(0, -1, "Loading successfully done", "Map", 8, 1), EResult::NONE);
+	EXPECT_EQ(Pending.Message(0, -1, "No such savegame for this map", "Map", 7, 1), EResult::FAILED);
+	EXPECT_EQ(Pending.Message(0, -1, "Too many players in this team, should be 2", "Map", 7, 1), EResult::FAILED);
+	EXPECT_EQ(Pending.Message(0, -1, "本服务器已禁用存档功能", "Map", 7, 1), EResult::FAILED);
+	Pending.Reset();
+	EXPECT_EQ(Pending.Message(0, -1, "Loading successfully done", "Map", 7, 2), EResult::NONE);
+	Pending.Track({"Map", "code", 1, 7, 1000, false, 30000});
+	EXPECT_EQ(Pending.Message(1, -1, "存档载入成功", "Map", 7, 30001), EResult::NONE);
+	EXPECT_EQ(Pending.Message(1, -1, "存档载入成功", "Map", 7, 2), EResult::SUCCESS);
+}
+
+TEST(QmLocalSaves, RestoredServerClockIsDistinctFromStartingANewRace)
+{
+	using namespace QmLocalSaves;
+	CConfirmation Pending;
+	Pending.Track({"Map", "code", 0, 7, 1000, false, 30000});
+	EXPECT_FALSE(Pending.RestoredRace("Map", 7, 1020, 1005, 50, 1));
+	EXPECT_FALSE(Pending.RestoredRace("Other", 7, 1020, 100, 50, 1));
+	EXPECT_FALSE(Pending.RestoredRace("Map", 8, 1020, 100, 50, 1));
+	EXPECT_TRUE(Pending.RestoredRace("Map", 7, 1020, -2000, 50, 1));
+	Pending.Reset();
+	Pending.Track({"Map", "code", 0, 7, 1000, true, 30000});
+	EXPECT_FALSE(Pending.RestoredRace("Map", 7, 1020, -2000, 50, 1));
+}
+
+TEST(QmLocalSaves, OverlappingDifferentLoadsCannotDeleteTheWrongCode)
+{
+	using namespace QmLocalSaves;
+	CConfirmation Pending;
+	Pending.Track({"Map", "first", 0, 7, 1000, false, 30000});
+	Pending.Track({"Map", "second", 0, 7, 1010, false, 30010});
+	EXPECT_EQ(Pending.Message(0, -1, "Loading successfully done", "Map", 7, 1), EResult::FAILED);
+	EXPECT_FALSE(Pending.RestoredRace("Map", 7, 1020, -2000, 50, 1));
+}
+
+TEST(QmLocalSaves, RestoreWaitsForConnectionNamesAndTeamBeforeLoading)
+{
+	using namespace QmLocalSaves;
+	CRestore Restore;
+	CRestore::SWorld World;
+	World.m_Map = "Map";
+	World.m_Online = true;
+	World.m_aNames = {"new", "other"};
+	World.m_aTeams = {0, 0};
+	EXPECT_EQ(Restore.Update(World, 0, 1000), EAction::WAIT);
+	Restore.Begin({"now", "A, B", "Map", "code"}, {"A", "B"}, 0, 1000);
+	EXPECT_EQ(Restore.Update(World, 0, 1000), EAction::CONNECT);
+	EXPECT_EQ(Restore.Update(World, 1000, 1000), EAction::WAIT);
+	World.m_DummyConnected = true;
+	World.m_PlayersReady = true;
+	EXPECT_EQ(Restore.Update(World, 1100, 1000), EAction::RENAME);
+	EXPECT_EQ(Restore.Update(World, 2200, 1000), EAction::WAIT);
+	World.m_aNames = {"A", "B"};
+	World.m_CharactersReady = true;
+	EXPECT_EQ(Restore.Update(World, 2300, 1000), EAction::JOIN_MAIN);
+	EXPECT_EQ(Restore.Team(), 1);
+	EXPECT_EQ(Restore.Update(World, 3400, 1000), EAction::WAIT);
+	World.m_aTeams[0] = 1;
+	World.m_aTeamSizes[1] = 1;
+	EXPECT_EQ(Restore.Update(World, 3500, 1000), EAction::INVITE);
+	EXPECT_EQ(Restore.Update(World, 4600, 1000), EAction::JOIN_DUMMY);
+	EXPECT_EQ(Restore.Update(World, 5700, 1000), EAction::WAIT);
+	World.m_aTeams[1] = 1;
+	World.m_aTeamSizes[1] = 2;
+	EXPECT_EQ(Restore.Update(World, 5800, 1000), EAction::LOAD);
+	EXPECT_EQ(Restore.Update(World, 6900, 1000), EAction::WAIT);
+	Restore.Reset();
+	EXPECT_EQ(Restore.Update(World, 8000, 1000), EAction::WAIT);
+}
+
+TEST(QmLocalSaves, RestoreCancelsOnMapChangeTimeoutOrUnavailableTeams)
+{
+	using namespace QmLocalSaves;
+	CRestore Restore;
+	CRestore::SWorld World;
+	World.m_Online = true;
+	World.m_Map = "Other";
+	Restore.Begin({"now", "A, B", "Map", "code"}, {"A", "B"}, 0, 1000);
+	EXPECT_EQ(Restore.Update(World, 1, 1000), EAction::FAILED);
+	World.m_Map = "Map";
+	Restore.Begin({"now", "A, B", "Map", "code"}, {"A", "B"}, 0, 1000);
+	EXPECT_EQ(Restore.Update(World, 61000, 1000), EAction::FAILED);
+	World.m_DummyConnected = World.m_PlayersReady = World.m_CharactersReady = true;
+	World.m_aNames = {"A", "B"};
+	World.m_aTeamSizes.fill(3);
+	Restore.Begin({"now", "A, B", "Map", "code"}, {"A", "B"}, 0, 1000);
+	EXPECT_EQ(Restore.Update(World, 1, 1000), EAction::FAILED);
+}
+
+TEST(QmLocalSaves, RestoreReusesOnlyAnExclusivePairAndAcceptsMapCaseDifferences)
+{
+	using namespace QmLocalSaves;
+	CRestore Restore;
+	CRestore::SWorld World;
+	World.m_Online = World.m_DummyConnected = World.m_PlayersReady = World.m_CharactersReady = true;
+	World.m_Map = "map";
+	World.m_aNames = {"A", "B"};
+	World.m_aTeams = {7, 7};
+	World.m_aTeamSizes[7] = 2;
+	Restore.Begin({"now", "A, B", "Map", "code"}, {"A", "B"}, 0, 1000);
+	EXPECT_EQ(Restore.Update(World, 1, 1000), EAction::LOAD);
+	EXPECT_EQ(Restore.Team(), 7);
+	World.m_aTeamSizes[7] = 3;
+	Restore.Begin({"now", "A, B", "Map", "code"}, {"A", "B"}, 0, 1000);
+	EXPECT_EQ(Restore.Update(World, 1, 1000), EAction::JOIN_MAIN);
+	EXPECT_EQ(Restore.Team(), 1);
+	World.m_aTeamSizes[1] = 1;
+	EXPECT_EQ(Restore.Update(World, 1100, 1000), EAction::FAILED);
+}
+
+TEST(QmLocalSaves, RestoreDoesNotInterruptAnExistingRace)
+{
+	using namespace QmLocalSaves;
+	CRestore Restore;
+	CRestore::SWorld World;
+	World.m_Online = World.m_DummyConnected = World.m_PlayersReady = true;
+	World.m_Map = "Map";
+	World.m_Racing = true;
+	World.m_aNames = {"other", "names"};
+	Restore.Begin({"now", "A, B", "Map", "code"}, {"A", "B"}, 0, 1000);
+	EXPECT_EQ(Restore.Update(World, 1, 1000), EAction::FAILED);
+}
+
+TEST(QmChatLogWrites, KeepsMessageOrderWhileDiskWriteIsBlocked)
+{
+	CQmChatLogWriteQueue Queue;
+	CSemaphore Started;
+	CSemaphore Finish;
+	std::vector<int> Written;
+	CJobPool Pool;
+	Pool.Init(1);
+	auto pJob = Queue.Enqueue([&] {
+		Started.Signal();
+		Finish.Wait();
+		Written.push_back(1);
+	});
+	ASSERT_NE(pJob, nullptr);
+	Pool.Add(pJob);
+	Started.Wait();
+	// IO 阻塞时仍可直接入队，且不会占用另一个 worker 并行写同一文件。
+	EXPECT_EQ(Queue.Enqueue([&] { Written.push_back(2); }), nullptr);
+	EXPECT_EQ(Queue.Enqueue([&] { Written.push_back(3); }), nullptr);
+	Finish.Signal();
+	Pool.Shutdown();
+	EXPECT_EQ(Written, (std::vector<int>{1, 2, 3}));
+	EXPECT_NE(Queue.Enqueue([] {}), nullptr);
 }

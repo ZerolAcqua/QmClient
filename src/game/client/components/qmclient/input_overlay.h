@@ -5,11 +5,14 @@
 #include <base/color.h>
 
 #include <engine/graphics.h>
+#include <engine/shared/jobs.h>
 
 #include <game/client/component.h>
 
 #include <algorithm>
 #include <ctime>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -53,12 +56,33 @@ namespace QmInputOverlay
 	}
 }
 
+// 检查任务只持有文件路径快照，完成状态发布后主线程才读取结果。
+class CQmInputOverlayFileTimeJob : public IJob
+{
+	std::function<std::optional<time_t>()> m_Check;
+	std::optional<time_t> m_Modified;
+	void Run() override { m_Modified = m_Check(); }
+
+public:
+	explicit CQmInputOverlayFileTimeJob(std::function<std::optional<time_t>()> Check) :
+		m_Check(std::move(Check)) {}
+	bool TryGetResult(std::optional<time_t> &Modified) const
+	{
+		if(State() != STATE_DONE)
+			return false;
+		Modified = m_Modified;
+		return true;
+	}
+};
+
 class CInputOverlay : public CComponent
 {
 public:
 	int Sizeof() const override { return sizeof(*this); }
 	void OnInit() override;
 	void OnRender() override;
+	void OnShutdown() override { m_pFileTimeJob.reset(); }
+	void OnWindowResize() override;
 
 private:
 	enum class EConfigMode
@@ -120,6 +144,8 @@ private:
 	{
 		std::string m_Id;
 		std::string m_Label;
+		float m_LabelWidth = -1.0f;
+		float m_LabelTextSize = 0.0f;
 		EInputKind m_InputKind = EInputKind::NONE;
 		int m_Key = 0;
 		int m_MouseButton = 0;
@@ -191,6 +217,7 @@ private:
 	int WheelDirFromObsId(const char *pId) const;
 	bool IsObsActive(const SObsElement &Element) const;
 	bool GetConfigModifiedTime(time_t &OutModified) const;
+	std::vector<std::string> ConfigPaths() const;
 	int DetectObsPressedOffset(const CImageInfo &Image, const std::vector<SObsElement> &Elements) const;
 	void ClearObsLayouts();
 
@@ -208,6 +235,10 @@ private:
 	bool m_ConfigValid = false;
 	float m_Time = 0.0f;
 	float m_ConfigCheckTimer = 0.0f;
+	std::shared_ptr<CQmInputOverlayFileTimeJob> m_pFileTimeJob;
+	vec2 m_LabelScreenScale = vec2(0.0f, 0.0f);
+	unsigned m_LabelRenderFlags = 0;
+	int m_LabelFontPreset = 0;
 	time_t m_ConfigModifiedTime = 0;
 	bool m_HasConfigModifiedTime = false;
 	float m_PosXPercent = 71.0f;

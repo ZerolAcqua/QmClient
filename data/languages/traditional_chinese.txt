@@ -28,9 +28,6 @@
 %d items selected
 == 已選擇 %d 項
 
-%d more cut segments
-== 還有 %d 個裁剪片段
-
 %d of %d server
 == %d/%d 個伺服器
 
@@ -60,6 +57,9 @@
 
 %d users
 == %d 個用戶
+
+%d. %s | main: %s | dummy: %s
+== %d. %s | 本體：%s | 分身：%s
 
 %d/%d KiB (%.1f KiB/s)
 == %d/%d KiB（%.1f KiB/s）
@@ -259,6 +259,9 @@ A demo with this name already exists
 
 A folder with this name already exists
 == 已有同名資料夾
+
+A save is already being restored. Please wait.
+== 正在恢復存檔，請稍候。
 
 A screenshot with this name already exists
 == 已有同名截圖
@@ -691,9 +694,6 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == 拖動排序或版面重排時播放卡片位置過渡動畫
-
-Animated styles override the fallback title color
-== 有動態風格時優先使用風格配色，無動態風格時使用此處配色
 
 Animated title style id
 == 頭銜動態風格 ID
@@ -1427,8 +1427,14 @@ Bit flags for disabling settings tabs
 Black
 == 黑色
 
+Black Flash
+== 黑閃
+
 Blend mode
 == 疊加模式
+
+Blend strength
+== 混合強度
 
 Blink the active local tee
 == 讓目前本機角色閃爍
@@ -1897,6 +1903,12 @@ Clearable text...
 
 Clears the voting options
 == 清除投票選項
+
+Click a part on the right to edit its color, blend mode and strength.
+== 點擊右側部件，調整顏色、混合模式和強度。
+
+Click again to find the next location.
+== 再次點擊可尋找下一個位置
 
 Click to add this community to favorites
 == 點擊將該社區加入收藏
@@ -2483,9 +2495,6 @@ Current: Score
 Current: Time
 == 當前：時間
 
-Cursed Flame
-== 咒焰·黑閃
-
 Custom
 == 自定義
 
@@ -2555,6 +2564,9 @@ Customize translate button and menu colors
 Customize vote display and interaction
 == Customize vote display and interaction
 
+Cut end: %s
+== 終點：%s
+
 Cut interval
 == 裁剪區間
 
@@ -2563,6 +2575,9 @@ Cut length
 
 Cut segments
 == 裁剪片段
+
+Cut start: %s
+== 起點：%s
 
 Cute:
 == 可愛：
@@ -2702,6 +2717,9 @@ Debug SQL.
 Debug tile layer clipping.
 == 調試圖塊圖層裁剪
 
+Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)
+== 專用 WebSocket 位址（留空使用 wss://qmclient.icu/ws）
+
 Deep freeze color
 == 深度凍結顏色
 
@@ -2825,8 +2843,20 @@ Delete this preset
 Demo
 == 回放
 
+Demo display
+== Demo 顯示
+
 Demo effects
 == Demo 特效
+
+Demo hook strength (0=Off 1=Icon 2=Icon and number)
+== Demo 強弱鉤（0=關閉 1=圖示 2=圖示與數字）
+
+Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)
+== Demo 強弱鉤範圍（0=自己 1=其他玩家 2=強鉤 3=弱鉤 4=全部）
+
+Demo key presses (0=Off 1=Others 2=All 3=Own)
+== Demo 方向鍵（0=關閉 1=其他玩家 2=全部 3=自己）
 
 Demo marker added
 == 已添加回放標記
@@ -3482,9 +3512,6 @@ Enable chat with all/team mode
 Enable cheats for your current team's run, but you can't earn a rank
 == 為你當前隊伍啟用作弊，但將無法獲得排名
 
-Enable client stutter diagnostics at startup
-== 啟動時啟用用戶端卡頓診斷
-
 Enable colored console output
 == 啟用控制台彩色輸出
 
@@ -3610,9 +3637,6 @@ Enable lyrics
 
 Enable macOS graphics diagnostics and Instruments signposts
 == 啟用 macOS 圖形診斷和 Instruments 標記
-
-Enable main thread and render stage performance debug logging
-== 啟用主線程與渲染階段性能調試日誌
 
 Enable map compatibility mode using the specified bug (example: grenade-doubleexplosion@ddnet.tw)
 == 使用指定 bug 啟用地圖兼容模式（例如：grenade-doubleexplosion@ddnet.tw）
@@ -3761,6 +3785,9 @@ Enable Tee trail
 Enable tee trails
 == 啟用 Tee 拖尾
 
+Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
+== 啟用 QmClient 專用 WebSocket 服務（不回退 HTTP 輪詢）
+
 Enable thinking mode (slower)
 == 啟用思考模式（較慢）
 
@@ -3835,6 +3862,9 @@ Endpoint (optional)
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == 請輸入 /practice 或重新開始，否則整隊將在 60 秒後被處死
+
+Enter a CP number from 1 to 255.
+== 請輸入 1–255 的 CP 編號
 
 Enter Password
 == 輸入密碼
@@ -3950,6 +3980,9 @@ Execute the specified file
 Existing Player
 == 玩家已存在
 
+Exo
+== 高能科技
+
 Export
 == 導出
 
@@ -4055,9 +4088,6 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == 回退後的簡單降噪強度
 
-Fallback title color
-== 基礎配色
-
 Fast input
 == 快速輸入
 
@@ -4160,8 +4190,14 @@ Filter out spectators from player count
 Filtered word console color
 == 被屏蔽詞控制台顏色
 
+Find / Next
+== 尋找 / 下一個
+
 Find all ban records for the specified IP address
 == 查詢指定 IP 的全部封禁記錄
+
+Find CP
+== 尋找 CP
 
 Find QmClient communities and project links
 == Find QmClient communities and project links
@@ -4180,6 +4216,9 @@ Finish name
 
 Finish Name:
 == 恰分名稱：
+
+Finish or reset the current race before restoring a save.
+== 請先結束或重設目前的比賽，再恢復存檔。
 
 Finished
 == 已完成
@@ -4585,9 +4624,6 @@ Go forward one tick
 
 Go forward the specified duration
 == 快進指定時長
-
-Golden Grace
-== 黃金·賜福
 
 Gores
 == 血腥模式
@@ -5066,6 +5102,9 @@ I am away from the game window
 I muted you
 == 我屏蔽你了
 
+Icon and number
+== 圖示與數字
+
 Icons
 == 圖示
 
@@ -5179,6 +5218,9 @@ Indicator size
 
 Indicator transparency
 == 指示器透明度
+
+Inferno
+== 冥火
 
 Infinite hook for super players on/off.
 == 超級玩家開/關的無盡鉤子
@@ -5314,6 +5356,9 @@ Invalid ID
 
 Invalid option
 == 無效的投票選項
+
+Invalid save number. Use a number from the save list.
+== 存檔序號無效，請使用清單中的序號。
 
 Invalid spectator id used
 == 無效的旁觀目標 ID
@@ -5621,6 +5666,9 @@ Left-click a Frankenstein part to tint it. Drag parts to replace them. Right-cli
 Left/right channel width
 == 左右聲道寬度
 
+Legacy option: connections that skip TLS verification are rejected
+== 舊版選項：跳過 TLS 驗證的連線會被拒絕
+
 Length
 == 時長
 
@@ -5855,6 +5903,9 @@ Locked
 Log output filename
 == 日誌輸出文件名
 
+Log realtime WebSocket channel events
+== 記錄即時 WebSocket 通道事件
+
 Log the network
 == 記錄網絡
 
@@ -6011,14 +6062,8 @@ Margin when notification is docked
 Mark demo
 == 標記回放
 
-Mark the beginning of a cut (right click to reset)
-== 標記裁剪起點 (右鍵重置)
-
 Mark the beginning of a demo cut
 == 標記回放剪輯起點
-
-Mark the end of a cut (right click to reset)
-== 標記裁剪終點 (右鍵重置)
 
 Mark the end of a demo cut
 == 標記回放剪輯終點
@@ -6514,6 +6559,9 @@ Name: %s
 
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 == 名牌鉤子強度圖標範圍（0=自己 1=他人 2=強鉤 3=弱鉤 4=所有玩家）
+
+Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)
+== 銘牌暱稱範圍（0=不顯示 1=當前角色 2=自身角色 3=其他玩家 4=其他玩家與自身非當前角色 5=全部）
 
 Nameplate position X
 == 名字牌顯示座標 X
@@ -7151,9 +7199,6 @@ Other
 Other players' hook line width
 == 其他玩家的鉤子輔助線寬度
 
-Other players' nameplate scope (0=All players 1=Friends only)
-== 他人銘牌範圍（0=所有玩家 1=僅好友）
-
 Others
 == 他人
 
@@ -7234,9 +7279,6 @@ Overwrite clan even if empty
 
 Own hook line width
 == 自己的鉤子輔助線寬度
-
-Own nameplate scope (0=Current character 1=All local characters)
-== 自身銘牌範圍（0=當前角色 1=本機全部角色）
 
 p = Ping latency
 == p = Ping 延遲
@@ -7339,9 +7381,6 @@ Penalty in seconds for saving or swapping positions
 
 Per-name volume (name=percent)
 == 按名字單獨音量（name=percent）
-
-Performance debug log threshold (ms)
-== 性能調試日誌閾值（毫秒）
 
 Permanent access; up to 4 online IP addresses
 == 永久資格，最多 4 個 IP 同時在線
@@ -7754,6 +7793,9 @@ Preview built with %d skipped slot(s).
 Preview button visibility while the editor is active.
 == 按鍵編輯器打開時用於預覽按鍵的可見度
 
+Preview cut (P)
+== 預覽片段 (P)
+
 Preview dummy nameplate
 == 預覽分身名牌
 
@@ -8080,6 +8122,18 @@ Ratio threshold for local target language detection
 
 Really? Not even a little?
 == 真的？一點都不考慮一下嗎？
+
+Realtime channel
+== 即時通道
+
+Realtime channel heartbeat interval (seconds, 0 uses default)
+== 即時通道心跳間隔（秒，0 使用預設值）
+
+Realtime channel reconnect backoff base (ms)
+== 即時通道重連退避基準（毫秒）
+
+Realtime channel reconnect backoff cap (ms)
+== 即時通道重連退避上限（毫秒）
 
 Reason
 == 原因
@@ -8588,8 +8642,14 @@ Restart the client
 Restarting. Please wait…
 == 正在重啟，請稍等
 
+Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
+== 是否恢復雙人存檔？/qm Yes 讀取最新一筆，/qm Yes 序號 選擇其他存檔，/qm No 忽略本次提示。
+
 Restore old single-segment hook collision line behavior
 == 恢復舊版單段鉤子輔助線行為
+
+Restoring save %d: main '%s', dummy '%s'.
+== 正在恢復存檔 %d：本體「%s」，分身「%s」。
 
 Retrying…
 == 正在重試…
@@ -8780,6 +8840,12 @@ Save ghost
 Save last %d min
 == 保存前 %d 分鐘
 
+Save loaded; local record removed.
+== 存檔讀取成功，已刪除本機紀錄。
+
+Save loaded; the local record could not be removed.
+== 存檔讀取成功，但未能刪除本機紀錄。
+
 Save player names in replay
 == 在回放中保存玩家名稱
 
@@ -8788,6 +8854,15 @@ Save power by lowering update rate (higher input latency)
 
 Save replay of best time per game
 == 保存每場遊戲最佳記錄的回放
+
+Save restore dismissed.
+== 已取消本次存檔恢復。
+
+Save restore stopped without confirming success. The local record was kept.
+== 未確認讀檔成功，恢復流程已停止。本機紀錄已保留。
+
+Save restore stopped: connection, names or team were not ready. The local record was kept.
+== 連線、名字或隊伍尚未就緒，存檔恢復已停止。本機紀錄已保留。
 
 Save settings file on exit
 == 退出時保存設置文件
@@ -8933,6 +9008,9 @@ Search skins and manage the skin queue
 Searching
 == 正在搜索
 
+Sec-WebSocket-Protocol sent during the realtime handshake
+== 即時握手時傳送的 Sec-WebSocket-Protocol
+
 Secondary
 == 次要
 
@@ -8980,6 +9058,9 @@ Selected candidate %d/%d under cursor.
 
 Selected item color
 == 已選項目顏色
+
+Selected part: %d
+== 所選部件：%d
 
 Selected server
 == 已選中伺服器
@@ -9158,6 +9239,12 @@ Set color
 Set current demo speed
 == 設置當前回放速度
 
+Set cut end at current position (O, right click to reset)
+== 將目前位置設為剪輯終點（O，右鍵重設）
+
+Set cut start at current position (I, right click to reset)
+== 將目前位置設為剪輯起點（I，右鍵重設）
+
 Set ddrace team for a player
 == 為玩家設置 DDRace 隊伍
 
@@ -9325,6 +9412,9 @@ Show chat (2 always show large chat area)
 
 Show chat bubbles above players
 == 在玩家頭頂顯示聊天氣泡
+
+Show chat in demo preview and video
+== 在 Demo 預覽和影片中顯示聊天
 
 Show chat messages above players
 == 在玩家頭頂顯示聊天消息
@@ -9632,6 +9722,9 @@ Show in-game HUD (spectator HUD)
 Show in-game HUD (timer)
 == 顯示遊戲內 HUD（計時器）
 
+Show in-game HUD in demo preview and video
+== 在 Demo 預覽和影片中顯示遊戲 HUD
+
 Show in-game HUD when rendering video
 == 渲染視頻時顯示遊戲內 HUD
 
@@ -9673,6 +9766,9 @@ Show katan on frozen players
 
 Show katana on frozen players (restores old behavior)
 == 在凍結玩家身上顯示武士刀（恢復舊行為）
+
+Show key presses
+== 方向鍵
 
 Show key presses (1 = others, 2 = all, 3 = own only)
 == 顯示按鍵（1 = 其他玩家的、2 = 所有人、3 = 僅你自己的）
@@ -10157,6 +10253,9 @@ Simple noise reduction strength
 Single color
 == 單色
 
+Single color and Rainbow override the color of animated styles; the style keeps its motion
+== 單色與彩虹檔會覆蓋動態風格自帶的顏色；風格只保留浮動與掠光
+
 Size
 == 大小
 
@@ -10195,6 +10294,21 @@ Skin list sort mode (0=Name, 1=Release date)
 
 Skin options
 == 皮膚選項
+
+Skin outline color
+== 皮膚描邊顏色
+
+Skin outline for other players
+== 其他玩家的皮膚描邊
+
+Skin outline for self and dummy
+== 自己與分身的皮膚描邊
+
+Skin outline opacity
+== 皮膚描邊不透明度
+
+Skin outline width
+== 皮膚描邊粗細
 
 Skin prefix
 == 皮膚名稱前綴
@@ -10511,8 +10625,8 @@ Sphere
 Spin pop
 == 旋轉彈出
 
-Spirit Light
-== 靈光·流螢
+Spirit
+== 靈光
 
 Sponsor code
 == 認證碼
@@ -10630,6 +10744,9 @@ Stop key input on switch (0=off, 1=dummy, 2=player)
 
 Stop practice
 == 停止練習
+
+Stop preview (P)
+== 停止預覽 (P)
 
 Stop record
 == 停止錄製
@@ -10988,8 +11105,8 @@ Tee trail color
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee 軌跡顏色模式（1=純色，2=當前 Tee 顏色，3=彩虹，4=按 Tee 速度著色，5=隨機）
 
-Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
-== Tee 拖尾樣式（0=原版，1=咒焰黑閃，2=紫電雷切，3=靈光流螢，4=虛空暗影，5=黃金賜福）
+Tee trail style (0=Original, 1=Black Flash, 2=Exo, 3=Spirit, 4=Void, 5=Inferno)
+== Tee 拖尾樣式 (0=原版, 1=黑閃, 2=高能科技, 3=靈光, 4=虛空, 5=冥火)
 
 Tee Trails
 == Tee 拖尾
@@ -11165,6 +11282,9 @@ There are unsaved changes in the touch controls editor. Saving first is recommen
 There is no checkpoint teleporter with that index on the map.
 == 這張地圖上沒有這個編號的檢查點傳送器
 
+There is no pending save restore prompt.
+== 目前沒有待處理的存檔恢復提示。
+
 There is no teleporter with that index on the map.
 == 這張地圖上沒有這個編號的傳送器
 
@@ -11195,6 +11315,9 @@ Thin
 Thinking mode requires a reasoning model
 == 啟用思考模式需要使用推理模型
 
+This connection cannot change names while connected. Reconnect with the saved names first.
+== 此連線不支援線上改名，請使用存檔中的名字重新連線。
+
 This ID is not connected
 == 該 ID 未連接
 
@@ -11203,6 +11326,9 @@ This is the master switch for all interface animation categories
 
 This name cannot be used for files and folders
 == 此名稱不能用於文件和文件夾
+
+This save is no longer in the local save file.
+== 本機存檔檔案中已沒有這筆紀錄。
 
 This server has an initial chat delay, you will be able to talk in %s seconds.
 == 本伺服器啟用了初始發言延遲，你還需要等待 %s 秒才能說話
@@ -11335,6 +11461,9 @@ Title bob angular speed in 1/100 rad/s
 
 Title bob wavelength in pixels
 == 頭銜浮動波長（像素）
+
+Title color
+== 頭銜顏色
 
 Title color (single color)
 == 頭銜顏色（單色）
@@ -11900,6 +12029,9 @@ URL for downloading skins
 Usage: %s %s
 == 用法：%s %s
 
+Use /qm Yes [number] to restore a save, or /qm No to dismiss.
+== 輸入 /qm Yes [序號] 恢復存檔，或 /qm No 忽略本次提示。
+
 Use 12 hour clock
 == 使用 12 小時制
 
@@ -12107,9 +12239,6 @@ View the developers and contributors
 View the people supporting QmClient development
 == View the people supporting QmClient development
 
-Violet Lightning
-== 紫電·雷切
-
 Virtual joystick which always uses fire.
 == 始終使用開火的虛擬搖桿。
 
@@ -12218,8 +12347,8 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == 語音白名單（逗號分隔）
 
-Void Shadow
-== 虛空·暗影
+Void
+== 虛空
 
 Volume
 == 音量
@@ -12559,9 +12688,6 @@ Word filter action: 0=replace matching words, 1=hide entire message
 
 Write local console contents to a text file
 == 將本地控制台內容寫入文本文件
-
-Write performance debug logs to dedicated file
-== 將性能調試日誌寫入專用文件
 
 Write remote console contents to a text file
 == 將遠程控制台內容寫入文本文件
@@ -12927,6 +13053,46 @@ Zoom to current mouse target
 == ⚠️ 騰訊雲 API 密鑰未配置
 
 [Assets editor blend mode]
+Color
+== 顏色
+
+[Assets editor blend mode]
+Color Burn
+== 顏色加深
+
+[Assets editor blend mode]
+Color Dodge
+== 顏色減淡
+
+[Assets editor blend mode]
+Darken
+== 變暗
+
+[Assets editor blend mode]
+Difference
+== 差值
+
+[Assets editor blend mode]
+Exclusion
+== 排除
+
+[Assets editor blend mode]
+Hard Light
+== 強光
+
+[Assets editor blend mode]
+Hue
+== 色相
+
+[Assets editor blend mode]
+Lighten
+== 變亮
+
+[Assets editor blend mode]
+Luminosity
+== 明度
+
+[Assets editor blend mode]
 Multiply
 == 正片疊底
 
@@ -12939,8 +13105,16 @@ Overlay
 == 疊加
 
 [Assets editor blend mode]
+Saturation
+== 飽和度
+
+[Assets editor blend mode]
 Screen
 == 濾色
+
+[Assets editor blend mode]
+Soft Light
+== 柔光
 
 [Auto camera]
 Active
@@ -13163,32 +13337,24 @@ All
 == 全體
 
 [Show name plates]
+Current
+== 當前
+
+[Show name plates]
+Current + Local
+== 當前+本地
+
+[Show name plates]
+Local + Others
+== 本地+他人
+
+[Show name plates]
 None
 == 無
 
 [Show name plates]
 Others
 == 他人
-
-[Show name plates]
-Own
-== 自身
-
-[Show name plates scope]
-All
-== 所有
-
-[Show name plates scope]
-Current
-== 當前
-
-[Show name plates scope]
-Friends
-== 好友
-
-[Show name plates scope]
-Local
-== 本地
 
 [Show players' key presses]
 All

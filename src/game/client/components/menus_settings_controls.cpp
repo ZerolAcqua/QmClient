@@ -134,6 +134,7 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Spectate teleport"), "qm_spec_teleport"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Spectate next"), "spectate_next"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Spectate previous"), "spectate_previous"},
+		{EBindOptionGroup::MISCELLANEOUS, Localizable("Active disconnect"), "qm_timeout_disconnect"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Console"), "toggle_local_console"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Remote console"), "toggle_remote_console"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Screenshot"), "screenshot"},

@@ -21,6 +21,9 @@
 #include <engine/shared/protocol7.h>
 #include <engine/storage.h>
 
+#include <generated/client_data7.h>
+
+#include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/gameclient.h>
 #include <game/localization.h>
 
@@ -141,10 +144,22 @@ void CSkins7::CSkinPartLoadJob::Run()
 // TODO: uncomment
 // const float MIN_EYE_BODY_COLOR_DIST = 80.f; // between body and eyes (LAB color space)
 
+static std::shared_ptr<CQmSkinOutline> CreateSkinPartOutline(const CImageInfo &Image, int Part)
+{
+	if(Part == protocol7::SKINPART_BODY)
+		return QmCreateSkinOutline(Image, client_data7::g_pData->m_aSprites[client_data7::SPRITE_TEE_BODY], client_data7::g_pData->m_aSprites[client_data7::SPRITE_TEE_BODY_OUTLINE], vec2(64, 64));
+	if(Part == protocol7::SKINPART_FEET)
+		return QmCreateSkinOutline(Image, client_data7::g_pData->m_aSprites[client_data7::SPRITE_TEE_FOOT], client_data7::g_pData->m_aSprites[client_data7::SPRITE_TEE_FOOT_OUTLINE], vec2(64.0f / 2.1f, 64.0f / 2.1f));
+	if(Part == protocol7::SKINPART_DECORATION)
+		return QmCreateSkinOutline(Image, client_data7::g_pData->m_aSprites[client_data7::SPRITE_TEE_DECORATION], client_data7::g_pData->m_aSprites[client_data7::SPRITE_TEE_DECORATION_OUTLINE], vec2(64, 64));
+	return nullptr;
+}
+
 void CSkins7::CSkinPart::ApplyTo(CTeeRenderInfo::CSixup &SixupRenderInfo) const
 {
 	SixupRenderInfo.m_aOriginalTextures[m_Type] = m_OriginalTexture;
 	SixupRenderInfo.m_aColorableTextures[m_Type] = m_ColorableTexture;
+	SixupRenderInfo.m_apQmSkinOutlines[m_Type] = m_pQmSkinOutline;
 	if(m_Type == protocol7::SKINPART_BODY)
 	{
 		SixupRenderInfo.m_BloodColor = m_BloodColor;
@@ -230,6 +245,7 @@ bool CSkins7::LoadSkinPart(int PartType, const char *pName, int DirType)
 	Part.m_OriginalTexture = Graphics()->LoadTextureRaw(Info, 0, aFilename);
 	GameClient()->GpuUploadLimiter()->OnUploaded();
 	Part.m_BloodColor = DetermineBloodColorFromInfo(Info);
+	Part.m_pQmSkinOutline = CreateSkinPartOutline(Info, PartType);
 	ConvertToGrayscale(Info);
 	Part.m_ColorableTexture = Graphics()->LoadTextureRawMove(Info, 0, aFilename);
 	GameClient()->GpuUploadLimiter()->OnUploaded();
@@ -300,6 +316,7 @@ void CSkins7::ProcessCompletedJobs()
 			Part.m_OriginalTexture = Graphics()->LoadTextureRaw(Result.m_OriginalImage, 0, Result.m_aName);
 			GameClient()->GpuUploadLimiter()->OnUploaded();
 			Part.m_BloodColor = Result.m_BloodColor;
+			Part.m_pQmSkinOutline = CreateSkinPartOutline(Result.m_OriginalImage, Result.m_PartType);
 			Part.m_ColorableTexture = Graphics()->LoadTextureRawMove(Result.m_GrayscaleImage, 0, Result.m_aName);
 			GameClient()->GpuUploadLimiter()->OnUploaded();
 
@@ -575,6 +592,8 @@ void CSkins7::Refresh(TSkinLoadedCallback &&SkinLoadedCallback)
 		{
 			Graphics()->UnloadTexture(&SkinPart.m_OriginalTexture);
 			Graphics()->UnloadTexture(&SkinPart.m_ColorableTexture);
+			if(SkinPart.m_pQmSkinOutline)
+				SkinPart.m_pQmSkinOutline->Unload(Graphics());
 		}
 		m_avSkinParts[Part].clear();
 

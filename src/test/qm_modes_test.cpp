@@ -9,12 +9,213 @@
 
 #include <generated/protocol.h>
 
+#include <game/client/components/qmclient/map_progress.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/translate/translate_ui_settings.h>
 
 #include <gtest/gtest.h>
 
 #include <string>
+
+namespace
+{
+	QmMapProgress::CMap MakeProgressLine(int Width)
+	{
+		QmMapProgress::CMap Map(Width, 1);
+		for(int Index = 0; Index < Width; ++Index)
+			Map.SetTile(Index, QmMapProgress::MakeTile(Index == 0 ? TILE_START : (Index == Width - 1 ? TILE_FINISH : TILE_AIR)));
+		return Map;
+	}
+
+	QmMapProgress::SEstimate MoveProgressPlayer(QmMapProgress::CPlayer &Player, const QmMapProgress::CMap &Map, int Index, int TeleCheckpoint = 0)
+	{
+		Player.Observe(Map.Tile(Index), Index);
+		// 小地图也分多次推进，以覆盖换段和回传后重建距离场的行为。
+		for(int Step = 0; Step < 128; ++Step)
+			Player.Update(Map, Index, TeleCheckpoint, 128);
+		return Player.Estimate();
+	}
+}
+
+TEST(QmMapProgress, DragThroughFreezeUsesRouteLengthAndCanGoBack)
+{
+	auto Map = MakeProgressLine(11);
+	for(int Index = 4; Index <= 6; ++Index)
+		Map.SetTile(Index, QmMapProgress::MakeTile(TILE_FREEZE));
+	Map.Finalize();
+	QmMapProgress::CPlayer Player;
+	EXPECT_FLOAT_EQ(MoveProgressPlayer(Player, Map, 0).m_Progress, 0.0f);
+	const auto InWater = MoveProgressPlayer(Player, Map, 5);
+	ASSERT_TRUE(InWater.m_Valid);
+	EXPECT_FLOAT_EQ(InWater.m_Progress, 0.5f);
+	EXPECT_FLOAT_EQ(MoveProgressPlayer(Player, Map, 7).m_Progress, 0.7f);
+	EXPECT_FLOAT_EQ(MoveProgressPlayer(Player, Map, 3).m_Progress, 0.3f);
+	EXPECT_FLOAT_EQ(MoveProgressPlayer(Player, Map, 10).m_Progress, 1.0f);
+	EXPECT_FLOAT_EQ(MoveProgressPlayer(Player, Map, 0).m_Progress, 0.0f);
+}
+
+TEST(QmMapProgress, SafeDetourStillWinsButPenaltyDoesNotBecomeLength)
+{
+	QmMapProgress::CMap Map(5, 2);
+	for(int Index = 0; Index < 10; ++Index)
+		Map.SetTile(Index, QmMapProgress::MakeTile(TILE_AIR));
+	Map.SetTile(0, QmMapProgress::MakeTile(TILE_START));
+	Map.SetTile(4, QmMapProgress::MakeTile(TILE_FINISH));
+	Map.SetTile(1, QmMapProgress::MakeTile(TILE_FREEZE));
+	Map.SetTile(2, QmMapProgress::MakeTile(TILE_FREEZE));
+	Map.Finalize();
+	QmMapProgress::CField Field;
+	Field.Start(Map, 0);
+	while(!Field.Complete())
+		Field.Step(Map, 1);
+	EXPECT_EQ(Field.Length(0), 6);
+	EXPECT_EQ(Field.Next(0), 5);
+}
+
+TEST(QmMapProgress, DeepFreezeIsPassableButDeathAndSolidAreNot)
+{
+	for(const int Tile : {TILE_DFREEZE, TILE_LFREEZE, TILE_DEATH, TILE_SOLID, TILE_NOHOOK})
+	{
+		auto Map = MakeProgressLine(5);
+		Map.SetTile(2, QmMapProgress::MakeTile(Tile));
+		Map.Finalize();
+		QmMapProgress::CField Field;
+		Field.Start(Map, 0);
+		while(!Field.Complete())
+			Field.Step(Map, 1);
+		EXPECT_EQ(Field.Length(0), Tile == TILE_DFREEZE || Tile == TILE_LFREEZE ? 4 : -1);
+	}
+}
+
+TEST(QmMapProgress, DirectTeleportLinksRoomsWithoutCountingItsWorldDistance)
+{
+	auto Map = MakeProgressLine(9);
+	Map.SetTile(2, QmMapProgress::MakeTile(TILE_AIR, TILE_AIR, TILE_TELEINEVIL, 17));
+	Map.SetTile(3, QmMapProgress::MakeTile(TILE_SOLID));
+	Map.SetTile(6, QmMapProgress::MakeTile(TILE_AIR, TILE_AIR, TILE_TELEOUT, 17));
+	Map.Finalize();
+	QmMapProgress::CField Field;
+	Field.Start(Map, 0);
+	while(!Field.Complete())
+		Field.Step(Map, 1);
+	EXPECT_EQ(Field.Length(0), 4);
+	EXPECT_EQ(Field.Next(2), 6);
+	EXPECT_EQ(Field.Length(2), Field.Length(6));
+}
+
+TEST(QmMapProgress, CheckpointReturnUsesRecordedNumberAndFallsBackToEarlierExit)
+{
+	auto Map = MakeProgressLine(9);
+	Map.SetTile(1, QmMapProgress::MakeTile(ENTITY_OFFSET + ENTITY_SPAWN));
+	Map.SetTile(2, QmMapProgress::MakeTile(TILE_AIR, TILE_AIR, TILE_TELECHECKINEVIL, 0));
+	Map.SetTile(3, QmMapProgress::MakeTile(TILE_SOLID));
+	Map.SetTile(6, QmMapProgress::MakeTile(TILE_AIR, TILE_AIR, TILE_TELECHECKOUT, 2));
+	Map.Finalize();
+	QmMapProgress::CField Field;
+	Field.Start(Map, 4);
+	while(!Field.Complete())
+		Field.Step(Map, 1);
+	EXPECT_EQ(Field.Next(2), 6);
+	EXPECT_EQ(Field.Length(0), 4);
+	Field.Start(Map, 1);
+	while(!Field.Complete())
+		Field.Step(Map, 1);
+	EXPECT_EQ(Field.Length(0), -1);
+}
+
+TEST(QmMapProgress, CheckpointReturnWithoutExitGoesToSpawn)
+{
+	auto Map = MakeProgressLine(9);
+	Map.SetTile(2, QmMapProgress::MakeTile(TILE_AIR, TILE_AIR, TILE_TELECHECKIN, 0));
+	Map.SetTile(3, QmMapProgress::MakeTile(TILE_SOLID));
+	Map.SetTile(6, QmMapProgress::MakeTile(ENTITY_OFFSET + ENTITY_SPAWN));
+	Map.Finalize();
+	QmMapProgress::CField Field;
+	Field.Start(Map, 0);
+	while(!Field.Complete())
+		Field.Step(Map, 1);
+	EXPECT_EQ(Field.Next(2), 6);
+	EXPECT_EQ(Field.Length(0), 4);
+}
+
+TEST(QmMapProgress, TimeCheckpointsDivideStagesAndBacktrackingDecreasesProgress)
+{
+	auto Map = MakeProgressLine(11);
+	Map.SetTile(2, QmMapProgress::MakeTile(TILE_AIR, TILE_TIME_CHECKPOINT_FIRST));
+	Map.SetTile(8, QmMapProgress::MakeTile(TILE_TIME_CHECKPOINT_FIRST + 1));
+	Map.Finalize();
+	ASSERT_EQ(Map.CheckpointCount(), 2);
+	QmMapProgress::CPlayer Player;
+	MoveProgressPlayer(Player, Map, 0);
+	EXPECT_NEAR(MoveProgressPlayer(Player, Map, 2).m_Progress, 1.0f / 3.0f, 0.001f);
+	EXPECT_NEAR(MoveProgressPlayer(Player, Map, 5).m_Progress, 0.5f, 0.001f);
+	EXPECT_NEAR(MoveProgressPlayer(Player, Map, 8).m_Progress, 2.0f / 3.0f, 0.001f);
+	EXPECT_NEAR(MoveProgressPlayer(Player, Map, 9).m_Progress, 5.0f / 6.0f, 0.001f);
+	MoveProgressPlayer(Player, Map, 8);
+	EXPECT_NEAR(MoveProgressPlayer(Player, Map, 7).m_Progress, 11.0f / 18.0f, 0.001f);
+	EXPECT_NEAR(MoveProgressPlayer(Player, Map, 3).m_Progress, 7.0f / 18.0f, 0.001f);
+	MoveProgressPlayer(Player, Map, 2);
+	EXPECT_NEAR(MoveProgressPlayer(Player, Map, 1).m_Progress, 1.0f / 6.0f, 0.001f);
+}
+
+TEST(QmMapProgress, MissingAndReversedCheckpointOrderFallBackToWholeMap)
+{
+	for(const bool Reversed : {false, true})
+	{
+		auto Map = MakeProgressLine(11);
+		Map.SetTile(2, QmMapProgress::MakeTile(TILE_TIME_CHECKPOINT_FIRST + 1));
+		if(Reversed)
+			Map.SetTile(8, QmMapProgress::MakeTile(TILE_TIME_CHECKPOINT_FIRST));
+		Map.Finalize();
+		QmMapProgress::CPlayer Player;
+		MoveProgressPlayer(Player, Map, 0);
+		const auto Estimate = MoveProgressPlayer(Player, Map, 5);
+		ASSERT_TRUE(Estimate.m_Valid);
+		EXPECT_FLOAT_EQ(Estimate.m_Progress, 0.5f);
+	}
+}
+
+TEST(QmMapProgress, MidRunEnableCanEstimateWithoutHavingSeenStart)
+{
+	auto Map = MakeProgressLine(11);
+	Map.Finalize();
+	QmMapProgress::CPlayer Player;
+	const auto Estimate = MoveProgressPlayer(Player, Map, 6);
+	ASSERT_TRUE(Estimate.m_Valid);
+	EXPECT_FLOAT_EQ(Estimate.m_Progress, 0.6f);
+}
+
+TEST(QmMapProgress, MainAndDummyCheckpointStatesAreIndependent)
+{
+	auto Map = MakeProgressLine(9);
+	Map.SetTile(1, QmMapProgress::MakeTile(ENTITY_OFFSET + ENTITY_SPAWN));
+	Map.SetTile(2, QmMapProgress::MakeTile(TILE_AIR, TILE_AIR, TILE_TELECHECKIN, 0));
+	Map.SetTile(3, QmMapProgress::MakeTile(TILE_SOLID));
+	Map.SetTile(6, QmMapProgress::MakeTile(TILE_AIR, TILE_AIR, TILE_TELECHECKOUT, 2));
+	Map.Finalize();
+	QmMapProgress::CPlayer Main;
+	QmMapProgress::CPlayer Dummy;
+	EXPECT_TRUE(MoveProgressPlayer(Main, Map, 1, 2).m_Valid);
+	EXPECT_FALSE(MoveProgressPlayer(Dummy, Map, 1, 0).m_Valid);
+	EXPECT_FALSE(MoveProgressPlayer(Main, Map, 1, 0).m_Valid);
+	EXPECT_TRUE(MoveProgressPlayer(Dummy, Map, 1, 2).m_Valid);
+}
+
+TEST(QmMapProgress, OneWayRestrictionsAreRespectedAndEmptyMapsStayUnknown)
+{
+	auto Map = MakeProgressLine(5);
+	Map.SetTile(2, QmMapProgress::MakeTile(TILE_AIR, TILE_AIR, 0, 0, CANTMOVE_RIGHT));
+	Map.Finalize();
+	QmMapProgress::CField Field;
+	Field.Start(Map, 0);
+	while(!Field.Complete())
+		Field.Step(Map, 1);
+	EXPECT_EQ(Field.Length(0), -1);
+	QmMapProgress::CMap Empty(1, 1);
+	Empty.Finalize();
+	QmMapProgress::CPlayer Player;
+	EXPECT_FALSE(MoveProgressPlayer(Player, Empty, 0).m_Valid);
+}
 
 static void ExpectColorNear(const ColorRGBA &Color, const ColorRGBA &Expected)
 {
@@ -329,29 +530,37 @@ TEST(QmNameplateHookStrongWeak, ScopeFiltersExpectedPlayers)
 	EXPECT_FALSE(ShouldShowQmHookStrongWeakScope(99, false, true, false));
 }
 
-TEST(QmNameplateNameScope, OwnScopeSelectsCurrentCharacterOrAllLocalCharacters)
+TEST(QmNameplateNameScope, OwnCharactersRespectCurrentAndLocalScopes)
 {
-	// 自身·当前：只有当前操控角色显示自己的昵称（= 旧 cl_nameplates_own 行为）。
-	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_ALL, true, true, true, true, false));
-	// 自身·当前：分身（本机但非当前角色）不显示。
-	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_ALL, true, true, false, true, false));
-	// 自身·本地：主号与分身都显示。
-	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_LOCAL, QM_NAMEPLATE_OTHERS_SCOPE_ALL, true, true, false, true, false));
-	// 总开关关掉自身时，二级范围不能反过来点亮昵称。
-	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_LOCAL, QM_NAMEPLATE_OTHERS_SCOPE_ALL, false, true, false, true, false));
+	// 当前：只有当前操控角色显示自己的昵称（= 旧 cl_nameplates_own 行为）。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_CURRENT, true, true));
+	// 当前：分身（本机但非当前角色）不显示。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_CURRENT, false, true));
+	// 当前 + 本地：主号与分身都显示。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_LOCAL, false, true));
+	// 本地 + 他人：当前操控角色不算在内。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_OTHERS_LOCAL, true, true));
+	// 他人：只看别人，本机角色一律不显示。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_OTHERS, true, true));
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_OTHERS, false, true));
 }
 
-TEST(QmNameplateNameScope, OthersScopeFiltersAllPlayersOrFriendsOnly)
+TEST(QmNameplateNameScope, OtherPlayersRespectOthersAndAllScopes)
 {
-	// 他人·所有：任何非本机玩家都显示（= 旧 cl_nameplates 行为）。
-	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_ALL, true, true, false, false, false));
-	// 他人·好友：非好友隐藏，好友显示。
-	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS, true, true, false, false, false));
-	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS, true, true, false, false, true));
-	// 总开关关掉他人时，好友也不能显示。
-	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS, true, false, false, false, true));
-	// 自身范围与好友过滤互不干扰：别人是否好友不影响自身的昵称。
-	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_OWN_SCOPE_CURRENT, QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS, true, true, true, true, false));
+	// 他人：任何非本机玩家都显示（= 旧 cl_nameplates 行为）。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_OTHERS, false, false));
+	// 本地 + 他人：非本机玩家同样显示。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_OTHERS_LOCAL, false, false));
+	// 全体：三类玩家全显示。
+	EXPECT_TRUE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_ALL, false, false));
+	// 只覆盖本机角色的档位不能显示别人。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_CURRENT, false, false));
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_LOCAL, false, false));
+	// 关：谁都不显示；越界档位按关闭处理。
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_OFF, true, true));
+	EXPECT_FALSE(ShouldShowQmNameplateName(QM_NAMEPLATE_SHOW_SCOPE_OFF, false, false));
+	EXPECT_FALSE(ShouldShowQmNameplateName(99, true, true));
+	EXPECT_FALSE(ShouldShowQmNameplateName(99, false, false));
 }
 
 TEST(QmNameplateTextEffects, PlayingScopeSupportsSelfOthersFriendsAndAll)

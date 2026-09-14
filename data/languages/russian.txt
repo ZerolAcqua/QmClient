@@ -28,9 +28,6 @@
 %d items selected
 == Выбрано %d элементов
 
-%d more cut segments
-== Ещё %d отрезков обрезки
-
 %d of %d server
 == %d из %d сервера
 
@@ -60,6 +57,9 @@
 
 %d users
 == %d пользователей
+
+%d. %s | main: %s | dummy: %s
+== %d. %s | основной: %s | дамми: %s
 
 %d/%d KiB (%.1f KiB/s)
 == %d/%d КиБ (%.1f КиБ/с)
@@ -259,6 +259,9 @@ A demo with this name already exists
 
 A folder with this name already exists
 == Папка с таким именем уже существует
+
+A save is already being restored. Please wait.
+== Сохранение уже восстанавливается. Подождите.
 
 A screenshot with this name already exists
 == Скриншот с таким именем уже существует
@@ -691,9 +694,6 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == Анимировать сортировку и перестроение раскладки карточек настроек
-
-Animated styles override the fallback title color
-== Цвета анимированного стиля имеют приоритет над базовым цветом титула
 
 Animated title style id
 == Идентификатор анимированного стиля титула
@@ -1427,8 +1427,14 @@ Bit flags for disabling settings tabs
 Black
 == Чёрный
 
+Black Flash
+== Чёрная вспышка
+
 Blend mode
 == Режим смешивания
+
+Blend strength
+== Сила смешивания
 
 Blink the active local tee
 == Заставить активного локального персонажа мигнуть
@@ -1897,6 +1903,12 @@ Clearable text...
 
 Clears the voting options
 == Очищает варианты голосования
+
+Click a part on the right to edit its color, blend mode and strength.
+== Нажмите на часть справа, чтобы изменить цвет, режим и силу смешивания.
+
+Click again to find the next location.
+== Нажмите ещё раз, чтобы найти следующее место.
 
 Click to add this community to favorites
 == Нажмите, чтобы добавить это сообщество в избранное
@@ -2483,9 +2495,6 @@ Current: Score
 Current: Time
 == Текущее: Время
 
-Cursed Flame
-== Проклятое пламя
-
 Custom
 == Пользовательский
 
@@ -2555,6 +2564,9 @@ Customize translate button and menu colors
 Customize vote display and interaction
 == Customize vote display and interaction
 
+Cut end: %s
+== Конец: %s
+
 Cut interval
 == Интервал обрезки
 
@@ -2563,6 +2575,9 @@ Cut length
 
 Cut segments
 == Отрезки обрезки
+
+Cut start: %s
+== Начало: %s
 
 Cute:
 == Мило:
@@ -2702,6 +2717,9 @@ Debug SQL.
 Debug tile layer clipping.
 == Отладка обрезки тайловых слоёв.
 
+Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)
+== Адрес выделенного WebSocket (пусто — используется wss://qmclient.icu/ws)
+
 Deep freeze color
 == Цвет глубокой заморозки
 
@@ -2825,8 +2843,20 @@ Delete this preset
 Demo
 == Демо
 
+Demo display
+== Отображение демо
+
 Demo effects
 == Эффекты демо
+
+Demo hook strength (0=Off 1=Icon 2=Icon and number)
+== Сила крюка в демо (0=выкл. 1=значок 2=значок и число)
+
+Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)
+== Сила крюка в демо для (0=себя 1=других 2=сильных 3=слабых 4=всех)
+
+Demo key presses (0=Off 1=Others 2=All 3=Own)
+== Клавиши в демо (0=выкл. 1=другие 2=все 3=свои)
 
 Demo marker added
 == Маркер демки добавлен
@@ -3482,9 +3512,6 @@ Enable chat with all/team mode
 Enable cheats for your current team's run, but you can't earn a rank
 == Включить читы для текущего забега вашей команды, но вы не сможете получить ранг
 
-Enable client stutter diagnostics at startup
-== Включить диагностику рывков клиента при запуске
-
 Enable colored console output
 == Включить цветной вывод консоли
 
@@ -3610,9 +3637,6 @@ Enable lyrics
 
 Enable macOS graphics diagnostics and Instruments signposts
 == Включить графическую диагностику macOS и метки Instruments
-
-Enable main thread and render stage performance debug logging
-== Включить отладочный лог производительности главного потока и рендеринга
 
 Enable map compatibility mode using the specified bug (example: grenade-doubleexplosion@ddnet.tw)
 == Включить режим совместимости карты с указанным багом (пример: grenade-doubleexplosion@ddnet.tw)
@@ -3761,6 +3785,9 @@ Enable Tee trail
 Enable tee trails
 == Включить следы ти
 
+Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
+== Включить выделенный сервис WebSocket QmClient (без отката к опросу по HTTP)
+
 Enable thinking mode (slower)
 == Включить режим размышления (медленнее)
 
@@ -3835,6 +3862,9 @@ Endpoint (optional)
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == Войдите в режим /practice или перезапуститесь, чтобы избежать убийства всей команды через 60 секунд.
+
+Enter a CP number from 1 to 255.
+== Введите номер CP от 1 до 255.
 
 Enter Password
 == Введите пароль
@@ -3950,6 +3980,9 @@ Execute the specified file
 Existing Player
 == Существующий игрок
 
+Exo
+== Экзоэнергия
+
 Export
 == Экспорт
 
@@ -4055,9 +4088,6 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == Запасная простая сила шумоподавления
 
-Fallback title color
-== Базовый цвет титула
-
 Fast input
 == Быстрый ввод
 
@@ -4160,8 +4190,14 @@ Filter out spectators from player count
 Filtered word console color
 == Цвет заблокированных слов в консоли
 
+Find / Next
+== Найти / Далее
+
 Find all ban records for the specified IP address
 == Найти все записи банов для указанного IP-адреса
+
+Find CP
+== Найти CP
 
 Find QmClient communities and project links
 == Find QmClient communities and project links
@@ -4180,6 +4216,9 @@ Finish name
 
 Finish Name:
 == Имя на финише:
+
+Finish or reset the current race before restoring a save.
+== Завершите или сбросьте текущую гонку перед восстановлением.
 
 Finished
 == Завершённые
@@ -4585,9 +4624,6 @@ Go forward one tick
 
 Go forward the specified duration
 == Вперёд на указанную длительность
-
-Golden Grace
-== Золотая благодать
 
 Gores
 == Горы
@@ -5066,6 +5102,9 @@ I am away from the game window
 I muted you
 == Я тебя замьютил
 
+Icon and number
+== Значок и число
+
 Icons
 == Значки
 
@@ -5179,6 +5218,9 @@ Indicator size
 
 Indicator transparency
 == Прозрачность индикатора
+
+Inferno
+== Адское пламя
 
 Infinite hook for super players on/off.
 == Бесконечный крюк для супер-игроков вкл/выкл.
@@ -5314,6 +5356,9 @@ Invalid ID
 
 Invalid option
 == Неверная опция
+
+Invalid save number. Use a number from the save list.
+== Неверный номер сохранения. Выберите номер из списка.
 
 Invalid spectator id used
 == Использован неверный ID зрителя
@@ -5621,6 +5666,9 @@ Left-click a Frankenstein part to tint it. Drag parts to replace them. Right-cli
 Left/right channel width
 == Ширина левого/правого канала
 
+Legacy option: connections that skip TLS verification are rejected
+== Устаревшая опция: подключения без проверки TLS отклоняются
+
 Length
 == Длительность
 
@@ -5855,6 +5903,9 @@ Locked
 Log output filename
 == Имя файла вывода лога
 
+Log realtime WebSocket channel events
+== Записывать события канала WebSocket реального времени
+
 Log the network
 == Логировать сеть
 
@@ -6011,14 +6062,8 @@ Margin when notification is docked
 Mark demo
 == Отметить демку
 
-Mark the beginning of a cut (right click to reset)
-== Отметить начало обрезки (правый клик — сбросить)
-
 Mark the beginning of a demo cut
 == Отметить начало обрезки демо
-
-Mark the end of a cut (right click to reset)
-== Отметить конец обрезки (правый клик — сбросить)
 
 Mark the end of a demo cut
 == Отметить конец обрезки демо
@@ -6514,6 +6559,9 @@ Name: %s
 
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 == Область значка силы крючка на табличке (0=Свой 1=Другие 2=Сильный крючок 3=Слабый крючок 4=Все игроки)
+
+Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)
+== Область ников на табличках (0=Нет 1=Текущий персонаж 2=Свои персонажи 3=Другие игроки 4=Другие игроки и свои неактивные персонажи 5=Все)
 
 Nameplate position X
 == Показывать координату X на табличке с именем
@@ -7151,9 +7199,6 @@ Other
 Other players' hook line width
 == Ширина линии крюка других игроков
 
-Other players' nameplate scope (0=All players 1=Friends only)
-== Область чужих табличек (0=Все игроки 1=Только друзья)
-
 Others
 == Другие
 
@@ -7234,9 +7279,6 @@ Overwrite clan even if empty
 
 Own hook line width
 == Ширина собственной линии крюка
-
-Own nameplate scope (0=Current character 1=All local characters)
-== Область своей таблички (0=Текущий персонаж 1=Все локальные персонажи)
 
 p = Ping latency
 == p = Пинг
@@ -7339,9 +7381,6 @@ Penalty in seconds for saving or swapping positions
 
 Per-name volume (name=percent)
 == Индивидуальная громкость по имени (name=percent)
-
-Performance debug log threshold (ms)
-== Порог журнала отладки производительности (мс)
 
 Permanent access; up to 4 online IP addresses
 == Навсегда; до 4 IP одновременно
@@ -7754,6 +7793,9 @@ Preview built with %d skipped slot(s).
 Preview button visibility while the editor is active.
 == Видимость кнопки при активном редакторе.
 
+Preview cut (P)
+== Просмотр отрезка (P)
+
 Preview dummy nameplate
 == Предпросмотр таблички дамми
 
@@ -8080,6 +8122,18 @@ Ratio threshold for local target language detection
 
 Really? Not even a little?
 == Серьёзно? Даже чуть-чуть?
+
+Realtime channel
+== Канал реального времени
+
+Realtime channel heartbeat interval (seconds, 0 uses default)
+== Интервал heartbeat канала реального времени (секунды, 0 — значение по умолчанию)
+
+Realtime channel reconnect backoff base (ms)
+== Базовый интервал backoff переподключения канала реального времени (мс)
+
+Realtime channel reconnect backoff cap (ms)
+== Предел backoff переподключения канала реального времени (мс)
 
 Reason
 == Причина
@@ -8588,8 +8642,14 @@ Restart the client
 Restarting. Please wait…
 == Перезапуск. Пожалуйста, подождите…
 
+Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
+== Восстановить сохранение для двоих? /qm Yes — последнее, /qm Yes номер — другое, /qm No — отмена.
+
 Restore old single-segment hook collision line behavior
 == Восстановить старое поведение линии столкновения крюка с одним сегментом
+
+Restoring save %d: main '%s', dummy '%s'.
+== Восстановление сохранения %d: основной '%s', дамми '%s'.
 
 Retrying…
 == Повторная попытка…
@@ -8780,6 +8840,12 @@ Save ghost
 Save last %d min
 == Сохранить последние %d мин
 
+Save loaded; local record removed.
+== Сохранение загружено, локальная запись удалена.
+
+Save loaded; the local record could not be removed.
+== Сохранение загружено, но удалить локальную запись не удалось.
+
 Save player names in replay
 == Сохранять имена игроков в записи
 
@@ -8788,6 +8854,15 @@ Save power by lowering update rate (higher input latency)
 
 Save replay of best time per game
 == Сохранять запись лучшего времени за игру
+
+Save restore dismissed.
+== Восстановление сохранения отменено.
+
+Save restore stopped without confirming success. The local record was kept.
+== Успешная загрузка не подтверждена, восстановление остановлено. Локальная запись сохранена.
+
+Save restore stopped: connection, names or team were not ready. The local record was kept.
+== Восстановление остановлено: соединение, имена или команда не готовы. Локальная запись сохранена.
 
 Save settings file on exit
 == Сохранять файл настроек при выходе
@@ -8933,6 +9008,9 @@ Search skins and manage the skin queue
 Searching
 == Поиск
 
+Sec-WebSocket-Protocol sent during the realtime handshake
+== Sec-WebSocket-Protocol, отправляемый при рукопожатии реального времени
+
 Secondary
 == Вторичная
 
@@ -8980,6 +9058,9 @@ Selected candidate %d/%d under cursor.
 
 Selected item color
 == Цвет выбранного элемента
+
+Selected part: %d
+== Выбранная часть: %d
 
 Selected server
 == Выбранный сервер
@@ -9158,6 +9239,12 @@ Set color
 Set current demo speed
 == Установить скорость текущего демо
 
+Set cut end at current position (O, right click to reset)
+== Конец отрезка в текущей позиции (O, ПКМ для сброса)
+
+Set cut start at current position (I, right click to reset)
+== Начало отрезка в текущей позиции (I, ПКМ для сброса)
+
 Set ddrace team for a player
 == Установить команду DDRace для игрока
 
@@ -9325,6 +9412,9 @@ Show chat (2 always show large chat area)
 
 Show chat bubbles above players
 == Показывать облака чата над игроками
+
+Show chat in demo preview and video
+== Показывать чат в просмотре демо и видео
 
 Show chat messages above players
 == Показывать сообщения чата над игроками
@@ -9632,6 +9722,9 @@ Show in-game HUD (spectator HUD)
 Show in-game HUD (timer)
 == Показывать внутриигровой HUD (таймер)
 
+Show in-game HUD in demo preview and video
+== Показывать игровой HUD в просмотре демо и видео
+
 Show in-game HUD when rendering video
 == Показывать внутриигровой HUD при рендеринге видео
 
@@ -9673,6 +9766,9 @@ Show katan on frozen players
 
 Show katana on frozen players (restores old behavior)
 == Показывать катану на замороженных игроках (восстанавливает старое поведение)
+
+Show key presses
+== Нажатия клавиш
 
 Show key presses (1 = others, 2 = all, 3 = own only)
 == Показывать нажатия клавиш (1 = других, 2 = всех, 3 = только свои)
@@ -10157,6 +10253,9 @@ Simple noise reduction strength
 Single color
 == Один цвет
 
+Single color and Rainbow override the color of animated styles; the style keeps its motion
+== Однотонный и радужный режимы перекрывают цвета анимированного стиля; движение стиля сохраняется
+
 Size
 == Размер
 
@@ -10195,6 +10294,21 @@ Skin list sort mode (0=Name, 1=Release date)
 
 Skin options
 == Настройки скина
+
+Skin outline color
+== Цвет контура скина
+
+Skin outline for other players
+== Контур скина других игроков
+
+Skin outline for self and dummy
+== Контур скина для себя и дамми
+
+Skin outline opacity
+== Непрозрачность контура скина
+
+Skin outline width
+== Толщина контура скина
 
 Skin prefix
 == Префикс скина
@@ -10511,7 +10625,7 @@ Sphere
 Spin pop
 == Вращающееся появление
 
-Spirit Light
+Spirit
 == Свет духа
 
 Sponsor code
@@ -10630,6 +10744,9 @@ Stop key input on switch (0=off, 1=dummy, 2=player)
 
 Stop practice
 == Остановить практику
+
+Stop preview (P)
+== Остановить просмотр (P)
 
 Stop record
 == Остановить запись
@@ -10988,8 +11105,8 @@ Tee trail color
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Режим цвета следа Tee (1=Сплошной, 2=Текущий цвет Tee, 3=Радуга, 4=Скорость Tee, 5=Случайный)
 
-Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
-== Стиль следа Tee (0=Оригинал, 1=Проклятое пламя, 2=Лиловая молния, 3=Свет духа, 4=Тень пустоты, 5=Золотая благодать)
+Tee trail style (0=Original, 1=Black Flash, 2=Exo, 3=Spirit, 4=Void, 5=Inferno)
+== Стиль следа Tee  (0=Оригинал, 1=Чёрная вспышка, 2=Экзоэнергия, 3=Свет духа, 4=Пустота, 5=Адское пламя)
 
 Tee Trails
 == Следы ти
@@ -11165,6 +11282,9 @@ There are unsaved changes in the touch controls editor. Saving first is recommen
 There is no checkpoint teleporter with that index on the map.
 == На карте нет телепорта к чекпоинту с таким индексом.
 
+There is no pending save restore prompt.
+== Сейчас нет запроса на восстановление сохранения.
+
 There is no teleporter with that index on the map.
 == На карте нет телепорта с таким индексом.
 
@@ -11195,6 +11315,9 @@ Thin
 Thinking mode requires a reasoning model
 == Для режима размышления требуется модель рассуждения
 
+This connection cannot change names while connected. Reconnect with the saved names first.
+== Это соединение не поддерживает смену имени во время игры. Переподключитесь с сохранёнными именами.
+
 This ID is not connected
 == Этот ID не подключён
 
@@ -11203,6 +11326,9 @@ This is the master switch for all interface animation categories
 
 This name cannot be used for files and folders
 == Это имя нельзя использовать для файлов и папок
+
+This save is no longer in the local save file.
+== Этого сохранения больше нет в локальном файле.
 
 This server has an initial chat delay, you will be able to talk in %s seconds.
 == На этом сервере есть начальная задержка чата, вы сможете говорить через %s секунд.
@@ -11335,6 +11461,9 @@ Title bob angular speed in 1/100 rad/s
 
 Title bob wavelength in pixels
 == Длина волны покачивания титула в пикселях
+
+Title color
+== Цвет титула
 
 Title color (single color)
 == Цвет титула (однотонный)
@@ -11900,6 +12029,9 @@ URL for downloading skins
 Usage: %s %s
 == Использование: %s %s
 
+Use /qm Yes [number] to restore a save, or /qm No to dismiss.
+== Введите /qm Yes [номер] для восстановления или /qm No для отмены.
+
 Use 12 hour clock
 == Использовать 12-часовой формат
 
@@ -12107,9 +12239,6 @@ View the developers and contributors
 View the people supporting QmClient development
 == View the people supporting QmClient development
 
-Violet Lightning
-== Лиловая молния
-
 Virtual joystick which always uses fire.
 == Виртуальный джойстик, который всегда использует огонь.
 
@@ -12218,8 +12347,8 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == Белый список голосового чата (через запятую)
 
-Void Shadow
-== Тень пустоты
+Void
+== Пустота
 
 Volume
 == Громкость
@@ -12559,9 +12688,6 @@ Word filter action: 0=replace matching words, 1=hide entire message
 
 Write local console contents to a text file
 == Записать содержимое локальной консоли в текстовый файл
-
-Write performance debug logs to dedicated file
-== Записывать отладочные логи производительности в отдельный файл
 
 Write remote console contents to a text file
 == Записать содержимое удалённой консоли в текстовый файл
@@ -12927,6 +13053,46 @@ Zoom to current mouse target
 == ⚠️ API Tencent Cloud не настроен
 
 [Assets editor blend mode]
+Color
+== Цветность
+
+[Assets editor blend mode]
+Color Burn
+== Затемнение основы
+
+[Assets editor blend mode]
+Color Dodge
+== Осветление основы
+
+[Assets editor blend mode]
+Darken
+== Затемнение
+
+[Assets editor blend mode]
+Difference
+== Разница
+
+[Assets editor blend mode]
+Exclusion
+== Исключение
+
+[Assets editor blend mode]
+Hard Light
+== Жесткий свет
+
+[Assets editor blend mode]
+Hue
+== Цветовой тон
+
+[Assets editor blend mode]
+Lighten
+== Замена светлым
+
+[Assets editor blend mode]
+Luminosity
+== Яркость
+
+[Assets editor blend mode]
 Multiply
 == Умножение
 
@@ -12939,8 +13105,16 @@ Overlay
 == Перекрытие
 
 [Assets editor blend mode]
+Saturation
+== Насыщенность
+
+[Assets editor blend mode]
 Screen
 == Экран
+
+[Assets editor blend mode]
+Soft Light
+== Мягкий свет
 
 [Auto camera]
 Active
@@ -13163,32 +13337,24 @@ All
 == Все
 
 [Show name plates]
+Current
+== Текущий
+
+[Show name plates]
+Current + Local
+== Текущий + локальные
+
+[Show name plates]
+Local + Others
+== Локальные + другие
+
+[Show name plates]
 None
 == Нет
 
 [Show name plates]
 Others
 == Другие
-
-[Show name plates]
-Own
-== Свой
-
-[Show name plates scope]
-All
-== Все
-
-[Show name plates scope]
-Current
-== Текущий
-
-[Show name plates scope]
-Friends
-== Друзья
-
-[Show name plates scope]
-Local
-== Локальный
 
 [Show players' key presses]
 All

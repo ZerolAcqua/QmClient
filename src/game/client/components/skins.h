@@ -625,6 +625,17 @@ public:
 	const char *SkinPrefix() const;
 
 	static bool IsSpecialSkin(const char *pName);
+
+	/**
+	 * 旧 Tee 渲染信息只有在它引用的 6.x 皮肤贴图仍然驻留时才能继续复用。
+	 * 皮肤贴图被资源预算卸载（或目录扫描重建）后，句柄依旧 IsValid()，但纹理已经释放；
+	 * 继续复用会把这些句柄画到屏幕上，表现为一只没有贴图的纯白块 Tee。
+	 */
+	static bool CanReusePreviousSixSkin(bool SixFlagSet, bool SkinNameValid, bool SkinResident)
+	{
+		return !SixFlagSet || !SkinNameValid || SkinResident;
+	}
+
 	static int ParseOfficialSkinReleaseDateKey(const char *pDate)
 	{
 		if(pDate == nullptr)
@@ -856,6 +867,8 @@ private:
 	static int SkinScan(const char *pName, int IsDir, int StorageType, void *pUser);
 
 	void UpdateUnloadSkins(CSkinLoadingStats &Stats);
+	void UnloadLoadedSkinTextures(CSkinContainer *pSkinContainer);
+	void QueueSkinTexturesUnloaded(const char *pSkinName);
 	bool ReclaimBackgroundSkinForPriorityRequest(const char *pRequesterName, int CountFuseLimit);
 	void UpdateStartLoading(CSkinLoadingStats &Stats);
 	void UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseconds StartTime, std::chrono::nanoseconds MaxTime);
@@ -907,6 +920,11 @@ private:
 	 * LOADING，因此必须在解析彻底失败后重新通知一次，回退皮肤才会生效。
 	 */
 	std::vector<std::string> m_vSkinsUnresolvedThisFrame;
+	/**
+	 * 本帧内 6.x 贴图被卸载的皮肤名。旧句柄在渲染信息里依旧 IsValid()，不重新通知一次，
+	 * 引用它的玩家、聊天头像与击杀提示会继续绑定已释放的纹理，画出没有贴图的白块。
+	 */
+	std::vector<std::string> m_vSkinsTexturesUnloadedThisFrame;
 	/**
 	 * Sorted from most recently to least recently used. Must be kept synchronized with the skin containers.
 	 * Contains prioritized skins in pending/loading/loaded states so visible items can be started and finished first.

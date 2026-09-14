@@ -14,6 +14,7 @@
 #include <engine/shared/config.h>
 #include <engine/textrender.h>
 
+#include <game/client/components/menus.h>
 #include <game/client/qm_icon_manager.h>
 #include <game/client/ui.h>
 
@@ -122,7 +123,10 @@ SSettingsCardFrame SettingsCard(const IUiContext &Ctx, const SSettingsCardFrame 
 		SLabelProperties TitleProps;
 		TitleProps.m_MaxWidth = DrawFrame.m_TitleRect.w;
 		TitleProps.m_EllipsisAtEnd = true;
-		Ctx.m_pUi->DoLabel(&DrawFrame.m_TitleRect, Spec.m_pTitle != nullptr ? Spec.m_pTitle : "", ui_token::font::TITLE * UiScale, TEXTALIGN_ML, TitleProps);
+		if(Ctx.m_pMenus != nullptr)
+			Ctx.m_pMenus->DoSettingsCardLabel(Spec.m_pStableId, false, &DrawFrame.m_TitleRect, Spec.m_pTitle != nullptr ? Spec.m_pTitle : "", ui_token::font::TITLE * UiScale, TitleProps);
+		else
+			Ctx.m_pUi->DoLabel(&DrawFrame.m_TitleRect, Spec.m_pTitle != nullptr ? Spec.m_pTitle : "", ui_token::font::TITLE * UiScale, TEXTALIGN_ML, TitleProps);
 		const char *pSubtitle = Spec.m_pSubtitle;
 		if(pSubtitle != nullptr && SettingsCardSubtitleVisible(DrawState.m_Hovered, DrawState.m_SubtitleVisibleDuringMotion, DrawState.m_Focused))
 		{
@@ -133,7 +137,10 @@ SSettingsCardFrame SettingsCard(const IUiContext &Ctx, const SSettingsCardFrame 
 			SubtitleProps.m_MaxWidth = DrawFrame.m_SubtitleRect.w;
 			SubtitleProps.m_EllipsisAtEnd = true;
 			const float SubtitleSize = ResolveSettingsSmallFontSize(UiScale);
-			Ctx.m_pUi->DoLabel(&DrawFrame.m_SubtitleRect, pSubtitle, SubtitleSize, TEXTALIGN_ML, SubtitleProps);
+			if(Ctx.m_pMenus != nullptr)
+				Ctx.m_pMenus->DoSettingsCardLabel(Spec.m_pStableId, true, &DrawFrame.m_SubtitleRect, pSubtitle, SubtitleSize, SubtitleProps);
+			else
+				Ctx.m_pUi->DoLabel(&DrawFrame.m_SubtitleRect, pSubtitle, SubtitleSize, TEXTALIGN_ML, SubtitleProps);
 		}
 		// 标题和副标题只影响本卡片，不能把调用方的文本状态写死为默认白色。
 		Ctx.m_pTextRender->SetRenderFlags(PreviousRenderFlags);

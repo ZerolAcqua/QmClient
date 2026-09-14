@@ -191,7 +191,7 @@ TEST(QmIconAtlas, MsdfSelectionAndReloadPolicyKeepsAlphaFallbackUsable)
 	EXPECT_NE(Header.find("QmIconMsdfRunBucket"), std::string::npos);
 	EXPECT_NE(GameClient.find("m_QmIconManager.RefreshForCurrentDpi();"), std::string::npos);
 	EXPECT_NE(GameClient.find("LogQmIconDiagnostics(m_QmIconManager.TakeDiagnostics(), Client());"), std::string::npos);
-	EXPECT_NE(GameClient.find("event=icon_frame"), std::string::npos);
+	EXPECT_NE(GameClient.find("event=icon_summary sample_frames="), std::string::npos);
 	EXPECT_NE(GameClient.find("m_QmIconManager.Shutdown();"), std::string::npos);
 }
 
@@ -655,4 +655,32 @@ TEST(QmVulkanRenderTargetDestroy, GuardsPausedRenderingAndActiveRenderPass)
 	const size_t NextFn = Source.find("[[nodiscard]] bool Cmd_TextTextures_Create", BlurPassFn);
 	ASSERT_NE(NextFn, std::string::npos);
 	EXPECT_NE(Source.substr(BlurPassFn, NextFn - BlurPassFn).find("if(m_RenderingPaused)"), std::string::npos);
+}
+
+TEST(QmIconAtlas, DiagnosticWindowKeepsTotalsPeaksAndResourceEvents)
+{
+	SQmIconDiagnosticsWindow Window;
+	SQmIconDiagnostics Frame;
+	Frame.m_AlphaIconDraws = 2;
+	Frame.m_MsdfIconDraws = 5;
+	Frame.m_MaxMsdfManagerCallRun = 3;
+	Frame.m_MsdfManagerCallRunBuckets[2] = 1;
+	for(int i = 0; i < 144; ++i)
+		EXPECT_FALSE(Window.Add(Frame));
+	EXPECT_EQ(Window.m_Frames, 144U);
+	EXPECT_EQ(Window.m_Total.m_AlphaIconDraws, 288U);
+	EXPECT_EQ(Window.m_Total.m_MsdfIconDraws, 720U);
+	EXPECT_EQ(Window.m_Total.m_MsdfManagerCallRunBuckets[2], 144U);
+	EXPECT_EQ(Window.m_Total.m_MaxMsdfManagerCallRun, 3U);
+	EXPECT_EQ(Window.m_MaxMsdfDraws, 5U);
+	Frame.m_MsdfIconDraws = 17;
+	Frame.m_MaxMsdfManagerCallRun = 9;
+	Frame.m_TextureLoadFailures = 1;
+	EXPECT_TRUE(Window.Add(Frame));
+	EXPECT_EQ(Window.m_Total.m_TextureLoadFailures, 1U);
+	EXPECT_EQ(Window.m_MaxMsdfDraws, 17U);
+	EXPECT_EQ(Window.m_Total.m_MaxMsdfManagerCallRun, 9U);
+	Window = {};
+	EXPECT_EQ(Window.m_Frames, 0U);
+	EXPECT_EQ(Window.m_Total.m_MsdfIconDraws, 0U);
 }

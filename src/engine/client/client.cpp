@@ -3822,7 +3822,7 @@ void CClient::UpdateDemoIntraTimers()
 void CClient::Update()
 {
 	// Qm 性能诊断：把 client_update 拆成子阶段计时，定位卡顿到底花在哪个环节。
-	// 只有开启 qm_perf_debug / qm_perf_logfile / qm_perf_stutter_diagnostics 时才计时，
+	// 只有开启 qm_perf_debug 时才计时，
 	// 且仍走 QmPerfLogStage 的阈值门控（正常帧不产生任何日志行）。
 	const bool PerfEnabled = QmPerfEnabled();
 	std::optional<CPerfTimer> PumpNetworkTimer;
@@ -4405,7 +4405,12 @@ void CClient::Run()
 	while(true)
 	{
 		const bool PerfEnabled = QmPerfEnabled();
-		UpdateQmPerfFileLogger(); // 游戏内开关立即开/关性能日志文件（状态无变化时仅几次内存读）
+		UpdateQmPerfFileLogger(); // 先完成旧会话收尾，再关闭日志文件。
+		if(PerfEnabled && m_QmPerfFileLoggerActive && time_get() - m_QmPerfLastConfigCheck >= time_freq())
+		{
+			m_QmPerfConfigSnapshot.Update(this);
+			m_QmPerfLastConfigCheck = time_get();
+		}
 		std::optional<CPerfTimer> LoopTimer;
 		if(PerfEnabled)
 			LoopTimer.emplace();
@@ -4635,6 +4640,15 @@ void CClient::Run()
 				}
 				else
 					m_pGraphics->Swap();
+				if(PerfEnabled && QmPerfEnabled() && m_QmPerfFileLoggerActive)
+				{
+					const int64_t FrameEnd = time_get();
+					const double FrameMs = m_QmPerfLastFrameEnd != 0 ? (FrameEnd - m_QmPerfLastFrameEnd) * 1000.0 / time_freq() : 0.0;
+					m_QmPerfLastFrameEnd = FrameEnd;
+					GameClient()->OnQmPerfFrame(FrameMs);
+					if(m_QmPerfFrameBatch.Record(PerfFrame(), FrameMs))
+						QmPerfLogFields("perf/frame", m_QmPerfFrameBatch.TakeFields(), this);
+				}
 			}
 			else if(!IsRenderActive)
 			{
@@ -4742,6 +4756,8 @@ void CClient::Run()
 	StopHangWatchdog();
 
 	GameClient()->RenderShutdownMessage();
+	if(m_QmPerfFileLoggerActive)
+		FinishQmPerfSession(true);
 	GameClient()->OnShutdown();
 	delete m_pEditor;
 
@@ -6778,7 +6794,7 @@ int main(int argc, const char **argv)
 	}
 
 	// 性能日志文件：CFutureLogger 只能 Set 一次，启动时固定到可切换包装；
-	// 游戏内 qm_perf_debug / qm_perf_logfile / qm_perf_stutter_diagnostics 任一
+	// 游戏内 qm_perf_debug 的
 	// 变化由 CClient::UpdateQmPerfFileLogger 按帧检测，立即打开/关闭文件。
 	std::shared_ptr<CQmPerfFileSwitchLogger> pQmPerfFileSwitchLogger = std::make_shared<CQmPerfFileSwitchLogger>();
 	pFuturePerfFileLogger->Set(pQmPerfFileSwitchLogger);
@@ -7325,14 +7341,15 @@ void CClient::SetQmPerfFileSwitch(std::shared_ptr<CQmPerfFileSwitchLogger> pSwit
 	m_pQmPerfFileSwitch = static_cast<CQmPerfFileSwitchLogger *>(m_pQmPerfFileSwitchLogger.get());
 }
 
-// 按配置开/关性能日志文件：任一性能开关开启即打开专用文件并立即落盘，
-// 全部关闭则关闭文件。启动时调用一次建立初始状态，主循环按帧调用处理游戏内切换。
+// 按总开关创建独立诊断会话，关闭前补齐配置、帧批次和卡顿摘要。
+// 启动时调用一次建立初始状态，主循环按帧调用处理游戏内切换。
 void CClient::UpdateQmPerfFileLogger()
 {
-	const bool Wanted = g_Config.m_QmPerfLogfile != 0 || g_Config.m_QmPerfDebug != 0 || g_Config.m_QmPerfStutterDiagnostics != 0;
-	if(Wanted == m_QmPerfFileLoggerActive || m_pQmPerfFileSwitch == nullptr)
+	const bool Wanted = QmPerfEnabled();
+	if(Wanted == m_QmPerfFileLoggerWanted || m_pQmPerfFileSwitch == nullptr)
 		return;
-	m_QmPerfFileLoggerActive = Wanted;
+	// 打开失败后等待下一次开关变化再尝试，不把失败标记为正在采集。
+	m_QmPerfFileLoggerWanted = Wanted;
 
 	if(Wanted)
 	{
@@ -7369,7 +7386,14 @@ void CClient::UpdateQmPerfFileLogger()
 		}
 		if(PerfLogfile)
 		{
+			m_QmPerfFileLoggerActive = true;
+			QmPerfBeginSession();
+			m_QmPerfLastFrameEnd = 0;
+			m_QmPerfFrameBatch = CQmPerfFrameBatch();
 			m_pQmPerfFileSwitch->Set(log_logger_prefix_file(PerfLogfile, "perf/"));
+			QmPerfLogFields("perf/session", "\"event\":\"session_start\",\"schema\":2,\"sampling\":\"automatic\",\"frame_samples\":\"all\",\"target_fps\":300,\"version\":" + QmPerfJsonString(CLIENT_RELEASE_VERSION), this);
+			m_QmPerfConfigSnapshot.Start(ConfigManager(), this);
+			m_QmPerfLastConfigCheck = time_get();
 			log_info("client", "writing performance log to '%s'", aPerfLogCompletePath);
 		}
 		else
@@ -7380,7 +7404,21 @@ void CClient::UpdateQmPerfFileLogger()
 	}
 	else
 	{
-		m_pQmPerfFileSwitch->Set(log_logger_noop());
+		if(m_QmPerfFileLoggerActive)
+			FinishQmPerfSession(false);
 		log_info("client", "stopped writing performance log");
 	}
+}
+
+void CClient::FinishQmPerfSession(bool Shutdown)
+{
+	GameClient()->OnQmPerfStop(Shutdown);
+	if(m_QmPerfFrameBatch.Count() != 0)
+		QmPerfLogFields("perf/frame", m_QmPerfFrameBatch.TakeFields(), this);
+	m_QmPerfConfigSnapshot.Update(this);
+	QmPerfFlushDropped(this);
+	QmPerfLogFields("perf/session", std::string("\"event\":\"session_end\",\"reason\":") + QmPerfJsonString(Shutdown ? "shutdown" : "disabled"), this);
+	m_pQmPerfFileSwitch->Set(log_logger_noop());
+	m_QmPerfFileLoggerActive = false;
+	m_QmPerfLastFrameEnd = 0;
 }

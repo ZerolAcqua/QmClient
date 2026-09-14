@@ -6,6 +6,10 @@
 #include <engine/graphics.h>
 #include <engine/shared/protocol.h>
 
+#include <memory>
+
+class CQmSkinOutline;
+
 // do this better and nicer
 class CSkin
 {
@@ -20,6 +24,9 @@ public:
 
 		IGraphics::CTextureHandle m_Feet;
 		IGraphics::CTextureHandle m_FeetOutline;
+
+		std::shared_ptr<CQmSkinOutline> m_pBodyOutline;
+		std::shared_ptr<CQmSkinOutline> m_pFeetOutline;
 
 		IGraphics::CTextureHandle m_Hands;
 		IGraphics::CTextureHandle m_HandsOutline;

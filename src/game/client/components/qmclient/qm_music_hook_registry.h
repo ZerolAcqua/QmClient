@@ -4,6 +4,7 @@
 #include <engine/shared/config.h>
 
 #include <cstddef>
+#include <cstdint>
 
 // 音乐 Hook 注册表:一个 Hook 一行。未来新增音乐客户端 Hook 时在此追加一行,
 // 设置页的互斥开关与「跟随启动应用」的自动切换都会自动覆盖新条目。
@@ -19,6 +20,32 @@ struct SQmMusicHookEntry
 	// Windows 下目标音乐应用主进程名(如 cloudmusic.exe);非 Windows 平台不使用。
 	const wchar_t *m_pProcessName;
 };
+
+// 用一条快照记录匹配所有 Hook；结果可按位合并，重复子进程不会重复计数。
+inline uint64_t QmMusicHookMaskForProcess(const wchar_t *pProcessName, const SQmMusicHookEntry *pHooks, size_t Count)
+{
+	// 进程名大小写不敏感比较。
+	const auto ProcessNameEquals = [](const wchar_t *pLeft, const wchar_t *pRight) {
+		for(;;)
+		{
+			const wchar_t A = *pLeft++;
+			const wchar_t B = *pRight++;
+			const wchar_t LowerA = (A >= L'A' && A <= L'Z') ? (wchar_t)(A - L'A' + L'a') : A;
+			const wchar_t LowerB = (B >= L'A' && B <= L'Z') ? (wchar_t)(B - L'A' + L'a') : B;
+			if(LowerA != LowerB)
+				return false;
+			if(LowerA == L'\0')
+				return true;
+		}
+	};
+	uint64_t Mask = 0;
+	for(size_t i = 0; i < Count; ++i)
+	{
+		if(pHooks[i].m_pProcessName != nullptr && ProcessNameEquals(pProcessName, pHooks[i].m_pProcessName))
+			Mask |= uint64_t(1) << i;
+	}
+	return Mask;
+}
 
 inline const SQmMusicHookEntry *QmMusicHookRegistry(size_t *pCount)
 {

@@ -22,6 +22,7 @@
 #include <game/client/animstate.h>
 #include <game/client/components/menus.h>
 #include <game/client/components/qmclient/perf_logging.h>
+#include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/components/qmclient/settings_resource_preview.h>
 #include <game/client/components/settings_runtime_cache.h>
 #include <game/client/gameclient.h>
@@ -68,7 +69,7 @@ static void LogSkinSettingsResourcePerf(const char *pJob, int Count, int Budget,
 
 static void LogSettingsSkinSourceEvictEvent(const char *pSkinName, const char *pReason)
 {
-	if(g_Config.m_QmPerfDebug == 0 && g_Config.m_QmPerfLogfile == 0)
+	if(g_Config.m_QmPerfDebug == 0)
 		return;
 	char aPayload[256];
 	str_format(aPayload, sizeof(aPayload), "event=evict skin=%s artifact=source reason=%s",
@@ -79,7 +80,7 @@ static void LogSettingsSkinSourceEvictEvent(const char *pSkinName, const char *p
 
 static void LogSettingsSkinSourceStageEvent(const char *pEvent, const char *pSkinName, int Width, int Height, int ByteCount, double DurationMs, int Uploads = -1)
 {
-	if(g_Config.m_QmPerfDebug == 0 && g_Config.m_QmPerfLogfile == 0)
+	if(g_Config.m_QmPerfDebug == 0)
 		return;
 	char aPayload[256];
 	if(Uploads > 0)
@@ -134,7 +135,7 @@ static const char *SkinStateName(CSkins::CSkinContainer::EState State)
 
 static void LogSettingsSkinSourceRequestEvent(const char *pSkinName, ESettingsResourcePriority Priority, CSkins::CSkinContainer::EState State)
 {
-	if(g_Config.m_QmPerfDebug == 0 && g_Config.m_QmPerfLogfile == 0)
+	if(g_Config.m_QmPerfDebug == 0)
 		return;
 	char aPayload[256];
 	str_format(aPayload, sizeof(aPayload), "event=source_request skin=%s priority=%s state=%s",
@@ -146,7 +147,7 @@ static void LogSettingsSkinSourceRequestEvent(const char *pSkinName, ESettingsRe
 
 static void LogSettingsSkinSourceWaitEvent(const char *pSkinName, const char *pReason, int RemainingUploads, int MaxUploads)
 {
-	if(g_Config.m_QmPerfDebug == 0 && g_Config.m_QmPerfLogfile == 0)
+	if(g_Config.m_QmPerfDebug == 0)
 		return;
 	char aPayload[256];
 	str_format(aPayload, sizeof(aPayload), "event=source_wait skin=%s artifact=source reason=%s remaining_uploads=%d max_uploads=%d",
@@ -159,7 +160,7 @@ static void LogSettingsSkinSourceWaitEvent(const char *pSkinName, const char *pR
 
 static void LogSettingsSkinStartLoadingFallbackSweepEvent(int ItemsTotal, int ItemsScanned, int ItemsStarted, int ItemsSkipped, bool Invoked, double DurationMs, const char *pReason)
 {
-	if(g_Config.m_QmPerfDebug == 0 && g_Config.m_QmPerfLogfile == 0)
+	if(g_Config.m_QmPerfDebug == 0)
 		return;
 	char aPayload[256];
 	str_format(aPayload, sizeof(aPayload), "event=skin_start_loading_fallback_sweep items_total=%d items_scanned=%d items_started=%d items_skipped=%d invoked=%d dur_ms=%.3f reason=%s",
@@ -175,7 +176,7 @@ static void LogSettingsSkinStartLoadingFallbackSweepEvent(int ItemsTotal, int It
 
 static void LogSettingsSkinSourceWarmupEvent(const char *pEvent, const char *pExtra = nullptr)
 {
-	if(g_Config.m_QmPerfDebug == 0 && g_Config.m_QmPerfLogfile == 0)
+	if(g_Config.m_QmPerfDebug == 0)
 		return;
 	char aPayload[256];
 	if(pExtra != nullptr && pExtra[0] != '\0')
@@ -235,7 +236,7 @@ static void LogSettingsSkinFrameCapEvent(const CGameClient *pGameClient)
 	static int s_LastVisibleLoadCap = -1;
 	static int s_LastNormalLoadCap = -1;
 
-	if(g_Config.m_QmPerfDebug == 0 && g_Config.m_QmPerfLogfile == 0)
+	if(g_Config.m_QmPerfDebug == 0)
 		return;
 
 	const bool TeeSettingsActive = ActiveSettingsTeePage(pGameClient);
@@ -1047,6 +1048,8 @@ void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData 
 	}
 
 	Skin.m_Metrics = Data.m_Metrics;
+	Skin.m_OriginalSkin.m_pBodyOutline = QmCreateSkinOutline(Data.m_Info, g_pData->m_aSprites[SPRITE_TEE_BODY], g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE], vec2(64, 64));
+	Skin.m_OriginalSkin.m_pFeetOutline = QmCreateSkinOutline(Data.m_Info, g_pData->m_aSprites[SPRITE_TEE_FOOT], g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE], vec2(64, 32));
 	Skin.m_BloodColor = Data.m_BloodColor;
 
 	if(g_Config.m_Debug)
@@ -1209,6 +1212,9 @@ void CSkins::FinishSkinPreviewUpload(CSkinContainer *pSkinContainer)
 	dbg_assert(SkinIt != m_Skins.end(), "FinishSkinPreviewUpload on skin '%s' which is not in m_Skins", pSkinContainer->Name());
 	const bool BackgroundTracked = SkinIt->second->IsBackgroundTracked();
 	pSkinContainer->m_pSkin->m_Metrics = pSkinContainer->m_SettingsPendingUploadData.m_Metrics;
+	const CImageInfo &OutlineSource = pSkinContainer->m_SettingsPendingUploadData.m_Info;
+	pSkinContainer->m_pSkin->m_OriginalSkin.m_pBodyOutline = QmCreateSkinOutline(OutlineSource, g_pData->m_aSprites[SPRITE_TEE_BODY], g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE], vec2(64, 64));
+	pSkinContainer->m_pSkin->m_OriginalSkin.m_pFeetOutline = QmCreateSkinOutline(OutlineSource, g_pData->m_aSprites[SPRITE_TEE_FOOT], g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE], vec2(64, 32));
 	pSkinContainer->m_pSkin->m_BloodColor = pSkinContainer->m_SettingsPendingUploadData.m_BloodColor;
 	SkinIt->second->m_SettingsSourceApproxBytes = SettingsSkinSourceBytesEstimate((int)pSkinContainer->m_SettingsPendingUploadData.m_Info.m_Width, (int)pSkinContainer->m_SettingsPendingUploadData.m_Info.m_Height, 2);
 	pSkinContainer->SetState(CSkinContainer::EState::LOADED, BackgroundTracked ? ESettingsResourcePriority::BACKGROUND : ESettingsResourcePriority::VISIBLE);
@@ -1341,6 +1347,13 @@ void CSkins::OnUpdate()
 		GameClient()->OnSkinUpdate(SkinName.c_str());
 	}
 	m_vSkinsUnresolvedThisFrame.clear();
+
+	// 贴图被卸载的皮肤同样要通知：引用它的渲染信息里还留着已经释放的句柄。
+	for(const std::string &SkinName : m_vSkinsTexturesUnloadedThisFrame)
+	{
+		GameClient()->OnSkinUpdate(SkinName.c_str());
+	}
+	m_vSkinsTexturesUnloadedThisFrame.clear();
 }
 
 void CSkins::UpdateForSettingsWarmup()
@@ -1668,6 +1681,29 @@ void CSkins::SyncSkinQueueFromMapPlayers(int Dummy)
 	}
 }
 
+// 皮肤贴图卸载后，玩家渲染信息、聊天头像与击杀提示里保存的句柄依旧 IsValid()，
+// 继续画就会绑定已释放的纹理（表现为没有贴图的白块 Tee）。所以卸载贴图必须登记皮肤名，
+// 由 OnUpdate 末尾统一通知渲染信息重新解析；重解析期间会回退 default 皮肤，加载完成后自动换回。
+void CSkins::QueueSkinTexturesUnloaded(const char *pSkinName)
+{
+	if(pSkinName == nullptr || pSkinName[0] == '\0')
+		return;
+	if(std::find(m_vSkinsTexturesUnloadedThisFrame.begin(), m_vSkinsTexturesUnloadedThisFrame.end(), pSkinName) != m_vSkinsTexturesUnloadedThisFrame.end())
+		return;
+	m_vSkinsTexturesUnloadedThisFrame.emplace_back(pSkinName);
+}
+
+void CSkins::UnloadLoadedSkinTextures(CSkinContainer *pSkinContainer)
+{
+	if(pSkinContainer == nullptr || pSkinContainer->m_pSkin == nullptr)
+		return;
+	pSkinContainer->m_pSkin->m_OriginalSkin.Unload(Graphics());
+	pSkinContainer->m_pSkin->m_ColorableSkin.Unload(Graphics());
+	pSkinContainer->m_pSkin.reset();
+	pSkinContainer->m_SettingsSourceApproxBytes = 0;
+	QueueSkinTexturesUnloaded(pSkinContainer->Name());
+}
+
 void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)
 {
 	size_t SourceBytesInUse = 0;
@@ -1710,10 +1746,7 @@ void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)
 		if(pSkinContainer->m_State == CSkinContainer::EState::LOADED)
 		{
 			LogSettingsSkinSourceEvictEvent(pSkinContainer->Name(), BytesBudgetExceeded ? "bytes_budget" : "queue_count");
-			pSkinContainer->m_pSkin->m_OriginalSkin.Unload(Graphics());
-			pSkinContainer->m_pSkin->m_ColorableSkin.Unload(Graphics());
-			pSkinContainer->m_pSkin = nullptr;
-			pSkinContainer->m_SettingsSourceApproxBytes = 0;
+			UnloadLoadedSkinTextures(pSkinContainer);
 			Stats.m_NumLoaded--;
 		}
 		else
@@ -1895,6 +1928,8 @@ void CSkins::UpdateStartLoading(CSkinLoadingStats &Stats)
 	const int EffectiveNormalLoadingWindow = NormalLoadingWindow;
 	m_SettingsSourceAdmissionTelemetry.m_LoadingWindowLimit = EffectiveNormalLoadingWindow;
 	m_SettingsSourceAdmissionTelemetry.m_AdmissionInvariantViolated = Stats.AdmissionInvariantViolated(CountFuseLimit);
+	if(Stats.m_NumBackgroundRequested == 0 && Stats.m_NumPending == 0)
+		return;
 	struct SSettingsSourceAdmissionDecision
 	{
 		bool m_PromoteAllowed = true;
@@ -2198,6 +2233,8 @@ void CSkins::UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseco
 	int SkinsProcessedThisFrame = 0;
 	const int MaxSkinsPerFrame = SettingsSkinMaxPerFrame(GameClient());
 	LogSettingsSkinFrameCapEvent(GameClient());
+	if(Stats.m_NumLoading == 0)
+		return;
 	bool ProcessedHighPrioritySkin = false;
 	std::vector<std::string> vUsageSnapshot;
 	vUsageSnapshot.reserve(m_SkinsUsageList.size());
@@ -2739,13 +2776,8 @@ void CSkins::ProcessSkinDirectoryScanJob()
 				}
 				pSkinContainer->m_Type = Entry.m_Type;
 				pSkinContainer->m_StorageType = Entry.m_StorageType;
-				if(OldState == CSkinContainer::EState::LOADED && pSkinContainer->m_pSkin)
-				{
-					pSkinContainer->m_pSkin->m_OriginalSkin.Unload(Graphics());
-					pSkinContainer->m_pSkin->m_ColorableSkin.Unload(Graphics());
-					pSkinContainer->m_pSkin.reset();
-					pSkinContainer->m_SettingsSourceApproxBytes = 0;
-				}
+				if(OldState == CSkinContainer::EState::LOADED)
+					UnloadLoadedSkinTextures(pSkinContainer);
 				if(KeepRequestedState)
 				{
 					pSkinContainer->SetState(CSkinContainer::EState::PENDING, OldPriority);

@@ -23,6 +23,7 @@
 #include <game/client/components/qmclient/afk_presentation.h>
 #include <game/client/components/qmclient/jelly_tee.h>
 #include <game/client/components/qmclient/modes.h>
+#include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/components/qmclient/tee_hue_cycle.h>
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
@@ -144,6 +145,14 @@ static void BuildQmJellyExtraImpulse(const CGameClient *pGameClient, const CColl
 		OutExtraDeformImpulse.x += HorizontalKick * 0.80f * HitImpact;
 		OutExtraCompression += HitImpact;
 	}
+}
+
+static void ConfigureSkinOutline(CGameClient *pGameClient, int ClientId, CTeeRenderInfo &RenderInfo)
+{
+	const bool Enabled = !pGameClient->IsRenderingDummyMiniMap() && QmShouldDrawSkinOutline(ClientId,
+										pGameClient->m_aLocalIds[0], pGameClient->m_aLocalIds[1], g_Config.m_QmSkinOutlineLocal != 0, g_Config.m_QmSkinOutlineOthers != 0);
+	RenderInfo.m_QmSkinOutlineWidth = Enabled ? g_Config.m_QmSkinOutlineWidth : 0;
+	RenderInfo.m_QmSkinOutlineColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_QmSkinOutlineColor)).WithAlpha(g_Config.m_QmSkinOutlineAlpha / 100.0f);
 }
 
 static bool GetWarListTeeGlowColor(CGameClient *pGameClient, int ClientId, ColorRGBA &Color)
@@ -335,6 +344,16 @@ void CPlayers::RenderHookCollLine(
 	}
 
 	if(!AlwaysRenderHookColl && !RenderHookCollPlayer)
+		return;
+
+	// 完全透明的提示线无需执行后面的钩子模拟。
+	float Alpha = 1.0f;
+	if(GameClient()->IsOtherTeam(ClientId))
+		Alpha = g_Config.m_ClShowOthersAlpha / 100.0f;
+	Alpha *= (float)g_Config.m_ClHookCollAlpha / 100;
+	if(ClientId >= 0 && GameClient()->m_FastPractice.Enabled() && !GameClient()->m_Snap.m_SpecInfo.m_Active && !GameClient()->m_FastPractice.IsPracticeParticipant(ClientId))
+		Alpha = std::min(Alpha, 0.5f);
+	if(Alpha <= 0.0f)
 		return;
 
 	float Intra = GameClient()->m_aClients[ClientId].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy);
@@ -533,14 +552,6 @@ void CPlayers::RenderHookCollLine(
 	// Render hook coll line
 	const int HookCollSize = Local ? g_Config.m_ClHookCollSize : g_Config.m_ClHookCollSizeOther;
 
-	float Alpha = 1.0f;
-	if(GameClient()->IsOtherTeam(ClientId))
-		Alpha = g_Config.m_ClShowOthersAlpha / 100.0f;
-	Alpha *= (float)g_Config.m_ClHookCollAlpha / 100;
-	if(ClientId >= 0 && GameClient()->m_FastPractice.Enabled() && !GameClient()->m_Snap.m_SpecInfo.m_Active && !GameClient()->m_FastPractice.IsPracticeParticipant(ClientId))
-		Alpha = std::min(Alpha, 0.5f);
-	if(Alpha <= 0.0f)
-		return;
 	ColorRGBA HookCollTipColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClHookCollTipColor, true));
 
 	Graphics()->TextureClear();
@@ -1277,6 +1288,14 @@ void CPlayers::RenderPlayer(
 		}
 	}
 
+	ConfigureSkinOutline(GameClient(), ClientId, RenderInfo);
+	CTeeRenderInfo PreviousSkinInfoOutline;
+	if(pPreviousSkinInfo != nullptr && RenderInfo.m_QmSkinOutlineWidth > 0)
+	{
+		PreviousSkinInfoOutline = *pPreviousSkinInfo;
+		ConfigureSkinOutline(GameClient(), ClientId, PreviousSkinInfoOutline);
+		pPreviousSkinInfo = &PreviousSkinInfoOutline;
+	}
 	RenderTools()->RenderTeeWithSkinChangeTransition(&State, pPreviousSkinInfo, &RenderInfo, Player.m_Emote, Direction, Position, SkinTransitionProgress, Alpha, JellyDeform.m_BodyScale, JellyDeform.m_FeetScale, JellyDeform.m_BodyAngle, JellyDeform.m_FeetAngle);
 
 	float TeeAnimScale, TeeBaseSize;
@@ -1805,6 +1824,7 @@ void CPlayers::RenderPlayerGhost(
 		RenderTools()->RenderTee(&State, &RenderInfo, Player.m_Emote, Direction, ShadowPosition, 0.5f, JellyDeform.m_BodyScale, JellyDeform.m_FeetScale, JellyDeform.m_BodyAngle, JellyDeform.m_FeetAngle); // render ghost
 	}
 
+	ConfigureSkinOutline(GameClient(), ClientId, RenderInfo);
 	RenderTools()->RenderTee(&State, &RenderInfo, Player.m_Emote, Direction, Position, Alpha, JellyDeform.m_BodyScale, JellyDeform.m_FeetScale, JellyDeform.m_BodyAngle, JellyDeform.m_FeetAngle);
 
 	float TeeAnimScale, TeeBaseSize;
@@ -1865,6 +1885,9 @@ void CPlayers::OnRender()
 	const bool IsTeamPlay = GameClient()->IsTeamPlay();
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
+		// 后续 Tee 和钩子绘制均要求这些信息，空槽无需复制皮肤或计算冻结外观。
+		if(!IsPlayerInfoAvailable(i))
+			continue;
 		const auto &ClientData = GameClient()->m_aClients[i];
 		aRenderInfo[i] = ClientData.m_RenderInfo;
 		aRenderInfo[i].m_TeeRenderFlags = 0;

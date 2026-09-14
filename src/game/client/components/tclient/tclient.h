@@ -16,6 +16,8 @@
 #include <generated/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/components/qmclient/local_saves.h>
+#include <game/client/components/qmclient/map_progress.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/red_packet_auto_claim.h>
 #include <game/client/components/qmclient/update_manifest.h>
@@ -216,7 +218,21 @@ class CTClient : public CComponent
 	void UpdatePlayerStats();
 	void TrackHookDirection(int Dummy);
 
-	// Gores 地图进度（全图距离场估算）
+	// 地图进度：Gores 全图估算，DDRace 支持计时 CP 分段。
+	QmMapProgress::CMap m_QmDDraceProgressMap;
+	QmMapProgress::CPlayer m_aQmDDraceProgress[NUM_DUMMIES];
+	const void *m_pQmDDraceProgressGame = nullptr;
+	const void *m_pQmDDraceProgressFront = nullptr;
+	const void *m_pQmDDraceProgressTele = nullptr;
+	int m_QmDDraceProgressWidth = 0;
+	int m_QmDDraceProgressScanCursor = 0;
+	int m_aQmDDraceProgressClientId[NUM_DUMMIES] = {-1, -1};
+	int m_aQmDDraceTeleCheckpoint[NUM_DUMMIES] = {0, 0};
+	vec2 m_aQmDDraceProgressPreviousPos[NUM_DUMMIES] = {};
+	bool m_aQmDDraceProgressHasPreviousPos[NUM_DUMMIES] = {false, false};
+	bool IsDDraceMapProgressMap() const;
+	void ResetDDraceMapProgress();
+	void UpdateDDraceMapProgress();
 	enum class EGoresDistanceFieldBuildStage
 	{
 		IDLE,
@@ -333,17 +349,18 @@ class CTClient : public CComponent
 	void HandleMapHistoryFinish(int ClientId, int FinishTimeMs);
 
 	// 本地存档列表
-	struct SLocalSaveEntry
-	{
-		std::string m_Time;
-		std::string m_Players;
-		std::string m_Map;
-		std::string m_Code;
-	};
+	using SLocalSaveEntry = QmLocalSaves::SEntry;
 	char m_aLastLocalSaveHintMap[128] = "";
+	std::vector<SLocalSaveEntry> m_vLocalSaveCandidates;
+	bool m_LocalSavePromptActive = false;
+	QmLocalSaves::CConfirmation m_LocalSaveConfirmation;
+	QmLocalSaves::CRestore m_LocalSaveRestore;
 	bool LoadLocalSaveEntries(std::vector<SLocalSaveEntry> &vEntries, bool *pFileExists = nullptr) const;
-	bool RemoveLocalSaveByCode(const char *pCode);
+	bool RemoveLocalSaveByCode(const char *pMap, const char *pCode);
 	void MaybeShowLocalSaveJoinHint();
+	QmLocalSaves::CRestore::SWorld LocalSaveWorld() const;
+	void UpdateLocalSaveRestore();
+	void CompleteLocalSaveLoad(bool Success);
 	static void ConSaveList(IConsole::IResult *pResult, void *pUserData);
 
 	// 复读功能
@@ -486,7 +503,9 @@ public:
 	void RemoveMapHistoryRecord(const char *pMapId);
 	void ClearFinishedMapHistory();
 	void ClearAllMapHistory();
-	bool TryRemoveLocalSaveForLoadCommand(const char *pLine);
+	void TrackLocalSaveLoadCommand(int Conn, const char *pLine);
+	bool TryHandleLocalSaveReply(const char *pLine);
+	void HandleLocalSaveMessage(const CNetMsg_Sv_Chat *pMsg, int Conn);
 	bool IsGoresMapProgressEnabled() const;
 	bool ShouldHideGoresGuides(bool ManualGuideVisible = false) const;
 	bool HasGoresMapProgress(int Dummy = 0) const

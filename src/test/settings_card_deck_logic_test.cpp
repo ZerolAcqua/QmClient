@@ -266,6 +266,8 @@ TEST(SettingsPageLayout, DynamicVisualCardHeightsUseSharedMetrics)
 	EXPECT_FLOAT_EQ(ResolveQmVisualFocusModeHeight(Metrics), 16.0f * Metrics.m_RowStep + 3.0f * (Metrics.m_SmallSize + Metrics.m_LineSpacing) + Metrics.m_LineSpacing);
 	EXPECT_FLOAT_EQ(ResolveQmVisualSkinTransitionHeight(Metrics, true) - ResolveQmVisualSkinTransitionHeight(Metrics, false), 5.0f * Metrics.m_RowStep);
 	EXPECT_GT(ResolveQmVisualSkinTransitionHeight(Metrics, false), 0.0f);
+	// 描边的两个范围开关、颜色和两个滑块始终各占一行。
+	EXPECT_FLOAT_EQ(ResolveQmVisualSkinTransitionHeight(Metrics, false), 12.0f * Metrics.m_RowStep + 2.0f * (Metrics.m_SmallSize + Metrics.m_LineSpacing));
 }
 
 TEST(CollisionHitboxLogic, CapsuleOutlineHandlesDegenerateAndAxisAlignedLasers)
@@ -589,6 +591,116 @@ TEST(SettingsCardDeck, SameDisplayCycleTabChangeDoesNotRestartEntry)
 
 	Runtime.BeginDisplayCycle(8, true);
 	EXPECT_TRUE(Runtime.ConsumeEntryCycle());
+}
+
+TEST(SettingsCardDeck, ContinuousEntryKeepsPositionAndVelocityAcrossPageSwitches)
+{
+	CSettingsCardDeckFrameRuntime Runtime;
+	CUiV2AnimationRuntime Animation;
+	SCardMotionSpec Motion = ResolveCardMotionSpec(2, true, true, true, true);
+	const uint64_t Node = 100;
+	Runtime.BeginDisplayCycle(1, true);
+	EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, Node, Motion), Motion.m_EntryDistance);
+	Animation.Advance(0.05f);
+	const float BeforeSwitch = Runtime.ResolveContinuousEntryOffset(Animation, Node, Motion);
+	ASSERT_GT(BeforeSwitch, 0.0f);
+	ASSERT_LT(BeforeSwitch, Motion.m_EntryDistance);
+	CUiV2AnimationRuntime Reference = Animation;
+
+	Runtime.BeginDisplayCycle(2, true);
+	Runtime.OnTabChanged();
+	EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, Node, Motion), BeforeSwitch);
+	Animation.Advance(0.01f);
+	Reference.Advance(0.01f);
+	EXPECT_NEAR(Runtime.ResolveContinuousEntryOffset(Animation, Node, Motion), Reference.GetValue(Node, EUiAnimProperty::POS_Y), 0.0001f);
+
+	Runtime.BeginDisplayCycle(3, true);
+	Runtime.OnTabChanged();
+	EXPECT_NEAR(Runtime.ResolveContinuousEntryOffset(Animation, Node, Motion), Reference.GetValue(Node, EUiAnimProperty::POS_Y), 0.0001f);
+	EXPECT_EQ(Animation.ActiveTrackCount(), 1);
+	EXPECT_EQ(Animation.QueuedTrackCount(), 0);
+}
+
+TEST(SettingsCardDeck, SubTabStartsEntryInTheClickFrameAndParentCycleDoesNotRestartIt)
+{
+	CSettingsCardDeckFrameRuntime Runtime;
+	CUiV2AnimationRuntime Animation;
+	const SCardMotionSpec Motion = ResolveCardMotionSpec(2, true, true, true, true);
+	Runtime.BeginDisplayCycle(1, true);
+	Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion);
+	for(int Frame = 0; Frame < 30; ++Frame)
+	{
+		Animation.Advance(1.0f / 60.0f);
+		Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion);
+	}
+	ASSERT_FALSE(Runtime.EntryWasActive());
+
+	// 子分类输入发生在父设置页的 display cycle 检测之后，必须当帧启动。
+	Runtime.OnTabChanged(true);
+	EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion), Motion.m_EntryDistance);
+	Animation.Advance(1.0f / 120.0f);
+	const float BeforeParentCycle = Animation.GetValue(100, EUiAnimProperty::POS_Y);
+	Runtime.BeginDisplayCycle(2, true);
+	EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion), BeforeParentCycle);
+	EXPECT_LT(BeforeParentCycle, Motion.m_EntryDistance);
+	EXPECT_EQ(Animation.ActiveTrackCount(), 1);
+}
+
+TEST(SettingsCardDeck, ContinuousEntrySettlesWithOnlyASmallReboundAtDifferentRefreshRates)
+{
+	for(const int RefreshRate : {60, 120, 240})
+	{
+		SCOPED_TRACE(RefreshRate);
+		CSettingsCardDeckFrameRuntime Runtime;
+		CUiV2AnimationRuntime Animation;
+		const SCardMotionSpec Motion = ResolveCardMotionSpec(2, true, true, true, true);
+		Runtime.BeginDisplayCycle(1, true);
+		Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion);
+		float MinimumOffset = Motion.m_EntryDistance;
+		for(int Frame = 0; Frame < RefreshRate / 2; ++Frame)
+		{
+			Animation.Advance(1.0f / RefreshRate);
+			const float Offset = Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion);
+			MinimumOffset = std::min(MinimumOffset, Offset);
+			EXPECT_LE(Offset, Motion.m_EntryDistance);
+		}
+		EXPECT_LT(MinimumOffset, 0.0f);
+		EXPECT_GT(MinimumOffset, -Motion.m_EntryDistance * 0.03f);
+		EXPECT_FALSE(Runtime.EntryWasActive());
+		EXPECT_EQ(Animation.ActiveTrackCount(), 0);
+		EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion), 0.0f);
+		EXPECT_EQ(Animation.ActiveTrackCount(), 0);
+	}
+}
+
+TEST(SettingsCardDeck, ContinuousEntryCanBeDisabledImmediatelyAndReplayAfterSettling)
+{
+	CSettingsCardDeckFrameRuntime Runtime;
+	CUiV2AnimationRuntime Animation;
+	SCardMotionSpec Motion = ResolveCardMotionSpec(2, true, true, true, true);
+	Runtime.BeginDisplayCycle(1, true);
+	Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion);
+	Animation.Advance(0.05f);
+	Motion = ResolveCardMotionSpec(0, true, true, true, true);
+	EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion), 0.0f);
+	EXPECT_FALSE(Runtime.EntryWasActive());
+	EXPECT_EQ(Animation.ActiveTrackCount(), 0);
+
+	Motion = ResolveCardMotionSpec(1, true, true, true, true);
+	Runtime.BeginDisplayCycle(2, true);
+	EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion), Motion.m_EntryDistance);
+	for(int Frame = 0; Frame < 30; ++Frame)
+	{
+		Animation.Advance(1.0f / 120.0f);
+		Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion);
+	}
+	EXPECT_FALSE(Runtime.EntryWasActive());
+	Runtime.BeginDisplayCycle(3, true);
+	EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion), Motion.m_EntryDistance);
+
+	Runtime.BeginDisplayCycle(4, false);
+	EXPECT_FLOAT_EQ(Runtime.ResolveContinuousEntryOffset(Animation, 100, Motion), 0.0f);
+	EXPECT_EQ(Animation.ActiveTrackCount(), 0);
 }
 
 TEST(SettingsDropDown, DisablingOpenStateRequestsPopupCloseAndReleasesSelectionState)

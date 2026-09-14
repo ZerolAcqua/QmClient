@@ -729,6 +729,7 @@ private:
 		const SPopupMenuId *m_pId;
 		SPopupMenuProperties m_Props;
 		CUIRect m_Rect;
+		float m_OpenTime = 0.0f;
 		void *m_pContext;
 		FPopupMenuFunction m_pfnFunc;
 	};

@@ -103,6 +103,8 @@ public:
 		m_ColorBody = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 		m_ColorFeet = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 		m_OutlineColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+		m_QmSkinOutlineColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+		m_QmSkinOutlineWidth = 0;
 		m_Size = 1.0f;
 		m_GotAirJump = true;
 		m_TeeRenderFlags = 0;
@@ -185,6 +187,8 @@ public:
 	ColorRGBA m_ColorBody;
 	ColorRGBA m_ColorFeet;
 	ColorRGBA m_OutlineColor;
+	ColorRGBA m_QmSkinOutlineColor;
+	int m_QmSkinOutlineWidth;
 	float m_Size;
 	bool m_GotAirJump;
 	int m_TeeRenderFlags;
@@ -203,6 +207,8 @@ public:
 			{
 				Texture.Invalidate();
 			}
+			for(auto &pOutline : m_apQmSkinOutlines)
+				pOutline.reset();
 			std::fill(std::begin(m_aUseCustomColors), std::end(m_aUseCustomColors), false);
 			std::fill(std::begin(m_aColors), std::end(m_aColors), ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
 			m_BloodColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
@@ -214,6 +220,7 @@ public:
 
 		IGraphics::CTextureHandle m_aOriginalTextures[protocol7::NUM_SKINPARTS];
 		IGraphics::CTextureHandle m_aColorableTextures[protocol7::NUM_SKINPARTS];
+		std::shared_ptr<CQmSkinOutline> m_apQmSkinOutlines[protocol7::NUM_SKINPARTS];
 		bool m_aUseCustomColors[protocol7::NUM_SKINPARTS];
 		ColorRGBA m_aColors[protocol7::NUM_SKINPARTS];
 		ColorRGBA m_BloodColor;

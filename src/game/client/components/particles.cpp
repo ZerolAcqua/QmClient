@@ -181,21 +181,6 @@ void CParticles::OnInit()
 	Graphics()->QuadContainerUpload(m_ExtraParticleQuadContainerIndex);
 }
 
-bool CParticles::ParticleIsVisibleOnScreen(const vec2 &CurPos, float CurSize)
-{
-	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
-
-	// for simplicity assume the worst case rotation, that increases the bounding box around the particle by its diagonal
-	const float SqrtOf2 = std::sqrt(2);
-	CurSize = SqrtOf2 * CurSize;
-
-	// always uses the mid of the particle
-	float SizeHalf = CurSize / 2;
-
-	return CurPos.x + SizeHalf >= ScreenX0 && CurPos.x - SizeHalf <= ScreenX1 && CurPos.y + SizeHalf >= ScreenY0 && CurPos.y - SizeHalf <= ScreenY1;
-}
-
 void CParticles::RenderGroup(int Group)
 {
 	const bool IsExtraGroup = Group == GROUP_EXTRA || Group == GROUP_TRAIL_EXTRA;
@@ -210,6 +195,16 @@ void CParticles::RenderGroup(int Group)
 		FirstParticleOffset = SPRITE_PART_SNOWFLAKE;
 		ParticleQuadContainerIndex = m_ExtraParticleQuadContainerIndex;
 	}
+
+	// 一组粒子共用屏幕范围，避免每个粒子重复调用图形接口；旋转包围盒公式不变。
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+	const auto ParticleIsVisibleOnScreen = [&](const vec2 &CurPos, float CurSize) {
+		const float SqrtOf2 = std::sqrt(2);
+		CurSize = SqrtOf2 * CurSize;
+		const float SizeHalf = CurSize / 2;
+		return CurPos.x + SizeHalf >= ScreenX0 && CurPos.x - SizeHalf <= ScreenX1 && CurPos.y + SizeHalf >= ScreenY0 && CurPos.y - SizeHalf <= ScreenY1;
+	};
 
 	// don't use the buffer methods here, else the old renderer gets many draw calls
 	if(Graphics()->IsQuadContainerBufferingEnabled())

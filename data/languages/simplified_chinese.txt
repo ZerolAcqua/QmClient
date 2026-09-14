@@ -28,9 +28,6 @@
 %d items selected
 == 已选择 %d 项
 
-%d more cut segments
-== 还有 %d 个裁剪片段
-
 %d of %d server
 == %d/%d 个服务器
 
@@ -60,6 +57,9 @@
 
 %d users
 == %d 个用户
+
+%d. %s | main: %s | dummy: %s
+== %d. %s | 本体：%s | 分身：%s
 
 %d/%d KiB (%.1f KiB/s)
 == %d/%d KiB（%.1f KiB/s）
@@ -259,6 +259,9 @@ A demo with this name already exists
 
 A folder with this name already exists
 == 已有同名文件夹
+
+A save is already being restored. Please wait.
+== 正在恢复存档，请稍候。
 
 A screenshot with this name already exists
 == 已有同名截图
@@ -691,9 +694,6 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == 拖动排序或布局重排时播放卡片位置过渡动画
-
-Animated styles override the fallback title color
-== 有动态风格时优先使用风格配色，无动态风格时使用此处配色
 
 Animated title style id
 == 头衔动态风格 ID
@@ -1427,8 +1427,14 @@ Bit flags for disabling settings tabs
 Black
 == 黑色
 
+Black Flash
+== 黑闪
+
 Blend mode
 == 叠加模式
+
+Blend strength
+== 混合强度
 
 Blink the active local tee
 == 让当前本地角色闪烁
@@ -1897,6 +1903,12 @@ Clearable text...
 
 Clears the voting options
 == 清除投票选项
+
+Click a part on the right to edit its color, blend mode and strength.
+== 点击右侧部件，调整颜色、混合模式和强度。
+
+Click again to find the next location.
+== 再次点击可查找下一个位置
 
 Click to add this community to favorites
 == 点击将该社区加入收藏
@@ -2483,9 +2495,6 @@ Current: Score
 Current: Time
 == 当前：时间
 
-Cursed Flame
-== 咒焰·黑闪
-
 Custom
 == 自定义
 
@@ -2555,6 +2564,9 @@ Customize translate button and menu colors
 Customize vote display and interaction
 == 自定义投票显示和交互
 
+Cut end: %s
+== 终点：%s
+
 Cut interval
 == 裁剪区间
 
@@ -2563,6 +2575,9 @@ Cut length
 
 Cut segments
 == 裁剪片段
+
+Cut start: %s
+== 起点：%s
 
 Cute:
 == 可爱：
@@ -2702,6 +2717,9 @@ Debug SQL.
 Debug tile layer clipping.
 == 调试图块图层裁剪
 
+Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)
+== 专用 WebSocket 地址（留空使用 wss://qmclient.icu/ws）
+
 Deep freeze color
 == 深度冻结颜色
 
@@ -2825,8 +2843,20 @@ Delete this preset
 Demo
 == 回放
 
+Demo display
+== Demo 显示
+
 Demo effects
 == Demo 特效
+
+Demo hook strength (0=Off 1=Icon 2=Icon and number)
+== Demo 强弱钩（0=关闭 1=图标 2=图标与数字）
+
+Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)
+== Demo 强弱钩范围（0=自己 1=其他玩家 2=强钩 3=弱钩 4=全部）
+
+Demo key presses (0=Off 1=Others 2=All 3=Own)
+== Demo 方向键（0=关闭 1=其他玩家 2=全部 3=自己）
 
 Demo marker added
 == 已添加回放标记
@@ -3482,9 +3512,6 @@ Enable chat with all/team mode
 Enable cheats for your current team's run, but you can't earn a rank
 == 为你当前队伍启用作弊，但将无法获得排名
 
-Enable client stutter diagnostics at startup
-== 启动时启用客户端卡顿诊断
-
 Enable colored console output
 == 启用控制台彩色输出
 
@@ -3610,9 +3637,6 @@ Enable lyrics
 
 Enable macOS graphics diagnostics and Instruments signposts
 == 启用 macOS 图形诊断和 Instruments 标记
-
-Enable main thread and render stage performance debug logging
-== 启用主线程与渲染阶段性能调试日志
 
 Enable map compatibility mode using the specified bug (example: grenade-doubleexplosion@ddnet.tw)
 == 使用指定 bug 启用地图兼容模式（例如：grenade-doubleexplosion@ddnet.tw）
@@ -3761,6 +3785,9 @@ Enable Tee trail
 Enable tee trails
 == 启用 Tee 拖尾
 
+Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
+== 启用 QmClient 专用 WebSocket 服务（不回退 HTTP 轮询）
+
 Enable thinking mode (slower)
 == 启用思考模式（较慢）
 
@@ -3835,6 +3862,9 @@ Endpoint (optional)
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == 请输入 /practice 或重新开始，否则整队将在 60 秒后被处死
+
+Enter a CP number from 1 to 255.
+== 请输入 1–255 的 CP 编号
 
 Enter Password
 == 输入密码
@@ -3950,6 +3980,9 @@ Execute the specified file
 Existing Player
 == 玩家已存在
 
+Exo
+== 高能科技
+
 Export
 == 导出
 
@@ -4055,9 +4088,6 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == 回退后的简单降噪强度
 
-Fallback title color
-== 基础配色
-
 Fast input
 == 快速输入
 
@@ -4160,8 +4190,14 @@ Filter out spectators from player count
 Filtered word console color
 == 被屏蔽词控制台颜色
 
+Find / Next
+== 查找/下一个
+
 Find all ban records for the specified IP address
 == 查询指定 IP 的全部封禁记录
+
+Find CP
+== 查找 CP
 
 Find QmClient communities and project links
 == 查找 QmClient 社区和项目链接
@@ -4180,6 +4216,9 @@ Finish name
 
 Finish Name:
 == 恰分名称：
+
+Finish or reset the current race before restoring a save.
+== 请先结束或重置当前比赛，再恢复存档。
 
 Finished
 == 已完成
@@ -4585,9 +4624,6 @@ Go forward one tick
 
 Go forward the specified duration
 == 快进指定时长
-
-Golden Grace
-== 黄金·赐福
 
 Gores
 == 血腥模式
@@ -5066,6 +5102,9 @@ I am away from the game window
 I muted you
 == 我屏蔽你了
 
+Icon and number
+== 图标与数字
+
 Icons
 == 图标
 
@@ -5179,6 +5218,9 @@ Indicator size
 
 Indicator transparency
 == 指示器透明度
+
+Inferno
+== 冥火
 
 Infinite hook for super players on/off.
 == 超级玩家无限钩索开/关
@@ -5314,6 +5356,9 @@ Invalid ID
 
 Invalid option
 == 无效的投票选项
+
+Invalid save number. Use a number from the save list.
+== 存档序号无效，请使用列表中的序号。
 
 Invalid spectator id used
 == 无效的旁观目标 ID
@@ -5621,6 +5666,9 @@ Left-click a Frankenstein part to tint it. Drag parts to replace them. Right-cli
 Left/right channel width
 == 左右声道宽度
 
+Legacy option: connections that skip TLS verification are rejected
+== 旧版选项：跳过 TLS 校验的连接会被拒绝
+
 Length
 == 时长
 
@@ -5855,6 +5903,9 @@ Locked
 Log output filename
 == 日志输出文件名
 
+Log realtime WebSocket channel events
+== 记录实时 WebSocket 通道事件
+
 Log the network
 == 记录网络
 
@@ -6011,14 +6062,8 @@ Margin when notification is docked
 Mark demo
 == 标记回放
 
-Mark the beginning of a cut (right click to reset)
-== 标记裁剪起点 (右键重置)
-
 Mark the beginning of a demo cut
 == 标记回放剪辑起点
-
-Mark the end of a cut (right click to reset)
-== 标记裁剪终点 (右键重置)
 
 Mark the end of a demo cut
 == 标记回放剪辑终点
@@ -6514,6 +6559,9 @@ Name: %s
 
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 == 铭牌钩索强度图标范围（0=自己，1=他人，2=强钩，3=弱钩，4=所有玩家）
+
+Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)
+== 铭牌昵称范围（0=不显示 1=当前角色 2=自身角色 3=其他玩家 4=其他玩家与自身非当前角色 5=全部）
 
 Nameplate position X
 == 铭牌 X 坐标
@@ -7151,9 +7199,6 @@ Other
 Other players' hook line width
 == 其他玩家的钩索辅助线宽度
 
-Other players' nameplate scope (0=All players 1=Friends only)
-== 他人铭牌范围（0=所有玩家 1=仅好友）
-
 Others
 == 他人
 
@@ -7234,9 +7279,6 @@ Overwrite clan even if empty
 
 Own hook line width
 == 自己的钩索辅助线宽度
-
-Own nameplate scope (0=Current character 1=All local characters)
-== 自身铭牌范围（0=当前角色 1=本机全部角色）
 
 p = Ping latency
 == p = Ping 延迟
@@ -7339,9 +7381,6 @@ Penalty in seconds for saving or swapping positions
 
 Per-name volume (name=percent)
 == 按名字单独音量（name=percent）
-
-Performance debug log threshold (ms)
-== 性能调试日志阈值（毫秒）
 
 Permanent access; up to 4 online IP addresses
 == 永久资格，最多 4 个 IP 同时在线
@@ -7754,6 +7793,9 @@ Preview built with %d skipped slot(s).
 Preview button visibility while the editor is active.
 == 按键编辑器打开时用于预览按键的可见度
 
+Preview cut (P)
+== 预览片段 (P)
+
 Preview dummy nameplate
 == 预览分身名牌
 
@@ -8080,6 +8122,18 @@ Ratio threshold for local target language detection
 
 Really? Not even a little?
 == 真的？一点都不考虑一下吗？
+
+Realtime channel
+== 实时通道
+
+Realtime channel heartbeat interval (seconds, 0 uses default)
+== 实时通道心跳间隔（秒，0 使用默认值）
+
+Realtime channel reconnect backoff base (ms)
+== 实时通道重连退避基准（毫秒）
+
+Realtime channel reconnect backoff cap (ms)
+== 实时通道重连退避上限（毫秒）
 
 Reason
 == 原因
@@ -8588,8 +8642,14 @@ Restart the client
 Restarting. Please wait…
 == 正在重启，请稍等
 
+Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
+== 是否恢复双人存档？/qm Yes 读取最新一条，/qm Yes 序号 选择其他存档，/qm No 忽略本次提示。
+
 Restore old single-segment hook collision line behavior
 == 恢复旧版单段钩子辅助线行为
+
+Restoring save %d: main '%s', dummy '%s'.
+== 正在恢复存档 %d：本体“%s”，分身“%s”。
 
 Retrying…
 == 正在重试…
@@ -8780,6 +8840,12 @@ Save ghost
 Save last %d min
 == 保存前 %d 分钟
 
+Save loaded; local record removed.
+== 存档读取成功，已删除本地记录。
+
+Save loaded; the local record could not be removed.
+== 存档读取成功，但未能删除本地记录。
+
 Save player names in replay
 == 在回放中保存玩家名称
 
@@ -8788,6 +8854,15 @@ Save power by lowering update rate (higher input latency)
 
 Save replay of best time per game
 == 保存每场游戏最佳记录的回放
+
+Save restore dismissed.
+== 已取消本次存档恢复。
+
+Save restore stopped without confirming success. The local record was kept.
+== 未确认读档成功，恢复流程已停止。本地记录已保留。
+
+Save restore stopped: connection, names or team were not ready. The local record was kept.
+== 连接、名字或队伍尚未就绪，存档恢复已停止。本地记录已保留。
 
 Save settings file on exit
 == 退出时保存设置文件
@@ -8933,6 +9008,9 @@ Search skins and manage the skin queue
 Searching
 == 正在搜索
 
+Sec-WebSocket-Protocol sent during the realtime handshake
+== 实时握手时发送的 Sec-WebSocket-Protocol
+
 Secondary
 == 次要
 
@@ -8980,6 +9058,9 @@ Selected candidate %d/%d under cursor.
 
 Selected item color
 == 选中项颜色
+
+Selected part: %d
+== 所选部件：%d
 
 Selected server
 == 已选中服务器
@@ -9158,6 +9239,12 @@ Set color
 Set current demo speed
 == 设置当前回放速度
 
+Set cut end at current position (O, right click to reset)
+== 将当前位置设为剪辑终点（O，右键重置）
+
+Set cut start at current position (I, right click to reset)
+== 将当前位置设为剪辑起点（I，右键重置）
+
 Set ddrace team for a player
 == 为玩家设置 DDRace 队伍
 
@@ -9325,6 +9412,9 @@ Show chat (2 always show large chat area)
 
 Show chat bubbles above players
 == 在玩家头顶显示聊天气泡
+
+Show chat in demo preview and video
+== 在 Demo 预览和视频中显示聊天
 
 Show chat messages above players
 == 在玩家头顶显示聊天消息
@@ -9632,6 +9722,9 @@ Show in-game HUD (spectator HUD)
 Show in-game HUD (timer)
 == 显示游戏内 HUD（计时器）
 
+Show in-game HUD in demo preview and video
+== 在 Demo 预览和视频中显示游戏 HUD
+
 Show in-game HUD when rendering video
 == 渲染视频时显示游戏内 HUD
 
@@ -9673,6 +9766,9 @@ Show katan on frozen players
 
 Show katana on frozen players (restores old behavior)
 == 在冻结玩家身上显示武士刀（恢复旧行为）
+
+Show key presses
+== 方向键
 
 Show key presses (1 = others, 2 = all, 3 = own only)
 == 显示按键（1 = 其他玩家的、2 = 所有人、3 = 仅你自己的）
@@ -10157,6 +10253,9 @@ Simple noise reduction strength
 Single color
 == 单色
 
+Single color and Rainbow override the color of animated styles; the style keeps its motion
+== 单色与彩虹档会覆盖动态风格自带的颜色；风格只保留浮动与掠光
+
 Size
 == 大小
 
@@ -10195,6 +10294,21 @@ Skin list sort mode (0=Name, 1=Release date)
 
 Skin options
 == 皮肤选项
+
+Skin outline color
+== 皮肤描边颜色
+
+Skin outline for other players
+== 其他玩家的皮肤描边
+
+Skin outline for self and dummy
+== 自己和分身的皮肤描边
+
+Skin outline opacity
+== 皮肤描边不透明度
+
+Skin outline width
+== 皮肤描边粗细
 
 Skin prefix
 == 皮肤名称前缀
@@ -10511,8 +10625,8 @@ Sphere
 Spin pop
 == 旋转弹出
 
-Spirit Light
-== 灵光·流萤
+Spirit
+== 灵光
 
 Sponsor code
 == 认证码
@@ -10630,6 +10744,9 @@ Stop key input on switch (0=off, 1=dummy, 2=player)
 
 Stop practice
 == 停止练习
+
+Stop preview (P)
+== 停止预览 (P)
 
 Stop record
 == 停止录制
@@ -10988,8 +11105,8 @@ Tee trail color
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee 轨迹颜色模式（1=纯色，2=当前 Tee 颜色，3=彩虹，4=按 Tee 速度着色，5=随机）
 
-Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
-== Tee 拖尾样式（0=原版，1=咒焰黑闪，2=紫电雷切，3=灵光流萤，4=虚空暗影，5=黄金赐福）
+Tee trail style (0=Original, 1=Black Flash, 2=Exo, 3=Spirit, 4=Void, 5=Inferno)
+== Tee 拖尾样式 (0=原版，1=黑闪，2=高能科技，3=灵光，4=虚空，5=冥火)
 
 Tee Trails
 == Tee 拖尾
@@ -11165,6 +11282,9 @@ There are unsaved changes in the touch controls editor. Saving first is recommen
 There is no checkpoint teleporter with that index on the map.
 == 这张地图上没有这个编号的检查点传送器
 
+There is no pending save restore prompt.
+== 当前没有待处理的存档恢复提示。
+
 There is no teleporter with that index on the map.
 == 这张地图上没有这个编号的传送器
 
@@ -11195,6 +11315,9 @@ Thin
 Thinking mode requires a reasoning model
 == 启用思考模式需要使用推理模型
 
+This connection cannot change names while connected. Reconnect with the saved names first.
+== 此连接不支持在线改名，请使用存档中的名字重新连接。
+
 This ID is not connected
 == 该 ID 未连接
 
@@ -11203,6 +11326,9 @@ This is the master switch for all interface animation categories
 
 This name cannot be used for files and folders
 == 此名称不能用于文件和文件夹
+
+This save is no longer in the local save file.
+== 本地存档文件中已没有这条记录。
 
 This server has an initial chat delay, you will be able to talk in %s seconds.
 == 本服务器启用了初始发言延迟，你还需要等待 %s 秒才能说话
@@ -11335,6 +11461,9 @@ Title bob angular speed in 1/100 rad/s
 
 Title bob wavelength in pixels
 == 头衔浮动波长（像素）
+
+Title color
+== 头衔颜色
 
 Title color (single color)
 == 头衔颜色（单色）
@@ -11900,6 +12029,9 @@ URL for downloading skins
 Usage: %s %s
 == 用法：%s %s
 
+Use /qm Yes [number] to restore a save, or /qm No to dismiss.
+== 输入 /qm Yes [序号] 恢复存档，或 /qm No 忽略本次提示。
+
 Use 12 hour clock
 == 使用 12 小时制
 
@@ -12107,9 +12239,6 @@ View the developers and contributors
 View the people supporting QmClient development
 == 查看支持 QmClient 开发的成员
 
-Violet Lightning
-== 紫电·雷切
-
 Virtual joystick which always uses fire.
 == 始终用于开火的虚拟摇杆。
 
@@ -12218,8 +12347,8 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == 语音白名单（逗号分隔）
 
-Void Shadow
-== 虚空·暗影
+Void
+== 虚空
 
 Volume
 == 音量
@@ -12559,9 +12688,6 @@ Word filter action: 0=replace matching words, 1=hide entire message
 
 Write local console contents to a text file
 == 将本地控制台内容写入文本文件
-
-Write performance debug logs to dedicated file
-== 将性能调试日志写入专用文件
 
 Write remote console contents to a text file
 == 将远程控制台内容写入文本文件
@@ -12927,6 +13053,46 @@ Zoom to current mouse target
 == ⚠️ 腾讯云 API 密钥未配置
 
 [Assets editor blend mode]
+Color
+== 颜色
+
+[Assets editor blend mode]
+Color Burn
+== 颜色加深
+
+[Assets editor blend mode]
+Color Dodge
+== 颜色减淡
+
+[Assets editor blend mode]
+Darken
+== 变暗
+
+[Assets editor blend mode]
+Difference
+== 差值
+
+[Assets editor blend mode]
+Exclusion
+== 排除
+
+[Assets editor blend mode]
+Hard Light
+== 强光
+
+[Assets editor blend mode]
+Hue
+== 色相
+
+[Assets editor blend mode]
+Lighten
+== 变亮
+
+[Assets editor blend mode]
+Luminosity
+== 明度
+
+[Assets editor blend mode]
 Multiply
 == 正片叠底
 
@@ -12939,8 +13105,16 @@ Overlay
 == 叠加
 
 [Assets editor blend mode]
+Saturation
+== 饱和度
+
+[Assets editor blend mode]
 Screen
 == 滤色
+
+[Assets editor blend mode]
+Soft Light
+== 柔光
 
 [Auto camera]
 Active
@@ -13697,14 +13871,6 @@ Confirm editing of this command.
 [Editor]
 Confirm overwrite
 == 确认覆盖
-
-[Editor]
-Connection failed: the collaboration service address is too long
-== 连接失败：协作服务地址过长
-
-[Editor]
-Connection failed: the HTTP service is unavailable
-== 连接失败：HTTP 服务不可用
 
 [Editor]
 Construct '%s' game tiles (x%d)
@@ -16339,14 +16505,6 @@ Sync interrupted: connection failed
 == 同步中断：连接失败
 
 [Editor]
-Sync interrupted: the collaboration service address is too long
-== 同步中断：协作服务地址过长
-
-[Editor]
-Sync interrupted: the HTTP service is unavailable
-== 同步中断：HTTP 服务不可用
-
-[Editor]
 Sync interrupted: the room does not exist or has expired
 == 同步中断：房间不存在或已过期
 
@@ -17067,32 +17225,24 @@ All
 == 全体
 
 [Show name plates]
+Current
+== 当前
+
+[Show name plates]
+Current + Local
+== 当前+本地
+
+[Show name plates]
+Local + Others
+== 本地+他人
+
+[Show name plates]
 None
 == 无
 
 [Show name plates]
 Others
 == 他人
-
-[Show name plates]
-Own
-== 自身
-
-[Show name plates scope]
-All
-== 所有
-
-[Show name plates scope]
-Current
-== 当前
-
-[Show name plates scope]
-Friends
-== 好友
-
-[Show name plates scope]
-Local
-== 本地
 
 [Show players' key presses]
 All

@@ -5,52 +5,78 @@
 #include <base/color.h>
 #include <base/vmath.h>
 
+#include <array>
 #include <cstddef>
 #include <vector>
 
-class CTrailPart;
+// 保留旧几何接口的输入类型；时间和弧长使用双精度，避免长时间游戏后丢失帧内精度。
+class CTrailPart
+{
+public:
+	vec2 m_Pos = vec2(0.0f, 0.0f);
+	ColorRGBA m_Col = ColorRGBA(1, 1, 1, 1);
+	float m_Width = 0.0f;
+	int m_Tick = -1;
+	double m_Time = -1.0;
+	double m_Distance = 0.0;
+	float m_Speed = -1.0f;
+	float m_Life = 0.0f;
+};
 
-// Tee 拖尾特效样式：原版拖尾之外另有 5 套独立形态 / 运动 / 消散效果。
-//
-// 设计约定：
-// - 本模块只做纯几何构建，不碰 Graphics()，输出一串四边形交给渲染端；
-// - 输入是拖尾采样点（CTrailPart：位置、颜色、半宽、tick）与当前时间，
-//   因此同一组输入必然得到同一组输出，可测试、可重放；
-// - 特效只在移动时生成，停下后随采样点年龄自然消散（寿命见 qm_tee_trail.cpp）。
 namespace qm_tee_trail
 {
+	// 保留已保存配置的编号；原紫电升级为 Exo，原黄金升级为冥火。
 	enum
 	{
-		STYLE_ORIGINAL = 0, // 原版拖尾（仍由 trails.cpp 既有路径渲染）
-		STYLE_CURSED_FLAME = 1, // 咒焰·黑闪：蓝青咒力火舌 + 黑色核心 + 猩红分叉电弧
-		STYLE_VIOLET_BOLT = 2, // 紫电·雷切：雷之呼吸·火雷神（紫色版），斩线 + 紫电雷纹 + 落点雷环
-		STYLE_SPIRIT_LIGHT = 3, // 灵光·流萤：蓝白流光细丝 + 缓慢漂浮的光点
-		STYLE_VOID_SHADOW = 4, // 虚空·暗影：墨黑烟絮触须 + 灰白薄边 + 尾部碎片
-		STYLE_GOLDEN_GRACE = 5, // 黄金·赐福：金色丝线 + 交织细弧 + 飘散金尘
+		STYLE_ORIGINAL = 0,
+		STYLE_BLACK_FLASH = 1,
+		STYLE_EXO = 2,
+		STYLE_SPIRIT = 3,
+		STYLE_VOID = 4,
+		STYLE_INFERNO = 5,
 		STYLE_COUNT = 6,
 	};
 
-	// 单个输出四边形：4 个顶点位置与 4 个顶点颜色（无贴图自由形变四边形）。
+	constexpr size_t MAX_POINTS = 192;
+	constexpr size_t MAX_RENDER_POINTS = 384;
+	constexpr size_t MAX_QUADS = MAX_RENDER_POINTS * 12 + 96;
+	constexpr float SAMPLE_SPACING = 6.0f;
+	constexpr float MIN_SPEED = 0.15f; // 世界单位 / 游戏 tick
+
+	// 每个玩家独立的等距环形队列；渲染头只是端帽，不占用距离采样点。
+	class CTrailState
+	{
+		std::array<CTrailPart, MAX_POINTS> m_aPoints;
+		size_t m_First = 0;
+		size_t m_Count = 0;
+		CTrailPart m_Head;
+		vec2 m_LastPos = vec2(0, 0);
+		double m_LastTime = -1.0;
+		double m_Carry = 0.0;
+		float m_LastSpeed = 0.0f;
+		void Push(const CTrailPart &Point);
+
+	public:
+		void Reset();
+		// 时间以游戏 tick 为单位；Break 显式处理传送、复活与渲染时间源切换。
+		void Update(vec2 Position, double Time, float Speed, float Life, bool Break = false);
+		void Export(std::vector<CTrailPart> &vOut) const;
+	};
+
+	// 顶点沿周界排列；普通混合保存暗主体，加法混合只用于发光层。
 	struct SQuad
 	{
 		vec2 m_aPos[4];
 		ColorRGBA m_aColor[4];
+		bool m_Additive = false;
 	};
 
-	// 单次构建的输出上限，避免超长拖尾把顶点数量打爆。
-	// 目前最重的一套（咒焰·黑闪）在满采样下约 380 个四边形。
-	constexpr size_t MAX_QUADS = 448;
-
-	// 非法或未启用样式统一回落到原版拖尾。
 	int ResolveStyle(int Style);
+	float Lifetime(int Style, int Length, float Speed);
 
-	// 构建一套样式的全部四边形。
-	// vTrail 从新到旧排列（vTrail[0] 为 Tee 当前位置）。
-	// UsePresetPalette 为 true 时使用样式自带标志性配色，否则从拖尾采样颜色派生。
-	// CurTime 与 CTrailPart::m_Tick 同一时间基（游戏 tick，可带小数）。
-	// Width 为拖尾半宽（像素），仅在采样点自带宽度为 0 时作为回退。
-	// Seed 让同屏多个 Tee 的随机细节互不相同，同一 (Seed, 输入) 结果稳定。
-	void BuildEffect(const std::vector<CTrailPart> &vTrail, int Style, bool UsePresetPalette, float CurTime, float Width, int Seed, std::vector<SQuad> &vOut);
-} // namespace qm_tee_trail
+	// 同一网格构建器服务全部样式，包括原版。输入从新到旧，输出缓存由调用者复用。
+	// PixelSize 是一个屏幕像素对应的世界单位，放大时增加曲线细分并缩窄抗锯齿边。
+	void BuildEffect(const std::vector<CTrailPart> &vTrail, int Style, bool UsePresetPalette, double CurTime, float Width, int Seed, std::vector<SQuad> &vOut, float PixelSize = 1.0f, bool Taper = true, bool Fade = false);
+}
 
 #endif

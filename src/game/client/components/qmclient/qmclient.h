@@ -2,19 +2,24 @@
 #ifndef GAME_CLIENT_COMPONENTS_QMCLIENT_QMCLIENT_H
 #define GAME_CLIENT_COMPONENTS_QMCLIENT_QMCLIENT_H
 
+#include "qm_realtime.h"
 #include "qmclient_utils.h"
 
 #include <base/hash.h>
 
 #include <engine/shared/http.h>
 #include <engine/shared/protocol.h>
+#include <engine/shared/websocket_client.h>
 
 #include <game/client/component.h>
 
 #include <memory>
 #include <mutex>
+#include <string>
+#include <vector>
 
 class IJob;
+typedef struct _json_value json_value;
 
 class CQmClient : public CComponent
 {
@@ -36,14 +41,11 @@ public:
 
 private:
 	std::shared_ptr<CHttpRequest> m_pTitleOperation;
-	std::shared_ptr<CHttpRequest> m_pTitleReport;
-	std::shared_ptr<CHttpRequest> m_pTitleList;
 	char m_aTitleToken[65] = "";
 	char m_aTitleText[64] = "";
 	char m_aTitleBoundName[64] = "";
 	// 账号上已保存的自选头衔风格 id（空表示未自选，由服务端每局派生）。
 	char m_aTitleProfileStyle[64] = "";
-	char m_aTitlePendingServer[NETADDR_MAXSTRSIZE] = "";
 	char m_aaPlayerTitles[MAX_CLIENTS][64] = {};
 	// 服务端分配的头衔动态风格 id，与 m_aaPlayerTitles 同时刷新。
 	char m_aaPlayerStyles[MAX_CLIENTS][64] = {};
@@ -61,34 +63,20 @@ private:
 	void ResetTitlePresences();
 	void StartTitleRequest(const char *pPath, const char *pBody, std::shared_ptr<CHttpRequest> &pTask);
 
-	std::shared_ptr<CHttpRequest> m_pQmClientAuthTokenTask = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmClientUsersTask = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmClientUsersSendTask = nullptr;
 	std::shared_ptr<IJob> m_pQmClientUsersParseJob = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmDeveloperPresenceTask = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmDeveloperPresencesTask = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmClientLifecycleStartTask = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmClientLifecycleCrashTask = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmClientLifecycleStopTask = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmClientServerTimeTask = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmClientPlaytimeQueryTask = nullptr;
 	std::shared_ptr<IJob> m_pQmClientLifecycleMarkerWriteJob = nullptr;
 	std::shared_ptr<std::mutex> m_pQmClientLifecycleMarkerMutex = std::make_shared<std::mutex>();
 	std::shared_ptr<CHttpRequest> m_pQmDdnetPlayerTask = nullptr;
 	std::shared_ptr<IJob> m_pQmDdnetPlayerParseJob = nullptr;
-	std::shared_ptr<CHttpRequest> m_pQmNewsTask = nullptr;
 	std::shared_ptr<CHttpRequest> m_pQmNewsPublishTask = nullptr;
 
-	char m_aQmClientAuthToken[256] = "";
 	char m_aQmClientMachineHash[SHA256_MAXSTRSIZE] = "";
 	char m_aQmClientLifecycleSessionId[64] = "";
 	char m_aQmClientPlaytimeClientId[65] = "";
 	char m_aQmDdnetPlayerName[MAX_NAME_LENGTH] = "";
 	char m_aQmDdnetFavoritePartner[MAX_NAME_LENGTH] = "";
-	char m_aQmClientPendingVoicePresenceServerAddress[NETADDR_MAXSTRSIZE] = "";
 	char m_aQmDeveloperToken[65] = "";
 	char m_aQmDeveloperSessionId[33] = "";
-	char m_aQmDeveloperPendingServerAddress[NETADDR_MAXSTRSIZE] = "";
 
 	// 「新功能」广播：远端 Markdown + 本地缓存 + 开发者草稿。
 	std::string m_QmNewsMarkdown;
@@ -96,25 +84,49 @@ private:
 	EQmNewsStatus m_QmNewsStatus = EQmNewsStatus::IDLE;
 	int m_QmNewsVersion = 0;
 	int m_QmNewsRevision = 0;
-	int64_t m_QmNewsLastFetch = 0;
 	bool m_QmNewsPublishing = false;
 	void InitQmNews();
 	void LoadQmNewsCache();
 	void SaveQmNewsCache();
 	void ApplyQmNewsPayload(const char *pBody, size_t BodySize);
-	void FinishQmNews();
 	void FinishQmNewsPublish();
 
-	int64_t m_QmClientLastSync = 0;
-	int64_t m_QmDeveloperLastSync = 0;
+	// 自有服务专用 WS 通道；断线只重连，不回退 HTTP。
+	std::unique_ptr<IQmWebSocketClient> m_pQmRealtime;
+	char m_aQmRealtimeUrl[256] = "";
+	bool m_QmRealtimeFailureLogged = false;
+	// 已向服务端同步过的头衔资料版本，用于触发一次订阅刷新。
+	int m_QmRealtimeTitleRevision = 0;
+	void StartQmRealtime();
+	void StopQmRealtime();
+	void UpdateQmRealtime();
+	void EnsureQmRealtimeConnection();
+	void SendQmRealtimeHello();
+	void SendQmRealtimeStop();
+	std::string BuildQmRealtimePresence(bool Hello) const;
+	void ApplyQmRealtimeServices(const SQmRealtimeMessage &Message);
+	void ApplyQmRealtimeTitleProfile(const json_value *pPayload);
+	int64_t m_QmRealtimeConnectedTick = 0;
+	int64_t m_QmRealtimeLastPresence = 0;
+	int64_t m_QmRealtimeNextPresenceCheck = 0;
+	std::string m_QmRealtimePresenceBody;
+	std::shared_ptr<const json_value> m_pQmRealtimeUsersPayload;
+	char m_aQmRealtimeUsersServer[NETADDR_MAXSTRSIZE] = "";
+	int64_t m_QmRealtimeUsersExpireTick = 0;
+	void HandleQmRealtimeMessage(const SQmRealtimeMessage &Message);
+	void ApplyQmRealtimeState(const SQmRealtimeMessage &Message);
+	void ApplyQmRealtimeBroadcast(const SQmRealtimeMessage &Message);
+	void ApplyQmRealtimeTitles(const SQmRealtimeMessage &Message);
+	// 头衔名单的唯一落地入口，复用已有身份校验与租约规则。
+	void ApplyQmTitlePresences(const json_value *pRoot, const char *pServerAddress);
+	void LogQmRealtimeEvent(const char *pStage, const char *pDetail) const;
+
 	int64_t m_QmClientServerNow = 0;
 	int64_t m_QmClientServerSessionStart = 0;
 	int64_t m_QmClientServerTimeLastSync = 0;
 	int64_t m_QmClientServerPlaytimeSeconds = -1;
 	int64_t m_QmClientPlaytimeLastSync = 0;
 	int64_t m_QmClientRecoveryStopAt = 0;
-	int64_t m_QmClientRecoveryNextRetry = 0;
-	int64_t m_QmClientStartupNextRetry = 0;
 	int64_t m_QmClientMarkerStartedAt = 0;
 	int64_t m_QmClientMarkerLastSeenAt = 0;
 	int64_t m_QmClientMarkerLastFlushTick = 0;
@@ -123,7 +135,6 @@ private:
 	int m_QmClientOnlineUserCount = 0;
 	int m_QmClientOnlineDummyCount = 0;
 	int m_QmDdnetTotalFinishes = -1;
-	int m_QmClientPendingVoicePresencePlayers = 0;
 	bool m_QmClientDistributionSuccessLatched = false;
 	bool m_QmClientShutdownReported = false;
 	bool m_QmClientAwaitingRecoveryStop = false;
@@ -132,10 +143,6 @@ private:
 
 	void InitQmClientLifecycle();
 	void UpdateQmClientLifecycleAndServerTime();
-	void SendQmClientLifecyclePing(const char *pEvent, std::shared_ptr<CHttpRequest> &pTaskSlot);
-	bool FinishQmClientPlaytimeTask(std::shared_ptr<CHttpRequest> &pTaskSlot, bool UpdateSessionStart);
-	void FinishQmClientServerTimeTask();
-	void SendQmClientPlaytimeRequest(const char *pUrl, std::shared_ptr<CHttpRequest> &pTaskSlot, int64_t StopAt = 0);
 	void EnsureQmClientPlaytimeClientId();
 	bool ReadQmClientLifecycleMarker(int64_t &OutStartedAt, int64_t &OutLastSeenAt);
 	void TouchQmClientLifecycleMarker(bool ForceWrite);
@@ -143,24 +150,11 @@ private:
 	void ClearQmClientLifecycleMarker();
 
 	void UpdateQmClientRecognition();
-	void SyncQmClientUsers();
-	void FetchQmClientAuthToken();
-	void SendQmClientPlayerData();
-	void FetchQmClientUsers();
-	void FinishQmClientAuthToken();
 	void FinishQmClientUsers();
-	void ResetQmClientRecognitionTasks();
-	bool NeedsQmClientRecognition() const;
-	bool NeedsFastQmClientSync() const;
 	bool EnsureQmClientMachineHash();
-	bool BuildQmClientRecognitionUrl(const char *pPath, char *pBuf, size_t BufSize, const char *pQuery = nullptr) const;
 	void ClearQmClientServerDistribution();
 	void InitQmDeveloperAuthentication();
-	void UpdateQmDeveloperPresence();
-	void SendQmDeveloperPresence(const char *pServerAddress);
-	void FetchQmDeveloperPresences(const char *pServerAddress);
-	void FinishQmDeveloperPresences(const char *pServerAddress);
-	void ResetQmDeveloperPresenceTasks();
+	void ApplyQmRealtimeDevelopers(const json_value *pPayload);
 
 	void UpdateQmDdnetPlayerStats();
 	void FetchQmDdnetPlayerStats(const char *pPlayerName);
@@ -211,6 +205,18 @@ public:
 	void QmNewsRefresh(bool Force);
 	void QmNewsPublishDraft();
 	void QmNewsReloadDraft();
+
+	// 实时通道状态（供设置界面与诊断使用）。
+	bool QmRealtimeAvailable() const { return m_pQmRealtime != nullptr && m_pQmRealtime->Available(); }
+	bool QmRealtimeConnected() const { return m_pQmRealtime != nullptr && m_pQmRealtime->State() == EQmWebSocketState::CONNECTED; }
+	const char *QmRealtimeStateName() const { return m_pQmRealtime != nullptr ? m_pQmRealtime->StateName() : "off"; }
+	const char *QmRealtimeLastError() const { return m_pQmRealtime != nullptr ? m_pQmRealtime->LastError() : ""; }
+	int QmRealtimePingRttMs() const { return m_pQmRealtime != nullptr ? m_pQmRealtime->LastPingRttMs() : -1; }
+	int64_t QmRealtimeReconnectCount() const { return m_pQmRealtime != nullptr ? m_pQmRealtime->ReconnectCount() : 0; }
+	// 强制重连（设置界面在地址变更后调用）。
+	void QmRealtimeRestart();
+	// 请求服务端重推当前服务器的头衔名单（兑换/保存头衔、发现服务端变更后调用）。
+	void QmRealtimeRequestTitleRefresh();
 };
 
 #endif

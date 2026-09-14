@@ -1,6 +1,8 @@
 // 请抬头享受阳光｜日子很好 我很我---------致咩子
 #include "qm_title_render.h"
 
+#include "qmclient_utils.h"
+
 #include <base/str.h>
 #include <base/system.h>
 
@@ -9,18 +11,25 @@
 
 SQmTitleRenderStyle QmTitleResolveRenderStyle(const char *pServerStyleId)
 {
+	// 本地兜底 id 只在 qm_title_style_enabled 打开时才参与，语义与设置页下拉框一致。
+	return QmTitleResolveRenderStyle(pServerStyleId, g_Config.m_QmTitleStyleEnabled != 0, g_Config.m_QmTitleStyle);
+}
+
+SQmTitleRenderStyle QmTitleResolveRenderStyle(const char *pServerStyleId, const bool LocalStyleEnabled, const char *pLocalStyleId)
+{
 	SQmTitleRenderStyle Style;
 	// 服务端分配的风格优先；未知 id 会被 QmTitleStyleById 拒绝（返回 nullptr）后回退到本地配置。
 	if(pServerStyleId != nullptr && pServerStyleId[0] != '\0')
 		Style.m_pStyle = QmTitleStyleById(pServerStyleId);
-	if(Style.m_pStyle == nullptr)
-	{
-		if(!g_Config.m_QmTitleStyleEnabled)
-			return Style;
-		Style.m_pStyle = QmTitleStyleById(g_Config.m_QmTitleStyle);
-	}
+	if(Style.m_pStyle == nullptr && LocalStyleEnabled)
+		Style.m_pStyle = QmTitleStyleById(pLocalStyleId);
 	if(Style.m_pStyle == nullptr)
 		return Style;
+
+	// 配色优先级：本地配色档（单色/彩虹）压过风格自带颜色，风格只保留浮动/掠光/插值。
+	// 「跟随服务器」档不覆盖，保持既有表现：服务端下发什么颜色就是什么颜色。
+	Style.m_ColorOverride = g_Config.m_QmTitleColorMode == (int)EQmTitleColorMode::SINGLE ||
+				g_Config.m_QmTitleColorMode == (int)EQmTitleColorMode::RAINBOW;
 
 	// 服务端只下发风格 id，浮动与相位强度仍由本地配置决定。
 	Style.m_Interpolation = EQmTitleInterpolation::Smooth;
@@ -34,6 +43,18 @@ SQmTitleRenderStyle QmTitleResolveRenderStyle(const char *pServerStyleId)
 
 namespace
 {
+	float QmTitlePrefixWidth(ITextRender *pTextRender, const char *pText, int PrefixBytes, float FontSize, float LeftX, const CQmTitleTextMetrics *pMetrics)
+	{
+		if(pMetrics != nullptr)
+			return pMetrics->PrefixWidth(PrefixBytes, LeftX);
+		char aPrefix[64];
+		if(PrefixBytes >= (int)sizeof(aPrefix))
+			return LeftX;
+		mem_copy(aPrefix, pText, PrefixBytes);
+		aPrefix[PrefixBytes] = '\0';
+		return pTextRender->TextWidth(FontSize, aPrefix);
+	}
+
 	// 向白色插值：只动 RGB，透明度由调用方保持（名牌淡入淡出依赖它）。
 	ColorRGBA QmTitleLighten(const ColorRGBA &Color, const float Amount)
 	{
@@ -45,7 +66,7 @@ namespace
 	}
 }
 
-bool QmTitleRenderFillCursor(ITextRender *pTextRender, CTextCursor &Cursor, const char *pText, const float FontSize, const SQmTitleRenderStyle &Style, const float TimeSec, const float Alpha, const SQmTitleShimmer &Shimmer)
+bool QmTitleRenderFillCursor(ITextRender *pTextRender, CTextCursor &Cursor, const char *pText, const float FontSize, const SQmTitleRenderStyle &Style, const float TimeSec, const float Alpha, const SQmTitleShimmer &Shimmer, const CQmTitleTextMetrics *pMetrics, const ColorRGBA &Color, const ColorRGBA &ColorEnd)
 {
 	if(pTextRender == nullptr || pText == nullptr || pText[0] == '\0' || Style.m_pStyle == nullptr)
 		return false;
@@ -75,18 +96,21 @@ bool QmTitleRenderFillCursor(ITextRender *pTextRender, CTextCursor &Cursor, cons
 		// 当前字符的左边缘等于它的前缀宽度，右边缘等于含入当前字符后的宽度。
 		// 这与 Calamity 的 pos.X = MeasureString(已绘制前缀).X 语义一致，也保留了字形间距。
 		const float LeftX = PixelX;
-		float RightX = LeftX;
-		char aPrefix[64];
-		const int PrefixBytes = (int)(pNext - pText);
-		if(PrefixBytes < (int)sizeof(aPrefix))
-		{
-			mem_copy(aPrefix, pText, PrefixBytes);
-			aPrefix[PrefixBytes] = '\0';
-			RightX = pTextRender->TextWidth(FontSize, aPrefix);
-		}
+		const float RightX = QmTitlePrefixWidth(pTextRender, pText, (int)(pNext - pText), FontSize, LeftX, pMetrics);
 
-		ColorRGBA LeftColor = QmTitleStyleSampleWithInterpolation(TitleStyle, TimeSec, LeftX, Style.m_Interpolation).WithAlpha(Alpha);
-		ColorRGBA RightColor = QmTitleStyleSampleWithInterpolation(TitleStyle, TimeSec, RightX, Style.m_Interpolation).WithAlpha(Alpha);
+		ColorRGBA LeftColor;
+		ColorRGBA RightColor;
+		if(Style.m_ColorOverride)
+		{
+			// 本地配色档优先：不采样风格颜色，直接用调用方给的颜色（单色为同一个色，彩虹为逐字符色）。
+			LeftColor = Color.WithAlpha(Alpha);
+			RightColor = ColorEnd.WithAlpha(Alpha);
+		}
+		else
+		{
+			LeftColor = QmTitleStyleSampleWithInterpolation(TitleStyle, TimeSec, LeftX, Style.m_Interpolation).WithAlpha(Alpha);
+			RightColor = QmTitleStyleSampleWithInterpolation(TitleStyle, TimeSec, RightX, Style.m_Interpolation).WithAlpha(Alpha);
+		}
 
 		if(Shimmer.m_Enabled)
 		{
@@ -112,5 +136,33 @@ bool QmTitleRenderFillCursor(ITextRender *pTextRender, CTextCursor &Cursor, cons
 
 	// 静态单色且不浮动时内容不随时间变化，调用方无需逐帧重建；
 	// 掠光逐帧改变顶点色，必须逐帧重建。
-	return UseBob || Shimmer.m_Enabled || TitleStyle.m_Mode != EQmTitleStyleMode::Static;
+	// 颜色被本地配色档接管时也不能按静态处理：彩虹档逐字符颜色依赖本函数生成的色段。
+	return UseBob || Shimmer.m_Enabled || Style.m_ColorOverride || TitleStyle.m_Mode != EQmTitleStyleMode::Static;
+}
+
+void QmTitleRenderFillMotionOffsets(ITextRender *pTextRender, CTextCursor &Cursor, const char *pText, const float FontSize, const SQmTitleRenderStyle &Style, const float TimeSec, const SQmTitleShimmer &Shimmer, const CQmTitleTextMetrics *pMetrics)
+{
+	if(pTextRender == nullptr || pText == nullptr || pText[0] == '\0' || Style.m_pStyle == nullptr)
+		return;
+	if(Style.m_Bob.m_Amplitude == 0.0f || Style.m_Bob.m_WaveLength <= 0.0f)
+		return;
+
+	// 相位与 QmTitleRenderFillCursor 一致（按字符左边缘的累计像素宽度），
+	// 否则同一风格在「颜色被本地配色档接管」与「用风格颜色」两种情况下波纹位置会不一致。
+	const int BaseIndex = Cursor.m_CharCount;
+	const char *pCurrent = pText;
+	float PixelX = 0.0f;
+	while(*pCurrent != '\0')
+	{
+		const char *pNext = pCurrent;
+		if(str_utf8_decode(&pNext) <= 0)
+			break;
+
+		const float LeftX = PixelX;
+		const float RightX = QmTitlePrefixWidth(pTextRender, pText, (int)(pNext - pText), FontSize, LeftX, pMetrics);
+
+		Cursor.m_vCharOffsets.emplace_back(BaseIndex + (int)(pCurrent - pText), 0.0f, QmTitleStyleBobOffset(Style.m_Bob, TimeSec, LeftX));
+		PixelX = RightX;
+		pCurrent = pNext;
+	}
 }

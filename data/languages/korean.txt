@@ -28,9 +28,6 @@
 %d items selected
 == %d개 항목 선택됨
 
-%d more cut segments
-== 추가로 %d개의 잘라낸 구간
-
 %d of %d server
 == %d/%d 서버
 
@@ -60,6 +57,9 @@
 
 %d users
 == %d 명의 사용자
+
+%d. %s | main: %s | dummy: %s
+== %d. %s | 본체: %s | 더미: %s
 
 %d/%d KiB (%.1f KiB/s)
 == %d/%d KiB (%.1f KiB/s)
@@ -259,6 +259,9 @@ A demo with this name already exists
 
 A folder with this name already exists
 == 이 이름의 폴더가 이미 존재합니다.
+
+A save is already being restored. Please wait.
+== 저장 데이터를 복원 중입니다. 잠시 기다려 주세요.
 
 A screenshot with this name already exists
 == 이 이름의 스크린샷이 이미 존재합니다.
@@ -691,9 +694,6 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == 설정 카드 정렬 및 레이아웃 재배치에 애니메이션 적용
-
-Animated styles override the fallback title color
-== 애니메이션 스타일의 색상이 기본 칭호 색상보다 우선합니다
 
 Animated title style id
 == 칭호 애니메이션 스타일 ID
@@ -1427,8 +1427,14 @@ Bit flags for disabling settings tabs
 Black
 == 검정
 
+Black Flash
+== 흑섬
+
 Blend mode
 == 혼합 모드
+
+Blend strength
+== 혼합 강도
 
 Blink the active local tee
 == 활성 로컬 캐릭터를 깜박이게 합니다
@@ -1897,6 +1903,12 @@ Clearable text...
 
 Clears the voting options
 == 투표 옵션을 지웁니다
+
+Click a part on the right to edit its color, blend mode and strength.
+== 오른쪽 부품을 클릭하여 색상, 혼합 모드와 강도를 조정하세요.
+
+Click again to find the next location.
+== 다음 위치를 찾으려면 다시 클릭하세요.
 
 Click to add this community to favorites
 == 이 커뮤니티를 즐겨찾기에 추가하려면 클릭하세요
@@ -2483,9 +2495,6 @@ Current: Score
 Current: Time
 == 현재: 시간
 
-Cursed Flame
-== 저주 화염·흑섬
-
 Custom
 == 사용자 정의
 
@@ -2555,6 +2564,9 @@ Customize translate button and menu colors
 Customize vote display and interaction
 == Customize vote display and interaction
 
+Cut end: %s
+== 끝: %s
+
 Cut interval
 == 잘라낸 구간
 
@@ -2563,6 +2575,9 @@ Cut length
 
 Cut segments
 == 잘라낸 구간들
+
+Cut start: %s
+== 시작: %s
 
 Cute:
 == 귀여움:
@@ -2702,6 +2717,9 @@ Debug SQL.
 Debug tile layer clipping.
 == 디버그 타일 레이어 클리핑
 
+Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)
+== 전용 WebSocket 주소 (비우면 wss://qmclient.icu/ws 사용)
+
 Deep freeze color
 == 깊은 얼음 색상
 
@@ -2825,8 +2843,20 @@ Delete this preset
 Demo
 == 데모
 
+Demo display
+== 데모 표시
+
 Demo effects
 == 데모 효과
+
+Demo hook strength (0=Off 1=Icon 2=Icon and number)
+== 데모 훅 강도 (0=끔 1=아이콘 2=아이콘과 번호)
+
+Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)
+== 데모 훅 강도 표시 범위 (0=자신 1=다른 플레이어 2=강함 3=약함 4=모두)
+
+Demo key presses (0=Off 1=Others 2=All 3=Own)
+== 데모 키 입력 (0=끔 1=다른 플레이어 2=모두 3=자신)
 
 Demo marker added
 == 데모 마커 추가됨
@@ -3482,9 +3512,6 @@ Enable chat with all/team mode
 Enable cheats for your current team's run, but you can't earn a rank
 == 현재 팀의 실행에 치트를 활성화하지만, 순위를 획득할 수 없습니다
 
-Enable client stutter diagnostics at startup
-== 시작 시 클라이언트 끊김 진단 활성화
-
 Enable colored console output
 == 콘솔 컬러 출력 활성화
 
@@ -3610,9 +3637,6 @@ Enable lyrics
 
 Enable macOS graphics diagnostics and Instruments signposts
 == macOS 그래픽 진단 및 Instruments 표지 활성화
-
-Enable main thread and render stage performance debug logging
-== 메인 스레드 및 렌더링 단계 성능 디버그 로그 활성화
 
 Enable map compatibility mode using the specified bug (example: grenade-doubleexplosion@ddnet.tw)
 == 지정된 버그를 사용하여 맵 호환 모드 활성화 (예: grenade-doubleexplosion@ddnet.tw)
@@ -3761,6 +3785,9 @@ Enable Tee trail
 Enable tee trails
 == 티 꼬리 활성화
 
+Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
+== QmClient 전용 WebSocket 서비스 활성화 (HTTP 폴링 대체 없음)
+
 Enable thinking mode (slower)
 == 사고 모드 활성화 (느림)
 
@@ -3835,6 +3862,9 @@ Endpoint (optional)
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == /practice 모드를 입력하거나 재시작하세요. 그렇지 않으면 60초 후에 팀 전체가 사망합니다
+
+Enter a CP number from 1 to 255.
+== 1~255 사이의 CP 번호를 입력하세요.
 
 Enter Password
 == 비밀번호 입력
@@ -3950,6 +3980,9 @@ Execute the specified file
 Existing Player
 == 기존 플레이어
 
+Exo
+== Exo 에너지
+
 Export
 == 내보내기
 
@@ -4055,9 +4088,6 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == 대체 단순 노이즈 감소 강도
 
-Fallback title color
-== 기본 칭호 색상
-
 Fast input
 == 빠른 입력
 
@@ -4160,8 +4190,14 @@ Filter out spectators from player count
 Filtered word console color
 == 차단된 단어 콘솔 색상
 
+Find / Next
+== 찾기 / 다음
+
 Find all ban records for the specified IP address
 == 지정된 IP 주소의 모든 차단 기록 찾기
+
+Find CP
+== CP 찾기
 
 Find QmClient communities and project links
 == Find QmClient communities and project links
@@ -4180,6 +4216,9 @@ Finish name
 
 Finish Name:
 == 결승선 이름:
+
+Finish or reset the current race before restoring a save.
+== 현재 레이스를 끝내거나 초기화한 뒤 저장 데이터를 복원하세요.
 
 Finished
 == 완료됨
@@ -4585,9 +4624,6 @@ Go forward one tick
 
 Go forward the specified duration
 == 지정된 시간만큼 앞으로 가기
-
-Golden Grace
-== 황금·축복
 
 Gores
 == 고어스
@@ -5066,6 +5102,9 @@ I am away from the game window
 I muted you
 == 내가 당신을 음소거했습니다
 
+Icon and number
+== 아이콘과 번호
+
 Icons
 == 아이콘
 
@@ -5179,6 +5218,9 @@ Indicator size
 
 Indicator transparency
 == 표시기 투명도
+
+Inferno
+== 지옥불
 
 Infinite hook for super players on/off.
 == 슈퍼 플레이어용 무한 갈고리 켜기/끄기
@@ -5314,6 +5356,9 @@ Invalid ID
 
 Invalid option
 == 잘못된 옵션
+
+Invalid save number. Use a number from the save list.
+== 유효하지 않은 저장 번호입니다. 목록의 번호를 사용하세요.
 
 Invalid spectator id used
 == 잘못된 관전자 ID 가 사용됨
@@ -5621,6 +5666,9 @@ Left-click a Frankenstein part to tint it. Drag parts to replace them. Right-cli
 Left/right channel width
 == 좌/우 채널 폭
 
+Legacy option: connections that skip TLS verification are rejected
+== 레거시 옵션: TLS 검증을 건너뛰는 연결은 거부됩니다
+
 Length
 == 길이
 
@@ -5855,6 +5903,9 @@ Locked
 Log output filename
 == 로그 출력 파일 이름
 
+Log realtime WebSocket channel events
+== 실시간 WebSocket 채널 이벤트 기록
+
 Log the network
 == 네트워크 로그 기록
 
@@ -6011,14 +6062,8 @@ Margin when notification is docked
 Mark demo
 == 데모 표시
 
-Mark the beginning of a cut (right click to reset)
-== 잘라내기 시작 지점 표시 (우클릭 시 초기화)
-
 Mark the beginning of a demo cut
 == 데모 컷의 시작을 표시합니다
-
-Mark the end of a cut (right click to reset)
-== 잘라내기 끝 지점 표시 (우클릭 시 초기화)
 
 Mark the end of a demo cut
 == 데모 컷의 끝을 표시합니다
@@ -6514,6 +6559,9 @@ Name: %s
 
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 == 이름표 갈고리 강도 아이콘 범위 (0=자신 1=타인 2=강한 갈고리 3=약한 갈고리 4=모든 플레이어)
+
+Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)
+== 이름표 닉네임 범위 (0=없음 1=현재 캐릭터 2=자신의 캐릭터 3=다른 플레이어 4=다른 플레이어와 자신의 비활성 캐릭터 5=모두)
 
 Nameplate position X
 == 네임플레이트에 좌표 X 표시
@@ -7151,9 +7199,6 @@ Other
 Other players' hook line width
 == 다른 플레이어의 갈고리 선 너비
 
-Other players' nameplate scope (0=All players 1=Friends only)
-== 타인 이름표 범위 (0=모든 플레이어 1=친구만)
-
 Others
 == 다른 사람
 
@@ -7234,9 +7279,6 @@ Overwrite clan even if empty
 
 Own hook line width
 == 자신의 갈고리 선 너비
-
-Own nameplate scope (0=Current character 1=All local characters)
-== 자신 이름표 범위 (0=현재 캐릭터 1=로컬 모든 캐릭터)
 
 p = Ping latency
 == p = Ping 지연 시간
@@ -7339,9 +7381,6 @@ Penalty in seconds for saving or swapping positions
 
 Per-name volume (name=percent)
 == 이름별 개별 볼륨 (name=percent)
-
-Performance debug log threshold (ms)
-== 성능 디버그 로그 임계값 (ms)
 
 Permanent access; up to 4 online IP addresses
 == 영구 자격, 최대 4개 IP 동시 접속
@@ -7754,6 +7793,9 @@ Preview built with %d skipped slot(s).
 Preview button visibility while the editor is active.
 == 편집기 활성화 시 버튼 가시성 미리보기
 
+Preview cut (P)
+== 구간 미리 보기 (P)
+
 Preview dummy nameplate
 == 더미 이름표 미리보기
 
@@ -8080,6 +8122,18 @@ Ratio threshold for local target language detection
 
 Really? Not even a little?
 == 정말요? 조금도 생각해 보실 생각이 없나요?
+
+Realtime channel
+== 실시간 채널
+
+Realtime channel heartbeat interval (seconds, 0 uses default)
+== 실시간 채널 하트비트 간격 (초, 0이면 기본값)
+
+Realtime channel reconnect backoff base (ms)
+== 실시간 채널 재연결 백오프 기준 (밀리초)
+
+Realtime channel reconnect backoff cap (ms)
+== 실시간 채널 재연결 백오프 상한 (밀리초)
 
 Reason
 == 이유
@@ -8588,8 +8642,14 @@ Restart the client
 Restarting. Please wait…
 == 재시작 중입니다. 잠시 기다려 주세요…
 
+Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
+== 2인 저장 데이터를 복원할까요? /qm Yes는 최신 데이터, /qm Yes 번호는 다른 데이터 선택, /qm No는 알림 닫기입니다.
+
 Restore old single-segment hook collision line behavior
 == 이전 단일 세그먼트 갈고리 충돌선 동작 복원
+
+Restoring save %d: main '%s', dummy '%s'.
+== 저장 데이터 %d 복원 중: 본체 '%s', 더미 '%s'.
 
 Retrying…
 == 재시도 중…
@@ -8780,6 +8840,12 @@ Save ghost
 Save last %d min
 == 마지막 %d분 저장
 
+Save loaded; local record removed.
+== 저장 데이터를 불러왔으며 로컬 기록을 삭제했습니다.
+
+Save loaded; the local record could not be removed.
+== 저장 데이터를 불러왔지만 로컬 기록을 삭제하지 못했습니다.
+
 Save player names in replay
 == 리플레이에 플레이어 이름 저장
 
@@ -8788,6 +8854,15 @@ Save power by lowering update rate (higher input latency)
 
 Save replay of best time per game
 == 게임당 최고 기록의 리플레이 저장
+
+Save restore dismissed.
+== 저장 데이터 복원을 취소했습니다.
+
+Save restore stopped without confirming success. The local record was kept.
+== 불러오기 성공을 확인하지 못해 복원을 중단했습니다. 로컬 기록은 유지됩니다.
+
+Save restore stopped: connection, names or team were not ready. The local record was kept.
+== 연결, 이름 또는 팀이 준비되지 않아 복원을 중단했습니다. 로컬 기록은 유지됩니다.
 
 Save settings file on exit
 == 종료 시 설정 파일 저장
@@ -8933,6 +9008,9 @@ Search skins and manage the skin queue
 Searching
 == 검색 중
 
+Sec-WebSocket-Protocol sent during the realtime handshake
+== 실시간 핸드셰이크에서 보내는 Sec-WebSocket-Protocol
+
 Secondary
 == 보조
 
@@ -8980,6 +9058,9 @@ Selected candidate %d/%d under cursor.
 
 Selected item color
 == 선택 항목 색상
+
+Selected part: %d
+== 선택한 부품: %d
 
 Selected server
 == 선택한 서버
@@ -9158,6 +9239,12 @@ Set color
 Set current demo speed
 == 현재 데모 속도 설정
 
+Set cut end at current position (O, right click to reset)
+== 현재 위치를 구간 끝으로 설정 (O, 우클릭으로 초기화)
+
+Set cut start at current position (I, right click to reset)
+== 현재 위치를 구간 시작으로 설정 (I, 우클릭으로 초기화)
+
 Set ddrace team for a player
 == 플레이어의 DDRace 팀 설정
 
@@ -9325,6 +9412,9 @@ Show chat (2 always show large chat area)
 
 Show chat bubbles above players
 == 플레이어 위에 채팅 풍선 표시
+
+Show chat in demo preview and video
+== 데모 미리 보기와 영상에 채팅 표시
 
 Show chat messages above players
 == 플레이어 위에 채팅 메시지 표시
@@ -9632,6 +9722,9 @@ Show in-game HUD (spectator HUD)
 Show in-game HUD (timer)
 == 게임 내 HUD 표시 (타이머)
 
+Show in-game HUD in demo preview and video
+== 데모 미리 보기와 영상에 게임 HUD 표시
+
 Show in-game HUD when rendering video
 == 비디오 렌더링 시 게임 내 HUD 표시
 
@@ -9673,6 +9766,9 @@ Show katan on frozen players
 
 Show katana on frozen players (restores old behavior)
 == 얼어붙은 플레이어에 카타나 표시 (이전 동작 복원)
+
+Show key presses
+== 키 입력 표시
 
 Show key presses (1 = others, 2 = all, 3 = own only)
 == 키 입력 표시 (1 = 다른 플레이어, 2 = 모두, 3 = 자신만)
@@ -10157,6 +10253,9 @@ Simple noise reduction strength
 Single color
 == 단색
 
+Single color and Rainbow override the color of animated styles; the style keeps its motion
+== 단색과 무지개는 애니메이션 스타일의 색상을 덮어씁니다. 스타일의 움직임은 그대로 유지됩니다
+
 Size
 == 크기
 
@@ -10195,6 +10294,21 @@ Skin list sort mode (0=Name, 1=Release date)
 
 Skin options
 == 스킨 옵션
+
+Skin outline color
+== 스킨 윤곽선 색상
+
+Skin outline for other players
+== 다른 플레이어의 스킨 윤곽선
+
+Skin outline for self and dummy
+== 자신과 더미의 스킨 윤곽선
+
+Skin outline opacity
+== 스킨 윤곽선 불투명도
+
+Skin outline width
+== 스킨 윤곽선 두께
 
 Skin prefix
 == 스킨 접두사
@@ -10511,8 +10625,8 @@ Sphere
 Spin pop
 == 회전 팝
 
-Spirit Light
-== 영광·반딧불
+Spirit
+== 영혼의 빛
 
 Sponsor code
 == 인증 코드
@@ -10630,6 +10744,9 @@ Stop key input on switch (0=off, 1=dummy, 2=player)
 
 Stop practice
 == 연습 중지
+
+Stop preview (P)
+== 미리 보기 중지 (P)
 
 Stop record
 == 녹화 중지
@@ -10988,8 +11105,8 @@ Tee trail color
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee 궤적 색상 모드 (1=단색, 2=현재 Tee 색상, 3=무지개, 4=Tee 속도, 5=무작위)
 
-Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
-== Tee 궤적 스타일 (0=기본, 1=저주 화염·흑섬, 2=보랏빛 번개, 3=영광·반딧불, 4=공허·그림자, 5=황금·축복)
+Tee trail style (0=Original, 1=Black Flash, 2=Exo, 3=Spirit, 4=Void, 5=Inferno)
+== Tee 궤적 스타일  (0=기본, 1=흑섬, 2=Exo 에너지, 3=영혼의 빛, 4=공허, 5=지옥불)
 
 Tee Trails
 == Tee 궤적
@@ -11165,6 +11282,9 @@ There are unsaved changes in the touch controls editor. Saving first is recommen
 There is no checkpoint teleporter with that index on the map.
 == 해당 맵에 그 인덱스의 체크포인트 텔레포터가 없습니다
 
+There is no pending save restore prompt.
+== 현재 응답을 기다리는 저장 데이터 복원 알림이 없습니다.
+
 There is no teleporter with that index on the map.
 == 해당 맵에 그 인덱스의 텔레포터가 없습니다
 
@@ -11195,6 +11315,9 @@ Thin
 Thinking mode requires a reasoning model
 == 사고 모드를 사용하려면 추론 모델이 필요합니다
 
+This connection cannot change names while connected. Reconnect with the saved names first.
+== 이 연결에서는 접속 중 이름을 변경할 수 없습니다. 저장된 이름으로 다시 접속하세요.
+
 This ID is not connected
 == 이 ID는 연결되지 않음
 
@@ -11203,6 +11326,9 @@ This is the master switch for all interface animation categories
 
 This name cannot be used for files and folders
 == 이 이름은 파일 및 폴더에 사용할 수 없습니다
+
+This save is no longer in the local save file.
+== 이 저장 데이터는 로컬 저장 파일에 더 이상 없습니다.
 
 This server has an initial chat delay, you will be able to talk in %s seconds.
 == 이 서버에는 초기 채팅 지연이 있습니다. %s초 후에 말할 수 있습니다
@@ -11335,6 +11461,9 @@ Title bob angular speed in 1/100 rad/s
 
 Title bob wavelength in pixels
 == 칭호 흔들림 파장 (픽셀)
+
+Title color
+== 칭호 색상
 
 Title color (single color)
 == 칭호 색상 (단색)
@@ -11900,6 +12029,9 @@ URL for downloading skins
 Usage: %s %s
 == 사용법: %s %s
 
+Use /qm Yes [number] to restore a save, or /qm No to dismiss.
+== /qm Yes [번호]로 복원하거나 /qm No로 알림을 닫으세요.
+
 Use 12 hour clock
 == 12시간제 사용
 
@@ -12107,9 +12239,6 @@ View the developers and contributors
 View the people supporting QmClient development
 == View the people supporting QmClient development
 
-Violet Lightning
-== 보랏빛 번개
-
 Virtual joystick which always uses fire.
 == 항상 발사를 사용하는 가상 조이스틱입니다.
 
@@ -12218,8 +12347,8 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == 음성 화이트리스트 (쉼표로 구분)
 
-Void Shadow
-== 공허·그림자
+Void
+== 공허
 
 Volume
 == 볼륨
@@ -12559,9 +12688,6 @@ Word filter action: 0=replace matching words, 1=hide entire message
 
 Write local console contents to a text file
 == 로컬 콘솔 내용을 텍스트 파일로 저장
-
-Write performance debug logs to dedicated file
-== 성능 디버그 로그를 전용 파일에 기록
 
 Write remote console contents to a text file
 == 원격 콘솔 내용을 텍스트 파일로 저장
@@ -12927,6 +13053,46 @@ Zoom to current mouse target
 == ⚠️ 텐센트 클라우드 API가 구성되지 않음
 
 [Assets editor blend mode]
+Color
+== 색상
+
+[Assets editor blend mode]
+Color Burn
+== 색상 번
+
+[Assets editor blend mode]
+Color Dodge
+== 색상 닷지
+
+[Assets editor blend mode]
+Darken
+== 어둡게
+
+[Assets editor blend mode]
+Difference
+== 차이
+
+[Assets editor blend mode]
+Exclusion
+== 제외
+
+[Assets editor blend mode]
+Hard Light
+== 하드 라이트
+
+[Assets editor blend mode]
+Hue
+== 색조
+
+[Assets editor blend mode]
+Lighten
+== 밝게
+
+[Assets editor blend mode]
+Luminosity
+== 광도
+
+[Assets editor blend mode]
 Multiply
 == 곱하기
 
@@ -12939,8 +13105,16 @@ Overlay
 == 오버레이
 
 [Assets editor blend mode]
+Saturation
+== 채도
+
+[Assets editor blend mode]
 Screen
 == 스크린
+
+[Assets editor blend mode]
+Soft Light
+== 소프트 라이트
 
 [Auto camera]
 Active
@@ -13163,32 +13337,24 @@ All
 == 모두
 
 [Show name plates]
+Current
+== 현재
+
+[Show name plates]
+Current + Local
+== 현재+로컬
+
+[Show name plates]
+Local + Others
+== 로컬+다른 사람
+
+[Show name plates]
 None
 == 없음
 
 [Show name plates]
 Others
 == 다른 사람
-
-[Show name plates]
-Own
-== 자신
-
-[Show name plates scope]
-All
-== 모두
-
-[Show name plates scope]
-Current
-== 현재
-
-[Show name plates scope]
-Friends
-== 친구
-
-[Show name plates scope]
-Local
-== 로컬
 
 [Show players' key presses]
 All

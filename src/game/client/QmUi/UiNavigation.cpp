@@ -90,14 +90,12 @@ namespace ui_widget
 		CUIRect Indicator = Target;
 		if(Ctx.m_pAnim != nullptr)
 		{
-			// 滑块弹簧：欠阻尼一点点（ζ≈0.93），切换 Tab 时带速度续接地滑过去，
-			// 落到目标附近再收住，不会来回弹。
-			static constexpr SUiSpringConfig s_IndicatorSpring{1.0f, 420.0f, 38.0f, 0.05f, 0.4f};
+			// 导航使用统一弹簧，快速切换时从当前速度续接，接近目标时平稳收住。
 			const uint64_t NodeKey = BuildUiAnimNodeKey(GroupId, 0);
-			Indicator.x = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_X, Target.x, s_IndicatorSpring, 2);
-			Indicator.y = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_Y, Target.y, s_IndicatorSpring, 2);
-			Indicator.w = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::WIDTH, Target.w, s_IndicatorSpring, 2);
-			Indicator.h = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::HEIGHT, Target.h, s_IndicatorSpring, 2);
+			Indicator.x = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_X, Target.x, ui_token::motion::NAVIGATION_SPRING, 2);
+			Indicator.y = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_Y, Target.y, ui_token::motion::NAVIGATION_SPRING, 2);
+			Indicator.w = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::WIDTH, Target.w, ui_token::motion::NAVIGATION_SPRING, 2);
+			Indicator.h = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::HEIGHT, Target.h, ui_token::motion::NAVIGATION_SPRING, 2);
 		}
 		DrawRoundedSurface(Ctx, Indicator, Style.m_IndicatorColor, ColorRGBA(), ui_token::radius::PILL);
 	}
@@ -125,14 +123,12 @@ namespace ui_widget
 			CUIRect Indicator = Target;
 			if(Ctx.m_pAnim != nullptr)
 			{
-				// 滑块弹簧：欠阻尼一点点（ζ≈0.93），切换选项时带速度续接地滑过去，
-				// 落到目标附近再收住，不会来回弹。
-				static constexpr SUiSpringConfig s_IndicatorSpring{1.0f, 420.0f, 38.0f, 0.05f, 0.4f};
+				// 主级与次级导航沿用同一节奏，各自保留当前速度。
 				const uint64_t NodeKey = BuildUiAnimNodeKey(GroupId, TrackIndex);
-				Indicator.x = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_X, Target.x, s_IndicatorSpring, 2);
-				Indicator.y = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_Y, Target.y, s_IndicatorSpring, 2);
-				Indicator.w = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::WIDTH, Target.w, s_IndicatorSpring, 2);
-				Indicator.h = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::HEIGHT, Target.h, s_IndicatorSpring, 2);
+				Indicator.x = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_X, Target.x, ui_token::motion::NAVIGATION_SPRING, 2);
+				Indicator.y = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::POS_Y, Target.y, ui_token::motion::NAVIGATION_SPRING, 2);
+				Indicator.w = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::WIDTH, Target.w, ui_token::motion::NAVIGATION_SPRING, 2);
+				Indicator.h = ResolveUiAnimSpringValue(*Ctx.m_pAnim, NodeKey, EUiAnimProperty::HEIGHT, Target.h, ui_token::motion::NAVIGATION_SPRING, 2);
 			}
 			const bool HasBorder = Border.a > 0.0f;
 			DrawRoundedSurface(Ctx, Indicator, Fill, Border, ui_token::radius::PILL, HasBorder ? Ctx.m_pUi->PixelSize() : 0.0f);
@@ -146,16 +142,17 @@ namespace ui_widget
 		if(Ctx.m_pUi == nullptr)
 			return false;
 		CUiScopedGaussianBlurSuppression GaussianBlurSuppression(Ctx.m_pUi);
+		const bool RenderOnly = Ctx.m_pUi->RenderOnly();
 
 		// Background: selected first, then hover blend on top.
-		if(Props.m_Selected)
+		if(Props.m_Selected && !RenderOnly)
 			Rect.Draw(Ctx.m_pTheme != nullptr ? Ctx.m_pTheme->m_Selected : ui_token::color::ACCENT_PRIMARY_DIM, IGraphics::CORNER_ALL, ui_token::radius::TIGHT);
 
-		if(Ctx.m_pAnim != nullptr)
+		if(Ctx.m_pAnim != nullptr && !Props.m_Disabled && !RenderOnly)
 		{
 			const bool HoverPrev = Ctx.m_pUi->HotItem() == pId;
 			const float TargetAlpha = HoverPrev ? 1.0f : 0.0f;
-			const float Alpha = AnimateStateValue(Ctx, pId, EUiAnimProperty::ALPHA, TargetAlpha, ui_curve::DECELERATE);
+			const float Alpha = AnimateStateValue(Ctx, pId, EUiAnimProperty::ALPHA, TargetAlpha, ui_token::motion::HOVER_FADE);
 			if(Alpha > 0.01f)
 			{
 				ColorRGBA HoverBg = ui_token::color::SURFACE_HIGHLIGHT;
@@ -164,7 +161,7 @@ namespace ui_widget
 			}
 		}
 
-		const int Result = Props.m_Disabled ? 0 : Ctx.m_pUi->DoButtonLogic(pId, 0, &Rect, BUTTONFLAG_LEFT);
+		const int Result = Props.m_Disabled || RenderOnly ? 0 : Ctx.m_pUi->DoButtonLogic(pId, 0, &Rect, BUTTONFLAG_LEFT);
 
 		// Content layout
 		CUIRect Content;

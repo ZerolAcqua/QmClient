@@ -14,6 +14,8 @@
 #include <game/client/component.h>
 #include <game/client/components/qmclient/chat_emoji.h>
 #include <game/client/components/qmclient/hud_notifications/hud_notifications.h>
+#include <game/client/components/qmclient/qm_chat_log_jobs.h>
+#include <game/client/components/qmclient/qm_title_render.h>
 #include <game/client/lineinput.h>
 #include <game/client/render.h>
 #include <game/client/ui.h>
@@ -133,6 +135,9 @@ private:
 
 		STextContainerIndex m_TextContainerIndex;
 		int m_QuadContainerIndex;
+		CUIRect m_BackgroundRect = {};
+		float m_BackgroundRounding = 0.0f;
+		std::vector<CQmTitleTextMetrics> m_vTitleTextMetrics;
 
 		std::shared_ptr<CManagedTeeRenderInfo> m_pManagedTeeRenderInfo;
 
@@ -251,7 +256,8 @@ private:
 	bool m_EditingNewLine;
 	char m_aSavedInputText[MAX_LINE_LENGTH];
 	bool m_SavedInputPending;
-	char m_aChatLogLastCleanupDate[11];
+	CQmChatLogWriteQueue m_ChatLogWrites;
+	std::shared_ptr<std::string> m_pChatLogLastCleanupDate = std::make_shared<std::string>();
 
 	bool m_ServerSupportsCommandInfo;
 	static void ConSay(IConsole::IResult *pResult, void *pUserData);
@@ -267,8 +273,6 @@ private:
 
 	bool LineShouldHighlight(const char *pLine, const char *pName);
 	void StoreSave(const char *pText);
-	bool EnsureChatLogFolder() const;
-	void CleanupOldChatLogs(const char *pToday);
 	void SaveChatLogLine(int ClientId, int Team, const char *pLine);
 	void PrintBlockedMessageToConsole(int ClientId, int Team, const char *pLine);
 	void SendChatQueued(int Team, const char *pLine, bool AllowOutgoingTranslation);

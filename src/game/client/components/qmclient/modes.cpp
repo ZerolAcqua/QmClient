@@ -136,19 +136,16 @@ bool ShouldShowQmHookStrongWeakScope(int Scope, bool Self, bool Strong, bool Wea
 	}
 }
 
-bool ShouldShowQmNameplateName(int OwnScope, int OthersScope, bool ShowOwn, bool ShowOthers, bool IsCurrentChar, bool IsLocalClient, bool IsFriend)
+bool ShouldShowQmNameplateName(int Scope, bool IsCurrentChar, bool IsLocalClient)
 {
-	// 「自身」取当前操控角色（= 旧 cl_nameplates_own 的行为）或本机全部角色（主号 + 分身）。
-	const bool InOwnScope = OwnScope == QM_NAMEPLATE_OWN_SCOPE_LOCAL ? IsLocalClient : IsCurrentChar;
-	if(InOwnScope)
-		return ShowOwn != 0;
-	// 本机但不是当前操控角色：自身范围=当前 时不显示，避免分身昵称重复出现。
+	// 当前操控角色：只有 IsCurrentChar 那一个。
+	if(IsCurrentChar)
+		return Scope == QM_NAMEPLATE_SHOW_SCOPE_CURRENT || Scope == QM_NAMEPLATE_SHOW_SCOPE_LOCAL || Scope == QM_NAMEPLATE_SHOW_SCOPE_ALL;
+	// 本机其他角色（分身）：本机但不是当前操控角色。
 	if(IsLocalClient)
-		return false;
-	// 「他人」取所有非本机玩家，或只取已标记好友。
-	if(OthersScope == QM_NAMEPLATE_OTHERS_SCOPE_FRIENDS)
-		return ShowOthers != 0 && IsFriend;
-	return ShowOthers != 0;
+		return Scope == QM_NAMEPLATE_SHOW_SCOPE_LOCAL || Scope == QM_NAMEPLATE_SHOW_SCOPE_OTHERS_LOCAL || Scope == QM_NAMEPLATE_SHOW_SCOPE_ALL;
+	// 其他玩家：既不是本机、也不是当前操控角色。
+	return Scope == QM_NAMEPLATE_SHOW_SCOPE_OTHERS || Scope == QM_NAMEPLATE_SHOW_SCOPE_OTHERS_LOCAL || Scope == QM_NAMEPLATE_SHOW_SCOPE_ALL;
 }
 
 static bool ShouldUseQmNameplateTextPlayingScope(int Scope, bool Self, bool Friend)

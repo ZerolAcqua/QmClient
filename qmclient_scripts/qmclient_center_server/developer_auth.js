@@ -276,7 +276,9 @@ function RegisterDeveloperPresenceRoutes(app, Service, Options = {})
 		if(!CheckRateLimit(req, res))
 			return;
 		const Authorization = req.get ? req.get("authorization") : req.headers && req.headers.authorization;
-		SendServiceResult(res, Service.ReportPresence(Authorization, req.body));
+		const Result = Service.ReportPresence(Authorization, req.body);
+		SendServiceResult(res, Result);
+		if(Result.statusCode === 200 && Options.OnChanged) Options.OnChanged(req.body.server_address);
 	});
 
 	app.get("/api/v1/developers/presences", (req, res) => {

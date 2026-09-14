@@ -4,6 +4,8 @@
 
 #include <base/system.h>
 
+#include <engine/engine.h>
+
 #if defined(CONF_FAMILY_WINDOWS)
 #include <windows.h>
 
@@ -14,47 +16,6 @@ namespace
 {
 	constexpr int CHECK_INTERVAL_SECONDS = 2;
 
-#if defined(CONF_FAMILY_WINDOWS)
-	// 进程名大小写不敏感比较。
-	bool ProcessNameEquals(const wchar_t *pLeft, const wchar_t *pRight)
-	{
-		for(;;)
-		{
-			const wchar_t A = *pLeft++;
-			const wchar_t B = *pRight++;
-			const wchar_t LowerA = (A >= L'A' && A <= L'Z') ? (wchar_t)(A - L'A' + L'a') : A;
-			const wchar_t LowerB = (B >= L'A' && B <= L'Z') ? (wchar_t)(B - L'A' + L'a') : B;
-			if(LowerA != LowerB)
-				return false;
-			if(LowerA == L'\0')
-				return true;
-		}
-	}
-
-	bool IsProcessRunning(const wchar_t *pTargetName)
-	{
-		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-		if(hSnapshot == INVALID_HANDLE_VALUE)
-			return false;
-		PROCESSENTRY32W Entry{};
-		Entry.dwSize = sizeof(Entry);
-		bool Found = false;
-		if(Process32FirstW(hSnapshot, &Entry))
-		{
-			do
-			{
-				if(ProcessNameEquals(Entry.szExeFile, pTargetName))
-				{
-					Found = true;
-					break;
-				}
-			} while(Process32NextW(hSnapshot, &Entry));
-		}
-		CloseHandle(hSnapshot);
-		return Found;
-	}
-#endif
-
 	// 返回当前正在运行的已注册音乐应用的位掩码(按注册表下标)。
 	uint64_t BuildRunningMask()
 	{
@@ -62,11 +23,20 @@ namespace
 #if defined(CONF_FAMILY_WINDOWS)
 		size_t HookCount = 0;
 		const SQmMusicHookEntry *apHooks = QmMusicHookRegistry(&HookCount);
-		for(size_t i = 0; i < HookCount; ++i)
+		// 每轮只创建一次全系统快照，三个应用共享同一次采样。
+		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+		if(hSnapshot == INVALID_HANDLE_VALUE)
+			return 0;
+		PROCESSENTRY32W Entry{};
+		Entry.dwSize = sizeof(Entry);
+		if(Process32FirstW(hSnapshot, &Entry))
 		{
-			if(apHooks[i].m_pProcessName != nullptr && IsProcessRunning(apHooks[i].m_pProcessName))
-				Mask |= (uint64_t)1 << i;
+			do
+			{
+				Mask |= QmMusicHookMaskForProcess(Entry.szExeFile, apHooks, HookCount);
+			} while(Process32NextW(hSnapshot, &Entry));
 		}
+		CloseHandle(hSnapshot);
 #endif
 		return Mask;
 	}
@@ -74,26 +44,46 @@ namespace
 
 void CQmMusicAppWatcher::OnInit()
 {
+	m_pScanJob.reset();
 	m_Initialized = false;
 	m_PrevRunningMask = 0;
 	m_LastCheckTick = 0;
 }
 
+void CQmMusicAppWatcher::OnShutdown()
+{
+	// 任务池保留自己的引用，worker 不访问组件；退出时不在主线程等待系统枚举。
+	m_pScanJob.reset();
+}
+
 void CQmMusicAppWatcher::OnUpdate()
 {
+	if(m_pScanJob)
+	{
+		uint64_t RunningMask;
+		if(!m_pScanJob->TryGetResult(RunningMask))
+			return;
+		m_pScanJob.reset();
+		ApplyRunningApps(RunningMask);
+	}
+
 	const int64_t Now = time_get();
 	if(Now - m_LastCheckTick < time_freq() * CHECK_INTERVAL_SECONDS)
 		return;
 	m_LastCheckTick = Now;
-	CheckRunningApps();
+#if defined(CONF_FAMILY_WINDOWS)
+	// 一次只排一个任务；任务积压时不追加进程扫描，也不等待 worker。
+	m_pScanJob = std::make_shared<CQmMusicAppScanJob>(BuildRunningMask);
+	Engine()->AddJob(m_pScanJob);
+#else
+	ApplyRunningApps(BuildRunningMask());
+#endif
 }
 
-void CQmMusicAppWatcher::CheckRunningApps()
+void CQmMusicAppWatcher::ApplyRunningApps(uint64_t RunningMask)
 {
 	size_t HookCount = 0;
 	const SQmMusicHookEntry *apHooks = QmMusicHookRegistry(&HookCount);
-
-	const uint64_t RunningMask = BuildRunningMask();
 
 	// 只在「应用启动/退出」事件发生时切换;首个 tick 视为事件,
 	// 让客户端启动时也能跟随已经在运行的音乐应用。

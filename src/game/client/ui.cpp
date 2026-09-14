@@ -3,6 +3,7 @@
 #include "ui.h"
 
 #include "QmUi/QmDropdown.h"
+#include "QmUi/QmMotion.h"
 #include "QmUi/QmUiPerf.h"
 #include "QmUi/UiSurface.h"
 #include "components/qmclient/perf_logging.h"
@@ -2609,6 +2610,9 @@ void CUi::RenderBackButton()
 
 void CUi::DoPopupMenu(const SPopupMenuId *pId, float X, float Y, float Width, float Height, void *pContext, FPopupMenuFunction pfnFunc, const SPopupMenuProperties &Props)
 {
+	if(RenderOnly())
+		return;
+
 	if(Props.m_AutoReposition)
 	{
 		constexpr float Margin = SPopupMenu::POPUP_BORDER + SPopupMenu::POPUP_MARGIN;
@@ -2641,6 +2645,7 @@ void CUi::DoPopupMenu(const SPopupMenuId *pId, float X, float Y, float Width, fl
 	pNewMenu->m_Rect.h = Height;
 	pNewMenu->m_pContext = pContext;
 	pNewMenu->m_pfnFunc = pfnFunc;
+	pNewMenu->m_OpenTime = Client()->GlobalTime();
 	if(Props.m_BlockUnderlyingPointerInput)
 	{
 		if(CLineInput *pActiveInput = CLineInput::GetActiveInput())
@@ -2706,7 +2711,16 @@ void CUi::RenderPopupMenus()
 			ClipEnable(&PopupMenu.m_Props.m_Viewport);
 
 		CUIRect PopupRect = PopupMenu.m_Rect;
-		DrawRoundedSurface(this, PopupRect, PopupMenu.m_Props.m_BackgroundColor, PopupMenu.m_Props.m_BorderColor, ui_token::radius::CARD, SPopupMenu::POPUP_BORDER, PopupMenu.m_Props.m_Corners);
+		// 仅让表面轻微显现，正文与交互区域始终保持稳定。
+		const float Duration = qm_motion::ApplyMotionLevel(ui_token::motion::MODAL_IN, g_Config.m_QmUiMotionLevel).m_DurationSec;
+		const float Progress = Duration > 0.0f ? std::clamp((Client()->GlobalTime() - PopupMenu.m_OpenTime) / Duration, 0.0f, 1.0f) : 1.0f;
+		const float Remaining = 1.0f - Progress;
+		const float SurfaceAlpha = 1.0f - 0.15f * Remaining * Remaining * Remaining * Remaining;
+		ColorRGBA BackgroundColor = PopupMenu.m_Props.m_BackgroundColor;
+		ColorRGBA BorderColor = PopupMenu.m_Props.m_BorderColor;
+		BackgroundColor.a *= SurfaceAlpha;
+		BorderColor.a *= SurfaceAlpha;
+		DrawRoundedSurface(this, PopupRect, BackgroundColor, BorderColor, ui_token::radius::CARD, SPopupMenu::POPUP_BORDER, PopupMenu.m_Props.m_Corners);
 		PopupRect.Margin(SPopupMenu::POPUP_BORDER, &PopupRect);
 		PopupRect.Margin(SPopupMenu::POPUP_MARGIN, &PopupRect);
 

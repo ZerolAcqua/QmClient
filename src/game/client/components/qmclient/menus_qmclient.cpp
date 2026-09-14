@@ -501,7 +501,8 @@ static void RenderQmTitleStylePreviewEntry(void *pContext, const CUi::SSelection
 	const float PreviewTextWidth = pTextRender->TextWidth(PreviewCursor.m_FontSize, pPreview->m_aPreviewText);
 	const float PreviewX = PreviewRect.x + std::max(0.0f, (PreviewRect.w - PreviewTextWidth) * 0.5f);
 
-	const SQmTitleRenderStyle PreviewStyle = QmTitleResolveRenderStyle(pStyle->m_pId);
+	// 条目预览一律显示风格自身的颜色（不套本地配色档），这里是在挑风格，不是预览当前档位。
+	const SQmTitleRenderStyle PreviewStyle = QmTitleResolveRenderStyle(pStyle->m_pId, false, pStyle->m_pId);
 	QmTitleRenderFillCursor(pTextRender, PreviewCursor, pPreview->m_aPreviewText, PreviewCursor.m_FontSize, PreviewStyle, pPreview->m_TimeSec, 1.0f, QmTitleShimmerFromConfig());
 	const ColorRGBA PreviousTextColor = pTextRender->GetTextColor();
 	pTextRender->TextColor(pPreview->m_TextColor);
@@ -535,14 +536,15 @@ static void RenderQmTitleStylePreviewEntry(void *pContext, const CUi::SSelection
 }
 
 // 成品预览沿用名牌的配色优先级与空间效果参数，文本使用尚未保存的输入值。
-static void RenderQmTitleFinishedPreview(ITextRender *pTextRender, CRenderTools *pRenderTools, const CUIRect &PreviewRect, const char *pTitle, const char *pStyleId, bool ServerRainbow, float FontSize, float TimeSec)
+// LocalStyleId 为预览实际使用的本地兜底 id：预览与实际名牌走同一套解析，避免两边颜色不一致。
+static void RenderQmTitleFinishedPreview(ITextRender *pTextRender, CRenderTools *pRenderTools, const CUIRect &PreviewRect, const char *pTitle, const char *pStyleId, bool LocalStyleEnabled, const char *pLocalStyleId, bool ServerRainbow, float FontSize, float TimeSec)
 {
 	if(PreviewRect.w <= 1.0f || PreviewRect.h <= 1.0f)
 		return;
 	char aPreviewText[72];
 	str_format(aPreviewText, sizeof(aPreviewText), "[%s]", pTitle[0] != '\0' ? pTitle : Localize("Sponsor title"));
 	const SQmTitleColorStyle ColorStyle = ResolveQmTitleColorStyle(g_Config.m_QmTitleColorMode, g_Config.m_QmTitleColor, g_Config.m_QmTitleOpacity, ServerRainbow);
-	const SQmTitleRenderStyle RenderStyle = QmTitleResolveRenderStyle(pStyleId);
+	const SQmTitleRenderStyle RenderStyle = QmTitleResolveRenderStyle(pStyleId, LocalStyleEnabled, pLocalStyleId);
 	const bool DynamicStyle = RenderStyle.m_pStyle != nullptr;
 	const bool CustomColor = ColorStyle.m_Mode != EQmTitleColorMode::FOLLOW_SERVER;
 	const bool VertexColored = DynamicStyle || ColorStyle.m_Rainbow || !CustomColor;
@@ -553,12 +555,27 @@ static void RenderQmTitleFinishedPreview(ITextRender *pTextRender, CRenderTools 
 	CTextCursor PreviewCursor;
 	PreviewCursor.SetPosition(vec2(0.0f, 0.0f));
 	PreviewCursor.m_FontSize = FontSize;
-	if(DynamicStyle)
+	// 括号各自取相邻的字色，因此除彩虹档外整串一次性上色即可。
+	if(DynamicStyle && RenderStyle.m_ColorOverride)
+	{
+		// 本地配色档压过风格颜色：只取风格的浮动与掠光，颜色由下面的档位决定。
+		QmTitleRenderFillMotionOffsets(pTextRender, PreviewCursor, aPreviewText, FontSize, RenderStyle, TimeSec, QmTitleShimmerFromConfig());
+	}
+	else if(DynamicStyle)
+	{
 		QmTitleRenderFillCursor(pTextRender, PreviewCursor, aPreviewText, FontSize, RenderStyle, TimeSec, 1.0f, QmTitleShimmerFromConfig());
+	}
 	else if(ColorStyle.m_Rainbow)
-		QmAddTitleRainbowSplits(PreviewCursor, aPreviewText, 1.0f);
+	{
+		// 彩虹只跨头衔本体，与游戏内一致：游戏里 [] 是单独绘制的，不参与彩虹分段。
+		char aTitleOnly[64];
+		str_copy(aTitleOnly, pTitle[0] != '\0' ? pTitle : Localize("Sponsor title"));
+		QmAddTitleRainbowSplits(PreviewCursor, aTitleOnly, 1.0f);
+	}
 	else
+	{
 		PreviewCursor.m_vColorSplits.emplace_back(0, -1, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+	}
 
 	const ColorRGBA PreviousTextColor = pTextRender->GetTextColor();
 	pTextRender->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
@@ -1222,6 +1239,22 @@ void CMenus::RenderQmVisualSkinTransitionContent(CUIRect &Content, float LineHei
 	TextRender()->TextColor(ColorRGBA(0.9f, 0.9f, 0.9f, 0.9f));
 	RenderQmVisualLabel("qmclient-tee-appearance-title", &Row, Localize("Tee appearance"), SmallSize);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
+	Content.HSplitTop(LineSpacing, nullptr, &Content);
+	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinOutlineLocal, "Skin outline for self and dummy", Localize("Skin outline for self and dummy"), &g_Config.m_QmSkinOutlineLocal);
+	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinOutlineOthers, "Skin outline for other players", Localize("Skin outline for other players"), &g_Config.m_QmSkinOutlineOthers);
+	static CButtonContainer s_SkinOutlineColorId;
+	DoLine_ColorPicker(&s_SkinOutlineColorId, CurrentSettingsContentMetrics(), &Content, Localize("Skin outline color"), &g_Config.m_QmSkinOutlineColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::QmSkinOutlineColor)), false);
+	Content.HSplitTop(LineHeight, &Row, &Content);
+	Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
+	RenderQmVisualLabel("qmclient-skin-outline-width", &LabelColumn, Localize("Skin outline width"), BodySize);
+	static int s_SkinOutlineWidthInputId;
+	RenderQmSettingsSliderWithValueInput(&s_SkinOutlineWidthInputId, ControlColumn, &g_Config.m_QmSkinOutlineWidth, 1, 6, "", PrewarmOnly);
+	Content.HSplitTop(LineSpacing, nullptr, &Content);
+	Content.HSplitTop(LineHeight, &Row, &Content);
+	Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
+	RenderQmVisualLabel("qmclient-skin-outline-opacity", &LabelColumn, Localize("Skin outline opacity"), BodySize);
+	static int s_SkinOutlineAlphaInputId;
+	RenderQmSettingsSliderWithValueInput(&s_SkinOutlineAlphaInputId, ControlColumn, &g_Config.m_QmSkinOutlineAlpha, 0, 100, "%", PrewarmOnly);
 	Content.HSplitTop(LineSpacing, nullptr, &Content);
 
 	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmCycleTeeHue, "Cycle custom Tee hue", Localize("Cycle custom Tee hue"), &g_Config.m_QmCycleTeeHue);
@@ -1895,8 +1928,8 @@ void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOn
 				s_TitleBloomNames = {Localize("Off"), Localize("Subtle"), Localize("Full")};
 				Row = NextRow();
 				Row.VSplitLeft(Row.w * 0.55f, &Label, &Control);
-				DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, "qm-title-color-mode", &Label, Localize("Fallback title color"), BodySize, TEXTALIGN_ML);
-				GameClient()->m_Tooltips.DoToolTip(&g_Config.m_QmTitleColorMode, &Label, Localize("Animated styles override the fallback title color"));
+				DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, "qm-title-color-mode", &Label, Localize("Title color"), BodySize, TEXTALIGN_ML);
+				GameClient()->m_Tooltips.DoToolTip(&g_Config.m_QmTitleColorMode, &Label, Localize("Single color and Rainbow override the color of animated styles; the style keeps its motion"));
 				s_TitleColorModeState.m_SelectionPopupContext.m_pScrollRegion = &s_TitleColorModeScroll;
 				const int ColorMode = DoSettingsDropDown(&Control, g_Config.m_QmTitleColorMode, s_TitleColorModeNames.data(), s_TitleColorModeNames.size(), s_TitleColorModeState);
 				if(!ReadOnly && ColorMode != g_Config.m_QmTitleColorMode)
@@ -1965,11 +1998,11 @@ void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOn
 			Preview.Margin(LineSpacing, &PreviewArea);
 			PreviewArea.HSplitTop(TipSize, &PreviewLabel, &PreviewArea);
 			Ui()->DoLabel(&PreviewLabel, Localize("Title preview"), TipSize, TEXTALIGN_ML);
-			const char *pPreviewStyleId = g_Config.m_QmTitleStyleEnabled ? g_Config.m_QmTitleStyle : Auth.PlayerTitleStyle(GameClient()->m_Snap.m_LocalClientId);
-			if(!g_Config.m_QmTitleStyleEnabled && pPreviewStyleId[0] == '\0')
-				pPreviewStyleId = Auth.TitleProfileStyle();
+			const char *pServerStyleId = Auth.PlayerTitleStyle(GameClient()->m_Snap.m_LocalClientId);
+			// 本地兜底与实际渲染同源：开了本地风格就用本地 id，否则用账号上保存的自选风格。
+			const char *pLocalStyleId = g_Config.m_QmTitleStyleEnabled ? g_Config.m_QmTitleStyle : Auth.TitleProfileStyle();
 			Ui()->ClipEnable(&PreviewArea);
-			RenderQmTitleFinishedPreview(TextRender(), GameClient()->RenderTools(), PreviewArea, s_Title.GetString(), pPreviewStyleId, GameClient()->IsQmDeveloperRainbow(GameClient()->m_Snap.m_LocalClientId), BodySize * 1.4f, (float)Auth.TitleAnimationTime());
+			RenderQmTitleFinishedPreview(TextRender(), GameClient()->RenderTools(), PreviewArea, s_Title.GetString(), pServerStyleId, g_Config.m_QmTitleStyleEnabled != 0, pLocalStyleId, GameClient()->IsQmDeveloperRainbow(GameClient()->m_Snap.m_LocalClientId), BodySize * 1.4f, (float)Auth.TitleAnimationTime());
 			Ui()->ClipDisable();
 			Row = NextRow();
 			Row.VSplitMid(&Row, &Button, LineSpacing);
@@ -2078,8 +2111,7 @@ void CMenus::RenderQmFunctionKeyBindsContent(CUIRect &Content, float LineHeight,
 		s_ReaderButtonSmallSens, s_ClearButtonSmallSens,
 		s_ReaderButtonLeftJump, s_ClearButtonLeftJump,
 		s_ReaderButtonRightJump, s_ClearButtonRightJump,
-		s_ReaderButtonWeaponTrajectory, s_ClearButtonWeaponTrajectory,
-		s_ReaderButtonTimeoutDisconnect, s_ClearButtonTimeoutDisconnect;
+		s_ReaderButtonWeaponTrajectory, s_ClearButtonWeaponTrajectory;
 	[[maybe_unused]] static CButtonContainer s_ReaderButtonDeepflyToggle, s_ClearButtonDeepflyToggle;
 
 	RenderQmHudKeyBindRow(Content, s_ReaderButtonDummyPseudo, s_ClearButtonDummyPseudo,
@@ -2096,8 +2128,6 @@ void CMenus::RenderQmFunctionKeyBindsContent(CUIRect &Content, float LineHeight,
 		Localize("Right jump"), "+jump; +right", LineHeight, BodySize, LineSpacing, LabelWidth);
 	RenderQmHudKeyBindRow(Content, s_ReaderButtonWeaponTrajectory, s_ClearButtonWeaponTrajectory,
 		Localize("Weapon Trajectory"), "+showweapontrajectory", LineHeight, BodySize, LineSpacing, LabelWidth);
-	RenderQmHudKeyBindRow(Content, s_ReaderButtonTimeoutDisconnect, s_ClearButtonTimeoutDisconnect,
-		Localize("Active disconnect"), "qm_timeout_disconnect", LineHeight, BodySize, LineSpacing, LabelWidth);
 }
 
 void CMenus::RenderQmFunctionGoresActorContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)
@@ -2359,6 +2389,7 @@ void CMenus::RenderQmFunctionMiniFeaturesContent(CUIRect &Content, float LineHei
 	else if(!PrewarmOnly && SponsorNudgeBefore == 0 && g_Config.m_QmSponsorNudge != 0)
 		GameClient()->HideSponsorNudgeFarewell();
 	Content.HSplitTop(LineSpacing, nullptr, &Content);
+	RenderCheckbox(&g_Config.m_QmWebSocket, "Realtime channel", &g_Config.m_QmWebSocket);
 }
 
 void CMenus::RenderQmFunctionBlockWordsContent(CUIRect &Content, float UiScale, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)
@@ -3660,40 +3691,14 @@ void CMenus::RenderQmHudDebugGraphContent(CUIRect &Content, float LineHeight, fl
 	Content.HSplitTop(LineSpacing, nullptr, &Content);
 }
 
-void CMenus::RenderQmHudDebugModeContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)
+void CMenus::RenderQmHudDebugModeContent(CUIRect &Content, float LineHeight, float, float LineSpacing, float, bool)
 {
-	// 调试模式总开关：任一性能开关开启即视为"调试模式"开启；点击时统一开启/关闭三个开关。
-	const bool DebugModeEnabled = g_Config.m_QmPerfDebug != 0 || g_Config.m_QmPerfLogfile != 0 || g_Config.m_QmPerfStutterDiagnostics != 0;
-
-	CUIRect Row, LabelColumn, ControlColumn;
+	CUIRect Row;
 	Content.HSplitTop(LineHeight, &Row, &Content);
 	static int s_QmPerfDebugModeSwitchId;
-	if(DoSettingsButton_CheckBox(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_HUD, QMCLIENT_SETTINGS_TAB_HUD, &s_QmPerfDebugModeSwitchId, "Debug mode", Localize("Debug mode"), DebugModeEnabled, &Row))
-	{
-		const int NewValue = DebugModeEnabled ? 0 : 1;
-		g_Config.m_QmPerfDebug = NewValue;
-		g_Config.m_QmPerfLogfile = NewValue;
-		g_Config.m_QmPerfStutterDiagnostics = NewValue;
-	}
+	if(DoSettingsButton_CheckBox(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_HUD, QMCLIENT_SETTINGS_TAB_HUD, &s_QmPerfDebugModeSwitchId, "Debug mode", Localize("Debug mode"), g_Config.m_QmPerfDebug != 0, &Row))
+		g_Config.m_QmPerfDebug ^= 1;
 	Content.HSplitTop(LineSpacing, nullptr, &Content);
-
-	auto RenderCheckbox = [this, &Content, &Row, LineHeight, LineSpacing](const void *pId, const char *pText, int *pValue) {
-		Content.HSplitTop(LineHeight, &Row, &Content);
-		if(DoSettingsButton_CheckBox(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_HUD, QMCLIENT_SETTINGS_TAB_HUD, pId, pText, Localize(pText), *pValue, &Row))
-			*pValue ^= 1;
-		Content.HSplitTop(LineSpacing, nullptr, &Content);
-	};
-	RenderCheckbox(&g_Config.m_QmPerfDebug, "Enable main thread and render stage performance debug logging", &g_Config.m_QmPerfDebug);
-	RenderCheckbox(&g_Config.m_QmPerfLogfile, "Write performance debug logs to dedicated file", &g_Config.m_QmPerfLogfile);
-
-	Content.HSplitTop(LineHeight, &Row, &Content);
-	Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
-	DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_HUD, QMCLIENT_SETTINGS_TAB_HUD, "qmclient-debug-mode-threshold", &LabelColumn, Localize("Performance debug log threshold (ms)"), BodySize, TEXTALIGN_ML, {}, (int)LabelColumn.w);
-	static int s_QmPerfDebugThresholdMsInputId;
-	RenderQmSettingsSliderWithValueInput(&s_QmPerfDebugThresholdMsInputId, ControlColumn, &g_Config.m_QmPerfDebugThresholdMs, 1, 1000, "ms", PrewarmOnly);
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-
-	RenderCheckbox(&g_Config.m_QmPerfStutterDiagnostics, "Enable client stutter diagnostics at startup", &g_Config.m_QmPerfStutterDiagnostics);
 }
 
 void CMenus::RenderQmHudInputOverlayContent(CUIRect &Content, const SSettingsContentMetrics &Metrics, float LabelWidth, bool PrewarmOnly)
@@ -5305,8 +5310,8 @@ void CMenus::RenderSettingsQmClientFunctionDeck(CUIRect MainView, bool PrewarmOn
 			return !g_Config.m_TcFreezeChatEnabled ? Row() : Row() * (g_Config.m_TcFreezeChatEmoticon ? 5.0f : 4.0f);
 		case EQmModuleId::Gores:
 			return Row() * (3.0f + (g_Config.m_QmAxiomAutoLogin ? 2.0f : 0.0f) + ((g_Config.m_QmGores || g_Config.m_QmGoresAutoEnable) ? 6.0f : 0.0f)) + LineHeight;
-		case EQmModuleId::KeyBinds: return Rows(8.0f);
-		case EQmModuleId::MiniFeatures: return Rows(20.0f);
+		case EQmModuleId::KeyBinds: return Rows(7.0f);
+		case EQmModuleId::MiniFeatures: return Rows(21.0f);
 		case EQmModuleId::JumpHint: return Row() * 5.0f;
 		case EQmModuleId::WeaponTrajectory: return g_Config.m_QmWeaponTrajectory == 0 ? Row() : Row() * 6.0f;
 		case EQmModuleId::FriendNotify:
@@ -5574,13 +5579,17 @@ void CMenus::RenderSettingsQmClientVisualDeck(CUIRect MainView, bool PrewarmOnly
 		case EQmModuleId::SkinTransition:
 			return [this, Metrics, LineHeight, LineSpacing, ConsumeVisualRow, ConsumeVisualHeight](CUIRect Content) {
 				ConsumeVisualRow(Content); // Tee appearance heading
+				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinOutlineLocal, &g_Config.m_QmSkinOutlineLocal);
+				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinOutlineOthers, &g_Config.m_QmSkinOutlineOthers) || Changed;
+				for(int Index = 0; Index < 3; ++Index)
+					ConsumeVisualRow(Content); // 描边颜色、粗细、透明度
 				for(int Index = 0; Index < 3; ++Index)
 					ConsumeVisualRow(Content); // hue toggles and speed
 				ConsumeVisualHeight(Content, Metrics.m_SmallSize + LineSpacing);
 				ConsumeVisualHeight(Content, Metrics.m_SmallSize + LineSpacing);
 				ConsumeVisualRow(Content); // hammer skin steal
 				ConsumeVisualRow(Content); // emoticon shadow
-				return HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinChangeTransition, &g_Config.m_QmSkinChangeTransition);
+				return HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinChangeTransition, &g_Config.m_QmSkinChangeTransition) || Changed;
 			};
 		case EQmModuleId::WeaponAnimation:
 			return [this, LineHeight, LineSpacing](CUIRect Content) {

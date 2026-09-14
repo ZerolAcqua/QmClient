@@ -159,7 +159,7 @@ SSettingsCardDeckResult CSettingsCardDeck::RenderInternal(const IUiContext &Ctx,
 	if(TabChanged)
 	{
 		m_LastRenderedTab = pTab;
-		m_FrameRuntime.OnTabChanged();
+		m_FrameRuntime.OnTabChanged(Motion.m_ContinuousEntry);
 		m_SuppressHoverFeedbackOnce = true;
 	}
 
@@ -456,34 +456,47 @@ SSettingsCardDeckResult CSettingsCardDeck::RenderInternal(const IUiContext &Ctx,
 	bool SnapReflow = SettingsCardDeckShouldSnapReflow(GeometryStateChanged, m_Drag.Active()) || ContentHeightTargetChanged || ContentHeightAnimationActive;
 	if(Ctx.m_pAnim != nullptr)
 	{
-		uint64_t EntryKey = 0;
-		bool HasEntryKey = false;
-		const auto ResolveEntryKey = [&]() {
-			if(!HasEntryKey)
+		if(Motion.m_ContinuousEntry)
+		{
+			if(m_FrameRuntime.EntryCyclePending() || m_FrameRuntime.EntryWasActive())
 			{
-				EntryKey = SettingsCardEntryNodeKey(pTab);
-				HasEntryKey = true;
+				// 轨道属于可见 Deck，不随分类字符串变化；预热 Deck 使用自己的实例。
+				const uint64_t EntryKey = BuildUiAnimNodeKey(str_quickhash("settings-card-deck-continuous-entry"), reinterpret_cast<uintptr_t>(this));
+				DeckEntryOffsetY = m_FrameRuntime.ResolveContinuousEntryOffset(*Ctx.m_pAnim, EntryKey, Motion);
+				EntryPositionActive = m_FrameRuntime.EntryWasActive();
 			}
-			return EntryKey;
-		};
-		if(m_FrameRuntime.ConsumeEntryCycle())
-		{
-			Ctx.m_pAnim->SetValue(ResolveEntryKey(), EUiAnimProperty::POS_Y, m_FrameRuntime.AnimateEntry() ? Motion.m_EntryDistance : 0.0f);
-			m_FrameRuntime.SetEntryActive(m_FrameRuntime.AnimateEntry() && Motion.m_EntryDuration > 0.0f);
 		}
-		if(m_FrameRuntime.EntryWasActive() && Motion.m_EntryDuration > 0.0f)
+		else
 		{
-			if(Input.m_pDiagnostics != nullptr)
-				m_FrameRuntime.CountEntryAnimationResolve();
-			const uint64_t ResolvedEntryKey = ResolveEntryKey();
-			DeckEntryOffsetY = ResolveUiAnimValue(*Ctx.m_pAnim, ResolvedEntryKey, EUiAnimProperty::POS_Y, 0.0f, Motion.m_EntryDuration, EEasing::EASE_OUT);
-			EntryPositionActive = Ctx.m_pAnim->HasActiveAnimation(ResolvedEntryKey, EUiAnimProperty::POS_Y);
-			m_FrameRuntime.SetEntryActive(EntryPositionActive);
-		}
-		else if(m_FrameRuntime.EntryWasActive())
-		{
-			Ctx.m_pAnim->SetValue(ResolveEntryKey(), EUiAnimProperty::POS_Y, 0.0f);
-			m_FrameRuntime.SetEntryActive(false);
+			uint64_t EntryKey = 0;
+			bool HasEntryKey = false;
+			const auto ResolveEntryKey = [&]() {
+				if(!HasEntryKey)
+				{
+					EntryKey = SettingsCardEntryNodeKey(pTab);
+					HasEntryKey = true;
+				}
+				return EntryKey;
+			};
+			if(m_FrameRuntime.ConsumeEntryCycle())
+			{
+				Ctx.m_pAnim->SetValue(ResolveEntryKey(), EUiAnimProperty::POS_Y, m_FrameRuntime.AnimateEntry() ? Motion.m_EntryDistance : 0.0f);
+				m_FrameRuntime.SetEntryActive(m_FrameRuntime.AnimateEntry() && Motion.m_EntryDuration > 0.0f);
+			}
+			if(m_FrameRuntime.EntryWasActive() && Motion.m_EntryDuration > 0.0f)
+			{
+				if(Input.m_pDiagnostics != nullptr)
+					m_FrameRuntime.CountEntryAnimationResolve();
+				const uint64_t ResolvedEntryKey = ResolveEntryKey();
+				DeckEntryOffsetY = ResolveUiAnimValue(*Ctx.m_pAnim, ResolvedEntryKey, EUiAnimProperty::POS_Y, 0.0f, Motion.m_EntryDuration, EEasing::EASE_OUT);
+				EntryPositionActive = Ctx.m_pAnim->HasActiveAnimation(ResolvedEntryKey, EUiAnimProperty::POS_Y);
+				m_FrameRuntime.SetEntryActive(EntryPositionActive);
+			}
+			else if(m_FrameRuntime.EntryWasActive())
+			{
+				Ctx.m_pAnim->SetValue(ResolveEntryKey(), EUiAnimProperty::POS_Y, 0.0f);
+				m_FrameRuntime.SetEntryActive(false);
+			}
 		}
 		EntryPending = false;
 		for(const SPreparedCard &Card : m_vPreparedCards)

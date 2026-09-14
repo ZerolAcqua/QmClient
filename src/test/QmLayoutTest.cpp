@@ -399,3 +399,37 @@ TEST(QmScoreboardRender, DdTeamLabelSpacingFitsDenseColumnsWithoutOverlap)
 	EXPECT_FLOAT_EQ(TeamEnd.m_RowSpacing, SCOREBOARD_TEAM_MODE_ICON_SIZE);
 	EXPECT_LE(RowsPerColumn * (PreferredLineHeight * Scale + TeamEnd.m_RowSpacing), AvailableRowsHeight + 0.001f);
 }
+
+TEST(QmInputOverlayFiles, PendingCheckDoesNotWaitOrPublishPartialTime)
+{
+	CSemaphore Started;
+	CSemaphore Finish;
+	CJobPool Pool;
+	Pool.Init(1);
+	auto pCheck = std::make_shared<CQmInputOverlayFileTimeJob>([&]() -> std::optional<time_t> {
+		Started.Signal();
+		Finish.Wait();
+		return 123;
+	});
+	std::optional<time_t> Modified = 99;
+	Pool.Add(pCheck);
+	Started.Wait();
+	EXPECT_FALSE(pCheck->TryGetResult(Modified));
+	EXPECT_EQ(Modified, 99);
+	Finish.Signal();
+	Pool.Shutdown();
+	EXPECT_TRUE(pCheck->TryGetResult(Modified));
+	EXPECT_EQ(Modified, 123);
+}
+
+TEST(QmInputOverlayFiles, MissingFileIsACompletedResult)
+{
+	CJobPool Pool;
+	Pool.Init(1);
+	auto pCheck = std::make_shared<CQmInputOverlayFileTimeJob>([] { return std::optional<time_t>(); });
+	Pool.Add(pCheck);
+	Pool.Shutdown();
+	std::optional<time_t> Modified = 99;
+	EXPECT_TRUE(pCheck->TryGetResult(Modified));
+	EXPECT_FALSE(Modified.has_value());
+}

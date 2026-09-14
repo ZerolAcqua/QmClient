@@ -3277,9 +3277,9 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView, bool PrewarmOnly)
 				DoTClientSettingsButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcTeeTrailTaper, "tclient-tee-trail-taper", Localize("Taper trail width"), &g_Config.m_TcTeeTrailTaper, &TrailTaperRow, LineSize);
 				LogSettingsStage("tclient_settings_right_tee_trails_base", BaseTimer);
 			}
-			// 样式下拉：0 = 原版拖尾，1..5 为 5 套独立特效，取值与配置一一对应。
+			// 样式下拉：0 = 原版拖尾，1..5 共用采样与带状网格，取值与配置一一对应。
 			static std::vector<const char *> s_TrailStyleDropDownNames;
-			s_TrailStyleDropDownNames = {Localize("Original"), Localize("Cursed Flame"), Localize("Violet Lightning"), Localize("Spirit Light"), Localize("Void Shadow"), Localize("Golden Grace")};
+			s_TrailStyleDropDownNames = {Localize("Original"), Localize("Black Flash"), Localize("Exo"), Localize("Spirit"), Localize("Void"), Localize("Inferno")};
 			s_TrailStyleDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_TrailStyleDropDownScrollRegion;
 			const int TrailStyleOld = qm_tee_trail::ResolveStyle(g_Config.m_TcTeeTrailStyle);
 			CUIRect TrailStyleRow = Rows.Next();

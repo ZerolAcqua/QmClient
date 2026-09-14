@@ -4,7 +4,9 @@
 
 #include <base/color.h>
 
+#include <engine/engine.h>
 #include <engine/shared/config.h>
+#include <engine/shared/jobs.h>
 
 #include <game/client/gameclient.h>
 
@@ -15,6 +17,7 @@
 #include <fstream>
 #include <sstream>
 #include <string_view>
+#include <utility>
 
 namespace
 {
@@ -69,6 +72,62 @@ namespace
 		}
 		return Any ? Result : 0;
 	}
+
+	constexpr uint64_t LYRIC_LOAD_RETRY_DELAY_MS = 1000;
+
+	class CSodaLyricLoadJob final : public IJob
+	{
+	public:
+		struct SResult
+		{
+			std::string m_Path;
+			uint64_t m_SongId = 0;
+			uint64_t m_Generation = 0;
+			uint64_t m_Epoch = 0;
+			bool m_Parsed = false;
+			QmMusicLyrics::SLyricsData m_Lyrics;
+		};
+
+	private:
+		std::string m_Path;
+		uint64_t m_SongId;
+		uint64_t m_Generation;
+		uint64_t m_Epoch;
+		SResult m_Result;
+
+	protected:
+		void Run() override
+		{
+			m_Result.m_Path = m_Path;
+			m_Result.m_SongId = m_SongId;
+			m_Result.m_Generation = m_Generation;
+			m_Result.m_Epoch = m_Epoch;
+			std::ifstream File(m_Path, std::ios::binary);
+			if(!File)
+				return;
+			std::ostringstream Buffer;
+			Buffer << File.rdbuf();
+			const std::string Json = Buffer.str();
+			if(Json.empty())
+				return;
+			std::string Error;
+			m_Result.m_Parsed = QmSodaLyricFile::ParseLyricFileJson(Json, &m_Result.m_Lyrics, &Error);
+		}
+
+	public:
+		CSodaLyricLoadJob(std::string Path, uint64_t SongId, uint64_t Generation, uint64_t Epoch) :
+			m_Path(std::move(Path)),
+			m_SongId(SongId),
+			m_Generation(Generation),
+			m_Epoch(Epoch)
+		{
+		}
+
+		SResult TakeResult()
+		{
+			return std::move(m_Result);
+		}
+	};
 }
 
 struct CMusicLyricsIntegration::SImpl
@@ -92,6 +151,12 @@ struct CMusicLyricsIntegration::SImpl
 	int64_t m_PositionMs = 0;
 	bool m_PositionValid = false;
 	bool m_ActiveLyrics = false;
+	std::shared_ptr<CSodaLyricLoadJob> m_pLyricLoadJob;
+	std::string m_LyricLoadPath;
+	uint64_t m_LyricLoadSongId = 0;
+	uint64_t m_LyricLoadGeneration = 0;
+	uint64_t m_LyricLoadEpoch = 0;
+	uint64_t m_NextLyricLoadRetryTick = 0;
 
 	// 当前句选择。
 	std::string m_CurrentLyric;
@@ -114,6 +179,12 @@ void CMusicLyricsIntegration::OnInit()
 	m_pImpl->m_HasLyrics = false;
 	m_pImpl->m_LoadedFilePath.clear();
 	m_pImpl->m_LoadedGeneration = 0;
+	m_pImpl->m_pLyricLoadJob.reset();
+	m_pImpl->m_LyricLoadPath.clear();
+	m_pImpl->m_LyricLoadSongId = 0;
+	m_pImpl->m_LyricLoadGeneration = 0;
+	m_pImpl->m_LyricLoadEpoch = 0;
+	m_pImpl->m_NextLyricLoadRetryTick = 0;
 	m_pImpl->m_SongId = 0;
 	m_pImpl->m_HasSong = false;
 	m_pImpl->m_PositionValid = false;
@@ -131,6 +202,8 @@ void CMusicLyricsIntegration::OnShutdown()
 	m_pImpl->m_HasSnapshot = false;
 	m_pImpl->m_ActiveLyrics = false;
 	m_pImpl->m_CurrentLyric.clear();
+	++m_pImpl->m_LyricLoadEpoch;
+	m_pImpl->m_pLyricLoadJob.reset();
 }
 
 void CMusicLyricsIntegration::OnReset()
@@ -141,6 +214,11 @@ void CMusicLyricsIntegration::OnReset()
 	m_pImpl->m_CurrentLyric.clear();
 	m_pImpl->m_LoadedFilePath.clear();
 	m_pImpl->m_LoadedGeneration = 0;
+	m_pImpl->m_LyricLoadPath.clear();
+	m_pImpl->m_LyricLoadSongId = 0;
+	m_pImpl->m_LyricLoadGeneration = 0;
+	++m_pImpl->m_LyricLoadEpoch;
+	m_pImpl->m_NextLyricLoadRetryTick = 0;
 }
 
 void CMusicLyricsIntegration::SyncHookConfiguration()
@@ -175,28 +253,67 @@ void CMusicLyricsIntegration::ClearForStaleMedia()
 	m_pImpl->m_LineEndMs = -1;
 	m_pImpl->m_LoadedFilePath.clear();
 	m_pImpl->m_LoadedGeneration = 0;
+	m_pImpl->m_LyricLoadPath.clear();
+	m_pImpl->m_LyricLoadSongId = 0;
+	m_pImpl->m_LyricLoadGeneration = 0;
+	++m_pImpl->m_LyricLoadEpoch;
+	m_pImpl->m_NextLyricLoadRetryTick = 0;
 }
 
 void CMusicLyricsIntegration::LoadLyricFile(const char *pPath)
 {
 	if(pPath == nullptr || pPath[0] == '\0')
 		return;
-	std::ifstream Stream(pPath, std::ios::binary);
-	if(!Stream)
+	const std::string Path(pPath);
+	const bool IdentityChanged = Path != m_pImpl->m_LyricLoadPath ||
+				     m_pImpl->m_LyricLoadSongId != m_pImpl->m_SongId ||
+				     m_pImpl->m_LyricLoadGeneration != m_pImpl->m_LoadedGeneration;
+	if(IdentityChanged)
+	{
+		m_pImpl->m_LyricLoadPath = Path;
+		m_pImpl->m_LyricLoadSongId = m_pImpl->m_SongId;
+		m_pImpl->m_LyricLoadGeneration = m_pImpl->m_LoadedGeneration;
+		++m_pImpl->m_LyricLoadEpoch;
+		m_pImpl->m_NextLyricLoadRetryTick = 0;
+	}
+	ProcessLyricLoadJob();
+	if(m_pImpl->m_HasLyrics)
 		return;
-	std::ostringstream Buffer;
-	Buffer << Stream.rdbuf();
-	const std::string Json = Buffer.str();
-	if(Json.empty())
+	if(m_pImpl->m_pLyricLoadJob || MonotonicTickMs() < m_pImpl->m_NextLyricLoadRetryTick)
 		return;
-	QmMusicLyrics::SLyricsData Lyrics;
-	std::string Error;
-	if(!QmSodaLyricFile::ParseLyricFileJson(Json, &Lyrics, &Error))
+	auto pJob = std::make_shared<CSodaLyricLoadJob>(
+		m_pImpl->m_LyricLoadPath,
+		m_pImpl->m_LyricLoadSongId,
+		m_pImpl->m_LyricLoadGeneration,
+		m_pImpl->m_LyricLoadEpoch);
+	m_pImpl->m_pLyricLoadJob = pJob;
+	Engine()->AddJob(pJob);
+}
+
+void CMusicLyricsIntegration::ProcessLyricLoadJob()
+{
+	if(!m_pImpl->m_pLyricLoadJob || m_pImpl->m_pLyricLoadJob->State() != IJob::STATE_DONE)
 		return;
-	m_pImpl->m_Lyrics = std::move(Lyrics);
-	m_pImpl->m_HasLyrics = m_pImpl->m_Lyrics.HasLyrics();
-	m_pImpl->m_LoadedFilePath = pPath;
-	m_pImpl->m_ActiveLyrics = true;
+	CSodaLyricLoadJob::SResult Result = m_pImpl->m_pLyricLoadJob->TakeResult();
+	m_pImpl->m_pLyricLoadJob.reset();
+	if(!m_pImpl->m_HasSong || Result.m_SongId != m_pImpl->m_SongId ||
+		Result.m_Generation != m_pImpl->m_LoadedGeneration || Result.m_Path != m_pImpl->m_LyricLoadPath ||
+		Result.m_Epoch != m_pImpl->m_LyricLoadEpoch)
+		return;
+	m_pImpl->m_LoadedFilePath = Result.m_Path;
+	if(Result.m_Parsed && Result.m_Lyrics.HasLyrics())
+	{
+		m_pImpl->m_Lyrics = std::move(Result.m_Lyrics);
+		m_pImpl->m_HasLyrics = true;
+		m_pImpl->m_ActiveLyrics = true;
+		m_pImpl->m_NextLyricLoadRetryTick = 0;
+	}
+	else
+	{
+		m_pImpl->m_HasLyrics = false;
+		m_pImpl->m_ActiveLyrics = false;
+		m_pImpl->m_NextLyricLoadRetryTick = MonotonicTickMs() + LYRIC_LOAD_RETRY_DELAY_MS;
+	}
 }
 
 void CMusicLyricsIntegration::OnUpdate()
@@ -241,6 +358,12 @@ void CMusicLyricsIntegration::OnUpdate()
 		m_pImpl->m_HasSong = true;
 		m_pImpl->m_SongId = SongId;
 		m_pImpl->m_LoadedGeneration = Generation;
+		m_pImpl->m_LoadedFilePath.clear();
+		m_pImpl->m_LyricLoadPath.clear();
+		m_pImpl->m_LyricLoadSongId = 0;
+		m_pImpl->m_LyricLoadGeneration = 0;
+		++m_pImpl->m_LyricLoadEpoch;
+		m_pImpl->m_NextLyricLoadRetryTick = 0;
 		m_pImpl->m_ActiveLyrics = false;
 	}
 	else if(!HasSong)

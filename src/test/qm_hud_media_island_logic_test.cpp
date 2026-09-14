@@ -1005,8 +1005,7 @@ TEST(QmHudSwitchCountdownSource, ModesShareTrackingAndCanFeedBothSurfaces)
 	ASSERT_NE(IslandEnd, std::string::npos);
 	const std::string IslandBody = Source.substr(IslandBegin, IslandEnd - IslandBegin);
 
-	EXPECT_NE(UpdateBody.find("m_aaClientId[Team][SwitchNumber] = ClientId"), std::string::npos);
-	EXPECT_NE(UpdateBody.find("m_aaConnection[Team][SwitchNumber] = Connection"), std::string::npos);
+	EXPECT_NE(UpdateBody.find("m_SwitchCountdownTracker.Track(Team, SwitchNumber, CurTick + 1 + Delay * TickSpeed, CurTick, ClientId, Connection);"), std::string::npos);
 	EXPECT_NE(UpdateBody.find("QmHudSwitchCountdownShowsFollowTee"), std::string::npos);
 	EXPECT_NE(HasIslandBody.find("QmHudSwitchCountdownShowsMediaIsland"), std::string::npos);
 	EXPECT_NE(IslandBody.find("g_Config.m_QmSwitchCountdown"), std::string::npos);
@@ -2402,4 +2401,47 @@ TEST(QmIslandNoticeSource, GeometryFallbackDrawsTheOutlineRingWhenSdfIsUnavailab
 	EXPECT_NE(RingBody.find("RoundedRectPerimeterPoint"), std::string::npos);
 	EXPECT_NE(RingBody.find("0.18f * Item.m_ContentAlpha"), std::string::npos);
 	EXPECT_NE(RingBody.find("Item.m_CountdownProgress"), std::string::npos);
+}
+
+TEST(QmHudSwitchCountdownTracker, OnlyTouchedTeamsNeedMaintenance)
+{
+	SHudSwitchCountdownTracker Tracker;
+	EXPECT_EQ(std::count(Tracker.m_aTouchedTeams.begin(), Tracker.m_aTouchedTeams.end(), true), 0);
+	Tracker.Track(0, 1, 100, 50, 7, 0);
+	Tracker.Track(TEAM_SUPER, 255, 140, 51, 8, 1);
+	Tracker.Track(0, 1, 160, 52, 9, 1);
+	EXPECT_EQ(std::count(Tracker.m_aTouchedTeams.begin(), Tracker.m_aTouchedTeams.end(), true), 2);
+	EXPECT_EQ(Tracker.m_aaEndTick[0][1], 160);
+	EXPECT_EQ(Tracker.m_aaTouchTick[0][1], 52);
+	EXPECT_EQ(Tracker.m_aaClientId[0][1], 9);
+	EXPECT_EQ(Tracker.m_aaConnection[0][1], 1);
+	EXPECT_EQ(Tracker.m_aaEndTick[TEAM_SUPER][255], 140);
+	EXPECT_EQ(Tracker.m_aaClientId[TEAM_SUPER][255], 8);
+}
+
+TEST(QmHudSwitchCountdownTracker, RepeatedResetKeepsEverySlotEmpty)
+{
+	SHudSwitchCountdownTracker Tracker;
+	Tracker.Track(0, 1, 100, 50, 7, 0);
+	Tracker.Track(TEAM_SUPER, 255, 140, 51, 8, 1);
+	for(int ResetIndex = 0; ResetIndex < 3; ++ResetIndex)
+	{
+		Tracker.Reset();
+		for(int Team = 0; Team < NUM_DDRACE_TEAMS; ++Team)
+		{
+			EXPECT_FALSE(Tracker.m_aTouchedTeams[Team]);
+			for(int Number = 0; Number < 256; ++Number)
+			{
+				EXPECT_EQ(Tracker.m_aaEndTick[Team][Number], 0);
+				EXPECT_EQ(Tracker.m_aaTouchTick[Team][Number], 0);
+				EXPECT_EQ(Tracker.m_aaClientId[Team][Number], -1);
+				EXPECT_EQ(Tracker.m_aaConnection[Team][Number], -1);
+			}
+		}
+	}
+	Tracker.Track(3, 12, 200, 150, 11, 0);
+	EXPECT_TRUE(Tracker.m_aTouchedTeams[3]);
+	EXPECT_EQ(Tracker.m_aaEndTick[3][12], 200);
+	Tracker.Reset();
+	EXPECT_EQ(Tracker.m_aaClientId[3][12], -1);
 }

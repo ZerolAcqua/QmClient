@@ -40,6 +40,7 @@
 #include <game/client/QmUi/UiContainers.h>
 #include <game/client/QmUi/UiContext.h>
 #include <game/client/QmUi/UiForms.h>
+#include <game/client/QmUi/UiMotion.h>
 #include <game/client/QmUi/UiNavigation.h>
 #include <game/client/QmUi/UiSurface.h>
 #include <game/client/QmUi/UiTheme.h>
@@ -123,13 +124,13 @@ using namespace std::chrono_literals;
 
 namespace
 {
-	constexpr float MENU_SWITCH_DURATION = 0.18f;
+	constexpr float MENU_SWITCH_DURATION = ui_token::motion::PAGE_SLIDE.m_DurationSec;
 	constexpr float MENU_SWITCH_ALPHA_MAX = 0.12f;
-	constexpr float MENU_TAB_HOVER_DURATION = 0.10f;
+	constexpr float MENU_TAB_HOVER_DURATION = ui_token::motion::HOVER_FADE.m_DurationSec;
 	constexpr float MENU_TAB_DEFAULT_X_OFFSET = 0.0f;
-	constexpr float MENU_TAB_DEFAULT_Y_OFFSET = -1.5f;
+	constexpr float MENU_TAB_DEFAULT_Y_OFFSET = 0.0f;
 	constexpr float MENU_TAB_DEFAULT_W_OFFSET = 0.0f;
-	constexpr float MENU_TAB_DEFAULT_H_OFFSET = 3.0f;
+	constexpr float MENU_TAB_DEFAULT_H_OFFSET = 0.0f;
 	constexpr float MENU_TAB_ANIM_EPSILON = 0.0001f;
 	constexpr int MENU_IDLE_REFRESH_RATE = 60;
 	constexpr auto MENU_IDLE_INTERACTION_GRACE_TIME = 450ms;
@@ -562,10 +563,10 @@ CMenus::CMenus()
 	{
 		Animator.m_Active = false;
 		Animator.m_ScaleLabel = false;
-		Animator.m_YOffset = -2.5f;
-		Animator.m_HOffset = 5.0f;
-		Animator.m_WOffset = 5.0f;
-		Animator.m_RepositionLabel = true;
+		Animator.m_YOffset = 0.0f;
+		Animator.m_HOffset = 0.0f;
+		Animator.m_WOffset = 0.0f;
+		Animator.m_RepositionLabel = false;
 		Animator.m_XOffset = 0.0f;
 		Animator.m_Value = 0.0f;
 		Animator.m_Time = std::chrono::nanoseconds::zero();
@@ -638,12 +639,16 @@ int CMenus::DoSettingsDropDown(CUIRect *pRect, const int CurSelection, const cha
 
 SCardMotionSpec CMenus::SettingsCardMotionSpec() const
 {
-	return ResolveCardMotionSpec(
+	SCardMotionSpec Motion = ResolveCardMotionSpec(
 		g_Config.m_QmUiMotionLevel,
 		g_Config.m_QmUiListEntryAnimations != 0,
 		g_Config.m_QmUiCardHeightAnimations != 0,
 		g_Config.m_QmUiCardReflowAnimations != 0,
 		g_Config.m_QmExtraAnimations != 0);
+	Motion.m_ContinuousEntry = g_Config.m_QmNewUi != 0;
+	if(Motion.m_ContinuousEntry)
+		Motion.m_EntryDistance *= 2.0f / 3.0f;
+	return Motion;
 }
 
 SSettingsCardDeckVisualOptions CMenus::SettingsCardDeckVisualOptions() const
@@ -966,18 +971,7 @@ void CMenus::TriggerUiSwitchAnimation(const uint64_t NodeKey, const float Durati
 		return;
 
 	CUiV2AnimationRuntime &AnimRuntime = GameClient()->UiRuntimeV2()->AnimRuntime();
-	AnimRuntime.SetValue(NodeKey, EUiAnimProperty::POS_X, 1.0f);
-
-	SUiAnimRequest Request;
-	Request.m_NodeKey = NodeKey;
-	Request.m_Property = EUiAnimProperty::POS_X;
-	Request.m_Target = 0.0f;
-	Request.m_Transition.m_DurationSec = DurationSec;
-	Request.m_Transition.m_DelaySec = 0.0f;
-	Request.m_Transition.m_Priority = 1;
-	Request.m_Transition.m_Interrupt = EUiAnimInterruptPolicy::MERGE_TARGET;
-	Request.m_Transition.m_Easing = EEasing::EASE_OUT;
-	AnimRuntime.RequestAnimation(Request);
+	BeginUiSwitchAnimation(AnimRuntime, NodeKey, DurationSec);
 }
 
 float CMenus::ReadUiSwitchAnimation(const uint64_t NodeKey) const
@@ -1002,11 +996,12 @@ void CMenus::DrawUiSwitchTransitionOverlay(const CUIRect &Rect, const ColorRGBA 
 
 float CMenus::ApplyUiSwitchOffset(CUIRect &View, const float Strength, const float Direction, const bool Vertical, const float RelativeOffset, const float MinOffset, const float MaxOffset) const
 {
-	if(Strength <= 0.0f || Direction == 0.0f)
+	if(g_Config.m_QmUiMotionLevel < 2 || Strength <= 0.0f || Direction == 0.0f)
 		return 0.0f;
 
 	const float AxisSize = Vertical ? View.h : View.w;
-	const float Offset = Strength * std::clamp(AxisSize * RelativeOffset, MinOffset, MaxOffset) * Direction;
+	// 大面积内容只作短距离过渡，避免文字大幅移动。
+	const float Offset = Strength * std::min(8.0f, std::clamp(AxisSize * RelativeOffset, MinOffset, MaxOffset)) * Direction;
 	if(Vertical)
 		View.y += Offset;
 	else
@@ -1023,7 +1018,7 @@ float CMenus::ResolveMenuTabAnimationValue(const void *pButtonId, const bool Act
 	static const uint64_t s_ScopeHash = static_cast<uint64_t>(str_quickhash("menu_tab_hover"));
 	const uint64_t NodeKey = BuildUiAnimNodeKey(s_ScopeHash, reinterpret_cast<uint64_t>(pButtonId));
 	CUiV2AnimationRuntime &AnimRuntime = GameClient()->UiRuntimeV2()->AnimRuntime();
-	return std::clamp(ResolveUiAnimValue(AnimRuntime, NodeKey, EUiAnimProperty::SCALE, Target, DurationSec, EEasing::EASE_OUT), 0.0f, 1.0f);
+	return std::clamp(ResolveUiAnimValue(AnimRuntime, NodeKey, EUiAnimProperty::SCALE, Target, DurationSec, ui_token::motion::HOVER_FADE.m_Easing), 0.0f, 1.0f);
 }
 
 ColorRGBA CMenus::MenuPanelColor(float AlphaScale) const
@@ -1093,30 +1088,26 @@ int CMenus::DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText,
 {
 	CUiScopedGaussianBlurSuppression GaussianBlurSuppression(Ui());
 	CUIRect Text = *pRect;
-	const bool MouseInside = Ui()->HotItem() == pButtonContainer;
 	const bool Pressed = Ui()->CheckActiveItem(pButtonContainer);
-	const float HoverTarget = Checked || MouseInside || Pressed ? 1.0f : 0.0f;
-	float HoverStrength = HoverTarget;
+	const float TargetColorMul = Ui()->ButtonColorMul(pButtonContainer);
+	float AnimatedColorMul = TargetColorMul;
 	if(!Ui()->RenderOnly())
 	{
 		static const uint64_t s_ScopeHash = static_cast<uint64_t>(str_quickhash("menu_button_hover"));
 		const uint64_t NodeKey = BuildUiAnimNodeKey(s_ScopeHash, reinterpret_cast<uint64_t>(pButtonContainer));
 		CUiV2AnimationRuntime &AnimRuntime = GameClient()->UiRuntimeV2()->AnimRuntime();
-		HoverStrength = std::clamp(ResolveUiAnimValue(AnimRuntime, NodeKey, EUiAnimProperty::ALPHA, HoverTarget, 0.11f, EEasing::EASE_OUT), 0.0f, 1.0f);
+		const SUiAnimTransition &Transition = Pressed ? ui_token::motion::BTN_PRESS : ui_token::motion::BTN_HOVER;
+		AnimatedColorMul = Ui()->ButtonColorMulDefault() + ResolveUiAnimValue(AnimRuntime, NodeKey, EUiAnimProperty::ALPHA, TargetColorMul - Ui()->ButtonColorMulDefault(), Transition.m_DurationSec, Transition.m_Easing);
 	}
-	const float HoverLift = -1.25f * HoverStrength;
+	// 悬浮仅改变表面颜色，文字和图标保持原位置与字号。
+	const float HoverLift = 0.0f;
 
 	if(Checked)
 		Color = ColorRGBA(0.6f, 0.6f, 0.6f, 0.5f);
 	else // TClient, why was this not here? ig they never use "checked" anywhere important
-		Color.a *= Ui()->ButtonColorMul(pButtonContainer);
+		Color.a *= AnimatedColorMul;
 
 	DrawRoundedSurface(Ui(), *pRect, Color, ColorRGBA(), Rounding, 0.0f, Corners);
-	if(HoverStrength > MENU_TAB_ANIM_EPSILON)
-	{
-		const float OverlayAlpha = (Checked ? 0.05f : 0.08f) * HoverStrength;
-		DrawRoundedSurface(Ui(), *pRect, ColorRGBA(1.0f, 1.0f, 1.0f, OverlayAlpha), ColorRGBA(), Rounding, 0.0f, Corners);
-	}
 
 	if(pImageName)
 	{
@@ -1157,7 +1148,7 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 	CUiScopedGaussianBlurSuppression GaussianBlurSuppression(Ui());
 	const bool MouseInside = Ui()->HotItem() == pButtonContainer;
 	CUIRect AnimatedLabelRect = *pRect;
-	const bool TabActive = Checked || MouseInside;
+	const bool TabActive = MouseInside;
 	const float AnimValue = ResolveMenuTabAnimationValue(pButtonContainer, TabActive, MENU_TAB_HOVER_DURATION);
 
 	float XOffset = MENU_TAB_DEFAULT_X_OFFSET;
@@ -1183,8 +1174,12 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 	if(CapsuleTab)
 	{
 		// 胶囊 Tab 的激活外观由滑块胶囊承担，Tab 自己不再画分块底色，只保留 hover 反馈。
-		if(MouseInside)
-			DrawRoundedSurface(Ui(), *pRect, MenuCapsuleTabHoverColor(), ColorRGBA(), ui_token::radius::PILL, 0.0f, Corners);
+		if(AnimValue > MENU_TAB_ANIM_EPSILON)
+		{
+			ColorRGBA HoverColor = MenuCapsuleTabHoverColor();
+			HoverColor.a *= AnimValue;
+			DrawRoundedSurface(Ui(), *pRect, HoverColor, ColorRGBA(), ui_token::radius::PILL, 0.0f, Corners);
+		}
 	}
 	else if(Checked)
 	{
@@ -1198,7 +1193,7 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 	}
 	else
 	{
-		if(MouseInside)
+		if(AnimValue > MENU_TAB_ANIM_EPSILON)
 		{
 			ColorRGBA HoverColorMenuTab = ms_ColorTabbarHover;
 			if(pHoverColor)
@@ -1206,7 +1201,13 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 			else if(g_Config.m_QmNewUi)
 				HoverColorMenuTab = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_QmUiSelectedColor)).WithAlpha(0.20f);
 
-			DrawRoundedSurface(Ui(), *pRect, HoverColorMenuTab, ColorRGBA(), EdgeRounding, 0.0f, Corners);
+			const ColorRGBA IdleColor = pDefaultColor != nullptr ? *pDefaultColor : ms_ColorTabbarInactive;
+			const ColorRGBA AnimatedColor(
+				mix(IdleColor.r, HoverColorMenuTab.r, AnimValue),
+				mix(IdleColor.g, HoverColorMenuTab.g, AnimValue),
+				mix(IdleColor.b, HoverColorMenuTab.b, AnimValue),
+				mix(IdleColor.a, HoverColorMenuTab.a, AnimValue));
+			DrawRoundedSurface(Ui(), *pRect, AnimatedColor, ColorRGBA(), EdgeRounding, 0.0f, Corners);
 		}
 		else
 		{
@@ -1648,6 +1649,26 @@ void CMenus::DoSettingsMenuLabel(int Page, int Tab, int Subtab, const char *pTex
 	}
 	CUIElement &Element = MenuTextElement(MENU_TEXT_SCOPE_SETTINGS, Page, Tab, Subtab, pTextId, StyleKey);
 	DoSettingsLabelStreamed(Element, pLabelRect, pText, Size, Align, LabelProps, -1, nullptr, true);
+}
+
+void CMenus::DoSettingsCardLabel(const char *pStableId, const bool Subtitle, const CUIRect *pRect, const char *pText, const float Size, const SLabelProperties &Props)
+{
+	if(g_Config.m_QmNewUi == 0 || m_SettingsTextContextPage < 0 || pStableId == nullptr || pStableId[0] == '\0')
+	{
+		Ui()->DoLabel(pRect, pText, Size, TEXTALIGN_ML, Props);
+		return;
+	}
+	// 使用现有文字池管理字体、语言和缩放失效；动画位置与彩虹字色不参与缓存键。
+	char aTextId[256];
+	str_format(aTextId, sizeof(aTextId), "settings-card-%s:%s", Subtitle ? "subtitle" : "title", pStableId);
+	const SMenuTextStyleKey StyleKey = BuildMenuTextStyleKey(pRect, Size, TEXTALIGN_ML, Props);
+	if(m_MenuTextPlanCollecting)
+	{
+		CollectMenuTextPlanItem(MENU_TEXT_SCOPE_SETTINGS, m_SettingsTextContextPage, m_SettingsTextContextTab, m_SettingsTextContextSubtab, aTextId, pText, pRect, Size, TEXTALIGN_ML, Props, StyleKey);
+		return;
+	}
+	CUIElement &Element = MenuTextElement(MENU_TEXT_SCOPE_SETTINGS, m_SettingsTextContextPage, m_SettingsTextContextTab, m_SettingsTextContextSubtab, aTextId, StyleKey);
+	DoSettingsLabelStreamed(Element, pRect, pText, Size, TEXTALIGN_ML, Props);
 }
 
 int CMenus::DoSettingsButton_Menu(int Page, int Tab, int Subtab, CButtonContainer *pBC, const char *pTextId, const char *pText, int Checked, const CUIRect *pRect, int Flags, int Corners, float Rounding, const ColorRGBA &Color, float FontFactor, float BodySize)
@@ -2805,7 +2826,9 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 
 		const uint64_t IndicatorNode = BuildUiAnimNodeKey(MakeUiScopeHash("menubar_v2_indicator"), static_cast<uint64_t>(ClientState));
 		CUiV2AnimationRuntime &AnimRt = GameClient()->UiRuntimeV2()->AnimRuntime();
-		const CUIRect IndicatorRect = ResolveUiAnimValueRect(AnimRt, IndicatorNode, IndicatorTarget, ui_curve::EMPHASIZED.m_DurationSec, ui_curve::EMPHASIZED.m_Easing);
+		CUIRect IndicatorRect = IndicatorTarget;
+		IndicatorRect.x = ResolveUiAnimSpringValue(AnimRt, IndicatorNode, EUiAnimProperty::POS_X, IndicatorTarget.x, ui_token::motion::NAVIGATION_SPRING, 2);
+		IndicatorRect.w = ResolveUiAnimSpringValue(AnimRt, IndicatorNode, EUiAnimProperty::WIDTH, IndicatorTarget.w, ui_token::motion::NAVIGATION_SPRING, 2);
 		IndicatorRect.Draw(MenuUiColorAccent(1.0f), IGraphics::CORNER_NONE, 0.0f);
 	}
 
@@ -3840,7 +3863,23 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		Box.Margin(QmUiCenteredMargin(Box, 150.0f, 300.0f, 300.0f), &Box);
 	}
 
-	// Background
+#if defined(CONF_VIDEORECORDER)
+	if(m_Popup == POPUP_RENDER_DEMO)
+	{
+		const float Width = std::min(680.0f, Screen.w - 32.0f);
+		const float Height = std::min(496.0f, Screen.h - 32.0f);
+		Box = {Screen.x + (Screen.w - Width) * 0.5f, Screen.y + (Screen.h - Height) * 0.5f, Width, Height};
+	}
+#endif
+
+	// 入场只改变背景明暗，不缩放正文或重建其布局，按钮从首帧即可操作。
+	if(!Ui()->RenderOnly())
+	{
+		CUiV2AnimationRuntime &AnimRuntime = GameClient()->UiRuntimeV2()->AnimRuntime();
+		const uint64_t NodeKey = UiAnimNodeKey("menu_popup_entrance", static_cast<uint64_t>(m_Popup));
+		const SUiPresenceResult Presence = GameClient()->UiRuntimeV2()->Tree().ResolvePresence(AnimRuntime, NodeKey, true, ui_token::motion::MODAL_IN);
+		BgColor.a *= 0.85f + 0.15f * std::clamp(Presence.m_Alpha, 0.0f, 1.0f);
+	}
 	Box.Draw(BgColor, IGraphics::CORNER_ALL, ui_token::radius::CARD);
 
 	// Title
@@ -4150,7 +4189,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		DemoRenderTextInputCtx.m_ScopeHash = MakeUiScopeHash("demo_render_text_input");
 		DemoRenderTextInputCtx.m_FrameDt = GameClient()->UiRuntimeV2()->FrameDt();
 
-		Box.VMargin(60.0f, &Box);
+		Box.VMargin(24.0f, &Box);
 		Box.HMargin(20.0f, &Box);
 		Box.HSplitBottom(24.0f, &Box, &Row);
 		Box.HSplitBottom(40.0f, &Box, nullptr);
@@ -4195,23 +4234,15 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			}
 		}
 
-		CUIRect ShowChatCheckbox, UseSoundsCheckbox;
-		Box.HSplitBottom(20.0f, &Box, &Row);
-		Box.HSplitBottom(10.0f, &Box, nullptr);
-		Row.VSplitMid(&ShowChatCheckbox, &UseSoundsCheckbox, 20.0f);
+		CUIRect DisplayOptions;
+		Box.HSplitTop(144.0f, &DisplayOptions, &Box);
+		RenderDemoDisplaySettings(DisplayOptions, !Ui()->IsPopupOpen());
 
-		if(DoButton_CheckBox(&g_Config.m_ClVideoShowChat, Localize("Show chat"), g_Config.m_ClVideoShowChat, &ShowChatCheckbox))
-			g_Config.m_ClVideoShowChat ^= 1;
-
+		CUIRect UseSoundsCheckbox;
+		Box.HSplitBottom(24.0f, &Box, &Row);
+		Row.VSplitMid(&Row, &UseSoundsCheckbox, 20.0f);
 		if(DoButton_CheckBox(&g_Config.m_ClVideoSndEnable, Localize("Use sounds"), g_Config.m_ClVideoSndEnable, &UseSoundsCheckbox))
 			g_Config.m_ClVideoSndEnable ^= 1;
-
-		CUIRect ShowHudButton;
-		Box.HSplitBottom(20.0f, &Box, &Row);
-		Row.VSplitMid(&Row, &ShowHudButton, 20.0f);
-
-		if(DoButton_CheckBox(&g_Config.m_ClVideoShowhud, Localize("Show ingame HUD"), g_Config.m_ClVideoShowhud, &ShowHudButton))
-			g_Config.m_ClVideoShowhud ^= 1;
 
 		// slowdown
 		CUIRect SlowDownButton;
@@ -5730,9 +5761,13 @@ CUIElement &CMenus::MenuTextElement(EMenuTextScope Scope, int Page, int Tab, int
 		{
 			++m_MenuTextStableMissesThisFrame;
 			LogSettingsTextPoolCoverageGap(Client(), "settings_text_miss", Scope, SettingsPerfStableTextScope(Page), Page, Tab, Subtab, Key.c_str(), "missing", HasDescriptor ? (KeyPlanned ? "not_built" : "key_mismatch") : "missing_descriptor", SettingsPerfActiveOperation(), m_MenuTextCoverageFrame);
-			if(!m_MenuTextFallbackElement.IsRegistered())
-				m_MenuTextFallbackElement.Init(Ui(), 1);
-			return m_MenuTextFallbackElement;
+			// 新版设置允许可见文字登记；容器仍在帧末限额构建，不依赖预热。
+			if(g_Config.m_QmNewUi == 0 || Scope != MENU_TEXT_SCOPE_SETTINGS)
+			{
+				if(!m_MenuTextFallbackElement.IsRegistered())
+					m_MenuTextFallbackElement.Init(Ui(), 1);
+				return m_MenuTextFallbackElement;
+			}
 		}
 		TrimMenuTextPoolForInsert(CurrentFrame);
 		It = m_MenuTextPool.try_emplace(Key).first;
@@ -5746,10 +5781,14 @@ CUIElement &CMenus::MenuTextElement(EMenuTextScope Scope, int Page, int Tab, int
 		{
 			++m_MenuTextStableStalesThisFrame;
 			LogSettingsTextPoolCoverageGap(Client(), "settings_text_stale", Scope, SettingsPerfStableTextScope(Page), Page, Tab, Subtab, Key.c_str(), m_MenuTextPoolLastStaleReason.empty() ? "style" : m_MenuTextPoolLastStaleReason.c_str(), KeyPlanned ? "stale_generation" : (HasDescriptor ? "key_mismatch" : "missing_descriptor"), SettingsPerfActiveOperation(), m_MenuTextCoverageFrame);
-			if(!m_MenuTextFallbackElement.IsRegistered())
-				m_MenuTextFallbackElement.Init(Ui(), 1);
-			return m_MenuTextFallbackElement;
+			if(g_Config.m_QmNewUi == 0 || Scope != MENU_TEXT_SCOPE_SETTINGS)
+			{
+				if(!m_MenuTextFallbackElement.IsRegistered())
+					m_MenuTextFallbackElement.Init(Ui(), 1);
+				return m_MenuTextFallbackElement;
+			}
 		}
+		RemoveMenuTextContainerBuildRequest(It->second.m_Element);
 		Ui()->ResetUIElement(It->second.m_Element);
 		It->second.m_StyleKey = StyleKey;
 		It->second.m_Generation = m_MenuTextPoolGeneration;
@@ -5804,17 +5843,9 @@ bool CMenus::MenuTextContainerNeedsBuild(CUIElement &Element, const CUIRect *pRe
 	if(pRect == nullptr || pText == nullptr)
 		return false;
 	CUIElement::SUIElementRect *pElementRect = Element.Rect(0);
-	const bool TextChanged =
-		(StrLen > 0 && (StrLen != (int)pElementRect->m_Text.size() || str_comp_num(pElementRect->m_Text.c_str(), pText, StrLen) != 0)) ||
-		(StrLen != 0 && StrLen < 0 && str_comp(pElementRect->m_Text.c_str(), pText) != 0);
 	const int ReadCursorGlyphCount = pReadCursor == nullptr ? -1 : pReadCursor->m_GlyphCount;
 	const bool SizeChanged = pElementRect->m_Width != pRect->w || pElementRect->m_Height != pRect->h;
-	const bool NeedsBuild =
-		(!pElementRect->m_UITextContainer.Valid() && pText[0] != '\0' && StrLen != 0) ||
-		TextChanged ||
-		SizeChanged ||
-		pElementRect->m_ReadCursorGlyphCount != ReadCursorGlyphCount;
-	return NeedsBuild;
+	return SettingsTextCacheNeedsBuild(pElementRect->m_Text, pText, StrLen, pElementRect->m_UITextContainer.Valid(), SizeChanged, pElementRect->m_ReadCursorGlyphCount != ReadCursorGlyphCount);
 }
 
 bool CMenus::RequestMenuTextContainerBuild(CUIElement &Element, const CUIRect *pRect, const char *pText, float Size, int Align, int StrLen, const CTextCursor *pReadCursor)
@@ -5846,7 +5877,9 @@ void CMenus::QueueMenuTextContainerBuild(CUIElement &Element, const CUIRect *pRe
 			Request.m_Align = Align;
 			Request.m_LabelProps = LabelProps;
 			Request.m_StrLen = StrLen;
-			Request.m_ReadCursorGlyphCount = pReadCursor == nullptr ? -1 : pReadCursor->m_GlyphCount;
+			Request.m_ReadCursor = pReadCursor != nullptr ? std::make_optional(*pReadCursor) : std::nullopt;
+			Request.m_FontPreset = TextRender()->GetFontPreset();
+			Request.m_RenderFlags = TextRender()->GetRenderFlags();
 			return;
 		}
 	}
@@ -5858,21 +5891,49 @@ void CMenus::QueueMenuTextContainerBuild(CUIElement &Element, const CUIRect *pRe
 	Request.m_Align = Align;
 	Request.m_LabelProps = LabelProps;
 	Request.m_StrLen = StrLen;
-	Request.m_ReadCursorGlyphCount = pReadCursor == nullptr ? -1 : pReadCursor->m_GlyphCount;
+	Request.m_ReadCursor = pReadCursor != nullptr ? std::make_optional(*pReadCursor) : std::nullopt;
+	Request.m_FontPreset = TextRender()->GetFontPreset();
+	Request.m_RenderFlags = TextRender()->GetRenderFlags();
 	m_vMenuTextContainerBuildRequests.push_back(std::move(Request));
 }
 
 void CMenus::DrainMenuTextContainerBuildRequests()
 {
+	if(m_vMenuTextContainerBuildRequests.empty())
+		return;
+	if(g_Config.m_QmNewUi != 0 && !m_SettingsUiFrameBudgetInitialized)
+	{
+		// 普通设置页也要逐帧补充预算；零余额不能一直等到下次预热或 Tee 页。
+		const auto &Performance = GameClient()->m_QmMonitoring.Snapshot().m_Performance;
+		SSettingsAdaptiveBudgetInput Input;
+		Input.m_FrameMsAverage = Performance.m_FrameTimeMs;
+		Input.m_FrameMsP95 = Performance.m_FrameTimeP95Ms > 0.0f ? Performance.m_FrameTimeP95Ms : Performance.m_FrameTimeMs;
+		Input.m_ScrollActive = m_SettingsScrollActive;
+		Input.m_TabSwitchFirstFrame = m_SettingsPageSwitchActive;
+		Input.m_PostScrollRecoveryFrames = m_SettingsPostScrollRecoveryFrames;
+		Input.m_VisibleWaiting = (int)m_vMenuTextContainerBuildRequests.size();
+		// WindowActive() 属于 IEngineGraphics，IGraphics 上没有该接口。
+		IEngineGraphics *pEngineGraphics = Kernel()->RequestInterface<IEngineGraphics>();
+		Input.m_WindowActive = pEngineGraphics == nullptr || pEngineGraphics->WindowActive() != 0;
+		BeginSettingsUiFrameScheduler(EFrameSchedulerConsumer::SettingsText, "visible_text", Input);
+	}
+	const EFontPreset PreviousFontPreset = TextRender()->GetFontPreset();
+	const unsigned PreviousRenderFlags = TextRender()->GetRenderFlags();
+	// 语言页收集请求时已消耗页面预热额度，帧末构建另设上限，避免重复扣减后永远无法出队。
+	SSettingsWarmupFrameBudget RuntimeBudget;
 	while(m_CurrentSettingsUiFrameBudget.m_TextContainerTokens > 0 && !m_vMenuTextContainerBuildRequests.empty())
 	{
+		if(g_Config.m_QmNewUi != 0 && !SettingsWarmupConsumeBudget(RuntimeBudget, ESettingsWarmupCost::TEXT_CONTAINER))
+			break;
 		SMenuTextContainerBuildRequest Request = std::move(m_vMenuTextContainerBuildRequests.front());
-		m_vMenuTextContainerBuildRequests.erase(m_vMenuTextContainerBuildRequests.begin());
+		m_vMenuTextContainerBuildRequests.pop_front();
 		if(Request.m_pElement == nullptr)
 			continue;
 		bool TextContainerRecreated = false;
 		--m_CurrentSettingsUiFrameBudget.m_TextContainerTokens;
-		DrainMenuTextContainerBuild(*Request.m_pElement, &Request.m_Rect, Request.m_Text.c_str(), Request.m_Size, Request.m_Align, Request.m_LabelProps, Request.m_StrLen, nullptr, false, &TextContainerRecreated);
+		TextRender()->SetFontPreset(Request.m_FontPreset);
+		TextRender()->SetRenderFlags(Request.m_RenderFlags);
+		DrainMenuTextContainerBuild(*Request.m_pElement, &Request.m_Rect, Request.m_Text.c_str(), Request.m_Size, Request.m_Align, Request.m_LabelProps, Request.m_StrLen, Request.m_ReadCursor ? &*Request.m_ReadCursor : nullptr, false, &TextContainerRecreated);
 		if(TextContainerRecreated)
 		{
 			for(auto &[Key, Entry] : m_MenuTextPool)
@@ -5887,6 +5948,8 @@ void CMenus::DrainMenuTextContainerBuildRequests()
 			}
 		}
 	}
+	TextRender()->SetFontPreset(PreviousFontPreset);
+	TextRender()->SetRenderFlags(PreviousRenderFlags);
 }
 
 void CMenus::RemoveMenuTextContainerBuildRequest(const CUIElement &Element)
@@ -5911,7 +5974,6 @@ void CMenus::CountMenuTextImmediateFallback()
 
 void CMenus::DoMenuLabelStreamed(EMenuTextScope Scope, CUIElement &Element, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps, int StrLen, const CTextCursor *pReadCursor, bool Render)
 {
-	(void)Scope;
 	if(pText == nullptr)
 		return;
 
@@ -5954,7 +6016,16 @@ void CMenus::DoMenuLabelStreamed(EMenuTextScope Scope, CUIElement &Element, cons
 		if(m_MenuTextPoolVisibleGuard)
 			++m_MenuTextStableBuildQueuedThisFrame;
 		QueueMenuTextContainerBuild(Element, pRect, pText, Size, Align, LabelProps, StrLen, pReadCursor);
-		if(Render && pElementRect->m_UITextContainer.Valid() && pRect != nullptr)
+		if(Render && pRect != nullptr && Scope == MENU_TEXT_SCOPE_SETTINGS && g_Config.m_QmNewUi != 0)
+		{
+			// 排队期间显示当前文字，避免首次空白或继续显示旧语言；命中后直接复用容器。
+			CountMenuTextImmediateFallback();
+			if(StrLen < 0)
+				Ui()->DoLabel(pRect, pText, Size, Align, LabelProps);
+			else
+				Ui()->DoLabel(pRect, std::string(pText, StrLen).c_str(), Size, Align, LabelProps);
+		}
+		else if(Render && pElementRect->m_UITextContainer.Valid() && pRect != nullptr)
 		{
 			Ui()->RenderLabelTextContainerAligned(*pElementRect, pRect, Align);
 		}
@@ -6692,6 +6763,7 @@ SSettingsAdaptiveBudgetOutput CMenus::BeginSettingsUiFrameScheduler(EFrameSchedu
 {
 	PrepareSettingsAdaptiveBudgetInput(Input);
 	m_CurrentSettingsUiFrameBudget = GameClient()->FrameScheduler()->ComputeBudget(Consumer, Input);
+	m_SettingsUiFrameBudgetInitialized = true;
 	LogSettingsAdaptiveBudget(pSource, Input, m_CurrentSettingsUiFrameBudget);
 	return m_CurrentSettingsUiFrameBudget;
 }
@@ -6739,9 +6811,10 @@ void CMenus::InvalidateMenuTextPool(const char *pReason)
 	m_MenuTextPoolLayoutHash = 0;
 	m_MenuTextPoolThemeHash = 0;
 	m_SettingsMenuTextPlanMetadataDirty = true;
+	// 失效前排队的文字不能在帧末把旧内容重新标记为当前缓存。
+	m_vMenuTextContainerBuildRequests.clear();
 	if(!m_MenuTextPoolVisibleGuard)
 	{
-		m_vMenuTextContainerBuildRequests.clear();
 		for(auto &[Key, Entry] : m_MenuTextPool)
 		{
 			(void)Key;
@@ -6924,6 +6997,15 @@ bool CMenus::OnInput(const IInput::CEvent &Event)
 
 void CMenus::OnStateChange(int NewState, int OldState)
 {
+	m_DemoCutPreview.Reset();
+	if(NewState == IClient::STATE_DEMOPLAYBACK)
+	{
+		m_vDemoCutSegments.clear();
+		g_Config.m_ClDemoSliceBegin = -1;
+		g_Config.m_ClDemoSliceEnd = -1;
+		m_DemoPlayerState = DEMOPLAYER_NONE;
+	}
+
 	// reset active item
 	Ui()->SetActiveItem(nullptr);
 
@@ -7280,7 +7362,7 @@ void CMenus::SetMenuPage(int NewPage)
 	const bool NewIsBrowser = IsBrowserPage(NewPage);
 	if(OldIsBrowser && NewIsBrowser && OldPage != NewPage)
 	{
-		m_BrowserTabTransitionDirection = BrowserPageVisualOrder(NewPage) > BrowserPageVisualOrder(OldPage) ? 1.0f : -1.0f;
+		m_BrowserTabTransitionDirection = ResolveUiSwitchDirection(GameClient()->UiRuntimeV2()->AnimRuntime(), UiAnimNodeKey("browser_page_switch"), m_BrowserTabTransitionDirection, BrowserPageVisualOrder(NewPage) > BrowserPageVisualOrder(OldPage) ? 1.0f : -1.0f);
 		TriggerUiSwitchAnimation(UiAnimNodeKey("browser_page_switch"), MENU_SWITCH_DURATION);
 	}
 	else
@@ -7289,7 +7371,7 @@ void CMenus::SetMenuPage(int NewPage)
 	}
 	if(OldPage != NewPage && !(OldIsBrowser && NewIsBrowser))
 	{
-		m_MenuPageTransitionDirection = NewPage > OldPage ? 1.0f : -1.0f;
+		m_MenuPageTransitionDirection = ResolveUiSwitchDirection(GameClient()->UiRuntimeV2()->AnimRuntime(), UiAnimNodeKey("menu_page_switch"), m_MenuPageTransitionDirection, NewPage > OldPage ? 1.0f : -1.0f);
 		TriggerUiSwitchAnimation(UiAnimNodeKey("menu_page_switch"), MENU_SWITCH_DURATION);
 	}
 	else
@@ -7344,7 +7426,7 @@ void CMenus::SetGamePage(int NewPage)
 	m_GamePage = NewPage;
 	if(OldPage != NewPage)
 	{
-		m_GamePageTransitionDirection = NewPage > OldPage ? 1.0f : -1.0f;
+		m_GamePageTransitionDirection = ResolveUiSwitchDirection(GameClient()->UiRuntimeV2()->AnimRuntime(), UiAnimNodeKey("game_page_switch"), m_GamePageTransitionDirection, NewPage > OldPage ? 1.0f : -1.0f);
 		TriggerUiSwitchAnimation(UiAnimNodeKey("game_page_switch"), MENU_SWITCH_DURATION);
 	}
 	else

@@ -4,6 +4,7 @@
 #include <generated/client_data.h>
 
 #include <game/client/animstate.h>
+#include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/components/skins.h>
 #include <game/client/render.h>
 
@@ -108,6 +109,94 @@ static CImageInfo MakeTestSkinImage(size_t Width, size_t Height, CImageInfo::EIm
 	Image.m_Format = Format;
 	Image.m_pData = static_cast<uint8_t *>(calloc(Image.DataSize(), 1));
 	return Image;
+}
+
+TEST(SkinOutline, KeepsArtworkUntouchedAndUsesAlphaOfFillAndOutline)
+{
+	CImageInfo Image = MakeTestSkinImage(8, 4);
+	SetTestPixel(Image, 1, 1, 0, 0, 0, 255);
+	SetTestPixel(Image, 6, 1, 20, 80, 120, 255);
+	CImageInfo Original = Image.DeepCopy();
+	CQmSkinOutline Outline(Image, ivec2(0, 0), ivec2(4, 0), ivec2(4, 4), vec2(4, 4));
+	CImageInfo Border = Outline.BuildImage(1);
+	EXPECT_TRUE(Image.DataEquals(Original));
+	// 两张素材的实心部分均挖空，新增边缘只保留白色 RGB 和轮廓透明度。
+	EXPECT_FLOAT_EQ(Border.PixelColor(3, 3).a, 0.0f);
+	EXPECT_FLOAT_EQ(Border.PixelColor(4, 3).a, 0.0f);
+	EXPECT_EQ(Border.PixelColor(3, 2), ColorRGBA(1, 1, 1, 1));
+	EXPECT_EQ(Border.PixelColor(5, 3), ColorRGBA(1, 1, 1, 1));
+	Border.Free();
+	Image.Free();
+	Original.Free();
+}
+
+TEST(SkinOutline, WidthExpandsBeyondSpriteEdgesWithoutClipping)
+{
+	CImageInfo Image = MakeTestSkinImage(4, 4);
+	SetTestPixel(Image, 0, 0, 0, 0, 0, 255);
+	CQmSkinOutline Outline(Image, ivec2(0, 0), ivec2(0, 0), ivec2(4, 4), vec2(4, 4));
+	CImageInfo Thin = Outline.BuildImage(1);
+	CImageInfo Thick = Outline.BuildImage(3);
+	EXPECT_EQ(Thin.m_Width, 8u);
+	EXPECT_EQ(Thick.m_Width, 12u);
+	EXPECT_FLOAT_EQ(Thick.PixelColor(1, 4).a, 1.0f);
+	EXPECT_FLOAT_EQ(Thick.PixelColor(4, 4).a, 0.0f);
+	EXPECT_FLOAT_EQ(Thick.PixelColor(0, 4).a, 0.0f);
+	Thin.Free();
+	Thick.Free();
+	Image.Free();
+}
+
+TEST(SkinOutline, TransparentSkinsAndZeroWidthHaveNoVisibleBorder)
+{
+	CImageInfo Image = MakeTestSkinImage(4, 4);
+	CQmSkinOutline Outline(Image, ivec2(0, 0), ivec2(0, 0), ivec2(4, 4), vec2(4, 4));
+	CImageInfo Border = Outline.BuildImage(2);
+	for(size_t Index = 3; Index < Border.DataSize(); Index += 4)
+		EXPECT_EQ(Border.m_pData[Index], 0);
+	CImageInfo Disabled = Outline.BuildImage(0);
+	EXPECT_EQ(Disabled.m_pData, nullptr);
+	Border.Free();
+	Image.Free();
+}
+
+TEST(SkinOutline, LocalAndOtherPlayersHaveIndependentSwitches)
+{
+	EXPECT_TRUE(QmShouldDrawSkinOutline(4, 4, 7, true, false));
+	EXPECT_TRUE(QmShouldDrawSkinOutline(7, 4, 7, true, false));
+	EXPECT_FALSE(QmShouldDrawSkinOutline(9, 4, 7, true, false));
+	EXPECT_FALSE(QmShouldDrawSkinOutline(4, 4, 7, false, true));
+	EXPECT_TRUE(QmShouldDrawSkinOutline(9, 4, 7, false, true));
+	EXPECT_FALSE(QmShouldDrawSkinOutline(-1, -1, -1, true, true));
+	EXPECT_FALSE(QmShouldDrawSkinOutline(4, 4, 7, false, false));
+}
+
+TEST(SkinOutline, CircularBorderKeepsSoftAlphaAndExcludesDistantCorners)
+{
+	CImageInfo Image = MakeTestSkinImage(5, 5);
+	SetTestPixel(Image, 2, 2, 0, 0, 0, 128);
+	CQmSkinOutline Outline(Image, ivec2(0, 0), ivec2(0, 0), ivec2(5, 5), vec2(5, 5));
+	CImageInfo Border = Outline.BuildImage(2);
+	EXPECT_NEAR(Border.PixelColor(7, 5).a, 128.0f / 255.0f, 0.0001f);
+	EXPECT_NEAR(Border.PixelColor(6, 6).a, 128.0f / 255.0f, 0.0001f);
+	EXPECT_FLOAT_EQ(Border.PixelColor(7, 7).a, 0.0f);
+	EXPECT_FLOAT_EQ(Border.PixelColor(5, 5).a, 0.0f);
+	Border.Free();
+	Image.Free();
+}
+
+TEST(SkinOutline, LowResolutionSkinStillHasAThinBorder)
+{
+	CImageInfo Image = MakeTestSkinImage(4, 4);
+	for(size_t Index = 3; Index < Image.DataSize(); Index += 4)
+		Image.m_pData[Index] = 255;
+	CQmSkinOutline Outline(Image, ivec2(0, 0), ivec2(0, 0), ivec2(4, 4), vec2(64, 64));
+	CImageInfo Border = Outline.BuildImage(1);
+	EXPECT_EQ(Border.m_Width, 68u);
+	EXPECT_FLOAT_EQ(Border.PixelColor(1, 2).a, 1.0f);
+	EXPECT_FLOAT_EQ(Border.PixelColor(2, 2).a, 0.0f);
+	Border.Free();
+	Image.Free();
 }
 
 TEST(Skins, UsageTrackingSkipsAlwaysLoadedStates)
@@ -850,13 +939,48 @@ TEST(Skins, SkinTransitionUsesDefaultKeyWhenInitialDescriptorIsNotReady)
 
 	EXPECT_NE(UpdateRenderInfoBody.find("CSkinDescriptor RenderSkinDescriptor = SkinDescriptor;"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("const bool DescriptorRenderInfoReady = m_pSkinInfo->DescriptorRenderInfoReady();"), std::string::npos);
-	EXPECT_NE(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid())"), std::string::npos);
+	EXPECT_NE(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousSixSkinResident)"), std::string::npos);
+	EXPECT_NE(UpdateRenderInfoBody.find("CSkins::CanReusePreviousSixSkin("), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("else if(!DescriptorRenderInfoReady)"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("const float OriginalSize = NewRenderInfo.m_Size;"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("BuildDefaultSkinDescriptor(RenderSkinDescriptor);"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("if(!ApplyDefaultSkin(m_pGameClient, NewRenderInfo))\n\t\t\tNewRenderInfo.Reset();"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("UpdateSkinChangeTransition(NewRenderInfo, RenderSkinDescriptor);"), std::string::npos);
 	EXPECT_EQ(UpdateRenderInfoBody.find("UpdateSkinChangeTransition(NewRenderInfo, SkinDescriptor);"), std::string::npos);
+}
+
+TEST(Skins, UnloadedSkinTexturesInvalidateDependentRenderInfos)
+{
+	// 贴图卸载后句柄依旧 IsValid()，只有重新解析渲染信息才能避免绑定已释放的纹理（白块 Tee）。
+	EXPECT_TRUE(CSkins::CanReusePreviousSixSkin(true, true, true));
+	EXPECT_FALSE(CSkins::CanReusePreviousSixSkin(true, true, false));
+	// 0.7-only 描述符与无效皮肤名不引用 6.x 贴图，不受该限制。
+	EXPECT_TRUE(CSkins::CanReusePreviousSixSkin(false, true, false));
+	EXPECT_TRUE(CSkins::CanReusePreviousSixSkin(true, false, false));
+
+	const std::string Source = ReadTestSourceFile("src/game/client/components/skins.cpp");
+	const std::string UnloadBody = FunctionBody(Source, "void CSkins::UnloadLoadedSkinTextures(CSkinContainer *pSkinContainer)");
+	ASSERT_FALSE(UnloadBody.empty());
+	EXPECT_NE(UnloadBody.find("m_OriginalSkin.Unload(Graphics())"), std::string::npos);
+	EXPECT_NE(UnloadBody.find("m_ColorableSkin.Unload(Graphics())"), std::string::npos);
+	EXPECT_NE(UnloadBody.find("QueueSkinTexturesUnloaded(pSkinContainer->Name());"), std::string::npos);
+
+	// 资源预算卸载与目录扫描重建都必须走同一个卸载入口，否则又会留下失效句柄。
+	const std::string UnloadSkinsBody = FunctionBody(Source, "void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)");
+	ASSERT_FALSE(UnloadSkinsBody.empty());
+	EXPECT_EQ(UnloadSkinsBody.find("m_OriginalSkin.Unload(Graphics())"), std::string::npos);
+	EXPECT_NE(UnloadSkinsBody.find("UnloadLoadedSkinTextures(pSkinContainer);"), std::string::npos);
+	const std::string DirectoryScanBody = FunctionBody(Source, "void CSkins::ProcessSkinDirectoryScanJob()");
+	ASSERT_FALSE(DirectoryScanBody.empty());
+	EXPECT_EQ(DirectoryScanBody.find("m_OriginalSkin.Unload(Graphics())"), std::string::npos);
+	EXPECT_NE(DirectoryScanBody.find("UnloadLoadedSkinTextures(pSkinContainer);"), std::string::npos);
+
+	// 通知只能在 OnUpdate 末尾发出：OnSkinUpdate 会重新解析皮肤并改动容器表。
+	const std::string OnUpdateBody = FunctionBody(Source, "void CSkins::OnUpdate()");
+	ASSERT_FALSE(OnUpdateBody.empty());
+	EXPECT_NE(OnUpdateBody.find("for(const std::string &SkinName : m_vSkinsTexturesUnloadedThisFrame)"), std::string::npos);
+	EXPECT_NE(OnUpdateBody.find("GameClient()->OnSkinUpdate(SkinName.c_str());"), std::string::npos);
+	EXPECT_NE(OnUpdateBody.find("m_vSkinsTexturesUnloadedThisFrame.clear();"), std::string::npos);
 }
 
 TEST(Skins, DefaultFallbackNeverAppliesTheUntexturedPlaceholder)
@@ -984,10 +1108,10 @@ TEST(Skins, SkinTransitionKeepsPreviousSkinBaseWhileDescriptorIsPending)
 	const std::string UpdateRenderInfoBody = Source.substr(UpdateRenderInfoPos, UpdateTransitionPos - UpdateRenderInfoPos);
 
 	EXPECT_NE(UpdateRenderInfoBody.find("const bool DescriptorRenderInfoReady = m_pSkinInfo->DescriptorRenderInfoReady();"), std::string::npos);
-	EXPECT_NE(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid())"), std::string::npos);
+	EXPECT_NE(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousSixSkinResident)"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("NewRenderInfo = m_RenderInfo;"), std::string::npos);
 	EXPECT_EQ(UpdateRenderInfoBody.find("return;\n\t\t}"), std::string::npos);
-	EXPECT_LT(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid())"), UpdateRenderInfoBody.find("// force team colors"));
+	EXPECT_LT(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousSixSkinResident)"), UpdateRenderInfoBody.find("// force team colors"));
 	EXPECT_LT(UpdateRenderInfoBody.find("// force team colors"), UpdateRenderInfoBody.find("UpdateSkinChangeTransition(NewRenderInfo, RenderSkinDescriptor);"));
 }
 
@@ -1672,9 +1796,8 @@ TEST(Skins, DirectoryScanMergesLocalAndDownloadedSkinsWithLocalPriority)
 	EXPECT_NE(ProcessDirectoryBody.find("CSkinContainer SkinContainer(this, Entry.m_Name.c_str(), Entry.m_Type, Entry.m_StorageType);"), std::string::npos);
 	EXPECT_NE(ProcessDirectoryBody.find("pSkinContainer->SetLastModified(Entry.m_LastModified);"), std::string::npos);
 	EXPECT_NE(ProcessDirectoryBody.find("pSkinContainer->m_pLoadJob->Abort();"), std::string::npos);
-	EXPECT_NE(ProcessDirectoryBody.find("if(OldState == CSkinContainer::EState::LOADED && pSkinContainer->m_pSkin)"), std::string::npos);
-	EXPECT_NE(ProcessDirectoryBody.find("pSkinContainer->m_pSkin->m_OriginalSkin.Unload(Graphics());"), std::string::npos);
-	EXPECT_NE(ProcessDirectoryBody.find("pSkinContainer->m_pSkin.reset();"), std::string::npos);
+	EXPECT_NE(ProcessDirectoryBody.find("if(OldState == CSkinContainer::EState::LOADED)"), std::string::npos);
+	EXPECT_NE(ProcessDirectoryBody.find("UnloadLoadedSkinTextures(pSkinContainer);"), std::string::npos);
 	EXPECT_NE(ProcessDirectoryBody.find("pSkinContainer->SetState(CSkinContainer::EState::PENDING, OldPriority);"), std::string::npos);
 }
 

@@ -1,3 +1,4 @@
+#include <game/client/components/qmclient/qm_hook_coll_candidates.h>
 // 请抬头享受阳光｜日子很好 我很我---------致咩子
 #include "test.h"
 
@@ -107,4 +108,26 @@ TEST(DDNet199Sync, UsesLocalTuningForUnpredictedHookCollision)
 	EXPECT_NE(Players.find("GameClient()->m_aClients[GameClient()->m_aLocalIds[g_Config.m_ClDummy]].m_Predicted"), std::string::npos);
 	EXPECT_NE(Players.find("PlayerCore.m_Tuning.m_HookLength"), std::string::npos);
 	EXPECT_NE(Players.find("PlayerCore.m_Tuning.m_HookFireSpeed"), std::string::npos);
+}
+
+TEST(QmHookCollCandidates, ReusesTargetsForEverySimulatedSegmentAndPreservesOrder)
+{
+	CQmHookCollCandidates Cache;
+	int Checks = 0;
+	const auto Eligible = [&](int Id) {
+		++Checks;
+		return Id == 1 || Id == 3 || Id == 7;
+	};
+	const std::vector<int> Expected = {1, 7};
+	EXPECT_EQ(Cache.Get(3, Eligible), Expected);
+	const int FirstChecks = Checks;
+	for(int Tick = 0; Tick < 250; ++Tick)
+		EXPECT_EQ(Cache.Get(3, Eligible), Expected);
+	EXPECT_EQ(Checks, FirstChecks);
+	EXPECT_EQ(Cache.Get(1, Eligible), (std::vector<int>{3, 7}));
+	EXPECT_GT(Checks, FirstChecks);
+	Cache.Reset();
+	EXPECT_EQ(Cache.Get(3, [](int Id) { return Id == 8; }), (std::vector<int>{8}));
+	Cache.Reset();
+	EXPECT_TRUE(Cache.Get(3, [](int) { return false; }).empty());
 }

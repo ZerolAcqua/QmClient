@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 constexpr int CMD_BUFFER_DATA_BUFFER_SIZE = 1024 * 1024 * 2;
@@ -761,6 +762,45 @@ public:
 	const SCommand *Head() const { return m_pCmdBufferHead; }
 	SCommand *Head() { return m_pCmdBufferHead; }
 
+	bool TryMergeRenderCommand(const SCommand_Render &Command)
+	{
+		if(Command.m_Cmd != CMD_RENDER || !m_pCmdBufferTail || m_pCmdBufferTail->m_Cmd != CMD_RENDER)
+			return false;
+		auto *pPrevious = static_cast<SCommand_Render *>(m_pCmdBufferTail);
+		if(pPrevious->m_PrimType != Command.m_PrimType || !pPrevious->m_pVertices || !Command.m_pVertices ||
+			pPrevious->m_PrimCount == 0 || Command.m_PrimCount == 0)
+			return false;
+
+		unsigned VerticesPerPrimitive;
+		switch(Command.m_PrimType)
+		{
+		case EPrimitiveType::LINES: VerticesPerPrimitive = 2; break;
+		case EPrimitiveType::TRIANGLES: VerticesPerPrimitive = 3; break;
+		case EPrimitiveType::QUADS: VerticesPerPrimitive = 4; break;
+		default: return false;
+		}
+		const unsigned MaxPrimitives = MAX_VERTICES / VerticesPerPrimitive;
+		if(pPrevious->m_PrimCount > MaxPrimitives || Command.m_PrimCount > MaxPrimitives - pPrevious->m_PrimCount)
+			return false;
+
+		const auto &PreviousState = pPrevious->m_State;
+		const auto &State = Command.m_State;
+		if(PreviousState.m_BlendMode != State.m_BlendMode || PreviousState.m_WrapMode != State.m_WrapMode ||
+			PreviousState.m_Texture != State.m_Texture || PreviousState.m_ScreenTL != State.m_ScreenTL ||
+			PreviousState.m_ScreenBR != State.m_ScreenBR || PreviousState.m_ClipEnable != State.m_ClipEnable ||
+			PreviousState.m_ClipX != State.m_ClipX || PreviousState.m_ClipY != State.m_ClipY ||
+			PreviousState.m_ClipW != State.m_ClipW || PreviousState.m_ClipH != State.m_ClipH)
+			return false;
+
+		// 只延长同一缓冲中连续存储的尾批次，保留图元顺序和既有顶点上限。
+		const auto *pPreviousEnd = reinterpret_cast<const unsigned char *>(pPrevious->m_pVertices) +
+					   pPrevious->m_PrimCount * VerticesPerPrimitive * sizeof(SVertex);
+		if(pPreviousEnd != reinterpret_cast<const unsigned char *>(Command.m_pVertices))
+			return false;
+		pPrevious->m_PrimCount += Command.m_PrimCount;
+		return true;
+	}
+
 	void Reset()
 	{
 		m_pCmdBufferHead = m_pCmdBufferTail = nullptr;
@@ -1430,6 +1470,12 @@ public:
 
 		Command.m_PrimType = PrimType;
 		Command.m_PrimCount = PrimCount;
+
+		if constexpr(std::is_same_v<TName, CCommandBuffer::SCommand_Render>)
+		{
+			if(m_pCommandBuffer->TryMergeRenderCommand(Command))
+				return;
+		}
 
 		AddCmd(Command, [&] {
 			Command.m_pVertices = (decltype(Command.m_pVertices))m_pCommandBuffer->AllocData(VertSize * NumVerts);

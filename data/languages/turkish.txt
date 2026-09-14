@@ -28,9 +28,6 @@
 %d items selected
 == %d öğe seçildi
 
-%d more cut segments
-== %d tane daha kesilmiş bölüm
-
 %d of %d server
 == %d / %d sunucu
 
@@ -60,6 +57,9 @@
 
 %d users
 == %d kullanıcı
+
+%d. %s | main: %s | dummy: %s
+== %d. %s | ana oyuncu: %s | kukla: %s
 
 %d/%d KiB (%.1f KiB/s)
 == %d/%d KiB (%.1f KiB/s)
@@ -259,6 +259,9 @@ A demo with this name already exists
 
 A folder with this name already exists
 == Bu isimde bir klasör zaten mevcut
+
+A save is already being restored. Please wait.
+== Bir kayıt zaten geri yükleniyor. Lütfen bekleyin.
 
 A screenshot with this name already exists
 == Bu isimde bir ekran görüntüsü zaten mevcut
@@ -691,9 +694,6 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == Ayar kartı sıralamasını ve düzen yeniden akışını canlandır
-
-Animated styles override the fallback title color
-== Animasyonlu stiller temel unvan renginden önceliklidir
 
 Animated title style id
 == Animasyonlu unvan stili kimliği
@@ -1427,8 +1427,14 @@ Bit flags for disabling settings tabs
 Black
 == Siyah
 
+Black Flash
+== Kara parıltı
+
 Blend mode
 == Karışım modu
+
+Blend strength
+== Karıştırma gücü
 
 Blink the active local tee
 == Etkin yerel karakteri yanıp söndür
@@ -1897,6 +1903,12 @@ Clearable text...
 
 Clears the voting options
 == Oylama seçeneklerini temizler
+
+Click a part on the right to edit its color, blend mode and strength.
+== Rengini, karıştırma modunu ve gücünü ayarlamak için sağdaki bir parçaya tıklayın.
+
+Click again to find the next location.
+== Sonraki konumu bulmak için tekrar tıklayın.
 
 Click to add this community to favorites
 == Bu topluluğu favorilere eklemek için tıklayın
@@ -2483,9 +2495,6 @@ Current: Score
 Current: Time
 == Geçerli: Süre
 
-Cursed Flame
-== Lanetli alev
-
 Custom
 == Özel
 
@@ -2555,6 +2564,9 @@ Customize translate button and menu colors
 Customize vote display and interaction
 == Customize vote display and interaction
 
+Cut end: %s
+== Bitiş: %s
+
 Cut interval
 == Kesim aralığı
 
@@ -2563,6 +2575,9 @@ Cut length
 
 Cut segments
 == Kesim bölümleri
+
+Cut start: %s
+== Başlangıç: %s
 
 Cute:
 == Sevimli:
@@ -2702,6 +2717,9 @@ Debug SQL.
 Debug tile layer clipping.
 == Döşeme katmanı kırpma hata ayıklaması.
 
+Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)
+== Özel WebSocket adresi (boşsa wss://qmclient.icu/ws kullanılır)
+
 Deep freeze color
 == Derin donma rengi
 
@@ -2825,8 +2843,20 @@ Delete this preset
 Demo
 == Demo
 
+Demo display
+== Demo görünümü
+
 Demo effects
 == Demo efektleri
+
+Demo hook strength (0=Off 1=Icon 2=Icon and number)
+== Demo kanca gücü (0=Kapalı 1=Simge 2=Simge ve sayı)
+
+Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)
+== Demo kanca gücü kapsamı (0=Kendim 1=Diğerleri 2=Güçlü 3=Zayıf 4=Herkes)
+
+Demo key presses (0=Off 1=Others 2=All 3=Own)
+== Demo tuşları (0=Kapalı 1=Diğerleri 2=Herkes 3=Kendim)
 
 Demo marker added
 == Demo işareti eklendi
@@ -3482,9 +3512,6 @@ Enable chat with all/team mode
 Enable cheats for your current team's run, but you can't earn a rank
 == Mevcut takımının koşusu için hileleri etkinleştir, ancak sıralama kazanamazsın
 
-Enable client stutter diagnostics at startup
-== Başlangıçta istemci takılma tanılamasını etkinleştir
-
 Enable colored console output
 == Renkli konsol çıktısını etkinleştir
 
@@ -3610,9 +3637,6 @@ Enable lyrics
 
 Enable macOS graphics diagnostics and Instruments signposts
 == macOS grafik tanılamasını ve Instruments işaretlerini etkinleştir
-
-Enable main thread and render stage performance debug logging
-== Ana iş parçacığı ve işleme aşaması performans hata ayıklama günlüklerini etkinleştir
 
 Enable map compatibility mode using the specified bug (example: grenade-doubleexplosion@ddnet.tw)
 == Belirtilen hatayı kullanarak harita uyumluluk modunu etkinleştir (örnek: grenade-doubleexplosion@ddnet.tw)
@@ -3761,6 +3785,9 @@ Enable Tee trail
 Enable tee trails
 == Tee izlerini etkinleştir
 
+Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
+== QmClient'e özel WebSocket hizmetini etkinleştir (HTTP yoklamasına dönüş yok)
+
 Enable thinking mode (slower)
 == Düşünme modunu etkinleştir (daha yavaş)
 
@@ -3835,6 +3862,9 @@ Endpoint (optional)
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == /practice yazın veya yeniden başlatın, aksi takdirde tüm takım 60 saniye içinde öldürülecek
+
+Enter a CP number from 1 to 255.
+== 1 ile 255 arasında bir CP numarası girin.
 
 Enter Password
 == Şifre Gir
@@ -3950,6 +3980,9 @@ Execute the specified file
 Existing Player
 == Mevcut Oyuncu
 
+Exo
+== Exo enerjisi
+
 Export
 == Dışa aktar
 
@@ -4055,9 +4088,6 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == Yedek basit gürültü azaltma gücü
 
-Fallback title color
-== Temel unvan rengi
-
 Fast input
 == Hızlı giriş
 
@@ -4160,8 +4190,14 @@ Filter out spectators from player count
 Filtered word console color
 == Engellenen Kelime Konsol Rengi
 
+Find / Next
+== Bul / Sonraki
+
 Find all ban records for the specified IP address
 == Belirtilen IP adresi için tüm yasak kayıtlarını bul
+
+Find CP
+== CP bul
 
 Find QmClient communities and project links
 == Find QmClient communities and project links
@@ -4180,6 +4216,9 @@ Finish name
 
 Finish Name:
 == Bitiş İsmi:
+
+Finish or reset the current race before restoring a save.
+== Bir kaydı geri yüklemeden önce mevcut yarışı bitirin veya sıfırlayın.
 
 Finished
 == Tamamlandı
@@ -4585,9 +4624,6 @@ Go forward one tick
 
 Go forward the specified duration
 == Belirtilen süre kadar ileri git
-
-Golden Grace
-== Altın lütuf
 
 Gores
 == Gores
@@ -5066,6 +5102,9 @@ I am away from the game window
 I muted you
 == Seni sessize aldım
 
+Icon and number
+== Simge ve sayı
+
 Icons
 == Simgeler
 
@@ -5179,6 +5218,9 @@ Indicator size
 
 Indicator transparency
 == Gösterge şeffaflığı
+
+Inferno
+== Cehennem ateşi
 
 Infinite hook for super players on/off.
 == Süper oyuncular için sonsuz kanca açık/kapalı.
@@ -5314,6 +5356,9 @@ Invalid ID
 
 Invalid option
 == Geçersiz seçenek
+
+Invalid save number. Use a number from the save list.
+== Geçersiz kayıt numarası. Listedeki bir numarayı kullanın.
 
 Invalid spectator id used
 == Geçersiz izleyici kimliği kullanıldı
@@ -5621,6 +5666,9 @@ Left-click a Frankenstein part to tint it. Drag parts to replace them. Right-cli
 Left/right channel width
 == Sol/sağ kanal genişliği
 
+Legacy option: connections that skip TLS verification are rejected
+== Eski seçenek: TLS doğrulamasını atlayan bağlantılar reddedilir
+
 Length
 == Uzunluk
 
@@ -5855,6 +5903,9 @@ Locked
 Log output filename
 == Günlük çıktı dosya adı
 
+Log realtime WebSocket channel events
+== Gerçek zamanlı WebSocket kanalı olaylarını kaydet
+
 Log the network
 == Ağı günlüğe kaydet
 
@@ -6011,14 +6062,8 @@ Margin when notification is docked
 Mark demo
 == Demoyu işaretle
 
-Mark the beginning of a cut (right click to reset)
-== Bir kesimin başlangıcını işaretle (sağ tık sıfırlar)
-
 Mark the beginning of a demo cut
 == Bir demo kesintisinin başlangıcını işaretle
-
-Mark the end of a cut (right click to reset)
-== Bir kesimin sonunu işaretle (sağ tık sıfırlar)
 
 Mark the end of a demo cut
 == Bir demo kesintisinin sonunu işaretle
@@ -6514,6 +6559,9 @@ Name: %s
 
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 == İsim levhası kanca gücü simge kapsamı (0=Kendi 1=Diğerleri 2=Güçlü kanca 3=Zayıf kanca 4=Tüm oyuncular)
+
+Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)
+== İsim levhası takma ad kapsamı (0=Yok 1=Geçerli karakter 2=Kendi karakterlerim 3=Diğer oyuncular 4=Diğer oyuncular ve kendi etkin olmayan karakterlerim 5=Tümü)
 
 Nameplate position X
 == İsim Plakasında Koordinat X'i Göster
@@ -7151,9 +7199,6 @@ Other
 Other players' hook line width
 == Diğer oyuncuların kanca çizgisi genişliği
 
-Other players' nameplate scope (0=All players 1=Friends only)
-== Diğer oyuncuların isim levhası kapsamı (0=Tüm oyuncular 1=Yalnızca arkadaşlar)
-
 Others
 == Diğerleri
 
@@ -7234,9 +7279,6 @@ Overwrite clan even if empty
 
 Own hook line width
 == Kendi kanca çizgisi genişliği
-
-Own nameplate scope (0=Current character 1=All local characters)
-== Kendi isim levhası kapsamı (0=Geçerli karakter 1=Tüm yerel karakterler)
 
 p = Ping latency
 == p = Ping gecikmesi
@@ -7339,9 +7381,6 @@ Penalty in seconds for saving or swapping positions
 
 Per-name volume (name=percent)
 == İsme göre bireysel ses seviyesi (isim=yüzde)
-
-Performance debug log threshold (ms)
-== Performans hata ayıklama günlüğü eşiği (ms)
 
 Permanent access; up to 4 online IP addresses
 == Kalıcı erişim; aynı anda en fazla 4 IP
@@ -7754,6 +7793,9 @@ Preview built with %d skipped slot(s).
 Preview button visibility while the editor is active.
 == Düzenleyici etkinken önizleme düğmesi görünürlüğü.
 
+Preview cut (P)
+== Kesiti önizle (P)
+
 Preview dummy nameplate
 == Dummy isim plakasını önizle
 
@@ -8080,6 +8122,18 @@ Ratio threshold for local target language detection
 
 Really? Not even a little?
 == Gerçekten mi? Hiç mi düşünmezsin?
+
+Realtime channel
+== Gerçek zamanlı kanal
+
+Realtime channel heartbeat interval (seconds, 0 uses default)
+== Gerçek zamanlı kanal kalp atışı aralığı (saniye, 0 varsayılanı kullanır)
+
+Realtime channel reconnect backoff base (ms)
+== Gerçek zamanlı kanal yeniden bağlanma bekleme tabanı (ms)
+
+Realtime channel reconnect backoff cap (ms)
+== Gerçek zamanlı kanal yeniden bağlanma bekleme üst sınırı (ms)
 
 Reason
 == Sebep
@@ -8588,8 +8642,14 @@ Restart the client
 Restarting. Please wait…
 == Yeniden başlatılıyor. Lütfen bekleyin…
 
+Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
+== İki kişilik kayıt geri yüklensin mi? /qm Yes en yeniyi yükler; /qm Yes numara başka kayıt seçer; /qm No kapatır.
+
 Restore old single-segment hook collision line behavior
 == Eski tek parçalı kanca çarpışma çizgisi davranışını geri yükle
+
+Restoring save %d: main '%s', dummy '%s'.
+== %d numaralı kayıt geri yükleniyor: ana oyuncu '%s', kukla '%s'.
 
 Retrying…
 == Yeniden deneniyor…
@@ -8780,6 +8840,12 @@ Save ghost
 Save last %d min
 == Son %d dakikayı kaydet
 
+Save loaded; local record removed.
+== Kayıt yüklendi; yerel kayıt girdisi silindi.
+
+Save loaded; the local record could not be removed.
+== Kayıt yüklendi ancak yerel kayıt girdisi silinemedi.
+
 Save player names in replay
 == Tekrar oynatmada oyuncu adlarını kaydet
 
@@ -8788,6 +8854,15 @@ Save power by lowering update rate (higher input latency)
 
 Save replay of best time per game
 == Oyun başına en iyi sürenin tekrar oynatmasını kaydet
+
+Save restore dismissed.
+== Geri yükleme iptal edildi.
+
+Save restore stopped without confirming success. The local record was kept.
+== Yükleme başarısı doğrulanamadı. Geri yükleme durduruldu ve yerel kayıt korundu.
+
+Save restore stopped: connection, names or team were not ready. The local record was kept.
+== Bağlantı, adlar veya takım hazır olmadığından geri yükleme durduruldu. Yerel kayıt korundu.
 
 Save settings file on exit
 == Çıkışta ayar dosyasını kaydet
@@ -8933,6 +9008,9 @@ Search skins and manage the skin queue
 Searching
 == Aranıyor
 
+Sec-WebSocket-Protocol sent during the realtime handshake
+== Gerçek zamanlı el sıkışmada gönderilen Sec-WebSocket-Protocol
+
 Secondary
 == İkincil
 
@@ -8980,6 +9058,9 @@ Selected candidate %d/%d under cursor.
 
 Selected item color
 == Seçili öğe rengi
+
+Selected part: %d
+== Seçili parça: %d
 
 Selected server
 == Seçili sunucu
@@ -9158,6 +9239,12 @@ Set color
 Set current demo speed
 == Geçerli demo hızını ayarla
 
+Set cut end at current position (O, right click to reset)
+== Kesit bitişini geçerli konuma ayarla (O, sıfırlamak için sağ tık)
+
+Set cut start at current position (I, right click to reset)
+== Kesit başlangıcını geçerli konuma ayarla (I, sıfırlamak için sağ tık)
+
 Set ddrace team for a player
 == Bir oyuncu için ddrace takımı ayarla
 
@@ -9325,6 +9412,9 @@ Show chat (2 always show large chat area)
 
 Show chat bubbles above players
 == Oyuncuların üzerinde sohbet balonlarını göster
+
+Show chat in demo preview and video
+== Demo önizlemesinde ve videoda sohbeti göster
 
 Show chat messages above players
 == Oyuncuların üzerinde sohbet mesajlarını göster
@@ -9632,6 +9722,9 @@ Show in-game HUD (spectator HUD)
 Show in-game HUD (timer)
 == Oyunda HUD'u göster (zamanlayıcı)
 
+Show in-game HUD in demo preview and video
+== Demo önizlemesinde ve videoda oyun HUD’unu göster
+
 Show in-game HUD when rendering video
 == Video oluştururken oyunda HUD'u göster
 
@@ -9673,6 +9766,9 @@ Show katan on frozen players
 
 Show katana on frozen players (restores old behavior)
 == Donmuş oyuncularda kılıcı göster (eski davranışı geri yükler)
+
+Show key presses
+== Tuş basışları
 
 Show key presses (1 = others, 2 = all, 3 = own only)
 == Tuş basımlarını göster (1 = diğerleri, 2 = tümü, 3 = yalnızca kendin)
@@ -10157,6 +10253,9 @@ Simple noise reduction strength
 Single color
 == Tek renk
 
+Single color and Rainbow override the color of animated styles; the style keeps its motion
+== Tek renk ve gökkuşağı animasyonlu stillerin rengini geçersiz kılar; stilin hareketi korunur
+
 Size
 == Boyut
 
@@ -10195,6 +10294,21 @@ Skin list sort mode (0=Name, 1=Release date)
 
 Skin options
 == Görünüm seçenekleri
+
+Skin outline color
+== Görünüm dış çizgisi rengi
+
+Skin outline for other players
+== Diğer oyuncuların görünüm dış çizgisi
+
+Skin outline for self and dummy
+== Kendin ve dummy için görünüm dış çizgisi
+
+Skin outline opacity
+== Görünüm dış çizgisi opaklığı
+
+Skin outline width
+== Görünüm dış çizgisi kalınlığı
 
 Skin prefix
 == Skin ön eki
@@ -10511,7 +10625,7 @@ Sphere
 Spin pop
 == Döndürerek aç
 
-Spirit Light
+Spirit
 == Ruh ışığı
 
 Sponsor code
@@ -10630,6 +10744,9 @@ Stop key input on switch (0=off, 1=dummy, 2=player)
 
 Stop practice
 == Pratiği durdur
+
+Stop preview (P)
+== Önizlemeyi durdur (P)
 
 Stop record
 == Kaydı durdur
@@ -10988,8 +11105,8 @@ Tee trail color
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee izi renk modu (1=Düz, 2=Geçerli Tee rengi, 3=Gökkuşağı, 4=Tee hızı, 5=Rastgele)
 
-Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
-== Tee izi stili (0=Özgün, 1=Lanetli alev, 2=Mor şimşek, 3=Ruh ışığı, 4=Boşluk gölgesi, 5=Altın lütuf)
+Tee trail style (0=Original, 1=Black Flash, 2=Exo, 3=Spirit, 4=Void, 5=Inferno)
+== Tee izi stili  (0=Özgün, 1=Kara parıltı, 2=Exo enerjisi, 3=Ruh ışığı, 4=Boşluk, 5=Cehennem ateşi)
 
 Tee Trails
 == Tee İzleri
@@ -11165,6 +11282,9 @@ There are unsaved changes in the touch controls editor. Saving first is recommen
 There is no checkpoint teleporter with that index on the map.
 == Haritada bu dizine sahip bir kontrol noktası ışınlayıcısı yok.
 
+There is no pending save restore prompt.
+== Bekleyen bir geri yükleme sorusu yok.
+
 There is no teleporter with that index on the map.
 == Haritada bu dizine sahip bir ışınlayıcı yok.
 
@@ -11195,6 +11315,9 @@ Thin
 Thinking mode requires a reasoning model
 == Düşünme modu bir akıl yürütme modeli gerektirir
 
+This connection cannot change names while connected. Reconnect with the saved names first.
+== Bu bağlantıda bağlıyken ad değiştirilemez. Önce kayıtlı adlarla yeniden bağlanın.
+
 This ID is not connected
 == Bu ID bağlı değil
 
@@ -11203,6 +11326,9 @@ This is the master switch for all interface animation categories
 
 This name cannot be used for files and folders
 == Bu isim dosya ve klasörler için kullanılamaz
+
+This save is no longer in the local save file.
+== Bu kayıt artık yerel kayıt dosyasında bulunmuyor.
 
 This server has an initial chat delay, you will be able to talk in %s seconds.
 == Bu sunucuda bir başlangıç sohbet gecikmesi var, %s saniye içinde konuşabileceksiniz.
@@ -11335,6 +11461,9 @@ Title bob angular speed in 1/100 rad/s
 
 Title bob wavelength in pixels
 == Unvan salınım dalga boyu (piksel)
+
+Title color
+== Unvan rengi
 
 Title color (single color)
 == Unvan rengi (tek renk)
@@ -11900,6 +12029,9 @@ URL for downloading skins
 Usage: %s %s
 == Kullanım: %s %s
 
+Use /qm Yes [number] to restore a save, or /qm No to dismiss.
+== Geri yüklemek için /qm Yes [numara], kapatmak için /qm No kullanın.
+
 Use 12 hour clock
 == 12 saatlik saat kullan
 
@@ -12107,9 +12239,6 @@ View the developers and contributors
 View the people supporting QmClient development
 == View the people supporting QmClient development
 
-Violet Lightning
-== Mor şimşek
-
 Virtual joystick which always uses fire.
 == Her zaman ateş kullanan sanal joystick.
 
@@ -12218,8 +12347,8 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == Ses Beyaz Listesi (Virgülle Ayrılmış)
 
-Void Shadow
-== Boşluk gölgesi
+Void
+== Boşluk
 
 Volume
 == Ses düzeyi
@@ -12559,9 +12688,6 @@ Word filter action: 0=replace matching words, 1=hide entire message
 
 Write local console contents to a text file
 == Yerel konsol içeriğini bir metin dosyasına yaz
-
-Write performance debug logs to dedicated file
-== Performans hata ayıklama günlüklerini özel bir dosyaya yaz
 
 Write remote console contents to a text file
 == Uzak konsol içeriğini bir metin dosyasına yaz
@@ -12927,6 +13053,46 @@ Zoom to current mouse target
 == ⚠️ Tencent Cloud API yapılandırılmamış
 
 [Assets editor blend mode]
+Color
+== Renk
+
+[Assets editor blend mode]
+Color Burn
+== Renk Yanması
+
+[Assets editor blend mode]
+Color Dodge
+== Renk Soldurma
+
+[Assets editor blend mode]
+Darken
+== Koyulaştır
+
+[Assets editor blend mode]
+Difference
+== Fark
+
+[Assets editor blend mode]
+Exclusion
+== Dışlama
+
+[Assets editor blend mode]
+Hard Light
+== Sert Işık
+
+[Assets editor blend mode]
+Hue
+== Ton
+
+[Assets editor blend mode]
+Lighten
+== Açıklaştır
+
+[Assets editor blend mode]
+Luminosity
+== Parlaklık
+
+[Assets editor blend mode]
 Multiply
 == Çarp
 
@@ -12939,8 +13105,16 @@ Overlay
 == Kaplama
 
 [Assets editor blend mode]
+Saturation
+== Doygunluk
+
+[Assets editor blend mode]
 Screen
 == Ekran
+
+[Assets editor blend mode]
+Soft Light
+== Yumuşak Işık
 
 [Auto camera]
 Active
@@ -13163,32 +13337,24 @@ All
 == Tümü
 
 [Show name plates]
+Current
+== Geçerli
+
+[Show name plates]
+Current + Local
+== Geçerli + yerel
+
+[Show name plates]
+Local + Others
+== Yerel + diğerleri
+
+[Show name plates]
 None
 == Yok
 
 [Show name plates]
 Others
 == Başkaları
-
-[Show name plates]
-Own
-== Kendi
-
-[Show name plates scope]
-All
-== Tümü
-
-[Show name plates scope]
-Current
-== Geçerli
-
-[Show name plates scope]
-Friends
-== Arkadaşlar
-
-[Show name plates scope]
-Local
-== Yerel
 
 [Show players' key presses]
 All

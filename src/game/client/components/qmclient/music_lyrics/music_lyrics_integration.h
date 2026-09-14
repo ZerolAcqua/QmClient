@@ -37,6 +37,7 @@ public:
 private:
 	void SyncHookConfiguration();
 	void ClearForStaleMedia();
+	void ProcessLyricLoadJob();
 	void LoadLyricFile(const char *pPath);
 
 	struct SImpl;

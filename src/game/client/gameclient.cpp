@@ -99,7 +99,7 @@ namespace
 
 	void LogSettingsLoadingPrewarmEvent(const IClient *pClient, const char *pEvent, int CompletedSteps, int MaxAttempts, int TeeWarmupEntries, int ConsecutiveNoProgressSteps, uint64_t UploadsCompleted, uint64_t LoadsCompleted)
 	{
-		if(g_Config.m_QmPerfDebug == 0 && g_Config.m_QmPerfLogfile == 0)
+		if(g_Config.m_QmPerfDebug == 0)
 			return;
 		char aPayload[256];
 		str_format(aPayload, sizeof(aPayload), "event=%s steps=%d max_attempts=%d tee_entries=%d stall_steps=%d uploads_completed=%" PRIu64 " loads_completed=%" PRIu64,
@@ -113,12 +113,22 @@ namespace
 		QmPerfLogPayload("perf/settings-warmup", aPayload, pClient, "settings:tee");
 	}
 
-	void LogQmIconDiagnostics(const SQmIconDiagnostics &Diagnostics, const IClient *pClient)
+	void LogQmIconDiagnostics(const SQmIconDiagnostics &Frame, const IClient *pClient, bool Force = false)
 	{
-		if(!QmPerfEnabled())
+		if(!Force && !QmPerfEnabled())
 			return;
+		static SQmIconDiagnosticsWindow s_Window;
+		static int64_t s_LastLog = 0;
+		const bool ResourceEvent = !Force && s_Window.Add(Frame);
+		const int64_t Now = time_get();
+		if((!Force && !ResourceEvent && Now - s_LastLog < time_freq()) || s_Window.m_Frames == 0)
+			return;
+		const SQmIconDiagnostics &Diagnostics = s_Window.m_Total;
 		char aPayload[1024];
-		str_format(aPayload, sizeof(aPayload), "event=icon_frame alpha_draws=%" PRIu64 " msdf_draws=%" PRIu64 " msdf_manager_call_run_max=%" PRIu64 " msdf_manager_call_run_1=%" PRIu64 " msdf_manager_call_run_2=%" PRIu64 " msdf_manager_call_run_3_4=%" PRIu64 " msdf_manager_call_run_5_8=%" PRIu64 " msdf_manager_call_run_9_16=%" PRIu64 " msdf_manager_call_run_17_32=%" PRIu64 " msdf_manager_call_run_33_64=%" PRIu64 " msdf_manager_call_run_65_plus=%" PRIu64 " reload_attempts=%" PRIu64 " reload_successes=%" PRIu64 " msdf_probe_attempts=%" PRIu64 " msdf_probe_successes=%" PRIu64 " atlas_swaps=%" PRIu64 " texture_load_successes=%" PRIu64 " texture_load_failures=%" PRIu64 " texture_unloads=%" PRIu64,
+		str_format(aPayload, sizeof(aPayload), "event=icon_summary sample_frames=%" PRIu64 " alpha_draws_max=%" PRIu64 " msdf_draws_max=%" PRIu64 " alpha_draws=%" PRIu64 " msdf_draws=%" PRIu64 " msdf_manager_call_run_max=%" PRIu64 " msdf_manager_call_run_1=%" PRIu64 " msdf_manager_call_run_2=%" PRIu64 " msdf_manager_call_run_3_4=%" PRIu64 " msdf_manager_call_run_5_8=%" PRIu64 " msdf_manager_call_run_9_16=%" PRIu64 " msdf_manager_call_run_17_32=%" PRIu64 " msdf_manager_call_run_33_64=%" PRIu64 " msdf_manager_call_run_65_plus=%" PRIu64 " reload_attempts=%" PRIu64 " reload_successes=%" PRIu64 " msdf_probe_attempts=%" PRIu64 " msdf_probe_successes=%" PRIu64 " atlas_swaps=%" PRIu64 " texture_load_successes=%" PRIu64 " texture_load_failures=%" PRIu64 " texture_unloads=%" PRIu64,
+			s_Window.m_Frames,
+			s_Window.m_MaxAlphaDraws,
+			s_Window.m_MaxMsdfDraws,
 			Diagnostics.m_AlphaIconDraws,
 			Diagnostics.m_MsdfIconDraws,
 			Diagnostics.m_MaxMsdfManagerCallRun,
@@ -138,7 +148,9 @@ namespace
 			Diagnostics.m_TextureLoads,
 			Diagnostics.m_TextureLoadFailures,
 			Diagnostics.m_TextureUnloads);
-		QmPerfLogPayload("perf/icons", aPayload, pClient);
+		QmPerfLogPayloadForce("perf/icons", aPayload, pClient);
+		s_Window = {};
+		s_LastLog = Now;
 	}
 
 } // namespace
@@ -1173,7 +1185,7 @@ void CGameClient::OnUpdate()
 		m_Binds.m_MouseOnAction = false;
 	}
 
-	if(g_Config.m_QmPerfStutterDiagnostics)
+	if(g_Config.m_QmPerfDebug)
 	{
 		for(size_t i = 0; i < m_vpAll.size(); ++i)
 		{
@@ -1913,7 +1925,7 @@ void CGameClient::OnRender()
 			pComponent->OnRender();
 		}
 	};
-	if(g_Config.m_QmPerfStutterDiagnostics)
+	if(g_Config.m_QmPerfDebug)
 	{
 		for(size_t i = 0; i < m_vpAll.size(); ++i)
 		{
@@ -2175,9 +2187,25 @@ void CGameClient::FlushQmStutterWindow(const SQmStutterFrameDecision &Decision, 
 	}
 }
 
-void CGameClient::ProcessQmStutterFrame()
+void CGameClient::OnQmPerfFrame(double FrameMs)
 {
-	const bool Enabled = g_Config.m_QmPerfStutterDiagnostics != 0;
+	ProcessQmStutterFrame(FrameMs);
+}
+
+void CGameClient::OnQmPerfStop(bool Shutdown)
+{
+	const SQmStutterFrameDecision Decision = m_QmStutterEpisodeTracker.Flush(Shutdown ? EQmStutterFlushReason::SHUTDOWN : EQmStutterFlushReason::DISABLED);
+	FlushQmStutterWindow(Decision, true);
+	ResetQmStutterWindowSamples();
+	m_QmStutterDiagnosticsWasEnabled = false;
+	std::fill(m_vQmStutterPendingUpdateMs.begin(), m_vQmStutterPendingUpdateMs.end(), 0.0);
+	std::fill(m_vQmStutterPendingRenderMs.begin(), m_vQmStutterPendingRenderMs.end(), 0.0);
+	LogQmIconDiagnostics({}, Client(), true);
+}
+
+void CGameClient::ProcessQmStutterFrame(double FrameMs)
+{
+	const bool Enabled = g_Config.m_QmPerfDebug != 0;
 	if(!Enabled)
 	{
 		if(m_QmStutterDiagnosticsWasEnabled)
@@ -2200,7 +2228,6 @@ void CGameClient::ProcessQmStutterFrame()
 	}
 
 	const uint64_t FrameId = Client()->PerfFrame();
-	const double FrameMs = Client()->RenderFrameTime() * 1000.0;
 	const SQmStutterFrameDecision Decision = m_QmStutterEpisodeTracker.RecordFrame(FrameId, FrameMs);
 	if(Decision.m_Started)
 	{
@@ -2703,6 +2730,7 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 		CNetMsg_Sv_Chat *pMsg = (CNetMsg_Sv_Chat *)pRawMsg;
 		if(pMsg->m_ClientId < 0 && pMsg->m_pMessage != nullptr)
 		{
+			m_TClient.HandleLocalSaveMessage(pMsg, Conn);
 			m_TClient.HandleSwapCountdownMessage(pMsg->m_pMessage, Conn);
 			m_Hud.HandleSpamProtectionMessage(pMsg->m_pMessage);
 		}
@@ -5579,7 +5607,14 @@ void CGameClient::CClientData::UpdateRenderInfo()
 	const bool DescriptorRenderInfoReady = m_pSkinInfo->DescriptorRenderInfoReady();
 	if(m_RenderInfoSkinDescriptor != SkinDescriptor && m_RenderInfoFallbackResidencyDescriptor != SkinDescriptor)
 		m_RenderInfoFallbackResidencyRequested = false;
-	if(!DescriptorRenderInfoReady && m_RenderInfo.Valid())
+	// 皮肤贴图可能已被资源预算或目录扫描卸载：旧渲染信息里的句柄依旧 IsValid()，但纹理已释放。
+	// 这种渲染信息不能继续复用，否则 Tee 会绑定到失效纹理，画出没有贴图的纯白块；
+	// 让它走下面的 default 皮肤回退，皮肤加载完成后 OnSkinUpdate 会再刷新回真实皮肤。
+	const bool PreviousSixSkinResident = CSkins::CanReusePreviousSixSkin(
+		(m_RenderInfoSkinDescriptor.m_Flags & CSkinDescriptor::FLAG_SIX) != 0,
+		CSkin::IsValidName(m_RenderInfoSkinDescriptor.m_aSkinName),
+		m_pGameClient != nullptr && m_pGameClient->m_Skins.FindOrNullptr(m_RenderInfoSkinDescriptor.m_aSkinName) != nullptr);
+	if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousSixSkinResident)
 	{
 		if(!m_RenderInfoFallbackResidencyRequested && m_RenderInfoSkinDescriptor.m_aSkinName[0] != '\0')
 		{
@@ -6272,6 +6307,7 @@ IGameClient *CreateGameClient()
 
 void CGameClient::UpdateHookCollTargets()
 {
+	m_HookCollCandidates.Reset();
 	// 每渲染帧刷新一次：这些取值在两次 OnRender 之间不会变化，而模拟循环会重复读取上万次。
 	const float Intra = Client()->IntraGameTick(g_Config.m_ClDummy);
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -6295,22 +6331,17 @@ int CGameClient::IntersectCharacter(vec2 HookPos, vec2 NewPos, vec2 &NewPos2, in
 
 	const SHookCollTarget &OwnTarget = m_aHookCollTargets[OwnId];
 
-	for(int i = 0; i < MAX_CLIENTS; i++)
-	{
-		if(i == OwnId)
-			continue;
-
-		const SHookCollTarget &Target = m_aHookCollTargets[i];
+	const auto &vCandidates = m_HookCollCandidates.Get(OwnId, [&](int Id) {
+		const SHookCollTarget &Target = m_aHookCollTargets[Id];
 		if(!Target.m_Valid)
-			continue;
-
-		const vec2 Position = Target.m_Pos;
-
-		bool IsOneSuper = Target.m_Super || OwnTarget.m_Super;
-		bool IsOneSolo = Target.m_Solo || OwnTarget.m_Solo;
-
-		if(!IsOneSuper && (!m_Teams.SameTeam(i, OwnId) || IsOneSolo || OwnTarget.m_HookHitDisabled))
-			continue;
+			return false;
+		const bool IsOneSuper = Target.m_Super || OwnTarget.m_Super;
+		const bool IsOneSolo = Target.m_Solo || OwnTarget.m_Solo;
+		return IsOneSuper || (m_Teams.SameTeam(Id, OwnId) && !IsOneSolo && !OwnTarget.m_HookHitDisabled);
+	});
+	for(const int i : vCandidates)
+	{
+		const vec2 Position = m_aHookCollTargets[i].m_Pos;
 
 		vec2 ClosestPoint;
 		if(closest_point_on_line(HookPos, NewPos, Position, ClosestPoint))

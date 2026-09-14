@@ -6,6 +6,7 @@
 #include <base/log.h>
 
 #include <engine/editor.h>
+#include <engine/engine.h>
 #include <engine/external/regex.h>
 #include <engine/graphics.h>
 #include <engine/keys.h>
@@ -23,6 +24,7 @@
 #include <game/client/components/console.h>
 #include <game/client/components/message_gradient.h>
 #include <game/client/components/qmclient/colored_parts.h>
+#include <game/client/components/qmclient/demo_display.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_title_color.h>
 #include <game/client/components/qmclient/qm_title_render.h>
@@ -380,6 +382,7 @@ void CChat::CLine::Reset(CChat &This)
 	m_ChatEmoji = EQmChatEmoji::NONE;
 	m_ChatEmojiRect = {};
 	m_QmTitleBobPadding = 0.0f;
+	m_vTitleTextMetrics.clear();
 	m_aYOffset[0] = -1.0f;
 	m_aYOffset[1] = -1.0f;
 	m_TextYOffset = 0.0f;
@@ -415,7 +418,6 @@ CChat::CChat()
 	m_LargeAreaOpenTick = 0;
 	m_LastPresentationShowLargeArea = false;
 	m_PendingConsoleLineIndex = -1;
-	m_aChatLogLastCleanupDate[0] = '\0';
 
 	m_Input.SetCalculateOffsetCallback([this]() { return m_IsInputCensored; });
 	m_Input.SetDisplayTextCallback([this](char *pStr, size_t NumChars) {
@@ -1396,14 +1398,14 @@ void CChat::StoreSave(const char *pText)
 	io_close(File);
 }
 
-bool CChat::EnsureChatLogFolder() const
+static bool EnsureChatLogFolder(IStorage *pStorage)
 {
-	if(!Storage()->CreateFolder("qmclient", IStorage::TYPE_SAVE) && !Storage()->FolderExists("qmclient", IStorage::TYPE_SAVE))
+	if(!pStorage->CreateFolder("qmclient", IStorage::TYPE_SAVE) && !pStorage->FolderExists("qmclient", IStorage::TYPE_SAVE))
 	{
 		log_error("chat", "Failed to create chat log root folder");
 		return false;
 	}
-	if(!Storage()->CreateFolder(QM_CHAT_LOG_DIR, IStorage::TYPE_SAVE) && !Storage()->FolderExists(QM_CHAT_LOG_DIR, IStorage::TYPE_SAVE))
+	if(!pStorage->CreateFolder(QM_CHAT_LOG_DIR, IStorage::TYPE_SAVE) && !pStorage->FolderExists(QM_CHAT_LOG_DIR, IStorage::TYPE_SAVE))
 	{
 		log_error("chat", "Failed to create chat log folder '%s'", QM_CHAT_LOG_DIR);
 		return false;
@@ -1411,9 +1413,9 @@ bool CChat::EnsureChatLogFolder() const
 	return true;
 }
 
-void CChat::CleanupOldChatLogs(const char *pToday)
+static void CleanupOldChatLogs(IStorage *pStorage, const char *pToday, int KeepDays, std::string &LastCleanupDate)
 {
-	if(g_Config.m_QmChatLogKeepDays <= 0 || str_comp(m_aChatLogLastCleanupDate, pToday) == 0)
+	if(KeepDays <= 0 || LastCleanupDate == pToday)
 		return;
 
 	time_t TodayDate = 0;
@@ -1421,22 +1423,19 @@ void CChat::CleanupOldChatLogs(const char *pToday)
 		return;
 
 	SChatLogCleanupData Data;
-	Data.m_pStorage = Storage();
-	Data.m_CutoffDate = TodayDate - (time_t)maximum(g_Config.m_QmChatLogKeepDays - 1, 0) * 24 * 60 * 60;
-	Storage()->ListDirectory(IStorage::TYPE_SAVE, QM_CHAT_LOG_DIR, ChatLogCleanupCallback, &Data);
-	str_copy(m_aChatLogLastCleanupDate, pToday);
+	Data.m_pStorage = pStorage;
+	Data.m_CutoffDate = TodayDate - (time_t)maximum(KeepDays - 1, 0) * 24 * 60 * 60;
+	pStorage->ListDirectory(IStorage::TYPE_SAVE, QM_CHAT_LOG_DIR, ChatLogCleanupCallback, &Data);
+	LastCleanupDate = pToday;
 }
 
 void CChat::SaveChatLogLine(int ClientId, int Team, const char *pLine)
 {
 	if(!g_Config.m_QmChatLogAutoSave || Client()->State() == IClient::STATE_DEMOPLAYBACK || pLine == nullptr || pLine[0] == '\0')
 		return;
-	if(!EnsureChatLogFolder())
-		return;
 
 	char aDate[11];
 	str_timestamp_format(aDate, sizeof(aDate), "%Y-%m-%d");
-	CleanupOldChatLogs(aDate);
 
 	char aTimestamp[20];
 	str_timestamp_format(aTimestamp, sizeof(aTimestamp), FORMAT_SPACE);
@@ -1466,12 +1465,6 @@ void CChat::SaveChatLogLine(int ClientId, int Team, const char *pLine)
 
 	char aFilename[IO_MAX_PATH_LENGTH];
 	str_format(aFilename, sizeof(aFilename), "%s/%s%s%s", QM_CHAT_LOG_DIR, QM_CHAT_LOG_PREFIX, aDate, QM_CHAT_LOG_EXTENSION);
-	IOHANDLE File = Storage()->OpenFile(aFilename, IOFLAG_APPEND, IStorage::TYPE_SAVE);
-	if(!File)
-	{
-		log_error("chat", "Failed to open chat log '%s'", aFilename);
-		return;
-	}
 
 	char aLine[512];
 	if(ClientId == SERVER_MSG || ClientId == CLIENT_MSG)
@@ -1479,9 +1472,24 @@ void CChat::SaveChatLogLine(int ClientId, int Team, const char *pLine)
 	else
 		str_format(aLine, sizeof(aLine), "[%s] [%s] %s: %s", aTimestamp, ChatLogKind(ClientId, Team), aName, aText);
 
-	io_write(File, aLine, str_length(aLine));
-	io_write_newline(File);
-	io_close(File);
+	// 时间、玩家名、隐私格式和保留天数均在收消息时快照，worker 不访问组件或配置。
+	auto pJob = m_ChatLogWrites.Enqueue([pStorage = Storage(), pLastCleanupDate = m_pChatLogLastCleanupDate,
+						    Date = std::string(aDate), Filename = std::string(aFilename), Line = std::string(aLine), KeepDays = g_Config.m_QmChatLogKeepDays] {
+		if(!EnsureChatLogFolder(pStorage))
+			return;
+		CleanupOldChatLogs(pStorage, Date.c_str(), KeepDays, *pLastCleanupDate);
+		IOHANDLE File = pStorage->OpenFile(Filename.c_str(), IOFLAG_APPEND, IStorage::TYPE_SAVE);
+		if(!File)
+		{
+			log_error("chat", "Failed to open chat log '%s'", Filename.c_str());
+			return;
+		}
+		io_write(File, Line.data(), Line.size());
+		io_write_newline(File);
+		io_close(File);
+	});
+	if(pJob)
+		Engine()->AddJob(pJob);
 }
 
 void CChat::PrintBlockedMessageToConsole(int ClientId, int Team, const char *pLine)
@@ -2003,7 +2011,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible
 #if defined(CONF_VIDEORECORDER)
 			if(IVideo::Current())
 			{
-				PlaySound &= (bool)g_Config.m_ClVideoShowChat;
+				PlaySound &= qm_demo_display::Resolve(g_Config, Client()->State() == IClient::STATE_DEMOPLAYBACK, true).m_Chat;
 			}
 #endif
 			if(PlaySound)
@@ -2153,8 +2161,14 @@ void CChat::OnPrepareLines(float y)
 			continue;
 		}
 
-		TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
-		Graphics()->DeleteQuadContainer(Line.m_QuadContainerIndex);
+		// 动态称号每帧更新顶点，但布局不变时保留 GPU 容器和背景。
+		if(ForceRecreate || !LineHasDynamicTitle)
+			TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
+		if(!Line.m_TextContainerIndex.Valid())
+		{
+			for(auto &Metrics : Line.m_vTitleTextMetrics)
+				Metrics.Reset();
+		}
 		Line.m_ChatEmojiRect = {};
 		const bool MultipleAuthors = Line.m_vMergedAuthors.size() > 1;
 
@@ -2311,8 +2325,11 @@ void CChat::OnPrepareLines(float y)
 			break;
 		const float TargetY = LayoutBottom - LineHeight;
 
-		// the position the text was created
-		Line.m_TextYOffset = TargetY + RealMsgPaddingY / 2.0f;
+		// 软重建保留容器初始像素对齐锚点；锚点变化时仍走完整重建。
+		const float TextYOffset = TargetY + RealMsgPaddingY / 2.0f;
+		if(Line.m_TextYOffset != TextYOffset)
+			TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
+		Line.m_TextYOffset = TextYOffset;
 
 		int CurRenderFlags = TextRender()->GetRenderFlags();
 		TextRender()->SetRenderFlags(CurRenderFlags | ETextRenderFlags::TEXT_RENDER_FLAG_NO_AUTOMATIC_QUAD_UPLOAD);
@@ -2324,6 +2341,19 @@ void CChat::OnPrepareLines(float y)
 		LineCursor.m_FontSize = FontSize;
 		LineCursor.m_LineWidth = LineWidth;
 		LineCursor.m_LineSpacing = 2.0f * TitleBobPadding;
+		if(Line.m_TextContainerIndex.Valid())
+		{
+			// 清理顶点时不修改接下来首次追加文字使用的光标。
+			CTextCursor ClearCursor = LineCursor;
+			TextRender()->RecreateTextContainerSoft(Line.m_TextContainerIndex, &ClearCursor, "");
+		}
+		Line.m_vTitleTextMetrics.resize(maximum(size_t(1), Line.m_vMergedAuthors.size()));
+		size_t TitleMetricsIndex = 0;
+		CQmTitleTextMetrics::SContext TitleMetricsContext;
+		TitleMetricsContext.m_FontSize = FontSize;
+		TitleMetricsContext.m_ScreenScale = vec2(Graphics()->ScreenWidth() / (ScreenX1 - ScreenX0), Graphics()->ScreenHeight() / (ScreenY1 - ScreenY0));
+		TitleMetricsContext.m_RenderFlags = TextRender()->GetRenderFlags();
+		TitleMetricsContext.m_FontPreset = (int)TextRender()->GetFontPreset();
 
 		// Message is from valid player
 		if(!MultipleAuthors && Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
@@ -2350,15 +2380,27 @@ void CChat::OnPrepareLines(float y)
 
 		// [] 内头衔单独上色；自定义档结束后必须回到调用方原本的颜色。
 		const auto AppendQmTitle = [&](const char *pTitle, const ColorRGBA &FallbackColor, int AuthorId) {
+			CQmTitleTextMetrics &Metrics = Line.m_vTitleTextMetrics[TitleMetricsIndex++];
 			const bool CustomColor = pTitle[0] != '\0' && QmTitleColorStyle.m_Mode != EQmTitleColorMode::FOLLOW_SERVER;
 			// 保留完整的逐字浮动与掠光，行高已在测量时预留最大浮动范围。
 			const SQmTitleRenderStyle TitleRenderStyle = QmTitleResolveRenderStyle(GameClient()->m_QmClient.PlayerTitleStyle(AuthorId));
 			if(pTitle[0] != '\0' && TitleRenderStyle.m_pStyle != nullptr)
 			{
-				QmTitleRenderFillCursor(TextRender(), LineCursor, pTitle, LineCursor.m_FontSize, TitleRenderStyle, TitleAnimationTime, 1.0f, TitleShimmer);
+				Metrics.Update(pTitle, TitleMetricsContext, [&](const char *pPrefix) { return TextRender()->TextWidth(FontSize, pPrefix); });
+				// 配色优先级：本地配色档高于风格自带颜色。此时只取风格的浮动与掠光，颜色由本档决定。
+				if(TitleRenderStyle.m_ColorOverride)
+					QmTitleRenderFillMotionOffsets(TextRender(), LineCursor, pTitle, LineCursor.m_FontSize, TitleRenderStyle, TitleAnimationTime, TitleShimmer, &Metrics);
+				else
+					QmTitleRenderFillCursor(TextRender(), LineCursor, pTitle, LineCursor.m_FontSize, TitleRenderStyle, TitleAnimationTime, 1.0f, TitleShimmer, &Metrics);
+				if(CustomColor && QmTitleColorStyle.m_Rainbow)
+					QmAddTitleRainbowSplits(LineCursor, pTitle, QmTitleColorStyle.m_Alpha);
+				else if(CustomColor)
+					TextRender()->TextColor(QmTitleColorStyle.m_Color);
 				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, pTitle);
 				LineCursor.m_vColorSplits.clear();
 				LineCursor.m_vCharOffsets.clear();
+				if(CustomColor)
+					TextRender()->TextColor(FallbackColor);
 				return;
 			}
 			if(CustomColor && QmTitleColorStyle.m_Rainbow)
@@ -2528,8 +2570,17 @@ void CChat::OnPrepareLines(float y)
 			Line.m_ContentWidth = maximum(0.0f, FullWidth);
 			if(!g_Config.m_ClChatOld)
 			{
-				Graphics()->SetColor(1, 1, 1, 1);
-				Line.m_QuadContainerIndex = Graphics()->CreateRectQuadContainer(Begin, TargetY, FullWidth, LineHeight, MessageRounding(), IGraphics::CORNER_ALL);
+				const CUIRect Rect = {Begin, TargetY, FullWidth, LineHeight};
+				const float Rounding = MessageRounding();
+				if(Line.m_QuadContainerIndex == -1 || Line.m_BackgroundRect.x != Rect.x || Line.m_BackgroundRect.y != Rect.y ||
+					Line.m_BackgroundRect.w != Rect.w || Line.m_BackgroundRect.h != Rect.h || Line.m_BackgroundRounding != Rounding)
+				{
+					Graphics()->DeleteQuadContainer(Line.m_QuadContainerIndex);
+					Graphics()->SetColor(1, 1, 1, 1);
+					Line.m_QuadContainerIndex = Graphics()->CreateRectQuadContainer(Begin, TargetY, FullWidth, LineHeight, Rounding, IGraphics::CORNER_ALL);
+					Line.m_BackgroundRect = Rect;
+					Line.m_BackgroundRounding = Rounding;
+				}
 			}
 		}
 
@@ -2740,10 +2791,11 @@ void CChat::OnRender()
 	}
 
 #if defined(CONF_VIDEORECORDER)
-	if(!((g_Config.m_ClShowChat && !IVideo::Current()) || (g_Config.m_ClVideoShowChat && IVideo::Current())))
+	const bool VideoRendering = IVideo::Current() != nullptr;
 #else
-	if(!g_Config.m_ClShowChat)
+	const bool VideoRendering = false;
 #endif
+	if(!qm_demo_display::Resolve(g_Config, Client()->State() == IClient::STATE_DEMOPLAYBACK, VideoRendering).m_Chat)
 	{
 		GameClient()->m_HudEditor.EndTransform(HudEditorScope);
 		return;
@@ -3147,6 +3199,9 @@ static bool ShouldSyncDummyCommandToOther(const char *pLine)
 
 void CChat::SendChat(int Team, const char *pLine)
 {
+	if(pLine && GameClient()->TClientComponent().TryHandleLocalSaveReply(pLine))
+		return;
+
 	// don't send empty messages
 	if(*str_utf8_skip_whitespaces(pLine) == '\0')
 		return;
@@ -3161,8 +3216,8 @@ void CChat::SendChat(int Team, const char *pLine)
 		Msg7.m_Mode = Team == 1 ? protocol7::CHAT_TEAM : protocol7::CHAT_ALL;
 		Msg7.m_Target = -1;
 		Msg7.m_pMessage = pLine;
-		Client()->SendPackMsgActive(&Msg7, MSGFLAG_VITAL, true);
-		GameClient()->TClientComponent().TryRemoveLocalSaveForLoadCommand(pLine);
+		if(Client()->SendPackMsgActive(&Msg7, MSGFLAG_VITAL, true) == 0)
+			GameClient()->TClientComponent().TrackLocalSaveLoadCommand(g_Config.m_ClDummy, pLine);
 
 		if(Client()->DummyConnected() && ShouldSyncDummyCommandToOther(pLine))
 			SendChatOnConn(!g_Config.m_ClDummy, Team, pLine);
@@ -3174,8 +3229,8 @@ void CChat::SendChat(int Team, const char *pLine)
 	CNetMsg_Cl_Say Msg;
 	Msg.m_Team = Team;
 	Msg.m_pMessage = pLine;
-	Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
-	GameClient()->TClientComponent().TryRemoveLocalSaveForLoadCommand(pLine);
+	if(Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL) == 0)
+		GameClient()->TClientComponent().TrackLocalSaveLoadCommand(g_Config.m_ClDummy, pLine);
 
 	if(Client()->DummyConnected() && ShouldSyncDummyCommandToOther(pLine))
 		SendChatOnConn(!g_Config.m_ClDummy, Team, pLine);
@@ -3183,6 +3238,9 @@ void CChat::SendChat(int Team, const char *pLine)
 
 void CChat::SendChatOnConn(int Conn, int Team, const char *pLine, bool AllowWhitespaceOnly, bool HandleLocalSaveForLoadCommand)
 {
+	if(HandleLocalSaveForLoadCommand && pLine && GameClient()->TClientComponent().TryHandleLocalSaveReply(pLine))
+		return;
+
 	if(pLine == nullptr || pLine[0] == '\0')
 		return;
 
@@ -3194,6 +3252,7 @@ void CChat::SendChatOnConn(int Conn, int Team, const char *pLine, bool AllowWhit
 		Conn = IClient::CONN_MAIN;
 
 	m_LastChatSend = time();
+	int SendResult;
 
 	if(GameClient()->Client()->IsSixup())
 	{
@@ -3201,7 +3260,7 @@ void CChat::SendChatOnConn(int Conn, int Team, const char *pLine, bool AllowWhit
 		Msg7.m_Mode = Team == 1 ? protocol7::CHAT_TEAM : protocol7::CHAT_ALL;
 		Msg7.m_Target = -1;
 		Msg7.m_pMessage = pLine;
-		Client()->SendPackMsg(Conn, &Msg7, MSGFLAG_VITAL, true);
+		SendResult = Client()->SendPackMsg(Conn, &Msg7, MSGFLAG_VITAL, true);
 	}
 	else
 	{
@@ -3209,15 +3268,18 @@ void CChat::SendChatOnConn(int Conn, int Team, const char *pLine, bool AllowWhit
 		CNetMsg_Cl_Say Msg;
 		Msg.m_Team = Team;
 		Msg.m_pMessage = pLine;
-		Client()->SendPackMsg(Conn, &Msg, MSGFLAG_VITAL);
+		SendResult = Client()->SendPackMsg(Conn, &Msg, MSGFLAG_VITAL);
 	}
 
-	if(HandleLocalSaveForLoadCommand)
-		GameClient()->TClientComponent().TryRemoveLocalSaveForLoadCommand(pLine);
+	if(HandleLocalSaveForLoadCommand && SendResult == 0)
+		GameClient()->TClientComponent().TrackLocalSaveLoadCommand(Conn, pLine);
 }
 
 void CChat::SendChatQueued(int Team, const char *pLine, bool AllowOutgoingTranslation)
 {
+	if(pLine && GameClient()->TClientComponent().TryHandleLocalSaveReply(pLine))
+		return;
+
 	if(!pLine || str_length(pLine) < 1)
 		return;
 

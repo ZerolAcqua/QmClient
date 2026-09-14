@@ -8,7 +8,6 @@
 %d dummies
 %d dummy
 %d items selected
-%d more cut segments
 %d of %d server
 %d of %d servers
 %d player
@@ -19,6 +18,7 @@
 %d teams
 %d user
 %d users
+%d. %s | main: %s | dummy: %s
 %d/%d KiB (%.1f KiB/s)
 %ds left
 %i minute left
@@ -85,6 +85,7 @@ _ or ' ' = blank spacer
 a = View angle
 A demo with this name already exists
 A folder with this name already exists
+A save is already being restored. Please wait.
 A screenshot with this name already exists
 A Tee
 A vote is currently active.
@@ -229,7 +230,6 @@ Animate lists when entering a page
 Animate settings card expand and collapse height changes
 Animate settings card lists when entering a page
 Animate settings card reorder and layout reflow
-Animated styles override the fallback title color
 Animated title style id
 Animation
 Animation duration
@@ -474,7 +474,9 @@ Bind Wheel Key
 Binds
 Bit flags for disabling settings tabs
 Black
+Black Flash
 Blend mode
+Blend strength
 Blink the active local tee
 Block enemy chat
 Block votes from blacklisted addresses
@@ -631,6 +633,8 @@ Clear note
 Clear remote console
 Clearable text...
 Clears the voting options
+Click a part on the right to edit its color, blend mode and strength.
+Click again to find the next location.
 Click to add this community to favorites
 Click to copy map name
 Click to copy the map name
@@ -826,7 +830,6 @@ Current time: %s\n- Uptime and playtime are calculated from official JSON data\n
 Current: Ranks
 Current: Score
 Current: Time
-Cursed Flame
 Custom
 custom
 Custom API key
@@ -850,9 +853,11 @@ Customize QmClient visuals and effects
 Customize the position jump hint
 Customize translate button and menu colors
 Customize vote display and interaction
+Cut end: %s
 Cut interval
 Cut length
 Cut segments
+Cut start: %s
 Cute:
 Cycle custom Tee hue
 Cycle custom Tee hue for dummy simultaneously
@@ -899,6 +904,7 @@ Debug quad layer clipping.
 Debug quad layer cluster clipping.
 Debug SQL.
 Debug tile layer clipping.
+Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)
 Deep freeze color
 Deep freeze opacity
 Deep freeze tile outline color
@@ -940,7 +946,11 @@ Delete selected items
 Delete skin
 Delete this preset
 Demo
+Demo display
 Demo effects
+Demo hook strength (0=Off 1=Icon 2=Icon and number)
+Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)
+Demo key presses (0=Off 1=Others 2=All 3=Own)
 Demo marker added
 Demo player is currently active.
 Demo target
@@ -1159,7 +1169,6 @@ Enable chat mention sound
 Enable chat message sound
 Enable chat with all/team mode
 Enable cheats for your current team's run, but you can't earn a rank
-Enable client stutter diagnostics at startup
 Enable colored console output
 Enable coloring and hearts for friends
 Enable controller
@@ -1202,7 +1211,6 @@ Enable left swipe offset on chat fade
 Enable LLM thinking mode (may increase response time)
 Enable lyrics
 Enable macOS graphics diagnostics and Instruments signposts
-Enable main thread and render stage performance debug logging
 Enable map compatibility mode using the specified bug (example: grenade-doubleexplosion@ddnet.tw)
 Enable mod weapon on %d: %s
 Enable MySQL backend instead of SQLite (fallback to sv_sqlite_file when no MySQL server is reachable)
@@ -1252,6 +1260,7 @@ Enable team chat message sound
 Enable team chat sound
 Enable Tee trail
 Enable tee trails
+Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
 Enable thinking mode (slower)
 Enable tile outlines
 Enable UDP KCP transport negotiation (old clients keep legacy UDP, hot-switch fallback)
@@ -1277,6 +1286,7 @@ Endless hook has been deactivated
 Endpoint
 Endpoint (optional)
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
+Enter a CP number from 1 to 255.
 Enter Password
 Enter Username
 Enter your sponsor code
@@ -1315,6 +1325,7 @@ Execute on connect
 Execute on join
 Execute the specified file
 Existing Player
+Exo
 Export
 Export cut as a separate demo
 Export demo cut
@@ -1350,7 +1361,6 @@ Failed to read saves file
 Failed to write PNG export.
 Fake CTF flags
 Fallback simple noise reduction strength
-Fallback title color
 Fast input
 Fast input (reduce visual latency)
 Fast input others
@@ -1385,13 +1395,16 @@ Filter out servers with player country mismatch (ISO 3166-1 numeric)
 Filter out servers without friends
 Filter out spectators from player count
 Filtered word console color
+Find / Next
 Find all ban records for the specified IP address
+Find CP
 Find QmClient communities and project links
 Fine-tune improved anti-ping prediction
 Finish data source
 Finish Name
 Finish name
 Finish Name:
+Finish or reset the current race before restoring a save.
 Finished
 Finished maps
 Fire
@@ -1527,7 +1540,6 @@ Go back the specified duration
 Go forward one marker
 Go forward one tick
 Go forward the specified duration
-Golden Grace
 Gores
 Gores Actor
 Gores actor
@@ -1687,6 +1699,7 @@ i = Receive rate
 I am a robot
 I am away from the game window
 I muted you
+Icon and number
 Icons
 If 1, auto record only once on connect; if 0, auto record restarts after game end
 If 1, current driver is in blocking error state.
@@ -1725,6 +1738,7 @@ Indicator radius
 Indicator safe color
 Indicator size
 Indicator transparency
+Inferno
 Infinite hook for super players on/off.
 Info
 Info Messages
@@ -1770,6 +1784,7 @@ Invalid client id to move to spectators
 Invalid Demo
 Invalid ID
 Invalid option
+Invalid save number. Use a number from the save list.
 Invalid spectator id used
 Invalid sponsor code
 Invalid translation backend
@@ -1872,6 +1887,7 @@ Leave empty to use default prompt
 Left jump
 Left-click a Frankenstein part to tint it. Drag parts to replace them. Right-click resets.
 Left/right channel width
+Legacy option: connections that skip TLS verification are rejected
 Length
 Lenny:
 Let server start ghost
@@ -1950,6 +1966,7 @@ Lock delay
 Lock team
 Locked
 Log output filename
+Log realtime WebSocket channel events
 Log the network
 Logout of econ
 Logout of rcon
@@ -2002,9 +2019,7 @@ Map to use on server
 Map type:
 Margin when notification is docked
 Mark demo
-Mark the beginning of a cut (right click to reset)
 Mark the beginning of a demo cut
-Mark the end of a cut (right click to reset)
 Mark the end of a demo cut
 Markers
 Master server URL to register
@@ -2170,6 +2185,7 @@ Name to change to near finish (when tc_change_name_near_finish enabled)
 Name:
 Name: %s
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
+Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)
 Nameplate position X
 Nameplate position Y
 Nameplate size
@@ -2382,7 +2398,6 @@ Optional authentication key for the DNSBL provider
 Original
 Other
 Other players' hook line width
-Other players' nameplate scope (0=All players 1=Friends only)
 Others
 Others only
 Outgoing language
@@ -2410,7 +2425,6 @@ Override Selected
 Overview
 Overwrite clan even if empty
 Own hook line width
-Own nameplate scope (0=Current character 1=All local characters)
 p = Ping latency
 Pack name
 Panel opacity
@@ -2445,7 +2459,6 @@ Pause voice when window unfocused
 Pause/unpause game
 Penalty in seconds for saving or swapping positions
 Per-name volume (name=percent)
-Performance debug log threshold (ms)
 Permanent access; up to 4 online IP addresses
 Permanent sponsor verified
 Personal best:
@@ -2583,6 +2596,7 @@ Preview
 Preview 'Hook collisions' being pressed
 Preview built with %d skipped slot(s).
 Preview button visibility while the editor is active.
+Preview cut (P)
 Preview dummy nameplate
 Preview hook collision colors and line styles
 Preview import file
@@ -2692,6 +2706,10 @@ Randomize player color (0 = all, 1 = body, 2 = feet, 3 = skin, 4 = flag) example
 Ratio
 Ratio threshold for local target language detection
 Really? Not even a little?
+Realtime channel
+Realtime channel heartbeat interval (seconds, 0 uses default)
+Realtime channel reconnect backoff base (ms)
+Realtime channel reconnect backoff cap (ms)
 Reason
 Reason:
 Rebinds the client's listening address and port
@@ -2861,7 +2879,9 @@ Restart
 Restart in x seconds (0 = abort)
 Restart the client
 Restarting. Please wait…
+Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
 Restore old single-segment hook collision line behavior
+Restoring save %d: main '%s', dummy '%s'.
 Retrying…
 Review and edit custom key bindings
 Review and reset changed configuration values
@@ -2925,9 +2945,14 @@ Save drawings to a given csv file (defaults to map name)
 Save failed!
 Save ghost
 Save last %d min
+Save loaded; local record removed.
+Save loaded; the local record could not be removed.
 Save player names in replay
 Save power by lowering update rate (higher input latency)
 Save replay of best time per game
+Save restore dismissed.
+Save restore stopped without confirming success. The local record was kept.
+Save restore stopped: connection, names or team were not ready. The local record was kept.
 Save settings file on exit
 Save skin
 Save team with code r.
@@ -2976,6 +3001,7 @@ Search main asset
 Search settings by title, feature, or keyword
 Search skins and manage the skin queue
 Searching
+Sec-WebSocket-Protocol sent during the realtime handshake
 Secondary
 Seconds
 Seconds to wait before reconnecting (0=off, when server is full)
@@ -2992,6 +3018,7 @@ Selected button not visible
 Selected candidate
 Selected candidate %d/%d under cursor.
 Selected item color
+Selected part: %d
 Selected server
 Selected timertype is not supported by your client
 Selection
@@ -3051,6 +3078,8 @@ Set camera position relative to current view in the map
 Set camera position to x and y in the map
 Set color
 Set current demo speed
+Set cut end at current position (O, right click to reset)
+Set cut start at current position (I, right click to reset)
 Set ddrace team for a player
 Set default replay length
 Set force-pause timer of i to 0.
@@ -3107,6 +3136,7 @@ Show broadcast messages in-game
 Show chat
 Show chat (2 always show large chat area)
 Show chat bubbles above players
+Show chat in demo preview and video
 Show chat messages above players
 Show chat when rendering video
 Show clan above name plates
@@ -3209,6 +3239,7 @@ Show in-game HUD (score)
 Show in-game HUD (spectator count)
 Show in-game HUD (spectator HUD)
 Show in-game HUD (timer)
+Show in-game HUD in demo preview and video
 Show in-game HUD when rendering video
 Show in-game packet loss rate
 Show in-game prediction time (in milliseconds)
@@ -3223,6 +3254,7 @@ Show jump hint based on fractional part of position
 Show jumps indicator
 Show katan on frozen players
 Show katana on frozen players (restores old behavior)
+Show key presses
 Show key presses (1 = others, 2 = all, 3 = own only)
 Show key stuck status
 Show kill messages
@@ -3384,6 +3416,7 @@ Simple
 Simple noise reduction
 Simple noise reduction strength
 Single color
+Single color and Rainbow override the color of animated styles; the style keeps its motion
 Size
 Size of entity text data (20% to 100%)
 Size of hook strength icon and number indicator
@@ -3397,6 +3430,11 @@ Skin filter string
 Skin is loading.
 Skin list sort mode (0=Name, 1=Release date)
 Skin options
+Skin outline color
+Skin outline for other players
+Skin outline for self and dummy
+Skin outline opacity
+Skin outline width
 Skin prefix
 Skin queue
 Skin queue current position
@@ -3502,7 +3540,7 @@ Speedrun timer seconds
 Speedrun timer time (MM:SS, legacy)
 Sphere
 Spin pop
-Spirit Light
+Spirit
 Sponsor code
 Sponsor code already claimed
 Sponsor reminder
@@ -3542,6 +3580,7 @@ Steam profile name
 Still free after %d sponsors. Take a look?
 Stop key input on switch (0=off, 1=dummy, 2=player)
 Stop practice
+Stop preview (P)
 Stop record
 Stop recording
 Stop recording a demo
@@ -3661,7 +3700,7 @@ Tee size
 Tee status bar
 Tee trail color
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
-Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
+Tee trail style (0=Original, 1=Black Flash, 2=Exo, 3=Spirit, 4=Void, 5=Inferno)
 Tee Trails
 Tee trails
 Teeworlds 0.7 difficulty level (0 = Casual, 1 = Normal, 2 = Competitive).
@@ -3720,6 +3759,7 @@ Themes directory
 There are no Tutorial servers available
 There are unsaved changes in the touch controls editor. Saving first is recommended.
 There is no checkpoint teleporter with that index on the map.
+There is no pending save restore prompt.
 There is no teleporter with that index on the map.
 There is not enough space available for the button. Check its visibilities and size.
 There is not enough space available to place another button.
@@ -3730,9 +3770,11 @@ There's an unsaved change in the touch controls editor, you might want to save i
 There's an unsaved map in the editor, you might want to save it.
 Thin
 Thinking mode requires a reasoning model
+This connection cannot change names while connected. Reconnect with the saved names first.
 This ID is not connected
 This is the master switch for all interface animation categories
 This name cannot be used for files and folders
+This save is no longer in the local save file.
 This server has an initial chat delay, you will be able to talk in %s seconds.
 This skin name cannot be used.
 This team already has the maximum allowed size of %s players
@@ -3777,6 +3819,7 @@ Timer isn't displayed.
 Tiny Tee Size
 Title bob angular speed in 1/100 rad/s
 Title bob wavelength in pixels
+Title color
 Title color (single color)
 Title light sweep speed in 1/100 row per second (0 = off)
 Title opacity (custom color)
@@ -3965,6 +4008,7 @@ URL for downloading community skins
 URL for downloading maps (must start with https://)
 URL for downloading skins
 Usage: %s %s
+Use /qm Yes [number] to restore a save, or /qm No to dismiss.
 Use 12 hour clock
 Use 12-hour clock for local time
 Use a fixed prediction margin while frozen
@@ -4034,7 +4078,6 @@ View switch found (at offset) with given number
 View tele found (at offset) with given number
 View the developers and contributors
 View the people supporting QmClient development
-Violet Lightning
 Virtual joystick which always uses fire.
 Virtual joystick which always uses hook.
 Virtual joystick which only aims without using an action.
@@ -4071,7 +4114,7 @@ Voice stereo output
 Voice stereo width (percent)
 Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
-Void Shadow
+Void
 Volume
 Vote a map by name
 Vote command
@@ -4185,7 +4228,6 @@ Windowed fullscreen
 Word Filter
 Word filter action: 0=replace matching words, 1=hide entire message
 Write local console contents to a text file
-Write performance debug logs to dedicated file
 Write remote console contents to a text file
 Writing item %d failed
 Written %d items
@@ -4307,10 +4349,22 @@ Zoom to current mouse target
 ⚠️ LibreTranslate API Key not set
 ⚠️ LLM API Key not configured
 ⚠️ Tencent Cloud API not configured
+[Assets editor blend mode]	Color
+[Assets editor blend mode]	Color Burn
+[Assets editor blend mode]	Color Dodge
+[Assets editor blend mode]	Darken
+[Assets editor blend mode]	Difference
+[Assets editor blend mode]	Exclusion
+[Assets editor blend mode]	Hard Light
+[Assets editor blend mode]	Hue
+[Assets editor blend mode]	Lighten
+[Assets editor blend mode]	Luminosity
 [Assets editor blend mode]	Multiply
 [Assets editor blend mode]	Normal
 [Assets editor blend mode]	Overlay
+[Assets editor blend mode]	Saturation
 [Assets editor blend mode]	Screen
+[Assets editor blend mode]	Soft Light
 [Auto camera]	Active
 [Auto camera]	Disabled
 [Auto camera]	Enabled
@@ -4500,8 +4554,6 @@ Zoom to current mouse target
 [Editor]	Confirm delete
 [Editor]	Confirm editing of this command.
 [Editor]	Confirm overwrite
-[Editor]	Connection failed: the collaboration service address is too long
-[Editor]	Connection failed: the HTTP service is unavailable
 [Editor]	Construct '%s' game tiles (x%d)
 [Editor]	Construct 'tele' game tiles (x%d)
 [Editor]	Construct game tiles from this layer.
@@ -5160,8 +5212,6 @@ Zoom to current mouse target
 [Editor]	Sync failed: the map snapshot data is invalid
 [Editor]	Sync failed: the received map snapshot is too large
 [Editor]	Sync interrupted: connection failed
-[Editor]	Sync interrupted: the collaboration service address is too long
-[Editor]	Sync interrupted: the HTTP service is unavailable
 [Editor]	Sync interrupted: the room does not exist or has expired
 [Editor]	Sync interrupted: you are no longer in this room
 [Editor]	Sync the current editor map snapshot by room code, with up to 4 people collaborating.
@@ -5342,13 +5392,11 @@ Zoom to current mouse target
 [Predefined touch button behaviors]	Swap Action
 [Predefined touch button behaviors]	Use Action
 [Show name plates]	All
+[Show name plates]	Current
+[Show name plates]	Current + Local
+[Show name plates]	Local + Others
 [Show name plates]	None
 [Show name plates]	Others
-[Show name plates]	Own
-[Show name plates scope]	All
-[Show name plates scope]	Current
-[Show name plates scope]	Friends
-[Show name plates scope]	Local
 [Show players' key presses]	All
 [Show players' key presses]	None
 [Show players' key presses]	Others

@@ -438,6 +438,9 @@ public:
 	virtual void OnNewSnapshot() = 0;
 	virtual void OnEnterGame() = 0;
 	virtual void OnShutdown() = 0;
+	// 仅用于诊断：渲染帧完成和关闭采集前的收尾，不影响游戏时序。
+	virtual void OnQmPerfFrame(double) {}
+	virtual void OnQmPerfStop(bool) {}
 	virtual void OnRender() = 0;
 	virtual void OnUpdate() = 0;
 	// Render-only idle throttle requested by the game UI; 0 keeps the configured rate.

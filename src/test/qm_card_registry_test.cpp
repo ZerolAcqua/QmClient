@@ -41,6 +41,18 @@ TEST(QmCardRegistry, CoversAllCardsNoDuplicates)
 	}
 }
 
+TEST(QmCardRegistry, TimeoutDisconnectSearchPointsToControls)
+{
+	qm_card_order::CModel Model;
+	Model.SetEntries(qm_card_registry::BuildDefaultEntries());
+	for(const char *pQuery : {"qm_timeout_disconnect", "Active disconnect", "主动断开", "异常断开", "timeout disconnect"})
+	{
+		const auto Results = qm_card_registry::SearchCards(pQuery, Model);
+		ASSERT_EQ(Results.size(), 1u) << pQuery;
+		EXPECT_STREQ(Results.front().m_pStableId, "deck:controls-miscellaneous") << pQuery;
+	}
+}
+
 TEST(QmCardRegistry, P6QmClientContributorsCards)
 {
 	const auto *pCommunity = qm_card_registry::FindByStableId("deck:qmclient-contributors-community");

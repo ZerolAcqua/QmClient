@@ -443,7 +443,7 @@ inline float ResolveQmVisualSkinTransitionHeight(const SSettingsContentMetrics &
 	// 标题、开关、控件和说明均按 renderer 的实际顺序计数；每个可见行消费一次尾部间距。
 	const float StandardRow = Metrics.m_RowStep;
 	const float Notes = 2.0f * (Metrics.m_SmallSize + Metrics.m_LineSpacing);
-	return 7.0f * StandardRow + Notes + (Enabled ? 5.0f * StandardRow : 0.0f);
+	return 12.0f * StandardRow + Notes + (Enabled ? 5.0f * StandardRow : 0.0f);
 }
 
 inline float ResolveQmVisualWeaponAnimationHeight(const SSettingsContentMetrics &Metrics, const bool SwitchEnabled, const bool ReloadEnabled)
@@ -642,6 +642,45 @@ inline SSettingsNestedRadioSlots ResolveSettingsNestedRadioSlots(const CUIRect &
 	}
 	Slots.m_MainCount = MainCount;
 	return Slots;
+}
+
+// 多档分段行的落位：控件行够宽时用等宽胶囊分段（一行排完，标签不换行）；
+// 主内容区太窄、分段会被挤到贴边时，退回「标签一行 + 可换行分段行」的普通分段行，
+// 高度随之变化，所以测量、预布局与绘制三个阶段必须共用这一个解析结果。
+// MinOptionWidth 由调用方按真实最长标签给出（胶囊分段没有内边距，这个值通常远小于
+// ResolveSettingsRadioRowLayout 的 72px 下限）；给 0 时退回保守估算。
+// 胶囊分段的标签独占上一行、控件行用满整行宽度，判定因此只有「档数 × 单档宽度」；
+// 若照并排的分段行那样再预扣一列标签宽，两列卡片这类正常宽度会白白退回旧分段行。
+struct SSettingsSegmentedRowLayout
+{
+	bool m_Capsule = false;
+	CUIRect m_LabelRect{};
+	CUIRect m_ContainerRect{};
+	float m_Height = 0.0f;
+};
+
+inline SSettingsSegmentedRowLayout ResolveSettingsSegmentedRowLayout(const CUIRect &View, const int OptionCount, const SSettingsContentMetrics &Metrics, const float MinOptionWidth = 0.0f)
+{
+	SSettingsSegmentedRowLayout Layout;
+	if(View.w <= 0.0f)
+		return Layout;
+
+	const float RequiredPerOption = MinOptionWidth > 0.0f ? MinOptionWidth : std::max(72.0f, Metrics.m_ButtonHeight * 3.0f);
+	if(View.w >= RequiredPerOption * (float)std::max(1, OptionCount))
+	{
+		const SSettingsNestedRadioRowLayout Capsule = ResolveSettingsNestedRadioRowLayout(View, Metrics);
+		Layout.m_Capsule = true;
+		Layout.m_LabelRect = Capsule.m_LabelRect;
+		Layout.m_ContainerRect = Capsule.m_ContainerRect;
+		Layout.m_Height = Capsule.m_Height;
+		return Layout;
+	}
+
+	const SSettingsRadioRowLayout Radio = ResolveSettingsRadioRowLayout(View, OptionCount, Metrics);
+	Layout.m_LabelRect = Radio.m_LabelRect;
+	Layout.m_ContainerRect = Radio.m_ButtonsRect;
+	Layout.m_Height = Radio.m_Height;
+	return Layout;
 }
 
 inline float ResolveSettingsControllerAxisPickerHeight(const int AxisCount, const int MaxAxisCount, const float RowHeight, const float RowSpacing)

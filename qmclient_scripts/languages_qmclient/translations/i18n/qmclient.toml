@@ -1,5 +1,69 @@
 # 请抬头享受阳光｜日子很好 我很我---------致咩子
 [[message]]
+key = "Find CP"
+[message.translations]
+simplified_chinese = "查找 CP"
+traditional_chinese = "尋找 CP"
+japanese = "CP を検索"
+korean = "CP 찾기"
+russian = "Найти CP"
+german = "CP suchen"
+spanish = "Buscar CP"
+french = "Trouver un CP"
+brazilian_portuguese = "Buscar CP"
+portuguese = "Procurar CP"
+turkish = "CP bul"
+polish = "Znajdź CP"
+
+[[message]]
+key = "Find / Next"
+[message.translations]
+simplified_chinese = "查找 / 下一个"
+traditional_chinese = "尋找 / 下一個"
+japanese = "検索 / 次へ"
+korean = "찾기 / 다음"
+russian = "Найти / Далее"
+german = "Suchen / Weiter"
+spanish = "Buscar / Siguiente"
+french = "Trouver / Suivant"
+brazilian_portuguese = "Buscar / Próximo"
+portuguese = "Procurar / Seguinte"
+turkish = "Bul / Sonraki"
+polish = "Znajdź / Następny"
+
+[[message]]
+key = "Enter a CP number from 1 to 255."
+[message.translations]
+simplified_chinese = "请输入 1–255 的 CP 编号"
+traditional_chinese = "請輸入 1–255 的 CP 編號"
+japanese = "1～255 の CP 番号を入力してください。"
+korean = "1~255 사이의 CP 번호를 입력하세요."
+russian = "Введите номер CP от 1 до 255."
+german = "CP-Nummer von 1 bis 255 eingeben."
+spanish = "Introduce un número de CP del 1 al 255."
+french = "Saisissez un numéro de CP entre 1 et 255."
+brazilian_portuguese = "Digite um número de CP de 1 a 255."
+portuguese = "Introduza um número de CP de 1 a 255."
+turkish = "1 ile 255 arasında bir CP numarası girin."
+polish = "Wpisz numer CP od 1 do 255."
+
+[[message]]
+key = "Click again to find the next location."
+[message.translations]
+simplified_chinese = "再次点击可查找下一个位置"
+traditional_chinese = "再次點擊可尋找下一個位置"
+japanese = "もう一度クリックすると次の場所を検索します。"
+korean = "다음 위치를 찾으려면 다시 클릭하세요."
+russian = "Нажмите ещё раз, чтобы найти следующее место."
+german = "Erneut klicken, um die nächste Position zu finden."
+spanish = "Haz clic de nuevo para encontrar la siguiente ubicación."
+french = "Cliquez à nouveau pour trouver l'emplacement suivant."
+brazilian_portuguese = "Clique novamente para encontrar o próximo local."
+portuguese = "Clique novamente para encontrar o local seguinte."
+turkish = "Sonraki konumu bulmak için tekrar tıklayın."
+polish = "Kliknij ponownie, aby znaleźć następne miejsce."
+
+[[message]]
 key = "%s and %s have swapped"
 [message.translations]
 simplified_chinese = "%s 与 %s 已完成交换"
@@ -20260,7 +20324,7 @@ key = "Title color"
 [message.translations]
 simplified_chinese = "头衔颜色"
 traditional_chinese = "頭銜顏色"
-japanese = "称号の色"
+japanese = "タイトル色"
 korean = "칭호 색상"
 russian = "Цвет титула"
 german = "Titelfarbe"
@@ -27061,6 +27125,7 @@ brazilian_portuguese = "Sustentado por %d apoiadores. Quer ver?"
 portuguese = "Sustentado por %d apoiadores. Quer ver?"
 turkish = "Bizi %d destekçi ayakta tutuyor. Bakmak ister misin?"
 polish = "Wspiera nas %d sponsorów. Zobaczysz?"
+
 [[message]]
 key = "Really? Not even a little?"
 [message.translations]
@@ -27076,6 +27141,7 @@ brazilian_portuguese = "Sério? Nem um pouquinho?"
 portuguese = "A sério? Nem um pouquinho?"
 turkish = "Gerçekten mi? Hiç mi düşünmezsin?"
 polish = "Serio? Ani trochę?"
+
 [[message]]
 key = "Sponsor reminder"
 [message.translations]
@@ -27091,6 +27157,7 @@ brazilian_portuguese = "Lembrete de apoio"
 portuguese = "Lembrete de apoio"
 turkish = "Destekçi hatırlatması"
 polish = "Przypomnienie o wsparciu"
+
 [[message]]
 key = "Sponsor reminder preview"
 [message.translations]
@@ -27106,6 +27173,7 @@ brazilian_portuguese = "Prévia do lembrete de apoio"
 portuguese = "Pré-visualização do lembrete"
 turkish = "Destekçi hatırlatması önizlemesi"
 polish = "Podgląd przypomnienia o wsparciu"
+
 [[message]]
 key = "Accumulated client launch count (used by the sponsor reminder)"
 [message.translations]
@@ -27121,6 +27189,7 @@ brazilian_portuguese = "Contagem acumulada de execuções (para o lembrete)"
 portuguese = "Contagem acumulada de arranques (para o lembrete)"
 turkish = "Toplam istemci başlatma sayısı (destekçi hatırlatması için)"
 polish = "Łączna liczba uruchomień klienta (dla przypomnienia)"
+
 [[message]]
 key = "Launch count threshold for the next sponsor reminder"
 [message.translations]
@@ -27136,6 +27205,7 @@ brazilian_portuguese = "Limite de execuções para o próximo lembrete"
 portuguese = "Limite de arranques para o próximo lembrete"
 turkish = "Sonraki hatırlatma için başlatma eşiği"
 polish = "Próg uruchomień do następnego przypomnienia"
+
 [[message]]
 key = "Show the occasional sponsor reminder in the main menu"
 [message.translations]
@@ -27151,6 +27221,7 @@ brazilian_portuguese = "Mostrar ocasionalmente o lembrete no menu principal"
 portuguese = "Mostrar ocasionalmente o lembrete no menu principal"
 turkish = "Ana menüde ara sıra destekçi hatırlatması göster"
 polish = "Pokazuj czasem przypomnienie w menu głównym"
+
 [[message]]
 key = "Preview the sponsor reminder without changing the launch count"
 [message.translations]
@@ -27760,6 +27831,22 @@ turkish = "Animasyonlu stiller temel unvan renginden önceliklidir"
 polish = "Animowane style mają pierwszeństwo przed podstawowym kolorem tytułu"
 
 [[message]]
+key = "Single color and Rainbow override the color of animated styles; the style keeps its motion"
+[message.translations]
+simplified_chinese = "单色与彩虹档会覆盖动态风格自带的颜色；风格只保留浮动与掠光"
+traditional_chinese = "單色與彩虹檔會覆蓋動態風格自帶的顏色；風格只保留浮動與掠光"
+japanese = "単色とレインボーはアニメーションスタイルの色を上書きします（スタイルの動きは残ります）"
+korean = "단색과 무지개는 애니메이션 스타일의 색상을 덮어씁니다. 스타일의 움직임은 그대로 유지됩니다"
+russian = "Однотонный и радужный режимы перекрывают цвета анимированного стиля; движение стиля сохраняется"
+german = "Einfarbig und Regenbogen überschreiben die Farben animierter Stile; die Bewegung des Stils bleibt erhalten"
+spanish = "Color único y arcoíris anulan los colores de los estilos animados; el movimiento del estilo se mantiene"
+french = "Uni et arc-en-ciel remplacent les couleurs des styles animés ; le mouvement du style est conservé"
+brazilian_portuguese = "Cor única e arco-íris substituem as cores dos estilos animados; o movimento do estilo é mantido"
+portuguese = "Cor única e arco-íris substituem as cores dos estilos animados; o movimento do estilo é mantido"
+turkish = "Tek renk ve gökkuşağı animasyonlu stillerin rengini geçersiz kılar; stilin hareketi korunur"
+polish = "Jednolity kolor i tęcza zastępują kolory animowanych stylów; ruch stylu pozostaje"
+
+[[message]]
 key = "Classic title glow: 0 = off, 1 = subtle (6 draws), 2 = full Calamity (16 draws)"
 [message.translations]
 simplified_chinese = "经典头衔光晕：0 = 关闭，1 = 柔和（6 层），2 = 完整 Calamity（16 层）"
@@ -27806,3 +27893,323 @@ brazilian_portuguese = "Efeito espacial do título: 0 = polido, 1 = sólido, 2 =
 portuguese = "Efeito espacial do título: 0 = polido, 1 = sólido, 2 = Calamity clássico, 3 = desligado"
 turkish = "Unvan uzamsal efekti: 0 = cilalı, 1 = katı, 2 = klasik Calamity, 3 = kapalı"
 polish = "Efekt przestrzenny tytułu: 0 = połysk, 1 = jednolity, 2 = klasyczne Calamity, 3 = wył."
+
+[[message]]
+key = "Skin outline for self and dummy"
+[message.translations]
+simplified_chinese = "自己和分身的皮肤描边"
+traditional_chinese = "自己與分身的皮膚描邊"
+japanese = "自分とダミーのスキンの輪郭"
+korean = "자신과 더미의 스킨 윤곽선"
+russian = "Контур скина для себя и дамми"
+german = "Skin-Umriss für dich und Dummy"
+spanish = "Contorno de skin propio y del dummy"
+french = "Contour du skin pour soi et le dummy"
+brazilian_portuguese = "Contorno da skin própria e do dummy"
+portuguese = "Contorno da skin própria e do dummy"
+turkish = "Kendin ve dummy için görünüm dış çizgisi"
+polish = "Obrys skórki własnej i dummy"
+
+[[message]]
+key = "Skin outline for other players"
+[message.translations]
+simplified_chinese = "其他玩家的皮肤描边"
+traditional_chinese = "其他玩家的皮膚描邊"
+japanese = "他のプレイヤーのスキンの輪郭"
+korean = "다른 플레이어의 스킨 윤곽선"
+russian = "Контур скина других игроков"
+german = "Skin-Umriss anderer Spieler"
+spanish = "Contorno de skin de otros jugadores"
+french = "Contour du skin des autres joueurs"
+brazilian_portuguese = "Contorno da skin de outros jogadores"
+portuguese = "Contorno da skin dos outros jogadores"
+turkish = "Diğer oyuncuların görünüm dış çizgisi"
+polish = "Obrys skórek innych graczy"
+
+[[message]]
+key = "Skin outline color"
+[message.translations]
+simplified_chinese = "皮肤描边颜色"
+traditional_chinese = "皮膚描邊顏色"
+japanese = "スキンの輪郭の色"
+korean = "스킨 윤곽선 색상"
+russian = "Цвет контура скина"
+german = "Skin-Umrissfarbe"
+spanish = "Color del contorno de skin"
+french = "Couleur du contour du skin"
+brazilian_portuguese = "Cor do contorno da skin"
+portuguese = "Cor do contorno da skin"
+turkish = "Görünüm dış çizgisi rengi"
+polish = "Kolor obrysu skórki"
+
+[[message]]
+key = "Skin outline width"
+[message.translations]
+simplified_chinese = "皮肤描边粗细"
+traditional_chinese = "皮膚描邊粗細"
+japanese = "スキンの輪郭の太さ"
+korean = "스킨 윤곽선 두께"
+russian = "Толщина контура скина"
+german = "Skin-Umrissbreite"
+spanish = "Grosor del contorno de skin"
+french = "Épaisseur du contour du skin"
+brazilian_portuguese = "Espessura do contorno da skin"
+portuguese = "Espessura do contorno da skin"
+turkish = "Görünüm dış çizgisi kalınlığı"
+polish = "Grubość obrysu skórki"
+
+[[message]]
+key = "Skin outline opacity"
+[message.translations]
+simplified_chinese = "皮肤描边不透明度"
+traditional_chinese = "皮膚描邊不透明度"
+japanese = "スキンの輪郭の不透明度"
+korean = "스킨 윤곽선 불투명도"
+russian = "Непрозрачность контура скина"
+german = "Skin-Umrissdeckkraft"
+spanish = "Opacidad del contorno de skin"
+french = "Opacité du contour du skin"
+brazilian_portuguese = "Opacidade do contorno da skin"
+portuguese = "Opacidade do contorno da skin"
+turkish = "Görünüm dış çizgisi opaklığı"
+polish = "Krycie obrysu skórki"
+
+[[message]]
+key = "Demo key presses (0=Off 1=Others 2=All 3=Own)"
+[message.translations]
+simplified_chinese = "Demo 方向键（0=关闭 1=其他玩家 2=全部 3=自己）"
+traditional_chinese = "Demo 方向鍵（0=關閉 1=其他玩家 2=全部 3=自己）"
+japanese = "デモのキー入力（0=非表示 1=他人 2=全員 3=自分）"
+korean = "데모 키 입력 (0=끔 1=다른 플레이어 2=모두 3=자신)"
+russian = "Клавиши в демо (0=выкл. 1=другие 2=все 3=свои)"
+german = "Demo-Tastendrücke (0=Aus 1=Andere 2=Alle 3=Eigene)"
+spanish = "Teclas en demo (0=No 1=Otros 2=Todos 3=Propios)"
+french = "Touches dans la démo (0=Non 1=Autres 2=Tous 3=Soi)"
+brazilian_portuguese = "Teclas na demo (0=Não 1=Outros 2=Todos 3=Próprias)"
+portuguese = "Teclas na demo (0=Não 1=Outros 2=Todos 3=Próprias)"
+turkish = "Demo tuşları (0=Kapalı 1=Diğerleri 2=Herkes 3=Kendim)"
+polish = "Klawisze w demo (0=Wył. 1=Inni 2=Wszyscy 3=Własne)"
+
+[[message]]
+key = "Demo hook strength (0=Off 1=Icon 2=Icon and number)"
+[message.translations]
+simplified_chinese = "Demo 强弱钩（0=关闭 1=图标 2=图标与数字）"
+traditional_chinese = "Demo 強弱鉤（0=關閉 1=圖示 2=圖示與數字）"
+japanese = "デモのフック強弱（0=非表示 1=アイコン 2=アイコンと番号）"
+korean = "데모 훅 강도 (0=끔 1=아이콘 2=아이콘과 번호)"
+russian = "Сила крюка в демо (0=выкл. 1=значок 2=значок и число)"
+german = "Demo-Hakenstärke (0=Aus 1=Symbol 2=Symbol und Zahl)"
+spanish = "Fuerza del gancho en demo (0=No 1=Icono 2=Icono y número)"
+french = "Force du grappin dans la démo (0=Non 1=Icône 2=Icône et nombre)"
+brazilian_portuguese = "Força do gancho na demo (0=Não 1=Ícone 2=Ícone e número)"
+portuguese = "Força do gancho na demo (0=Não 1=Ícone 2=Ícone e número)"
+turkish = "Demo kanca gücü (0=Kapalı 1=Simge 2=Simge ve sayı)"
+polish = "Siła haka w demo (0=Wył. 1=Ikona 2=Ikona i numer)"
+
+[[message]]
+key = "Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)"
+[message.translations]
+simplified_chinese = "Demo 强弱钩范围（0=自己 1=其他玩家 2=强钩 3=弱钩 4=全部）"
+traditional_chinese = "Demo 強弱鉤範圍（0=自己 1=其他玩家 2=強鉤 3=弱鉤 4=全部）"
+japanese = "デモのフック強弱表示範囲（0=自分 1=他人 2=強い 3=弱い 4=全員）"
+korean = "데모 훅 강도 표시 범위 (0=자신 1=다른 플레이어 2=강함 3=약함 4=모두)"
+russian = "Сила крюка в демо для (0=себя 1=других 2=сильных 3=слабых 4=всех)"
+german = "Demo-Hakenstärke anzeigen (0=Eigene 1=Andere 2=Stark 3=Schwach 4=Alle)"
+spanish = "Mostrar fuerza del gancho en demo (0=Propios 1=Otros 2=Fuertes 3=Débiles 4=Todos)"
+french = "Portée de la force du grappin dans la démo (0=Soi 1=Autres 2=Forts 3=Faibles 4=Tous)"
+brazilian_portuguese = "Exibir força do gancho na demo (0=Próprio 1=Outros 2=Fortes 3=Fracos 4=Todos)"
+portuguese = "Mostrar força do gancho na demo (0=Próprio 1=Outros 2=Fortes 3=Fracos 4=Todos)"
+turkish = "Demo kanca gücü kapsamı (0=Kendim 1=Diğerleri 2=Güçlü 3=Zayıf 4=Herkes)"
+polish = "Zakres siły haka w demo (0=Własny 1=Inni 2=Silny 3=Słaby 4=Wszyscy)"
+
+[[message]]
+key = "Show in-game HUD in demo preview and video"
+[message.translations]
+simplified_chinese = "在 Demo 预览和视频中显示游戏 HUD"
+traditional_chinese = "在 Demo 預覽和影片中顯示遊戲 HUD"
+japanese = "デモプレビューと動画にゲーム HUD を表示"
+korean = "데모 미리 보기와 영상에 게임 HUD 표시"
+russian = "Показывать игровой HUD в просмотре демо и видео"
+german = "Spiel-HUD in Demo-Vorschau und Video anzeigen"
+spanish = "Mostrar HUD del juego en la vista previa de demo y el vídeo"
+french = "Afficher le HUD du jeu dans l’aperçu de la démo et la vidéo"
+brazilian_portuguese = "Mostrar HUD do jogo na prévia da demo e no vídeo"
+portuguese = "Mostrar HUD do jogo na pré-visualização da demo e no vídeo"
+turkish = "Demo önizlemesinde ve videoda oyun HUD’unu göster"
+polish = "Pokaż HUD gry w podglądzie demo i wideo"
+
+[[message]]
+key = "Show chat in demo preview and video"
+[message.translations]
+simplified_chinese = "在 Demo 预览和视频中显示聊天"
+traditional_chinese = "在 Demo 預覽和影片中顯示聊天"
+japanese = "デモプレビューと動画にチャットを表示"
+korean = "데모 미리 보기와 영상에 채팅 표시"
+russian = "Показывать чат в просмотре демо и видео"
+german = "Chat in Demo-Vorschau und Video anzeigen"
+spanish = "Mostrar chat en la vista previa de demo y el vídeo"
+french = "Afficher le chat dans l’aperçu de la démo et la vidéo"
+brazilian_portuguese = "Mostrar chat na prévia da demo e no vídeo"
+portuguese = "Mostrar chat na pré-visualização da demo e no vídeo"
+turkish = "Demo önizlemesinde ve videoda sohbeti göster"
+polish = "Pokaż czat w podglądzie demo i wideo"
+
+[[message]]
+key = "Realtime channel"
+[message.translations]
+simplified_chinese = "实时通道"
+traditional_chinese = "即時通道"
+japanese = "リアルタイムチャンネル"
+korean = "실시간 채널"
+russian = "Канал реального времени"
+german = "Echtzeit-Kanal"
+spanish = "Canal en tiempo real"
+french = "Canal temps réel"
+brazilian_portuguese = "Canal em tempo real"
+portuguese = "Canal em tempo real"
+turkish = "Gerçek zamanlı kanal"
+polish = "Kanał czasu rzeczywistego"
+
+[[message]]
+key = "Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)"
+[message.translations]
+simplified_chinese = "启用 QmClient 专用 WebSocket 服务（不回退 HTTP 轮询）"
+traditional_chinese = "啟用 QmClient 專用 WebSocket 服務（不回退 HTTP 輪詢）"
+japanese = "QmClient 専用 WebSocket サービスを有効化（HTTP ポーリングへのフォールバックなし）"
+korean = "QmClient 전용 WebSocket 서비스 활성화 (HTTP 폴링 대체 없음)"
+russian = "Включить выделенный сервис WebSocket QmClient (без отката к опросу по HTTP)"
+german = "Dedizierten QmClient-WebSocket-Dienst aktivieren (kein Rückfall auf HTTP-Abfragen)"
+spanish = "Activar el servicio WebSocket dedicado de QmClient (sin recurrir a sondeos HTTP)"
+french = "Activer le service WebSocket dédié de QmClient (aucun repli sur l’interrogation HTTP)"
+brazilian_portuguese = "Ativar o serviço WebSocket dedicado do QmClient (sem fallback para polling HTTP)"
+portuguese = "Ativar o serviço WebSocket dedicado do QmClient (sem recurso a polling HTTP)"
+turkish = "QmClient'e özel WebSocket hizmetini etkinleştir (HTTP yoklamasına dönüş yok)"
+polish = "Włącz dedykowaną usługę WebSocket QmClient (bez powrotu do odpytywania HTTP)"
+
+[[message]]
+key = "Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)"
+[message.translations]
+simplified_chinese = "专用 WebSocket 地址（留空使用 wss://qmclient.icu/ws）"
+traditional_chinese = "專用 WebSocket 位址（留空使用 wss://qmclient.icu/ws）"
+japanese = "専用 WebSocket エンドポイント（空欄なら wss://qmclient.icu/ws を使用）"
+korean = "전용 WebSocket 주소 (비우면 wss://qmclient.icu/ws 사용)"
+russian = "Адрес выделенного WebSocket (пусто — используется wss://qmclient.icu/ws)"
+german = "Dedizierter WebSocket-Endpunkt (leer verwendet wss://qmclient.icu/ws)"
+spanish = "Dirección WebSocket dedicada (vacío usa wss://qmclient.icu/ws)"
+french = "Point de terminaison WebSocket dédié (vide utilise wss://qmclient.icu/ws)"
+brazilian_portuguese = "Endereço WebSocket dedicado (vazio usa wss://qmclient.icu/ws)"
+portuguese = "Endereço WebSocket dedicado (vazio usa wss://qmclient.icu/ws)"
+turkish = "Özel WebSocket adresi (boşsa wss://qmclient.icu/ws kullanılır)"
+polish = "Dedykowany adres WebSocket (puste używa wss://qmclient.icu/ws)"
+
+[[message]]
+key = "Sec-WebSocket-Protocol sent during the realtime handshake"
+[message.translations]
+simplified_chinese = "实时握手时发送的 Sec-WebSocket-Protocol"
+traditional_chinese = "即時握手時傳送的 Sec-WebSocket-Protocol"
+japanese = "リアルタイムハンドシェイクで送信する Sec-WebSocket-Protocol"
+korean = "실시간 핸드셰이크에서 보내는 Sec-WebSocket-Protocol"
+russian = "Sec-WebSocket-Protocol, отправляемый при рукопожатии реального времени"
+german = "Beim Echtzeit-Handshake gesendetes Sec-WebSocket-Protocol"
+spanish = "Sec-WebSocket-Protocol enviado durante el handshake en tiempo real"
+french = "Sec-WebSocket-Protocol envoyé lors de la poignée de main temps réel"
+brazilian_portuguese = "Sec-WebSocket-Protocol enviado durante o handshake em tempo real"
+portuguese = "Sec-WebSocket-Protocol enviado durante o handshake em tempo real"
+turkish = "Gerçek zamanlı el sıkışmada gönderilen Sec-WebSocket-Protocol"
+polish = "Sec-WebSocket-Protocol wysyłany podczas uzgadniania w czasie rzeczywistym"
+
+[[message]]
+key = "Realtime channel heartbeat interval (seconds, 0 uses default)"
+[message.translations]
+simplified_chinese = "实时通道心跳间隔（秒，0 使用默认值）"
+traditional_chinese = "即時通道心跳間隔（秒，0 使用預設值）"
+japanese = "リアルタイムチャンネルのハートビート間隔（秒、0 で既定値）"
+korean = "실시간 채널 하트비트 간격 (초, 0이면 기본값)"
+russian = "Интервал heartbeat канала реального времени (секунды, 0 — значение по умолчанию)"
+german = "Heartbeat-Intervall des Echtzeit-Kanals (Sekunden, 0 verwendet Standard)"
+spanish = "Intervalo de latido del canal en tiempo real (segundos, 0 usa el valor por defecto)"
+french = "Intervalle de battement du canal temps réel (secondes, 0 utilise la valeur par défaut)"
+brazilian_portuguese = "Intervalo de heartbeat do canal em tempo real (segundos, 0 usa o padrão)"
+portuguese = "Intervalo de heartbeat do canal em tempo real (segundos, 0 usa a predefinição)"
+turkish = "Gerçek zamanlı kanal kalp atışı aralığı (saniye, 0 varsayılanı kullanır)"
+polish = "Interwał heartbeatu kanału czasu rzeczywistego (sekundy, 0 używa domyślnej)"
+
+[[message]]
+key = "Realtime channel reconnect backoff base (ms)"
+[message.translations]
+simplified_chinese = "实时通道重连退避基准（毫秒）"
+traditional_chinese = "即時通道重連退避基準（毫秒）"
+japanese = "リアルタイムチャンネルの再接続バックオフ基準（ミリ秒）"
+korean = "실시간 채널 재연결 백오프 기준 (밀리초)"
+russian = "Базовый интервал backoff переподключения канала реального времени (мс)"
+german = "Basis für Reconnect-Backoff des Echtzeit-Kanals (ms)"
+spanish = "Base del retroceso de reconexión del canal en tiempo real (ms)"
+french = "Base du délai de reconnexion du canal temps réel (ms)"
+brazilian_portuguese = "Base do backoff de reconexão do canal em tempo real (ms)"
+portuguese = "Base do backoff de reconexão do canal em tempo real (ms)"
+turkish = "Gerçek zamanlı kanal yeniden bağlanma bekleme tabanı (ms)"
+polish = "Podstawa opóźnienia ponownego połączenia kanału czasu rzeczywistego (ms)"
+
+[[message]]
+key = "Realtime channel reconnect backoff cap (ms)"
+[message.translations]
+simplified_chinese = "实时通道重连退避上限（毫秒）"
+traditional_chinese = "即時通道重連退避上限（毫秒）"
+japanese = "リアルタイムチャンネルの再接続バックオフ上限（ミリ秒）"
+korean = "실시간 채널 재연결 백오프 상한 (밀리초)"
+russian = "Предел backoff переподключения канала реального времени (мс)"
+german = "Obergrenze für Reconnect-Backoff des Echtzeit-Kanals (ms)"
+spanish = "Límite del retroceso de reconexión del canal en tiempo real (ms)"
+french = "Plafond du délai de reconnexion du canal temps réel (ms)"
+brazilian_portuguese = "Limite do backoff de reconexão do canal em tempo real (ms)"
+portuguese = "Limite do backoff de reconexão do canal em tempo real (ms)"
+turkish = "Gerçek zamanlı kanal yeniden bağlanma bekleme üst sınırı (ms)"
+polish = "Górny limit opóźnienia ponownego połączenia kanału czasu rzeczywistego (ms)"
+
+[[message]]
+key = "Log realtime WebSocket channel events"
+[message.translations]
+simplified_chinese = "记录实时 WebSocket 通道事件"
+traditional_chinese = "記錄即時 WebSocket 通道事件"
+japanese = "リアルタイム WebSocket チャンネルのイベントを記録"
+korean = "실시간 WebSocket 채널 이벤트 기록"
+russian = "Записывать события канала WebSocket реального времени"
+german = "Ereignisse des Echtzeit-WebSocket-Kanals protokollieren"
+spanish = "Registrar eventos del canal WebSocket en tiempo real"
+french = "Journaliser les événements du canal WebSocket temps réel"
+brazilian_portuguese = "Registrar eventos do canal WebSocket em tempo real"
+portuguese = "Registar eventos do canal WebSocket em tempo real"
+turkish = "Gerçek zamanlı WebSocket kanalı olaylarını kaydet"
+polish = "Zapisuj zdarzenia kanału WebSocket czasu rzeczywistego"
+
+[[message]]
+key = "Legacy option: connections that skip TLS verification are rejected"
+[message.translations]
+simplified_chinese = "旧版选项：跳过 TLS 校验的连接会被拒绝"
+traditional_chinese = "舊版選項：跳過 TLS 驗證的連線會被拒絕"
+japanese = "旧オプション：TLS 検証を省略する接続は拒否されます"
+korean = "레거시 옵션: TLS 검증을 건너뛰는 연결은 거부됩니다"
+russian = "Устаревшая опция: подключения без проверки TLS отклоняются"
+german = "Veraltete Option: Verbindungen ohne TLS-Prüfung werden abgelehnt"
+spanish = "Opción heredada: se rechazan las conexiones que omiten la verificación TLS"
+french = "Option héritée : les connexions qui ignorent la vérification TLS sont refusées"
+brazilian_portuguese = "Opção legada: conexões que ignoram a verificação TLS são recusadas"
+portuguese = "Opção legada: ligações que ignoram a verificação TLS são recusadas"
+turkish = "Eski seçenek: TLS doğrulamasını atlayan bağlantılar reddedilir"
+polish = "Opcja przestarzała: połączenia pomijające weryfikację TLS są odrzucane"
+
+[[message]]
+key = "Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)"
+[message.translations]
+simplified_chinese = "铭牌昵称范围（0=不显示 1=当前角色 2=自身角色 3=其他玩家 4=其他玩家与自身非当前角色 5=全部）"
+traditional_chinese = "銘牌暱稱範圍（0=不顯示 1=當前角色 2=自身角色 3=其他玩家 4=其他玩家與自身非當前角色 5=全部）"
+japanese = "ネームプレートのニックネーム範囲（0=なし 1=現在のキャラクター 2=自分のキャラクター 3=他のプレイヤー 4=他のプレイヤーと自分以外のキャラクター 5=すべて）"
+korean = "이름표 닉네임 범위 (0=없음 1=현재 캐릭터 2=자신의 캐릭터 3=다른 플레이어 4=다른 플레이어와 자신의 비활성 캐릭터 5=모두)"
+russian = "Область ников на табличках (0=Нет 1=Текущий персонаж 2=Свои персонажи 3=Другие игроки 4=Другие игроки и свои неактивные персонажи 5=Все)"
+german = "Bereich der Namensschild-Spitznamen (0=Keine 1=Aktueller Charakter 2=Eigene Charaktere 3=Andere Spieler 4=Andere Spieler und eigene inaktive Charaktere 5=Alle)"
+spanish = "Alcance de los apodos en las placas (0=Ninguno 1=Personaje actual 2=Personajes propios 3=Otros jugadores 4=Otros jugadores y personajes propios inactivos 5=Todos)"
+french = "Portée des pseudos sur les nametags (0=Aucun 1=Personnage actuel 2=Personnages locaux 3=Autres joueurs 4=Autres joueurs et personnages locaux inactifs 5=Tous)"
+brazilian_portuguese = "Escopo dos apelidos nas placas de nome (0=Nenhum 1=Personagem atual 2=Personagens próprios 3=Outros jogadores 4=Outros jogadores e personagens próprios inativos 5=Todos)"
+portuguese = "Âmbito das alcunhas nas placas de nome (0=Nenhum 1=Personagem atual 2=Personagens próprios 3=Outros jogadores 4=Outros jogadores e personagens próprios inativos 5=Todos)"
+turkish = "İsim levhası takma ad kapsamı (0=Yok 1=Geçerli karakter 2=Kendi karakterlerim 3=Diğer oyuncular 4=Diğer oyuncular ve kendi etkin olmayan karakterlerim 5=Tümü)"
+polish = "Zakres pseudonimów na tabliczkach (0=Brak 1=Bieżąca postać 2=Własne postacie 3=Inni gracze 4=Inni gracze i własne nieaktywne postacie 5=Wszystkie)"

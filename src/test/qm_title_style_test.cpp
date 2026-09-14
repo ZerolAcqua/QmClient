@@ -658,7 +658,7 @@ TEST(QmTitleStyle, PolishedDrawPathIsWired)
 	// 名牌默认走抛光档，且动态风格在经典档下仍能回到旧路径。
 	EXPECT_NE(Nameplates.find("if(Effect == (int)EQmTitleEffect::QM_TITLE_EFFECT_POLISHED || Effect == (int)EQmTitleEffect::QM_TITLE_EFFECT_SOLID)"), std::string::npos);
 	EXPECT_NE(Nameplates.find("RenderTitleContainerWithPolishedEffects(m_TextContainerIndex, PolishStyle"), std::string::npos);
-	EXPECT_NE(Nameplates.find("QmTitleRenderFillCursor(This.TextRender(), Cursor, m_aText, m_FontSize, m_TitleRenderStyle, (float)This.m_QmClient.TitleAnimationTime(), 1.0f, QmTitleShimmerFromConfig());"), std::string::npos);
+	EXPECT_NE(Nameplates.find("QmTitleRenderFillCursor(This.TextRender(), Cursor, m_aText, m_FontSize, m_TitleRenderStyle, (float)This.m_QmClient.TitleAnimationTime(), 1.0f, QmTitleShimmerFromConfig(), &m_TitleTextMetrics);"), std::string::npos);
 	// 设置页提供空间效果选择，预览沿用现有绘制入口。
 	EXPECT_NE(Menus.find("s_TitleEffectNames = {Localize(\"Polished\"), Localize(\"Solid\"), Localize(\"Classic\"), Localize(\"Off\")};"), std::string::npos);
 	EXPECT_NE(Menus.find("pPreview->m_pRenderTools->RenderTitleContainerWithPolishedEffects(PreviewContainer, PreviewPolish"), std::string::npos);
@@ -813,9 +813,10 @@ TEST(QmTitleStyle, FinishedPreviewUsesDraftAndCompleteAppearance)
 	ASSERT_NE(Start, std::string::npos);
 	ASSERT_NE(End, std::string::npos);
 	const std::string Preview = Menus.substr(Start, End - Start);
-	EXPECT_NE(Menus.find("s_Title.GetString(), pPreviewStyleId"), std::string::npos);
+	EXPECT_NE(Menus.find("s_Title.GetString(), pServerStyleId, g_Config.m_QmTitleStyleEnabled != 0, pLocalStyleId"), std::string::npos);
 	EXPECT_NE(Preview.find("ResolveQmTitleColorStyle(g_Config.m_QmTitleColorMode, g_Config.m_QmTitleColor, g_Config.m_QmTitleOpacity, ServerRainbow)"), std::string::npos);
-	EXPECT_NE(Preview.find("QmTitleResolveRenderStyle(pStyleId)"), std::string::npos);
+	// 预览必须与实际名牌走同一条风格解析路径：本地兜底显式传入，而不是在预览里另写一套回退。
+	EXPECT_NE(Preview.find("QmTitleResolveRenderStyle(pStyleId, LocalStyleEnabled, pLocalStyleId)"), std::string::npos);
 	EXPECT_NE(Preview.find("QmTitleShimmerFromConfig()"), std::string::npos);
 	EXPECT_NE(Preview.find("QmAddTitleRainbowSplits"), std::string::npos);
 	EXPECT_NE(Preview.find("g_Config.m_QmTitleBloom >= 2 ? 16 : 6"), std::string::npos);
@@ -823,6 +824,64 @@ TEST(QmTitleStyle, FinishedPreviewUsesDraftAndCompleteAppearance)
 	EXPECT_NE(Preview.find("pTextRender->RenderTextContainer(PreviewContainer, Color, OutlineColor, PreviewX, PreviewY);"), std::string::npos);
 	EXPECT_EQ(Preview.find("SaveTitleProfile"), std::string::npos);
 	EXPECT_NE(Menus.find("Ui()->ClipEnable(&PreviewArea);"), std::string::npos);
+}
+
+// 配色优先级：本地配色档（单色/彩虹）必须压过服务端/本地风格自带的渐变颜色，风格只保留浮动与掠光。
+// 现状曾经是「选了单色也没用，起效的还是预设渐变」，这条用例锁住优先级，防止再次反转。
+TEST(QmTitleStyle, LocalColorModeOverridesStyleColors)
+{
+	const std::string Source = ReadQmTitleStyleSource("src/game/client/components/qmclient/qm_title_render.cpp");
+	const std::string Header = ReadQmTitleStyleSource("src/game/client/components/qmclient/qm_title_render.h");
+	const std::string Chat = ReadQmTitleStyleSource("src/game/client/components/chat.cpp");
+	const std::string Nameplates = ReadQmTitleStyleSource("src/game/client/components/nameplates.cpp");
+	const std::string Menus = ReadQmTitleStyleSource("src/game/client/components/qmclient/menus_qmclient.cpp");
+	ASSERT_FALSE(Source.empty());
+	ASSERT_FALSE(Header.empty());
+	ASSERT_FALSE(Chat.empty());
+	ASSERT_FALSE(Nameplates.empty());
+	ASSERT_FALSE(Menus.empty());
+
+	// 只有单色与彩虹档覆盖风格颜色：「跟随服务器」档保持既有表现。
+	EXPECT_NE(Header.find("bool m_ColorOverride = false;"), std::string::npos);
+	EXPECT_NE(Source.find("Style.m_ColorOverride = g_Config.m_QmTitleColorMode == (int)EQmTitleColorMode::SINGLE ||"), std::string::npos);
+	EXPECT_NE(Source.find("g_Config.m_QmTitleColorMode == (int)EQmTitleColorMode::RAINBOW;"), std::string::npos);
+	// 被覆盖时不能再采样风格颜色，否则渐变会盖在本地配色上。
+	EXPECT_NE(Source.find("if(Style.m_ColorOverride)"), std::string::npos);
+	EXPECT_NE(Source.find("LeftColor = Color.WithAlpha(Alpha);"), std::string::npos);
+	EXPECT_NE(Source.find("RightColor = ColorEnd.WithAlpha(Alpha);"), std::string::npos);
+	// 覆盖档也必须逐帧重建：色段由本函数生成，静态判断不能把它当成不随时间变化的文本。
+	EXPECT_NE(Source.find("return UseBob || Shimmer.m_Enabled || Style.m_ColorOverride || TitleStyle.m_Mode != EQmTitleStyleMode::Static;"), std::string::npos);
+	// 浮动与掠光不能因为颜色被接管就一起丢掉。
+	EXPECT_NE(Source.find("void QmTitleRenderFillMotionOffsets"), std::string::npos);
+	EXPECT_NE(Header.find("void QmTitleRenderFillMotionOffsets"), std::string::npos);
+
+	// 三条绘制路径（聊天、名牌、设置页成品预览）都必须处理覆盖档，漏一条就会出现「某处颜色不跟随」。
+	EXPECT_NE(Chat.find("if(TitleRenderStyle.m_ColorOverride)"), std::string::npos);
+	EXPECT_NE(Nameplates.find("if(m_TitleRenderStyle.m_ColorOverride)"), std::string::npos);
+	EXPECT_NE(Menus.find("if(DynamicStyle && RenderStyle.m_ColorOverride)"), std::string::npos);
+	// 名牌在覆盖档下彩虹要能在「只写浮动」之后补上色段。
+	EXPECT_NE(Nameplates.find("QmAddTitleRainbowSplits(Cursor, m_aText, 1.0f);"), std::string::npos);
+}
+
+// 服务端 presence 只能在「确实拿到本服务器的有效名单」时丢弃：否则请求失败会让头衔与风格瞬间消失，
+// 表现为颜色在本地配色档与服务端风格之间来回闪。
+TEST(QmTitleStyle, TitlePresenceSurvivesFailedRefresh)
+{
+	const std::string Client = ReadQmTitleStyleSource("src/game/client/components/qmclient/qmclient.cpp");
+	ASSERT_FALSE(Client.empty());
+
+	const size_t ListStart = Client.find("if(m_pTitleList && m_pTitleList->Done())");
+	ASSERT_NE(ListStart, std::string::npos);
+	const size_t ListEnd = Client.find("if(Client()->State() != IClient::STATE_ONLINE", ListStart);
+	ASSERT_NE(ListEnd, std::string::npos);
+	const std::string List = Client.substr(ListStart, ListEnd - ListStart);
+
+	const size_t Success = List.find("m_pTitleList->StatusCode() == 200 && str_comp(aServer, m_aTitlePendingServer) == 0");
+	ASSERT_NE(Success, std::string::npos);
+	const size_t Clear = List.find("mem_zero(m_aTitleExpires, sizeof(m_aTitleExpires));");
+	ASSERT_NE(Clear, std::string::npos);
+	// 清空必须发生在成功分支内部、且在校验之后。
+	EXPECT_GT(Clear, Success) << "清空旧 presence 的位置必须落在拿名单成功的分支里";
 }
 
 // 相位基准：对齐服务端时间并取模。直接用 Unix 时间戳量级会让 float 相位失效（1e9 时 ULP≈64 秒）。
@@ -933,4 +992,77 @@ TEST(QmTitleStyle, ChatMeasuresAndRendersTheSameBobSpace)
 	const std::string Invalidation = Chat.substr(Start, End - Start);
 	EXPECT_NE(Invalidation.find("Line.m_aYOffset[0] = -1.0f;"), std::string::npos);
 	EXPECT_NE(Invalidation.find("Line.m_aYOffset[1] = -1.0f;"), std::string::npos);
+}
+
+// 相同标题跨帧复用前缀测量；UTF-8 的字节边界和整段字距保持原样。
+TEST(QmTitleMetrics, ReusesWholePrefixWidthsAcrossAnimationFrames)
+{
+	CQmTitleTextMetrics Metrics;
+	CQmTitleTextMetrics::SContext Context;
+	Context.m_FontSize = 12.0f;
+	int Measurements = 0;
+	const auto Measure = [&](const char *pPrefix) {
+		++Measurements;
+		const std::string Prefix(pPrefix);
+		if(Prefix == "A")
+			return 10.0f;
+		if(Prefix == "AV")
+			return 17.0f; // 整段测量保留 AV 字距，不能把单字宽度相加。
+		return 29.0f;
+	};
+	for(int Frame = 0; Frame < 240; ++Frame)
+	{
+		Metrics.Update("AV中", Context, Measure);
+		EXPECT_FLOAT_EQ(Metrics.PrefixWidth(1, 0.0f), 10.0f);
+		EXPECT_FLOAT_EQ(Metrics.PrefixWidth(2, 10.0f), 17.0f);
+		EXPECT_FLOAT_EQ(Metrics.PrefixWidth(5, 17.0f), 29.0f);
+	}
+	EXPECT_EQ(Measurements, 3);
+}
+
+TEST(QmTitleMetrics, TextFontScaleAndFlagsInvalidateCachedMeasurements)
+{
+	CQmTitleTextMetrics Metrics;
+	CQmTitleTextMetrics::SContext Context;
+	int Measurements = 0;
+	const auto Measure = [&](const char *) { return float(++Measurements); };
+	Metrics.Update("中", Context, Measure);
+	Metrics.Update("文", Context, Measure);
+	Context.m_FontSize = 14.0f;
+	Metrics.Update("文", Context, Measure);
+	Context.m_ScreenScale.x = 2.0f;
+	Metrics.Update("文", Context, Measure);
+	Context.m_ScreenScale.y = 2.0f;
+	Metrics.Update("文", Context, Measure);
+	Context.m_RenderFlags = 1;
+	Metrics.Update("文", Context, Measure);
+	Context.m_FontPreset = 1;
+	Metrics.Update("文", Context, Measure);
+	EXPECT_EQ(Measurements, 7);
+	// 字体语言切换和资源重建沿用名牌文本容器的失效通知。
+	Metrics.Reset();
+	Metrics.Update("文", Context, Measure);
+	EXPECT_EQ(Measurements, 8);
+	EXPECT_FLOAT_EQ(Metrics.PrefixWidth(3, 0.0f), 8.0f);
+}
+
+TEST(QmTitleMetrics, PreservesPrefixBufferBoundaryAndEmptyTitles)
+{
+	CQmTitleTextMetrics Metrics;
+	CQmTitleTextMetrics::SContext Context;
+	int Measurements = 0;
+	const auto Measure = [&](const char *pPrefix) {
+		++Measurements;
+		return float(str_length(pPrefix));
+	};
+	const std::string Text(64, 'A');
+	Metrics.Update(Text.c_str(), Context, Measure);
+	EXPECT_EQ(Measurements, 63);
+	EXPECT_FLOAT_EQ(Metrics.PrefixWidth(63, 62.0f), 63.0f);
+	EXPECT_FLOAT_EQ(Metrics.PrefixWidth(64, 63.0f), 63.0f);
+	Metrics.Update("", Context, Measure);
+	EXPECT_EQ(Measurements, 63);
+	Metrics.Update("A", Context, Measure);
+	EXPECT_EQ(Measurements, 64);
+	EXPECT_FLOAT_EQ(Metrics.PrefixWidth(1, 0.0f), 1.0f);
 }

@@ -10,12 +10,56 @@
 
 #include <game/client/QmUi/QmAnimResolve.h>
 #include <game/client/ui_rect.h>
+#include <game/teamscore.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+
+// 只维护本次连接中实际触发过开关的队伍；保留每队 256 槽的直接索引。
+struct SHudSwitchCountdownTracker
+{
+	int m_aaEndTick[NUM_DDRACE_TEAMS][256] = {};
+	int m_aaTouchTick[NUM_DDRACE_TEAMS][256] = {};
+	int m_aaClientId[NUM_DDRACE_TEAMS][256] = {};
+	int m_aaConnection[NUM_DDRACE_TEAMS][256] = {};
+	std::array<bool, NUM_DDRACE_TEAMS> m_aTouchedTeams{};
+
+	SHudSwitchCountdownTracker()
+	{
+		// 首次初始化所有槽位；后续 Reset 只需要清空写入过的队伍。
+		m_aTouchedTeams.fill(true);
+		Reset();
+	}
+
+	void Track(int Team, int Number, int EndTick, int TouchTick, int ClientId, int Connection)
+	{
+		m_aTouchedTeams[Team] = true;
+		m_aaEndTick[Team][Number] = EndTick;
+		m_aaTouchTick[Team][Number] = TouchTick;
+		m_aaClientId[Team][Number] = ClientId;
+		m_aaConnection[Team][Number] = Connection;
+	}
+
+	void Reset()
+	{
+		for(int Team = 0; Team < NUM_DDRACE_TEAMS; ++Team)
+		{
+			if(!m_aTouchedTeams[Team])
+				continue;
+			for(int Number = 0; Number < 256; ++Number)
+			{
+				m_aaEndTick[Team][Number] = 0;
+				m_aaTouchTick[Team][Number] = 0;
+				m_aaClientId[Team][Number] = -1;
+				m_aaConnection[Team][Number] = -1;
+			}
+			m_aTouchedTeams[Team] = false;
+		}
+	}
+};
 
 constexpr float QmHudMediaIslandDesignScale = 0.8f;
 

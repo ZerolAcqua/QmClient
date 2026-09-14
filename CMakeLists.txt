@@ -125,7 +125,8 @@ elseif(TARGET_OS STREQUAL "mac")
   set(AUTO_VULKAN_BACKEND ON)
 endif()
 
-option(WEBSOCKETS "Enable websockets support" OFF)
+# QmClient 的 WSS 通道由 Rust 提供，不受服务端 libwebsockets 开关影响。
+option(WEBSOCKETS "Enable websockets support for server" OFF)
 option(MYSQL "Enable mysql support" OFF)
 option(TEST_MYSQL "Test mysql support in unit tests (also sets -DMYSQL=ON)" OFF)
 if(WIN32)
@@ -1009,6 +1010,7 @@ set_glob(RUST_ENGINE_SHARED GLOB_RECURSE "rs;toml" src/engine/shared
   config.rs
   lib.rs
   qm_update.rs
+  qm_websocket.rs
   rust_version.rs
   snapshot/builder.rs
   snapshot/delta.rs
@@ -2610,6 +2612,9 @@ set_src(ENGINE_SHARED GLOB_RECURSE src/engine/shared
   uuid_manager.h
   video.cpp
   video.h
+  websocket_client.h
+  websocket_client_parse.cpp
+  websocket_client_rust.cpp
   websockets.cpp
   websockets.h
 )
@@ -3109,6 +3114,8 @@ if(CLIENT)
     components/qmclient/qm_markdown.cpp
     components/qmclient/qm_markdown.h
     components/qmclient/qm_music_hook_registry.h
+    components/qmclient/qm_realtime.cpp
+    components/qmclient/qm_realtime.h
     components/qmclient/qm_title_render.cpp
     components/qmclient/qm_title_render.h
     components/qmclient/qm_title_style.cpp
@@ -3970,7 +3977,9 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     qm_ime_platform_test.cpp
     qm_markdown_test.cpp
     qm_new_ui_menu_branch_test.cpp
+    qm_realtime_test.cpp
     qm_update_arguments_test.cpp
+    websocket_client_test.cpp
     netease_lyric_parser_test.cpp
     netease_lyric_timeline_test.cpp
     netease_lyric_state_test.cpp
@@ -4040,6 +4049,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/test/render_tee_offset_helpers.cpp
     src/game/client/components/section_loader.cpp
     src/game/client/components/qmclient/qm_markdown.cpp
+    src/game/client/components/qmclient/qm_realtime.cpp
     src/game/client/components/settings_runtime_cache.cpp
     src/game/client/components/settings_resource_jobs.cpp
     src/game/client/components/settings_warmup.cpp

@@ -34,6 +34,7 @@
 #include <game/client/components/menus_ingame_touch_controls.h>
 #include <game/client/components/menus_settings_controls.h>
 #include <game/client/components/menus_start.h>
+#include <game/client/components/qmclient/demo_cut.h>
 #include <game/client/components/qmclient/settings_perf_windows.h>
 #include <game/client/components/section_loader.h>
 #include <game/client/components/settings_resource_jobs.h>
@@ -44,6 +45,7 @@
 #include <game/client/ui.h>
 #include <game/voting.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <deque>
@@ -397,6 +399,27 @@ public:
 		bool m_PreviewLoaded = false;
 	};
 
+	enum
+	{
+		ASSETS_EDITOR_COLOR_BLEND_MULTIPLY = 0,
+		ASSETS_EDITOR_COLOR_BLEND_NORMAL,
+		ASSETS_EDITOR_COLOR_BLEND_SCREEN,
+		ASSETS_EDITOR_COLOR_BLEND_OVERLAY,
+		ASSETS_EDITOR_COLOR_BLEND_DARKEN,
+		ASSETS_EDITOR_COLOR_BLEND_COLOR_BURN,
+		ASSETS_EDITOR_COLOR_BLEND_LIGHTEN,
+		ASSETS_EDITOR_COLOR_BLEND_COLOR_DODGE,
+		ASSETS_EDITOR_COLOR_BLEND_SOFT_LIGHT,
+		ASSETS_EDITOR_COLOR_BLEND_HARD_LIGHT,
+		ASSETS_EDITOR_COLOR_BLEND_DIFFERENCE,
+		ASSETS_EDITOR_COLOR_BLEND_EXCLUSION,
+		ASSETS_EDITOR_COLOR_BLEND_HUE,
+		ASSETS_EDITOR_COLOR_BLEND_SATURATION,
+		ASSETS_EDITOR_COLOR_BLEND_COLOR,
+		ASSETS_EDITOR_COLOR_BLEND_LUMINOSITY,
+		ASSETS_EDITOR_COLOR_BLEND_COUNT,
+	};
+
 	struct SAssetsEditorPartSlot
 	{
 		int m_SpriteId = -1;
@@ -411,6 +434,8 @@ public:
 		int m_SrcW = 0;
 		int m_SrcH = 0;
 		unsigned int m_Color = color_cast<ColorHSLA>(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f)).Pack(true);
+		int m_ColorBlendMode = ASSETS_EDITOR_COLOR_BLEND_MULTIPLY;
+		int m_BlendStrength = 100;
 		char m_aFamilyKey[64] = {0};
 		char m_aSourceAsset[64] = {0};
 	};
@@ -431,15 +456,6 @@ public:
 		std::string m_DisplayName;
 		bool m_IsCurrentFile = false;
 		bool m_IsCurrentPackFile = false;
-	};
-
-	enum
-	{
-		ASSETS_EDITOR_COLOR_BLEND_MULTIPLY = 0,
-		ASSETS_EDITOR_COLOR_BLEND_NORMAL,
-		ASSETS_EDITOR_COLOR_BLEND_SCREEN,
-		ASSETS_EDITOR_COLOR_BLEND_OVERLAY,
-		ASSETS_EDITOR_COLOR_BLEND_COUNT,
 	};
 
 	static void GetStrongWeakEditorGridSize(int &OutGridX, int &OutGridY)
@@ -702,6 +718,18 @@ public:
 		case ASSETS_EDITOR_COLOR_BLEND_NORMAL: return "Normal";
 		case ASSETS_EDITOR_COLOR_BLEND_SCREEN: return "Screen";
 		case ASSETS_EDITOR_COLOR_BLEND_OVERLAY: return "Overlay";
+		case ASSETS_EDITOR_COLOR_BLEND_DARKEN: return "Darken";
+		case ASSETS_EDITOR_COLOR_BLEND_COLOR_BURN: return "Color Burn";
+		case ASSETS_EDITOR_COLOR_BLEND_LIGHTEN: return "Lighten";
+		case ASSETS_EDITOR_COLOR_BLEND_COLOR_DODGE: return "Color Dodge";
+		case ASSETS_EDITOR_COLOR_BLEND_SOFT_LIGHT: return "Soft Light";
+		case ASSETS_EDITOR_COLOR_BLEND_HARD_LIGHT: return "Hard Light";
+		case ASSETS_EDITOR_COLOR_BLEND_DIFFERENCE: return "Difference";
+		case ASSETS_EDITOR_COLOR_BLEND_EXCLUSION: return "Exclusion";
+		case ASSETS_EDITOR_COLOR_BLEND_HUE: return "Hue";
+		case ASSETS_EDITOR_COLOR_BLEND_SATURATION: return "Saturation";
+		case ASSETS_EDITOR_COLOR_BLEND_COLOR: return "Color";
+		case ASSETS_EDITOR_COLOR_BLEND_LUMINOSITY: return "Luminosity";
 		default: return "Multiply";
 		}
 	}
@@ -711,36 +739,100 @@ public:
 		return color_cast<ColorRGBA>(ColorHSLA(PackedColor, true));
 	}
 
+	static ColorRGBA AssetsEditorSlotTint(const SAssetsEditorPartSlot &Slot)
+	{
+		ColorRGBA Tint = AssetsEditorSlotColorToRgba(Slot.m_Color);
+		// 混合强度独立保存，不改变部件像素的透明度。
+		Tint.a = std::clamp(Slot.m_BlendStrength, 0, 100) / 100.0f;
+		return Tint;
+	}
+
 	static float AssetsEditorClampColorChannel(float Value)
 	{
 		return minimum(maximum(Value, 0.0f), 1.0f);
 	}
 
-	static float AssetsEditorColorLuma(const ColorRGBA &Base)
+	static float AssetsEditorColorLuma(const ColorRGBA &Color)
 	{
-		return AssetsEditorClampColorChannel(Base.r * 0.299f + Base.g * 0.587f + Base.b * 0.114f);
+		return Color.r * 0.30f + Color.g * 0.59f + Color.b * 0.11f;
 	}
 
-	static float AssetsEditorScreenTone(float Luma)
+	static float AssetsEditorColorSaturation(const ColorRGBA &Color)
 	{
-		return AssetsEditorClampColorChannel(Luma * (1.0f + (1.0f - Luma) * 0.65f));
+		return maximum(Color.r, maximum(Color.g, Color.b)) - minimum(Color.r, minimum(Color.g, Color.b));
 	}
 
-	static float AssetsEditorOverlayTone(float Luma)
+	static ColorRGBA AssetsEditorSetColorLuma(ColorRGBA Color, float Luma)
 	{
-		if(Luma <= 0.5f)
-			return AssetsEditorClampColorChannel(2.0f * Luma * Luma);
-		return AssetsEditorClampColorChannel(1.0f - 2.0f * (1.0f - Luma) * (1.0f - Luma));
+		// W3C SetLum / ClipColor：超出色域时缩放色差，保持目标明度。
+		const float Delta = Luma - AssetsEditorColorLuma(Color);
+		Color.r += Delta;
+		Color.g += Delta;
+		Color.b += Delta;
+		const float Min = minimum(Color.r, minimum(Color.g, Color.b));
+		const float Max = maximum(Color.r, maximum(Color.g, Color.b));
+		if(Min < 0.0f)
+		{
+			Color.r = Luma + (Color.r - Luma) * Luma / (Luma - Min);
+			Color.g = Luma + (Color.g - Luma) * Luma / (Luma - Min);
+			Color.b = Luma + (Color.b - Luma) * Luma / (Luma - Min);
+		}
+		if(Max > 1.0f)
+		{
+			Color.r = Luma + (Color.r - Luma) * (1.0f - Luma) / (Max - Luma);
+			Color.g = Luma + (Color.g - Luma) * (1.0f - Luma) / (Max - Luma);
+			Color.b = Luma + (Color.b - Luma) * (1.0f - Luma) / (Max - Luma);
+		}
+		return Color;
 	}
 
-	static ColorRGBA AssetsEditorRecolorColor(const ColorRGBA &Base, const ColorRGBA &Tint, float Tone, float DetailPreserve)
+	static ColorRGBA AssetsEditorSetColorSaturation(ColorRGBA Color, float Saturation)
 	{
-		const float BaseLuma = AssetsEditorColorLuma(Base);
-		return ColorRGBA(
-			AssetsEditorClampColorChannel(Tint.r * Tone + (Base.r - BaseLuma) * DetailPreserve),
-			AssetsEditorClampColorChannel(Tint.g * Tone + (Base.g - BaseLuma) * DetailPreserve),
-			AssetsEditorClampColorChannel(Tint.b * Tone + (Base.b - BaseLuma) * DetailPreserve),
-			Base.a);
+		float *apChannels[] = {&Color.r, &Color.g, &Color.b};
+		std::sort(std::begin(apChannels), std::end(apChannels), [](const float *pLeft, const float *pRight) { return *pLeft < *pRight; });
+		float &Min = *apChannels[0];
+		float &Mid = *apChannels[1];
+		float &Max = *apChannels[2];
+		if(Max > Min)
+		{
+			Mid = (Mid - Min) * Saturation / (Max - Min);
+			Max = Saturation;
+		}
+		else
+			Mid = Max = 0.0f;
+		Min = 0.0f;
+		return Color;
+	}
+
+	static float AssetsEditorBlendChannel(float Base, float Tint, int BlendMode)
+	{
+		switch(BlendMode)
+		{
+		case ASSETS_EDITOR_COLOR_BLEND_NORMAL: return Tint;
+		case ASSETS_EDITOR_COLOR_BLEND_SCREEN: return 1.0f - (1.0f - Base) * (1.0f - Tint);
+		case ASSETS_EDITOR_COLOR_BLEND_OVERLAY: return Base <= 0.5f ? 2.0f * Base * Tint : 1.0f - 2.0f * (1.0f - Base) * (1.0f - Tint);
+		case ASSETS_EDITOR_COLOR_BLEND_DARKEN: return minimum(Base, Tint);
+		case ASSETS_EDITOR_COLOR_BLEND_LIGHTEN: return maximum(Base, Tint);
+		case ASSETS_EDITOR_COLOR_BLEND_COLOR_DODGE:
+			if(Base == 0.0f)
+				return 0.0f;
+			return Tint == 1.0f ? 1.0f : minimum(1.0f, Base / (1.0f - Tint));
+		case ASSETS_EDITOR_COLOR_BLEND_COLOR_BURN:
+			if(Base == 1.0f)
+				return 1.0f;
+			return Tint == 0.0f ? 0.0f : 1.0f - minimum(1.0f, (1.0f - Base) / Tint);
+		case ASSETS_EDITOR_COLOR_BLEND_HARD_LIGHT: return Tint <= 0.5f ? 2.0f * Base * Tint : 1.0f - 2.0f * (1.0f - Base) * (1.0f - Tint);
+		case ASSETS_EDITOR_COLOR_BLEND_SOFT_LIGHT:
+		{
+			if(Tint <= 0.5f)
+				return Base - (1.0f - 2.0f * Tint) * Base * (1.0f - Base);
+			const float Curve = Base <= 0.25f ? ((16.0f * Base - 12.0f) * Base + 4.0f) * Base : sqrtf(Base);
+			return Base + (2.0f * Tint - 1.0f) * (Curve - Base);
+		}
+		case ASSETS_EDITOR_COLOR_BLEND_DIFFERENCE: return absolute(Base - Tint);
+		case ASSETS_EDITOR_COLOR_BLEND_EXCLUSION: return Base + Tint - 2.0f * Base * Tint;
+		default: return Base * Tint;
+		}
 	}
 
 	static ColorRGBA AssetsEditorMultiplyColor(const ColorRGBA &Base, const ColorRGBA &Tint)
@@ -751,39 +843,51 @@ public:
 	static ColorRGBA AssetsEditorBlendColor(const ColorRGBA &Base, const ColorRGBA &Tint, int BlendMode)
 	{
 		const int ClampedBlendMode = ClampAssetsEditorColorBlendMode(BlendMode);
-		const float BlendStrength = minimum(maximum(Tint.a, 0.0f), 1.0f);
-		ColorRGBA Blended = Base;
-		const float BaseLuma = AssetsEditorColorLuma(Base);
+		const float BlendStrength = AssetsEditorClampColorChannel(Tint.a);
+		if(BlendStrength == 0.0f || Base.a == 0.0f)
+			return Base;
+		ColorRGBA Blended;
+		// 混合公式参考 W3C Compositing and Blending Level 1 第 10 节。
 		switch(ClampedBlendMode)
 		{
-		case ASSETS_EDITOR_COLOR_BLEND_NORMAL:
-			Blended = AssetsEditorRecolorColor(Base, Tint, BaseLuma, 0.18f);
+		case ASSETS_EDITOR_COLOR_BLEND_HUE:
+			Blended = AssetsEditorSetColorLuma(AssetsEditorSetColorSaturation(Tint, AssetsEditorColorSaturation(Base)), AssetsEditorColorLuma(Base));
 			break;
-		case ASSETS_EDITOR_COLOR_BLEND_SCREEN:
-			Blended = AssetsEditorRecolorColor(Base, Tint, AssetsEditorScreenTone(BaseLuma), 0.10f);
+		case ASSETS_EDITOR_COLOR_BLEND_SATURATION:
+			Blended = AssetsEditorSetColorLuma(AssetsEditorSetColorSaturation(Base, AssetsEditorColorSaturation(Tint)), AssetsEditorColorLuma(Base));
 			break;
-		case ASSETS_EDITOR_COLOR_BLEND_OVERLAY:
-			Blended = AssetsEditorRecolorColor(Base, Tint, AssetsEditorOverlayTone(BaseLuma), 0.28f);
+		case ASSETS_EDITOR_COLOR_BLEND_COLOR:
+			Blended = AssetsEditorSetColorLuma(Tint, AssetsEditorColorLuma(Base));
+			break;
+		case ASSETS_EDITOR_COLOR_BLEND_LUMINOSITY:
+			Blended = AssetsEditorSetColorLuma(Base, AssetsEditorColorLuma(Tint));
 			break;
 		default:
-			Blended = ColorRGBA(Base.r * Tint.r, Base.g * Tint.g, Base.b * Tint.b, Base.a);
+			Blended = ColorRGBA(
+				AssetsEditorBlendChannel(Base.r, Tint.r, ClampedBlendMode),
+				AssetsEditorBlendChannel(Base.g, Tint.g, ClampedBlendMode),
+				AssetsEditorBlendChannel(Base.b, Tint.b, ClampedBlendMode));
 			break;
 		}
 
 		return ColorRGBA(
-			Base.r + (Blended.r - Base.r) * BlendStrength,
-			Base.g + (Blended.g - Base.g) * BlendStrength,
-			Base.b + (Blended.b - Base.b) * BlendStrength,
+			AssetsEditorClampColorChannel(Base.r + (Blended.r - Base.r) * BlendStrength),
+			AssetsEditorClampColorChannel(Base.g + (Blended.g - Base.g) * BlendStrength),
+			AssetsEditorClampColorChannel(Base.b + (Blended.b - Base.b) * BlendStrength),
 			Base.a);
 	}
 
-	static bool AssetsEditorHasColorOverride(const ColorRGBA &Tint)
+	static bool AssetsEditorHasColorOverride(const ColorRGBA &Tint, int BlendMode = ASSETS_EDITOR_COLOR_BLEND_MULTIPLY)
 	{
+		if(Tint.a <= 0.0f)
+			return false;
+		// 白色只在默认的正片叠底中代表无变化，其他模式必须正常计算。
+		if(ClampAssetsEditorColorBlendMode(BlendMode) != ASSETS_EDITOR_COLOR_BLEND_MULTIPLY)
+			return true;
 		constexpr float Epsilon = 0.001f;
 		return absolute(Tint.r - 1.0f) > Epsilon ||
 		       absolute(Tint.g - 1.0f) > Epsilon ||
-		       absolute(Tint.b - 1.0f) > Epsilon ||
-		       absolute(Tint.a - 1.0f) > Epsilon;
+		       absolute(Tint.b - 1.0f) > Epsilon;
 	}
 
 	static bool AssetsEditorSlotNeedsProcessing(const SAssetsEditorPartSlot &Slot, const char *pMainAssetName)
@@ -792,14 +896,14 @@ public:
 		const bool UsesMainSourceRect = str_comp(Slot.m_aSourceAsset, pResolvedMainAssetName) == 0 &&
 						Slot.m_SrcX == Slot.m_DstX && Slot.m_SrcY == Slot.m_DstY &&
 						Slot.m_SrcW == Slot.m_DstW && Slot.m_SrcH == Slot.m_DstH;
-		return !UsesMainSourceRect || AssetsEditorHasColorOverride(AssetsEditorSlotColorToRgba(Slot.m_Color));
+		return !UsesMainSourceRect || AssetsEditorHasColorOverride(AssetsEditorSlotTint(Slot), Slot.m_ColorBlendMode);
 	}
 
 	static void AssetsEditorApplyColorOverrideToImageRect(CImageInfo &Image, int X, int Y, int W, int H, const ColorRGBA &Tint, int BlendMode)
 	{
 		if(Image.m_pData == nullptr || Image.m_Format != CImageInfo::FORMAT_RGBA || W <= 0 || H <= 0)
 			return;
-		if(!AssetsEditorHasColorOverride(Tint))
+		if(!AssetsEditorHasColorOverride(Tint, BlendMode))
 			return;
 
 		const int ImageWidth = Image.m_Width;
@@ -1221,7 +1325,7 @@ private:
 		int m_aDonorAssetIndex[ASSETS_EDITOR_TYPE_COUNT] = {0};
 		bool m_ShowGrid = true;
 		bool m_ApplySameSize = false;
-		int m_ColorBlendMode = ASSETS_EDITOR_COLOR_BLEND_MULTIPLY;
+		int m_SelectedTargetSlotIndex = -1;
 		bool m_DragActive = false;
 		int m_ActiveDraggedSlotIndex = -1;
 		char m_aDraggedSourceAsset[64] = {0};
@@ -1558,11 +1662,7 @@ protected:
 		bool m_IsDir;
 	};
 
-	struct SDemoCutSegment
-	{
-		int m_StartTick;
-		int m_EndTick;
-	};
+	using SDemoCutSegment = SDemoSliceSegment;
 
 	char m_aCurrentDemoFolder[IO_MAX_PATH_LENGTH];
 	char m_aCurrentDemoSelectionName[IO_MAX_PATH_LENGTH];
@@ -1584,6 +1684,7 @@ protected:
 	std::vector<SDemoSelectionEntry> m_vDemoSelection;
 	std::vector<SDemoDeleteTarget> m_vDemoDeleteTargets;
 	std::vector<SDemoCutSegment> m_vDemoCutSegments;
+	qm_demo_cut::CPreview m_DemoCutPreview;
 	int m_DemoSelectionAnchorIndex = -1;
 	bool m_DemoScreenshotPreviewOpen = false;
 	bool m_DemoScreenshotPreviewLoadFailed = false;
@@ -1808,6 +1909,7 @@ protected:
 
 	// found in menus_demo.cpp
 	vec2 m_DemoControlsPositionOffset = vec2(0.0f, 0.0f);
+	bool m_DemoDisplayExpanded = false;
 	bool m_PausedBeforeSeeking;
 	float m_PrevSeekAmount;
 	float m_LastPauseChange = -1.0f;
@@ -1817,8 +1919,9 @@ protected:
 	static bool DemoFilterChat(const void *pData, int Size, void *pUser);
 	bool FetchHeader(CDemoItem &Item);
 	void FetchAllHeaders();
-	void HandleDemoSeeking(float PositionToSeek, float TimeToSeek);
+	void HandleDemoSeeking(float PositionToSeek, float TimeToSeek, int TickToSeek = -1);
 	void RenderDemoPlayer(CUIRect MainView);
+	void RenderDemoDisplaySettings(CUIRect View, bool Enabled = true);
 	void RenderDemoPlayerSliceSavePopup(CUIRect MainView);
 	bool m_DemoBrowserListInitialized = false;
 	void RenderDemoBrowser(CUIRect MainView);
@@ -1928,9 +2031,11 @@ protected:
 		int m_Align = 0;
 		SLabelProperties m_LabelProps;
 		int m_StrLen = -1;
-		int m_ReadCursorGlyphCount = -1;
+		std::optional<CTextCursor> m_ReadCursor;
+		EFontPreset m_FontPreset = EFontPreset::DEFAULT_FONT;
+		unsigned m_RenderFlags = 0;
 	};
-	std::vector<SMenuTextContainerBuildRequest> m_vMenuTextContainerBuildRequests;
+	std::deque<SMenuTextContainerBuildRequest> m_vMenuTextContainerBuildRequests;
 	SIngameServerInfoTextSnapshot m_IngameServerInfoTextSnapshot;
 	SIngameMotdParagraphCache m_IngameMotdParagraphCache;
 	void RenderGame(CUIRect MainView);
@@ -2055,9 +2160,7 @@ protected:
 	//       member function, to move this function to CMenusSettingsControls
 	void ResetSettingsControls();
 
-	std::vector<CButtonContainer> m_vButtonContainersNamePlateShow = {{}, {}, {}, {}};
-	std::vector<CButtonContainer> m_vButtonContainersNamePlateOwnScope = {{}, {}};
-	std::vector<CButtonContainer> m_vButtonContainersNamePlateOthersScope = {{}, {}};
+	std::vector<CButtonContainer> m_vButtonContainersNamePlateShow = {{}, {}, {}, {}, {}, {}};
 	std::vector<CButtonContainer> m_vButtonContainersNamePlateHookStrongWeakScope = {{}, {}, {}, {}, {}};
 	std::vector<CButtonContainer> m_vButtonContainersNamePlateKeyPresses = {{}, {}, {}, {}};
 	class CSkinQueuePresetRenamePopupContext : public SPopupMenuId
@@ -2441,6 +2544,7 @@ public:
 	void DoSettingsLabelStreamed(CUIElement &Element, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps = {}, int StrLen = -1, const CTextCursor *pReadCursor = nullptr, bool Render = true);
 	void DoSettingsLabel(int Page, int Tab, const char *pTextId, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps = {}, bool Render = true);
 	void DoSettingsMenuLabel(int Page, int Tab, int Subtab, const char *pTextId, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &Props = {}, int MaxWidth = -1);
+	void DoSettingsCardLabel(const char *pStableId, bool Subtitle, const CUIRect *pRect, const char *pText, float Size, const SLabelProperties &Props);
 	int DoSettingsButton_Menu(int Page, int Tab, int Subtab, CButtonContainer *pBC, const char *pTextId, const char *pText, int Checked, const CUIRect *pRect, int Flags = BUTTONFLAG_LEFT, int Corners = IGraphics::CORNER_ALL, float Rounding = ui_token::radius::BASE, const ColorRGBA &Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f), float FontFactor = 0.0f, float BodySize = -1.0f);
 	int DoSettingsButton_Menu(int Page, int Tab, int Subtab, CButtonContainer *pBC, const char *pTextId, const char *pText, int Checked, const CUIRect *pRect, const SSettingsContentMetrics &Metrics, int Flags = BUTTONFLAG_LEFT, int Corners = IGraphics::CORNER_ALL, float Rounding = ui_token::radius::BASE, const ColorRGBA &Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f), float FontFactor = 0.0f);
 	int DoSettingsButton_CheckBox(int Page, int Tab, int Subtab, const void *pId, const char *pTextId, const char *pText, int Checked, const CUIRect *pRect);
@@ -2499,6 +2603,7 @@ public:
 		const SSettingsResourceFrameContext FrameContext = SettingsResourceFrameContext();
 		m_SettingsFrameBudget = SSettingsWarmupFrameBudget{};
 		m_CurrentSettingsUiFrameBudget = SSettingsAdaptiveBudgetOutput{};
+		m_SettingsUiFrameBudgetInitialized = false;
 		SettingsApplyActiveTeeSkinFrameBudget(m_SettingsFrameBudget, TeeSettingsActive);
 		if(TeeSettingsActive)
 			m_SettingsFrameBudget.m_MaxGpuUploads = TeeSkinGpuUploadsPerFrame >= 0 ? TeeSkinGpuUploadsPerFrame : SettingsSkinGpuUploadFrameUnits(FrameContext, TeeSettingsActive);
@@ -2669,6 +2774,7 @@ private:
 	SSettingsRuntimeMetadata m_SettingsRuntimeMetadata;
 	SSettingsWarmupFrameBudget m_SettingsFrameBudget;
 	SSettingsAdaptiveBudgetOutput m_CurrentSettingsUiFrameBudget;
+	bool m_SettingsUiFrameBudgetInitialized = false;
 	SSettingsAdaptiveBudgetOutput m_IngameTextFrameBudget;
 	float m_TextContainerCreateMsEwma = 0.0f;
 	float m_TextContainerUploadMsEwma = 0.0f;

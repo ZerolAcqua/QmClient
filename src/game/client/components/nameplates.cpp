@@ -13,7 +13,9 @@
 #include <game/client/animstate.h>
 #include <game/client/components/nameplate_text_effects.h>
 #include <game/client/components/qmclient/chat_emoji.h>
+#include <game/client/components/qmclient/demo_display.h>
 #include <game/client/components/qmclient/modes.h>
+#include <game/client/components/qmclient/nameplate_layout.h>
 #include <game/client/components/qmclient/qm_title_color.h>
 #include <game/client/components/qmclient/qm_title_render.h>
 #include <game/client/components/qmclient/qmclient_utils.h>
@@ -34,17 +36,6 @@ enum class EHookStrongWeakState
 	STRONG
 };
 
-enum class ENameplateCoreRow
-{
-	NAME,
-	CLAN,
-	HOOK,
-	COORDS,
-	KEYS,
-	NUM_ROWS
-};
-
-static constexpr size_t kNameplateCoreRowCount = static_cast<size_t>(ENameplateCoreRow::NUM_ROWS);
 static constexpr std::array<ENameplateCoreRow, kNameplateCoreRowCount> s_aDefaultNameplateCoreRowsTopToBottom = {
 	ENameplateCoreRow::KEYS,
 	ENameplateCoreRow::COORDS,
@@ -669,6 +660,7 @@ private:
 	float m_Alpha = 1.0f;
 	SQmTitleColorStyle m_TitleColorStyle;
 	SQmTitleRenderStyle m_TitleRenderStyle;
+	CQmTitleTextMetrics m_TitleTextMetrics;
 
 protected:
 	bool UpdateNeeded(CGameClient &This, const CNamePlateData &Data) override
@@ -720,13 +712,38 @@ protected:
 		m_TitleRenderStyle = Data.m_TitleRenderStyle;
 		str_copy(m_aText, Data.m_aQmTitle);
 
+		if(!m_TextContainerIndex.Valid())
+			m_TitleTextMetrics.Reset();
 		CTextCursor Cursor;
 		Cursor.m_FontSize = m_FontSize;
 		if(m_TitleRenderStyle.m_pStyle != nullptr)
 		{
+			if(!m_TitleRenderStyle.m_ColorOverride || (m_TitleRenderStyle.m_Bob.m_Amplitude != 0.0f && m_TitleRenderStyle.m_Bob.m_WaveLength > 0.0f))
+			{
+				// 文字与布局上下文不变时复用前缀宽度；字体切换、窗口重建沿用容器失效通知。
+				float X0, Y0, X1, Y1;
+				This.Graphics()->GetScreen(&X0, &Y0, &X1, &Y1);
+				CQmTitleTextMetrics::SContext Context;
+				Context.m_FontSize = m_FontSize;
+				Context.m_ScreenScale = vec2(This.Graphics()->ScreenWidth() / (X1 - X0), This.Graphics()->ScreenHeight() / (Y1 - Y0));
+				Context.m_RenderFlags = This.TextRender()->GetRenderFlags();
+				Context.m_FontPreset = (int)This.TextRender()->GetFontPreset();
+				m_TitleTextMetrics.Update(m_aText, Context, [&](const char *pPrefix) { return This.TextRender()->TextWidth(m_FontSize, pPrefix); });
+			}
+
 			// 透明度统一由 Render 施加，色段只负责颜色与浮动。
 			// 这里没有 CComponent 继承链，GameClient() 不可用，改用传入的 This。
-			QmTitleRenderFillCursor(This.TextRender(), Cursor, m_aText, m_FontSize, m_TitleRenderStyle, (float)This.m_QmClient.TitleAnimationTime(), 1.0f, QmTitleShimmerFromConfig());
+			if(m_TitleRenderStyle.m_ColorOverride)
+			{
+				// 配色优先级：本地配色档高于风格自带颜色，此时只取风格的浮动与掠光。
+				QmTitleRenderFillMotionOffsets(This.TextRender(), Cursor, m_aText, m_FontSize, m_TitleRenderStyle, (float)This.m_QmClient.TitleAnimationTime(), QmTitleShimmerFromConfig(), &m_TitleTextMetrics);
+				if(m_TitleColorStyle.m_Rainbow)
+					QmAddTitleRainbowSplits(Cursor, m_aText, 1.0f);
+				else
+					Cursor.m_vColorSplits.emplace_back(0, -1, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+			}
+			else
+				QmTitleRenderFillCursor(This.TextRender(), Cursor, m_aText, m_FontSize, m_TitleRenderStyle, (float)This.m_QmClient.TitleAnimationTime(), 1.0f, QmTitleShimmerFromConfig(), &m_TitleTextMetrics);
 		}
 		else if(m_TitleColorStyle.m_Rainbow)
 		{
@@ -1372,6 +1389,13 @@ private:
 		}
 		return CoreRowSize(CoreRow);
 	}
+	std::array<float, kNameplateCoreRowCount> LayoutCoreRowHeights(const CNamePlate *pLayoutReference) const
+	{
+		std::array<float, kNameplateCoreRowCount> aHeights{};
+		for(const SCoreRowParts &CoreRow : m_vCoreRows)
+			aHeights[static_cast<size_t>(CoreRow.m_Row)] = LayoutCoreRowSize(CoreRow, pLayoutReference).y;
+		return aHeights;
+	}
 	float RangeTopY(vec2 PositionBottomMiddle, size_t StartIndex, size_t EndIndex) const
 	{
 		vec2 Position = PositionBottomMiddle;
@@ -1450,11 +1474,11 @@ public:
 	{
 		HasFrame = false;
 		HasTargetRow = false;
-		vec2 Position = PositionBottomMiddle;
+		const auto aBaselines = QmNameplateCoreRowBaselines(LayoutCoreRowHeights(pLayoutReference));
 		for(const SCoreRowParts &CoreRow : m_vCoreRows)
 		{
+			const vec2 Position = PositionBottomMiddle + vec2(0.0f, aBaselines[static_cast<size_t>(CoreRow.m_Row)]);
 			const vec2 Size = CoreRowSize(CoreRow);
-			const vec2 LayoutSize = LayoutCoreRowSize(CoreRow, pLayoutReference);
 			if(Size.x > 0.0f && Size.y > 0.0f)
 			{
 				// Baseline rect (no offset).
@@ -1480,7 +1504,6 @@ public:
 					HasTargetRow = true;
 				}
 			}
-			Position.y -= LayoutSize.y;
 		}
 	}
 	// Returns the baseline frame only.
@@ -1491,19 +1514,10 @@ public:
 		ComputeBaselineLayout(PositionBottomMiddle, ENameplateCoreRow::NUM_ROWS,
 			HasFrame, FrameMin, FrameMax, DummyHasRow, DummyCenter, DummySize);
 	}
-	// 按渲染实际使用的布局（含 pLayoutReference）测量内容包围盒，返回它相对锚点的垂直跨度。
-	// 行偏移不参与测量：拖动范围由预览边界单独夹取，否则框高会随拖动自我放大。
+	// 预览框为方向键和强弱钩保留固定空间；行偏移仍不参与测量，避免拖动时框高自我放大。
 	float ContentSpan(const CNamePlate *pLayoutReference = nullptr) const
 	{
-		bool HasFrame = false;
-		vec2 FrameMin = vec2(0.0f, 0.0f);
-		vec2 FrameMax = vec2(0.0f, 0.0f);
-		bool DummyHasRow = false;
-		vec2 DummyCenter = vec2(0.0f, 0.0f);
-		vec2 DummySize = vec2(0.0f, 0.0f);
-		ComputeBaselineLayout(vec2(0.0f, 0.0f), ENameplateCoreRow::NUM_ROWS,
-			HasFrame, FrameMin, FrameMax, DummyHasRow, DummyCenter, DummySize, pLayoutReference);
-		return HasFrame ? -FrameMin.y : 0.0f;
+		return QmNameplatePreviewContentSpan(LayoutCoreRowHeights(pLayoutReference));
 	}
 
 private:
@@ -1632,24 +1646,17 @@ public:
 	void Render(CGameClient &This, const vec2 &PositionBottomMiddle, const CNamePlate *pLayoutReference = nullptr)
 	{
 		dbg_assert(m_Inited, "Tried to render uninited nameplate");
-		if(NameplateFreeMoveEnabled())
+		// 普通显示与自由移动使用同一组基线，偏移只作用于对应行。
+		const auto aBaselines = QmNameplateCoreRowBaselines(LayoutCoreRowHeights(pLayoutReference));
+		for(const SCoreRowParts &CoreRow : m_vCoreRows)
 		{
-			// Each row is positioned independently from PositionBottomMiddle:
-			// row top = baseline top (stack default) + Offset(row). This
-			// guarantees moving one row never shifts another.
-			vec2 BaselinePos = PositionBottomMiddle;
-			for(const SCoreRowParts &CoreRow : m_vCoreRows)
+			const vec2 Size = CoreRowSize(CoreRow);
+			if(Size.x > 0.0f && Size.y > 0.0f)
 			{
-				const vec2 Size = CoreRowSize(CoreRow);
-				const vec2 LayoutSize = LayoutCoreRowSize(CoreRow, pLayoutReference);
-				if(Size.x > 0.0f && Size.y > 0.0f)
-					RenderRange(This, BaselinePos + NameplateCoreRowOffset(CoreRow.m_Row), CoreRow.m_Start, CoreRow.m_End);
-				BaselinePos.y -= LayoutSize.y;
+				const vec2 Position = PositionBottomMiddle + vec2(0.0f, aBaselines[static_cast<size_t>(CoreRow.m_Row)]);
+				RenderRange(This, Position + NameplateCoreRowOffset(CoreRow.m_Row), CoreRow.m_Start, CoreRow.m_End);
 			}
-			This.Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
-			return;
 		}
-		RenderRange(This, PositionBottomMiddle, 0, m_vpParts.size());
 		This.Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}
 	bool IsInitialized() const
@@ -1671,28 +1678,36 @@ public:
 			return HasFrame ? FrameMin.y : PositionBottomMiddle.y;
 		}
 
-		return RangeTopY(PositionBottomMiddle, 0, m_vpParts.size());
+		const auto aBaselines = QmNameplateCoreRowBaselines(LayoutCoreRowHeights(nullptr));
+		float Top = PositionBottomMiddle.y;
+		for(const SCoreRowParts &CoreRow : m_vCoreRows)
+		{
+			if(CoreRowSize(CoreRow).y > 0.0f)
+			{
+				const vec2 Position = PositionBottomMiddle + vec2(0.0f, aBaselines[static_cast<size_t>(CoreRow.m_Row)]);
+				Top = std::min(Top, RangeTopY(Position, CoreRow.m_Start, CoreRow.m_End));
+			}
+		}
+		return Top;
 	}
 	void CollectCoreRowRects(vec2 PositionBottomMiddle, std::array<SNameplateCoreRowRect, kNameplateCoreRowCount> &aRects, const CNamePlate *pLayoutReference = nullptr) const
 	{
 		for(SNameplateCoreRowRect &Rect : aRects)
 			Rect = SNameplateCoreRowRect();
 
-		vec2 BaselinePos = PositionBottomMiddle;
+		const auto aBaselines = QmNameplateCoreRowBaselines(LayoutCoreRowHeights(pLayoutReference));
 		for(const SCoreRowParts &CoreRow : m_vCoreRows)
 		{
 			const vec2 Size = CoreRowSize(CoreRow);
-			const vec2 LayoutSize = LayoutCoreRowSize(CoreRow, pLayoutReference);
 			if(Size.x > 0.0f && Size.y > 0.0f)
 			{
 				SNameplateCoreRowRect &Rect = aRects[static_cast<int>(CoreRow.m_Row)];
-				const vec2 RowPosition = BaselinePos + NameplateCoreRowOffset(CoreRow.m_Row);
+				const vec2 RowPosition = PositionBottomMiddle + vec2(0.0f, aBaselines[static_cast<size_t>(CoreRow.m_Row)]) + NameplateCoreRowOffset(CoreRow.m_Row);
 				Rect.m_Row = CoreRow.m_Row;
 				Rect.m_Min = vec2(RowPosition.x - Size.x / 2.0f, RowPosition.y - Size.y);
 				Rect.m_Max = vec2(RowPosition.x + Size.x / 2.0f, RowPosition.y);
 				Rect.m_Visible = true;
 			}
-			BaselinePos.y -= LayoutSize.y;
 		}
 	}
 };
@@ -1866,16 +1881,11 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 
 	const bool HideIdentity = GameClient()->ShouldHideStreamerIdentity(ClientId);
 
-	// 一级「显示昵称」决定自身/他人，二级决定自身取当前角色还是本机全部角色、
-	// 他人取所有玩家还是仅好友。
+	// 「显示昵称」按六档判定：当前操控角色 / 本机其他角色 / 其他玩家 三类可见组合。
 	Data.m_ShowName = ShouldShowQmNameplateName(
-		g_Config.m_QmNameplateOwnScope,
-		g_Config.m_QmNameplateOthersScope,
-		g_Config.m_ClNamePlatesOwn != 0,
-		g_Config.m_ClNamePlates != 0,
+		g_Config.m_QmNameplateShowScope,
 		pPlayerInfo->m_Local,
-		IsAnyLocalClient,
-		ClientData.m_Friend);
+		IsAnyLocalClient);
 	GameClient()->FormatStreamerName(ClientId, Data.m_aName, sizeof(Data.m_aName));
 	str_copy(Data.m_aQmTitle, Data.m_ShowName ? GameClient()->m_QmClient.PlayerTitle(ClientId) : "");
 	Data.m_TitleColorStyle = ResolveQmTitleColorStyle(
@@ -1975,11 +1985,13 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	}
 	Data.m_Color.a = Alpha;
 
-	int ShowDirectionConfig = g_Config.m_ClShowDirection;
 #if defined(CONF_VIDEORECORDER)
-	if(IVideo::Current())
-		ShowDirectionConfig = g_Config.m_ClVideoShowDirection;
+	const bool VideoRendering = IVideo::Current() != nullptr;
+#else
+	const bool VideoRendering = false;
 #endif
+	const auto DisplaySettings = qm_demo_display::Resolve(g_Config, DemoPlayback, VideoRendering);
+	const int ShowDirectionConfig = DisplaySettings.m_Direction;
 	Data.m_DirLeft = Data.m_DirJump = Data.m_DirRight = false;
 	switch(ShowDirectionConfig)
 	{
@@ -2025,7 +2037,7 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	}
 
 	Data.m_ShowHookStrongWeak = false;
-	Data.m_ReserveHookStrongWeakRow = g_Config.m_Debug || g_Config.m_ClNamePlatesStrong > 0;
+	Data.m_ReserveHookStrongWeakRow = (g_Config.m_Debug && !DemoPlayback) || DisplaySettings.m_StrongWeak > 0;
 	Data.m_HookStrongWeakState = EHookStrongWeakState::NEUTRAL;
 	Data.m_ShowHookStrongWeakId = false;
 	Data.m_HookStrongWeakId = 0;
@@ -2043,15 +2055,21 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 			{
 				int SelectedStrongWeakId = Selected.m_HasExtendedData ? Selected.m_ExtendedData.m_StrongWeakId : 0;
 				Data.m_HookStrongWeakId = Other.m_ExtendedData.m_StrongWeakId;
-				Data.m_ShowHookStrongWeakId = g_Config.m_Debug || g_Config.m_ClNamePlatesStrong == 2;
+				Data.m_ShowHookStrongWeakId = (g_Config.m_Debug && !DemoPlayback) || DisplaySettings.m_StrongWeak == 2;
 				if(SelectedId == ClientId)
-					Data.m_ShowHookStrongWeak = Data.m_ShowHookStrongWeakId || (g_Config.m_ClNamePlatesStrong > 0 && ShouldShowQmHookStrongWeakScope(g_Config.m_QmNameplateHookStrongWeakScope, true, false, false));
+					Data.m_ShowHookStrongWeak = Data.m_ShowHookStrongWeakId || (DisplaySettings.m_StrongWeak > 0 && ShouldShowQmHookStrongWeakScope(DisplaySettings.m_StrongWeakScope, true, false, false));
 				else
 				{
 					Data.m_HookStrongWeakState = SelectedStrongWeakId > Other.m_ExtendedData.m_StrongWeakId ? EHookStrongWeakState::STRONG : EHookStrongWeakState::WEAK;
 					const bool Strong = Data.m_HookStrongWeakState == EHookStrongWeakState::STRONG;
 					const bool Weak = Data.m_HookStrongWeakState == EHookStrongWeakState::WEAK;
-					Data.m_ShowHookStrongWeak = g_Config.m_Debug || (g_Config.m_ClNamePlatesStrong > 0 && ShouldShowQmHookStrongWeakScope(g_Config.m_QmNameplateHookStrongWeakScope, false, Strong, Weak));
+					Data.m_ShowHookStrongWeak = (g_Config.m_Debug && !DemoPlayback) || (DisplaySettings.m_StrongWeak > 0 && ShouldShowQmHookStrongWeakScope(DisplaySettings.m_StrongWeakScope, false, Strong, Weak));
+				}
+				// Demo 的数字与图标遵循同一范围，避免关闭某组图标后数字仍残留。
+				if(DemoPlayback && !ShouldShowQmHookStrongWeakScope(DisplaySettings.m_StrongWeakScope, SelectedId == ClientId, Data.m_HookStrongWeakState == EHookStrongWeakState::STRONG, Data.m_HookStrongWeakState == EHookStrongWeakState::WEAK))
+				{
+					Data.m_ShowHookStrongWeak = false;
+					Data.m_ShowHookStrongWeakId = false;
 				}
 			}
 		}
@@ -2063,7 +2081,7 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	Data.m_Local = pPlayerInfo->m_Local;
 
 	CNamePlate *pLayoutReference = nullptr;
-	if(Alpha > 0.0f && NameplateFreeMoveEnabled() && (!g_Config.m_ClNamePlates || !g_Config.m_ClNamePlatesOwn))
+	if(Alpha > 0.0f && NameplateFreeMoveEnabled() && !Data.m_ShowName)
 	{
 		CNamePlateData FrameData = Data;
 		FrameData.m_ShowName = true;
@@ -2109,8 +2127,11 @@ static void BuildNamePlatePreviewData(CGameClient &This, int DummyIdx, bool Forc
 	Data.m_InGame = false;
 	Data.m_Color = g_Config.m_ClNamePlatesTeamcolors ? This.GetDDTeamColor(13, 0.75f) : This.TextRender()->DefaultTextColor();
 	Data.m_Color.a = 1.0f;
+	// 预览里 DummyIdx 等于当前操控的那个分身，另一个分身按「本机其他角色」判定：
+	// 这样「当前 / 本地 / 本地+他人」等档位在两个分身之间才会显示差异。
 	const bool IsOwnPreview = DummyIdx == 0;
-	const bool NameplateScopeAllowsPreview = ForceNameplateScopeAll || (IsOwnPreview ? g_Config.m_ClNamePlatesOwn : g_Config.m_ClNamePlates);
+	const bool PreviewIsCurrentChar = DummyIdx == g_Config.m_ClDummy;
+	const bool NameplateScopeAllowsPreview = ForceNameplateScopeAll || ShouldShowQmNameplateName(g_Config.m_QmNameplateShowScope, PreviewIsCurrentChar, true);
 	const bool CoordModuleAllowsPreview = IsOwnPreview ? g_Config.m_QmNameplateCoordsOwn : g_Config.m_QmNameplateCoords;
 
 	Data.m_ShowName = NameplateScopeAllowsPreview;
@@ -2148,22 +2169,21 @@ static void BuildNamePlatePreviewData(CGameClient &This, int DummyIdx, bool Forc
 	Data.m_CoordXAligned = false;
 	Data.m_CoordXAlignColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_QmNameplateCoordXAlignHintColor));
 
-	// 预览没有玩家信息，把当前分身当作本地玩家（对应 pPlayerInfo->m_Local），
-	// 这样 Others/Only self 在两个分身之间才会显示差异。
-	const bool PreviewIsLocal = DummyIdx == g_Config.m_ClDummy;
+	// 预览没有玩家信息，把当前操控的那个分身当作本地玩家（对应 pPlayerInfo->m_Local），
+	// 这样「他人 / 仅自己」方向显示与昵称档位在两个分身之间才会显示差异。
 	switch(g_Config.m_ClShowDirection)
 	{
 	case 0: // Off
 		Data.m_ShowDirection = false;
 		break;
 	case 1: // Others
-		Data.m_ShowDirection = !PreviewIsLocal;
+		Data.m_ShowDirection = !PreviewIsCurrentChar;
 		break;
 	case 2: // Everyone
 		Data.m_ShowDirection = true;
 		break;
 	case 3: // Only self
-		Data.m_ShowDirection = PreviewIsLocal;
+		Data.m_ShowDirection = PreviewIsCurrentChar;
 		break;
 	default:
 		Data.m_ShowDirection = false;
@@ -2193,7 +2213,7 @@ static void BuildNamePlatePreviewData(CGameClient &This, int DummyIdx, bool Forc
 	Data.m_Local = false;
 }
 
-// 预览框需要的高度：最高的那份铭牌内容 + cl_nameplates_offset + 脚本体 + 上下留白。
+// 预览框需要的高度：预留方向键及强弱钩最大尺寸的铭牌内容 + cl_nameplates_offset + 脚本体 + 上下留白。
 // 两个分身取较大者，所以切换预览时框高与脚本体位置都不变。
 // 设置页据此撑开卡片高度，任何字号/模块组合下铭牌与脚本体都不会溢出预览框。
 float CNamePlates::MeasurePreviewAreaHeight() const
@@ -2802,18 +2822,23 @@ void CNamePlates::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
-	int ShowDirection = g_Config.m_ClShowDirection;
 #if defined(CONF_VIDEORECORDER)
-	if(IVideo::Current())
-		ShowDirection = g_Config.m_ClVideoShowDirection;
+	const bool VideoRendering = IVideo::Current() != nullptr;
+#else
+	const bool VideoRendering = false;
 #endif
+	const bool DemoPlayback = Client()->State() == IClient::STATE_DEMOPLAYBACK;
+	const auto DisplaySettings = qm_demo_display::Resolve(g_Config, DemoPlayback, VideoRendering);
+	const int ShowDirection = DisplaySettings.m_Direction;
 	const bool ShowCoordXAlignHint = g_Config.m_QmNameplateCoordXAlignHint || g_Config.m_QmNameplateCoordXAlignHintStrict;
 	const bool ShowCoords = (g_Config.m_QmNameplateCoords || g_Config.m_QmNameplateCoordsOwn) &&
 				(g_Config.m_QmNameplateCoordX || g_Config.m_QmNameplateCoordY);
-	const bool RenderNames = g_Config.m_ClNamePlates || g_Config.m_ClNamePlatesOwn;
+	// 昵称档位为「无」时没有任何玩家会画出昵称行；其余档位可能只画一部分玩家，
+	// 这里只要保证铭牌渲染流程仍然跑起来（行基线对齐、方向/坐标等模块还依赖它）。
+	const bool RenderNames = g_Config.m_QmNameplateShowScope != QM_NAMEPLATE_SHOW_SCOPE_OFF;
 	const bool RenderClan = g_Config.m_ClNamePlatesClan || (g_Config.m_TcWarList && g_Config.m_TcWarListShowClan);
 	const bool RenderClientIds = g_Config.m_Debug || g_Config.m_ClNamePlatesIds;
-	const bool RenderStrongWeak = g_Config.m_Debug || g_Config.m_ClNamePlatesStrong > 0;
+	const bool RenderStrongWeak = (g_Config.m_Debug && !DemoPlayback) || DisplaySettings.m_StrongWeak > 0;
 	const bool RenderTClientExtras = g_Config.m_TcNameplatePingCircle || g_Config.m_TcNameplateCountry || g_Config.m_TcNameplateSkins || (g_Config.m_TcWarList && g_Config.m_TcWarListReason);
 	const bool RenderDirection = ShowDirection != 0;
 	const bool RenderNameplates = RenderNames || RenderClan || RenderClientIds || RenderStrongWeak || RenderTClientExtras || RenderDirection || ShowCoords || ShowCoordXAlignHint;

@@ -538,6 +538,26 @@ TEST(SettingsRuntimeCache, ClearsTextPoolOnlyForContentChangingReasons)
 	EXPECT_FALSE(SettingsInvalidationClearsTextPool(ESettingsInvalidationReason::RESOURCE_DIRECTORY_CHANGED));
 }
 
+TEST(SettingsRuntimeCache, VisibleTextBuildsOnceAndReusesUntilContentOrLayoutChanges)
+{
+	EXPECT_TRUE(SettingsTextCacheNeedsBuild("", "Appearance", -1, false, false, false));
+	EXPECT_FALSE(SettingsTextCacheNeedsBuild("Appearance", "Appearance", -1, true, false, false));
+	EXPECT_TRUE(SettingsTextCacheNeedsBuild("Appearance", "外观", -1, true, false, false));
+	EXPECT_TRUE(SettingsTextCacheNeedsBuild("Appearance", "Appearance", -1, false, false, false));
+	EXPECT_TRUE(SettingsTextCacheNeedsBuild("Appearance", "Appearance", -1, true, true, false));
+	EXPECT_TRUE(SettingsTextCacheNeedsBuild("Appearance", "Appearance", -1, true, false, true));
+}
+
+TEST(SettingsRuntimeCache, VisibleTextPrefixAndEmptyContentDoNotStayStaleOrRebuildForever)
+{
+	EXPECT_FALSE(SettingsTextCacheNeedsBuild("Qm", "QmClient", 2, true, false, false));
+	EXPECT_TRUE(SettingsTextCacheNeedsBuild("Qm", "QmClient", 8, true, false, false));
+	EXPECT_TRUE(SettingsTextCacheNeedsBuild("QmClient", "QmClient", 0, true, false, false));
+	EXPECT_FALSE(SettingsTextCacheNeedsBuild("", "QmClient", 0, false, false, false));
+	EXPECT_TRUE(SettingsTextCacheNeedsBuild("Appearance", "", -1, true, false, false));
+	EXPECT_FALSE(SettingsTextCacheNeedsBuild("", "", -1, false, false, false));
+}
+
 TEST(SettingsRuntimeCache, RuntimeKeyMismatchNamesDirtyReason)
 {
 	SSettingsSectionCacheRuntimeKey Base;

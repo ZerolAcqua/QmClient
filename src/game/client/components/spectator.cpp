@@ -13,7 +13,9 @@
 
 #include <game/client/QmUi/QmAnimResolve.h>
 #include <game/client/animstate.h>
+#include <game/client/components/qmclient/spectator_tele_search.h>
 #include <game/client/gameclient.h>
+#include <game/collision.h>
 #include <game/localization.h>
 
 #include <algorithm>
@@ -128,6 +130,8 @@ void CSpectator::ConKeySpectator(IConsole::IResult *pResult, void *pUserData)
 		pSelf->m_Active = pResult->GetInteger(0) != 0;
 	else
 		pSelf->m_Active = false;
+	if(!pSelf->m_Active)
+		pSelf->m_TeleNumberInput.Deactivate();
 }
 
 void CSpectator::ConSpectate(IConsole::IResult *pResult, void *pUserData)
@@ -206,6 +210,38 @@ bool CSpectator::OnInput(const IInput::CEvent &Event)
 	{
 		m_SelectedSpectatorId = NO_SELECTION;
 		m_Active = false;
+		m_TeleNumberInput.Deactivate();
+		return true;
+	}
+
+	if(IsActive() && m_TeleNumberInput.IsActive())
+	{
+		if((Event.m_Flags & IInput::FLAG_PRESS) && (Event.m_Key == KEY_RETURN || Event.m_Key == KEY_KP_ENTER))
+			FindTele();
+		else
+		{
+			const int Digit = qm_spectator_tele::DigitFromKey(Event.m_Key);
+			if((Event.m_Flags & IInput::FLAG_TEXT) && m_IgnoreTeleNumberTextEvent)
+				m_IgnoreTeleNumberTextEvent = false;
+			else if((Event.m_Flags & IInput::FLAG_PRESS) && Digit >= 0 && !Input()->ModifierIsPressed() && !Input()->AltIsPressed())
+			{
+				// 默认按住右 Shift 打开 HUD，直接使用数字按键，避免录入符号或重复文本。
+				const char aDigit[] = {static_cast<char>('0' + Digit), '\0'};
+				m_TeleNumberInput.SetRange(aDigit, m_TeleNumberInput.GetSelectionStart(), m_TeleNumberInput.GetSelectionEnd());
+				m_IgnoreTeleNumberTextEvent = true;
+			}
+			else
+			{
+				if(Event.m_Flags & (IInput::FLAG_PRESS | IInput::FLAG_RELEASE))
+					m_IgnoreTeleNumberTextEvent = false;
+				m_TeleNumberInput.ProcessInput(Event);
+			}
+			if(m_TeleNumberInput.WasChanged())
+			{
+				m_TeleSearchStatus = ETeleSearchStatus::IDLE;
+				m_LastTeleNumber = 0;
+			}
+		}
 		return true;
 	}
 
@@ -245,7 +281,24 @@ void CSpectator::OnRelease()
 void CSpectator::OnRender()
 {
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+	{
+		m_TeleNumberInput.Deactivate();
+		m_TeleSearchPending = false;
 		return;
+	}
+
+	if(m_TeleSearchPending)
+	{
+		const auto &SpecInfo = GameClient()->m_Snap.m_SpecInfo;
+		if(!SpecInfo.m_Active || GameClient()->m_MultiViewActivated)
+			m_TeleSearchPending = false;
+		else if(SpecInfo.m_SpectatorId == SPEC_FREEVIEW && !SpecInfo.m_UsePosition)
+		{
+			// 等自由视角状态生效后再设置位置，避免跟随镜头覆盖查找目标。
+			GameClient()->m_Camera.SetViewWorld(m_TeleSearchPosition);
+			m_TeleSearchPending = false;
+		}
+	}
 
 	if(!GameClient()->m_MultiViewActivated && m_MultiViewActivateDelay != 0.0f)
 	{
@@ -260,6 +313,7 @@ void CSpectator::OnRender()
 
 	if(!m_Active)
 	{
+		m_TeleNumberInput.Deactivate();
 		// closing the spectator menu
 		if(m_WasActive)
 		{
@@ -290,6 +344,7 @@ void CSpectator::OnRender()
 	{
 		m_Active = false;
 		m_WasActive = false;
+		m_TeleNumberInput.Deactivate();
 		if(!ExtraAnimations)
 		{
 			return;
@@ -378,7 +433,7 @@ void CSpectator::OnRender()
 	const float CenterX = Width / 2.0f;
 	const float CenterY = Height / 2.0f + PanelOffsetY;
 	const vec2 ScreenCenter = vec2(CenterX, CenterY);
-	CUIRect SpectatorRect = {CenterX - ObjWidth, CenterY - 300.0f, ObjWidth * 2.0f, 600.0f};
+	CUIRect SpectatorRect = {CenterX - ObjWidth, CenterY - 300.0f, ObjWidth * 2.0f, 700.0f};
 	CUIRect SpectatorMouseRect;
 	SpectatorRect.Margin(20.0f, &SpectatorMouseRect);
 
@@ -409,9 +464,10 @@ void CSpectator::OnRender()
 
 	// clamp mouse position to selector area
 	m_SelectorMouse.x = std::clamp(m_SelectorMouse.x, -(ObjWidth - 20.0f), ObjWidth - 20.0f);
-	m_SelectorMouse.y = std::clamp(m_SelectorMouse.y, -280.0f, 280.0f);
+	m_SelectorMouse.y = std::clamp(m_SelectorMouse.y, -280.0f, 380.0f);
 
 	const bool MousePressed = WantActive && (Input()->KeyPress(KEY_MOUSE_1) || m_TouchState.m_PrimaryPressed);
+	const bool CanSelect = WantActive && (!m_TeleNumberInput.IsActive() || MousePressed);
 
 	// draw selections
 	if((Client()->State() == IClient::STATE_DEMOPLAYBACK && GameClient()->m_DemoSpecId == SPEC_FREEVIEW) ||
@@ -431,7 +487,7 @@ void CSpectator::OnRender()
 	}
 
 	bool FreeViewSelected = false;
-	if(WantActive && m_SelectorMouse.x >= -(ObjWidth - 20.0f) && m_SelectorMouse.x <= -(ObjWidth - 20.0f) + ((ObjWidth * 2.0f) / 3.0f) - 40.0f &&
+	if(CanSelect && m_SelectorMouse.x >= -(ObjWidth - 20.0f) && m_SelectorMouse.x <= -(ObjWidth - 20.0f) + ((ObjWidth * 2.0f) / 3.0f) - 40.0f &&
 		m_SelectorMouse.y >= -280.0f && m_SelectorMouse.y <= -220.0f)
 	{
 		m_SelectedSpectatorId = SPEC_FREEVIEW;
@@ -445,7 +501,7 @@ void CSpectator::OnRender()
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, (FreeViewSelected ? 1.0f : 0.5f) * ContentAlpha);
 	TextRender()->Text(CenterX - (ObjWidth - 40.0f), CenterY - 280.f + (60.f - BigFontSize) / 2.f, BigFontSize, Localize("Free-View"), -1.0f);
 
-	if(WantActive && m_SelectorMouse.x >= -(ObjWidth - 20.0f) + (ObjWidth * 2.0f / 3.0f) && m_SelectorMouse.x <= -(ObjWidth - 20.0f) + (ObjWidth * 2.0f / 3.0f) + ((ObjWidth * 2.0f) / 3.0f) - 40.0f &&
+	if(CanSelect && m_SelectorMouse.x >= -(ObjWidth - 20.0f) + (ObjWidth * 2.0f / 3.0f) && m_SelectorMouse.x <= -(ObjWidth - 20.0f) + (ObjWidth * 2.0f / 3.0f) + ((ObjWidth * 2.0f) / 3.0f) - 40.0f &&
 		m_SelectorMouse.y >= -280.0f && m_SelectorMouse.y <= -220.0f)
 	{
 		m_SelectedSpectatorId = MULTI_VIEW;
@@ -461,7 +517,7 @@ void CSpectator::OnRender()
 	if(Client()->State() == IClient::STATE_DEMOPLAYBACK && GameClient()->m_Snap.m_LocalClientId >= 0)
 	{
 		bool FollowSelected = false;
-		if(WantActive && m_SelectorMouse.x >= -(ObjWidth - 20.0f) + (ObjWidth * 2.0f * 2.0f / 3.0f) && m_SelectorMouse.x <= -(ObjWidth - 20.0f) + (ObjWidth * 2.0f * 2.0f / 3.0f) + ((ObjWidth * 2.0f) / 3.0f) - 40.0f &&
+		if(CanSelect && m_SelectorMouse.x >= -(ObjWidth - 20.0f) + (ObjWidth * 2.0f * 2.0f / 3.0f) && m_SelectorMouse.x <= -(ObjWidth - 20.0f) + (ObjWidth * 2.0f * 2.0f / 3.0f) + ((ObjWidth * 2.0f) / 3.0f) - 40.0f &&
 			m_SelectorMouse.y >= -280.0f && m_SelectorMouse.y <= -220.0f)
 		{
 			m_SelectedSpectatorId = SPEC_FOLLOW;
@@ -544,7 +600,7 @@ void CSpectator::OnRender()
 		}
 
 		bool PlayerSelected = false;
-		if(WantActive && m_SelectorMouse.x >= x - 10.0f && m_SelectorMouse.x < x + 260.0f &&
+		if(CanSelect && m_SelectorMouse.x >= x - 10.0f && m_SelectorMouse.x < x + 260.0f &&
 			m_SelectorMouse.y >= y - (LineHeight / 6.0f) && m_SelectorMouse.y < y + (LineHeight * 5.0f / 6.0f))
 		{
 			m_SelectedSpectatorId = GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId;
@@ -720,7 +776,111 @@ void CSpectator::OnRender()
 	}
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 
+	RenderTeleSearch(ScreenCenter, ContentAlpha, MousePressed);
 	RenderTools()->RenderCursor(ScreenCenter + m_SelectorMouse, 48.0f, ContentAlpha);
+}
+
+void CSpectator::FindTele()
+{
+	if(!m_Active || (!GameClient()->m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK))
+		return;
+
+	m_TeleSearchPending = false;
+	const int Number = qm_spectator_tele::ParseNumber(m_TeleNumberInput.GetString());
+	if(Number == 0)
+	{
+		m_TeleSearchStatus = ETeleSearchStatus::INVALID_NUMBER;
+		return;
+	}
+	const int Width = Collision()->GetWidth();
+	const int Index = qm_spectator_tele::FindNext(Collision()->TeleLayer(), Width, Collision()->GetHeight(), Number, Number == m_LastTeleNumber ? m_LastTeleIndex : -1);
+	if(Index == -1)
+	{
+		m_TeleSearchStatus = ETeleSearchStatus::NOT_FOUND;
+		return;
+	}
+
+	GameClient()->m_MultiViewActivated = false;
+	m_MultiViewActivateDelay = 0.0f;
+	Spectate(SPEC_FREEVIEW);
+	m_SelectedSpectatorId = NO_SELECTION;
+	m_LastTeleNumber = Number;
+	m_LastTeleIndex = Index;
+	m_TeleSearchStatus = ETeleSearchStatus::FOUND;
+	m_TeleSearchPosition = vec2((Index % Width) * 32.0f + 16.0f, (Index / Width) * 32.0f + 16.0f);
+	m_TeleSearchPending = true;
+}
+
+void CSpectator::RenderTeleSearch(vec2 Center, float Alpha, bool MousePressed)
+{
+	CUIRect Row = {Center.x - 280.0f, Center.y + 310.0f, 560.0f, 40.0f};
+	CUIRect Label, Minus, Number, Plus, Find;
+	Row.VSplitLeft(140.0f, &Label, &Row);
+	Row.VSplitLeft(40.0f, &Minus, &Row);
+	Row.VSplitLeft(8.0f, nullptr, &Row);
+	Row.VSplitLeft(80.0f, &Number, &Row);
+	Row.VSplitLeft(8.0f, nullptr, &Row);
+	Row.VSplitLeft(40.0f, &Plus, &Row);
+	Row.VSplitLeft(12.0f, nullptr, &Find);
+	const vec2 Mouse = Center + m_SelectorMouse;
+
+	const auto Button = [&](const CUIRect &Rect, const char *pText) {
+		const bool Hovered = m_Active && Rect.Inside(Mouse);
+		Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, (Hovered ? 0.25f : 0.1f) * Alpha), IGraphics::CORNER_ALL, 8.0f);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, (Hovered ? 1.0f : 0.8f) * Alpha);
+		Ui()->DoLabel(&Rect, pText, 20.0f, TEXTALIGN_MC);
+		return Hovered && MousePressed;
+	};
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.8f * Alpha);
+	Ui()->DoLabel(&Label, Localize("Find CP"), 20.0f, TEXTALIGN_ML);
+	const bool Decrease = Button(Minus, "-");
+	const bool Increase = Button(Plus, "+");
+	if(Decrease || Increase)
+	{
+		char aNumber[4];
+		str_format(aNumber, sizeof(aNumber), "%d", qm_spectator_tele::StepNumber(qm_spectator_tele::ParseNumber(m_TeleNumberInput.GetString()), Decrease ? -1 : 1));
+		m_TeleNumberInput.Set(aNumber);
+	}
+	if(MousePressed)
+	{
+		if(Number.Inside(Mouse))
+		{
+			m_TeleNumberInput.Activate(EInputPriority::UI);
+			if(m_TeleNumberInput.IsActive())
+			{
+				// 与共享 UI 的输入焦点同步，避免 Demo 控件更新时释放此输入框。
+				Ui()->SetActiveItem(&m_TeleNumberInput);
+				Ui()->SetActiveItem(nullptr);
+			}
+			m_TeleNumberInput.SelectAll();
+			m_IgnoreTeleNumberTextEvent = false;
+		}
+		else
+			m_TeleNumberInput.Deactivate();
+	}
+	const bool Changed = m_TeleNumberInput.WasChanged();
+	const bool CursorChanged = m_TeleNumberInput.WasCursorChanged();
+	if(Changed)
+	{
+		m_TeleSearchStatus = ETeleSearchStatus::IDLE;
+		m_LastTeleNumber = 0;
+	}
+	Number.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, (m_TeleNumberInput.IsActive() ? 0.25f : 0.1f) * Alpha), IGraphics::CORNER_ALL, 8.0f);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, Alpha);
+	m_TeleNumberInput.Render(&Number, 20.0f, TEXTALIGN_MC, Changed || CursorChanged, -1.0f, 0.0f);
+	if(Button(Find, Localize("Find / Next")))
+		FindTele();
+
+	const char *pStatus = Localize("Enter a CP number from 1 to 255.");
+	if(m_TeleSearchStatus == ETeleSearchStatus::FOUND)
+		pStatus = Localize("Click again to find the next location.");
+	else if(m_TeleSearchStatus == ETeleSearchStatus::NOT_FOUND)
+		pStatus = Localize("There is no teleporter with that index on the map.");
+	const bool Error = m_TeleSearchStatus == ETeleSearchStatus::INVALID_NUMBER || m_TeleSearchStatus == ETeleSearchStatus::NOT_FOUND;
+	TextRender()->TextColor(Error ? ColorRGBA(1.0f, 0.5f, 0.5f, Alpha) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.6f * Alpha));
+	const CUIRect Status = {Center.x - 280.0f, Center.y + 360.0f, 560.0f, 20.0f};
+	Ui()->DoLabel(&Status, pStatus, 16.0f, TEXTALIGN_ML);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 void CSpectator::OnReset()
@@ -731,10 +891,20 @@ void CSpectator::OnReset()
 	m_SelectedSpectatorId = NO_SELECTION;
 	m_MultiViewActivateDelay = 0.0f;
 	m_TouchState = {};
+	m_TeleNumberInput.Deactivate();
+	m_TeleNumberInput.Set("1");
+	m_IgnoreTeleNumberTextEvent = false;
+	m_TeleSearchStatus = ETeleSearchStatus::IDLE;
+	m_LastTeleNumber = 0;
+	m_LastTeleIndex = -1;
+	m_TeleSearchPending = false;
+	m_TeleSearchPosition = vec2(0.0f, 0.0f);
 }
 
 void CSpectator::Spectate(int SpectatorId)
 {
+	if(SpectatorId != SPEC_FREEVIEW)
+		m_TeleSearchPending = false;
 	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
 	{
 		GameClient()->m_DemoSpecId = std::clamp(SpectatorId, (int)SPEC_FOLLOW, MAX_CLIENTS - 1);

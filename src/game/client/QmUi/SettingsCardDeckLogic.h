@@ -12,6 +12,9 @@
 #include <unordered_map>
 #include <vector>
 
+class CUiV2AnimationRuntime;
+struct SCardMotionSpec;
+
 struct SSettingsCardDeckItemGeometry
 {
 	int m_StateIndex = -1;
@@ -53,9 +56,10 @@ class CSettingsCardDeckFrameRuntime
 {
 public:
 	bool BeginDisplayCycle(uint64_t DisplayCycle, bool AnimateEntry);
-	void OnTabChanged();
+	void OnTabChanged(bool StartEntryCycle = false);
 	bool EntryCyclePending() const { return m_EntryDisplayCycle != m_DisplayCycle; }
 	bool ConsumeEntryCycle();
+	float ResolveContinuousEntryOffset(CUiV2AnimationRuntime &AnimRuntime, uint64_t NodeKey, const SCardMotionSpec &Motion);
 	bool AnimateEntry() const { return m_AnimateEntry; }
 	bool EntryWasActive() const { return m_EntryWasActive; }
 	void SetEntryActive(bool Active) { m_EntryWasActive = Active; }

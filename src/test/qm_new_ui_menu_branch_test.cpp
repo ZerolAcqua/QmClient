@@ -12,6 +12,10 @@
 #include <game/client/components/nameplate_text_effects.h>
 #include <game/client/components/nameplates.h>
 #include <game/client/components/qmclient/axiom_auto_login.h>
+#include <game/client/components/qmclient/demo_cut.h>
+#include <game/client/components/qmclient/demo_display.h>
+#include <game/client/components/qmclient/nameplate_layout.h>
+#include <game/client/components/qmclient/spectator_tele_search.h>
 #include <game/client/components/tclient/statusbar.h>
 #include <game/client/components/tooltips.h>
 #include <game/client/prediction/gameworld.h>
@@ -22,10 +26,95 @@
 #include <test/test.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <regex>
 #include <sstream>
 #include <string>
+
+TEST(QmSpectatorTeleSearch, NumberInputAndSteppingStayInMapRange)
+{
+	EXPECT_EQ(qm_spectator_tele::ParseNumber("1"), 1);
+	EXPECT_EQ(qm_spectator_tele::ParseNumber("042"), 42);
+	EXPECT_EQ(qm_spectator_tele::ParseNumber("255"), 255);
+	for(const char *pInvalid : {"", "0", "256", "-1", "1a", "1.5", " 1", "999999999999"})
+		EXPECT_EQ(qm_spectator_tele::ParseNumber(pInvalid), 0) << pInvalid;
+	EXPECT_EQ(qm_spectator_tele::StepNumber(1, -1), 255);
+	EXPECT_EQ(qm_spectator_tele::StepNumber(255, 1), 1);
+	EXPECT_EQ(qm_spectator_tele::StepNumber(42, -1), 41);
+	EXPECT_EQ(qm_spectator_tele::StepNumber(42, 1), 43);
+	EXPECT_EQ(qm_spectator_tele::StepNumber(0, 1), 1);
+	EXPECT_EQ(qm_spectator_tele::StepNumber(0, -1), 255);
+}
+
+TEST(QmSpectatorTeleSearch, ReadsTopRowAndKeypadDigitsWhileHoldingSpectatorKey)
+{
+	EXPECT_EQ(qm_spectator_tele::DigitFromKey(KEY_0), 0);
+	EXPECT_EQ(qm_spectator_tele::DigitFromKey(KEY_KP_0), 0);
+	for(int Digit = 1; Digit <= 9; ++Digit)
+	{
+		EXPECT_EQ(qm_spectator_tele::DigitFromKey(KEY_1 + Digit - 1), Digit);
+		EXPECT_EQ(qm_spectator_tele::DigitFromKey(KEY_KP_1 + Digit - 1), Digit);
+	}
+	EXPECT_EQ(qm_spectator_tele::DigitFromKey(KEY_RSHIFT), -1);
+	EXPECT_EQ(qm_spectator_tele::DigitFromKey(KEY_A), -1);
+}
+
+TEST(QmSpectatorTeleSearch, MatchesEditorNumberedTeleTypes)
+{
+	for(const unsigned char Type : {TILE_TELEIN, TILE_TELEINEVIL, TILE_TELEINWEAPON, TILE_TELEINHOOK, TILE_TELEOUT, TILE_TELECHECK, TILE_TELECHECKOUT})
+	{
+		CTeleTile aTiles[1] = {};
+		aTiles[0].m_Number = 7;
+		aTiles[0].m_Type = Type;
+		EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 1, 1, 7, -1), 0) << static_cast<int>(Type);
+	}
+	for(const unsigned char Type : {TILE_AIR, TILE_SOLID, TILE_TELECHECKIN, TILE_TELECHECKINEVIL})
+	{
+		CTeleTile aTiles[1] = {};
+		aTiles[0].m_Number = 7;
+		aTiles[0].m_Type = Type;
+		EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 1, 1, 7, -1), -1) << static_cast<int>(Type);
+	}
+}
+
+TEST(QmSpectatorTeleSearch, CyclesDistinctLocationsInMapOrder)
+{
+	CTeleTile aTiles[64] = {};
+	for(const int Index : {0, 1, 9, 10, 30})
+	{
+		aTiles[Index].m_Number = 7;
+		aTiles[Index].m_Type = TILE_TELECHECK;
+	}
+	aTiles[10].m_Type = TILE_TELEOUT;
+	aTiles[30].m_Type = TILE_TELECHECKOUT;
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 64, 1, 7, -1), 0);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 64, 1, 7, 0), 10);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 64, 1, 7, 10), 30);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 64, 1, 7, 30), 0);
+	// 改号时从头查找；不同编号不会沿用上一个编号的位置。
+	aTiles[20].m_Number = 255;
+	aTiles[20].m_Type = TILE_TELECHECKOUT;
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 64, 1, 255, -1), 20);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 64, 1, 255, 20), 20);
+}
+
+TEST(QmSpectatorTeleSearch, UsesTwoDimensionalDistanceAndHandlesMissingPoints)
+{
+	CTeleTile aTiles[144] = {};
+	for(const int Index : {0, 12, 120})
+	{
+		aTiles[Index].m_Number = 1;
+		aTiles[Index].m_Type = TILE_TELECHECK;
+	}
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 12, 12, 1, 0), 120);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 12, 12, 1, 120), 0);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 12, 12, 2, -1), -1);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 12, 12, 0, -1), -1);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 12, 12, 256, -1), -1);
+	EXPECT_EQ(qm_spectator_tele::FindNext(nullptr, 12, 12, 1, -1), -1);
+	EXPECT_EQ(qm_spectator_tele::FindNext(aTiles, 0, 12, 1, -1), -1);
+}
 
 TEST(PlausibleSizes, RefreshRateAndWindowGuardsMatchContract)
 {
@@ -537,38 +626,131 @@ TEST(QmNewUiMenuBranches, NestedSegmentChromeDrawsContainerAndTwoSpringTracks)
 	EXPECT_NE(Body.find("DrawRoundedSurface(Ctx, Indicator, Fill, Border, ui_token::radius::PILL, HasBorder ? Ctx.m_pUi->PixelSize() : 0.0f);"), std::string::npos);
 }
 
-TEST(QmNewUiMenuBranches, NamePlateShowRowUsesNestedCapsuleInNewUi)
+TEST(QmNewUiMenuBranches, NamePlateShowRowUsesFlatSixSegmentCapsule)
 {
-	// 意图：昵称板块的「显示昵称」在新 UI 下是胶囊两级行：一级主滑块标记显示范围，
-	// 一级项带子级时它的一级标签被二级菜单整段替换，旧 UI 仍走原来的扁平分段行。
+	// 意图：昵称板块的「显示昵称」重整为六档互斥范围（无 / 当前 / 当前+本地 / 他人 / 本地+他人 / 全体），
+	// 宽够时是单行六段胶囊（只有主滑块），旧 UI 与窄窗口用同一份选项走可换行分段行，语义一致。
 	const std::string Source = ReadTextFile("src/game/client/components/menus_settings.cpp");
-	const size_t RowPos = Source.find("const SSettingsNestedRadioRowLayout ShowNameRow = ResolveSettingsNestedRadioRowLayout(LeftView, AppearanceMetrics);");
+	const size_t RowPos = Source.find("const SSettingsSegmentedRowLayout ShowNameRow = ResolveShowNameRowLayout(LeftView);");
 	ASSERT_NE(RowPos, std::string::npos);
 	const size_t ChromePos = Source.find("ui_widget::NestedSegmentChrome(TabBarUiContext(), ShowNameGroup, ShowNameRow.m_ContainerRect,", RowPos);
 	const size_t MainDrawPos = Source.find("if(DoSettingsButton_CapsuleSegment(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, APPEARANCE_TAB_NAME_PLATE, &m_vButtonContainersNamePlateShow[i]", RowPos);
-	const size_t SubDrawPos = Source.find("if(DoSettingsButton_CapsuleSegment(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, APPEARANCE_TAB_NAME_PLATE, &vSubButtons[s]", RowPos);
 	ASSERT_NE(ChromePos, std::string::npos);
 	ASSERT_NE(MainDrawPos, std::string::npos);
-	ASSERT_NE(SubDrawPos, std::string::npos);
 	EXPECT_LT(RowPos, ChromePos);
 	EXPECT_LT(ChromePos, MainDrawPos);
-	EXPECT_LT(MainDrawPos, SubDrawPos);
-	// 一级项只有自身/他人带子级；无与全体沿用最近一次的子级选择。
-	EXPECT_NE(Source.find("const int SubCount = (OwnRow || OthersRow) ? 2 : 0;"), std::string::npos);
-	EXPECT_NE(Source.find("std::vector<CButtonContainer> &vSubButtons = OwnRow ? m_vButtonContainersNamePlateOwnScope : m_vButtonContainersNamePlateOthersScope;"), std::string::npos);
-	// 替换语义：带子级的激活一级项不再画标签，也不再接手点击（那一段整段是子级菜单）。
-	const size_t SkipPos = Source.find("if(ShowSubMenu && i == Pressed)", RowPos);
-	ASSERT_NE(SkipPos, std::string::npos);
-	EXPECT_NE(Source.find("continue;", SkipPos), std::string::npos);
-	EXPECT_LT(SkipPos, MainDrawPos);
-	// 子级压在主滑块上，字色按主滑块明暗给实色。
-	EXPECT_NE(Source.find("const ColorRGBA SubLabelColor = SubActive == s ? ShowNameStyle.m_SubActiveLabelColor : ShowNameStyle.m_SubInactiveLabelColor;"), std::string::npos);
-	EXPECT_NE(Source.find("&SubLabelColor, &ShowNameStyle.m_SubHoverColor))"), std::string::npos);
-	// 旧 UI 分支还在。
-	EXPECT_NE(Source.find("else if(DoSettingsLine_RadioMenu(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, APPEARANCE_TAB_NAME_PLATE, LeftView, \"appearance-show-name-plates-label\""), std::string::npos);
-	// 测量、预布局与绘制三个阶段必须用同一个行高解析结果。
-	EXPECT_NE(Source.find("return ResolveSettingsNestedRadioRowLayout({0.0f, 0.0f, ContentWidth, LineSize * 2.0f + MarginSmall}, AppearanceMetrics).m_Height;"), std::string::npos);
-	EXPECT_NE(Source.find("LeftView.HSplitTop(ResolveSettingsNestedRadioRowLayout(LeftView, AppearanceMetrics).m_Height, nullptr, &LeftView);"), std::string::npos);
+	// 六档选项按顺序绑定档位常量（逐条检查，避免把缩进写进断言）。
+	EXPECT_NE(Source.find("const int aShowScopeValues[] = {"), std::string::npos);
+	const size_t ValuesPos = Source.find("const int aShowScopeValues[] = {");
+	ASSERT_NE(ValuesPos, std::string::npos);
+	const size_t ValuesEnd = Source.find("};", ValuesPos);
+	ASSERT_NE(ValuesEnd, std::string::npos);
+	const std::string ValuesBlock = Source.substr(ValuesPos, ValuesEnd - ValuesPos);
+	const char *apExpectedScopeOrder[] = {"QM_NAMEPLATE_SHOW_SCOPE_OFF", "QM_NAMEPLATE_SHOW_SCOPE_CURRENT", "QM_NAMEPLATE_SHOW_SCOPE_LOCAL", "QM_NAMEPLATE_SHOW_SCOPE_OTHERS", "QM_NAMEPLATE_SHOW_SCOPE_OTHERS_LOCAL", "QM_NAMEPLATE_SHOW_SCOPE_ALL"};
+	size_t PreviousEntry = 0;
+	for(const char *pEntry : apExpectedScopeOrder)
+	{
+		const size_t EntryPos = ValuesBlock.find(pEntry);
+		ASSERT_NE(EntryPos, std::string::npos) << pEntry;
+		EXPECT_LT(PreviousEntry, EntryPos) << pEntry;
+		PreviousEntry = EntryPos;
+	}
+	// 档位个数常量与档位数组同源，不允许再多写魔法数字 6。
+	EXPECT_NE(Source.find("const int ShowScopeCount = (int)std::size(aShowScopeValues);"), std::string::npos);
+	EXPECT_NE(Source.find("const int Pressed = std::clamp(g_Config.m_QmNameplateShowScope, 0, ShowScopeCount - 1);"), std::string::npos);
+	EXPECT_NE(Source.find("if(DoSettingsButton_CapsuleSegment(SETTINGS_APPEARANCE, APPEARANCE_TAB_NAME_PLATE, APPEARANCE_TAB_NAME_PLATE, &m_vButtonContainersNamePlateShow[i], apShowScopeTextIds[i], apShowScopeLabels[i], Pressed == aShowScopeValues[i], &ShowNameSlots.m_aMain[i], AppearanceMetrics.m_SmallSize))"), std::string::npos);
+	EXPECT_NE(Source.find("g_Config.m_QmNameplateShowScope = aShowScopeValues[i];"), std::string::npos);
+	// 单行六段：没有子级菜单，滑块只标主槽位。
+	EXPECT_NE(Source.find("const SSettingsNestedRadioSlots ShowNameSlots = ResolveSettingsNestedRadioSlots(ShowNameRow.m_ContainerRect, ShowScopeCount, Pressed, 0, CapsuleSegmentInset);"), std::string::npos);
+	EXPECT_NE(Source.find("ui_widget::NestedSegmentChrome(TabBarUiContext(), ShowNameGroup, ShowNameRow.m_ContainerRect, &ShowNameSlots.m_aMain[Pressed], nullptr, SettingsNestedSegmentStyle());"), std::string::npos);
+	EXPECT_EQ(Source.find("if(ShowSubMenu && i == Pressed)"), std::string::npos);
+	EXPECT_EQ(Source.find("const int SubCount = (OwnRow || OthersRow) ? 2 : 0;"), std::string::npos);
+	EXPECT_EQ(Source.find("m_vButtonContainersNamePlateOwnScope"), std::string::npos);
+	EXPECT_EQ(Source.find("m_vButtonContainersNamePlateOthersScope"), std::string::npos);
+	// 窄窗口兜底：放不下六段胶囊时退回可换行分段行，两条路径都写同一个配置项。
+	EXPECT_NE(Source.find("if(g_Config.m_QmNewUi != 0 && ShowNameRow.m_Capsule)"), std::string::npos);
+	EXPECT_NE(Source.find("// 旧 UI，以及新 UI 下主内容区太窄放不下六段胶囊时：走可换行分段行。"), std::string::npos);
+	EXPECT_NE(Source.find("DoShowScopeRadioMenu();"), std::string::npos);
+	EXPECT_NE(Source.find("g_Config.m_QmNameplateShowScope = Selected;"), std::string::npos);
+	// 测量、预布局与绘制三个阶段必须共用 ResolveShowNameRowLayout 这一个行高解析结果。
+	// 该 lambda 会被预布局回调按值拷走，所以标签表必须是静态的，不能指向栈上数组。
+	EXPECT_NE(Source.find("const auto ResolveShowNameRowLayout = [=](const CUIRect &View) {"), std::string::npos);
+	EXPECT_NE(Source.find("static const char *const apShowScopeLabels[] = {"), std::string::npos);
+	EXPECT_NE(Source.find("return ResolveSettingsSegmentedRowLayout(View, ShowScopeCount, AppearanceMetrics, ShowNameOptionMinWidth());"), std::string::npos);
+	EXPECT_NE(Source.find("const float GeneralContentHeight = ResolveShowNameRowLayout({0.0f, 0.0f, ContentWidth, LineSize * 2.0f + MarginSmall}).m_Height"), std::string::npos);
+	EXPECT_NE(Source.find("LeftView.HSplitTop(ResolveShowNameRowLayout(LeftView).m_Height, nullptr, &LeftView);"), std::string::npos);
+	EXPECT_NE(Source.find("const SSettingsSegmentedRowLayout ShowNameRow = ResolveShowNameRowLayout(LeftView);"), std::string::npos);
+	// 分段宽度阈值按最长档位标签的真实宽度算，否则正常窗口宽度下胶囊分段永远不生效。
+	EXPECT_NE(Source.find("const auto ShowNameOptionMinWidth = [this, AppearanceMetrics]() {"), std::string::npos);
+	EXPECT_NE(Source.find("Widest = maximum(Widest, pTextRender->TextWidth(AppearanceMetrics.m_SmallSize, pLabel, -1));"), std::string::npos);
+	EXPECT_EQ(Source.find("return RadioHeight(6);"), std::string::npos);
+	EXPECT_EQ(Source.find("ConsumeRadio(6);"), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, SettingsSegmentedRowFallsBackToWrappingRadioWhenNarrow)
+{
+	// 意图：多档分段行的共用落位解析。够宽给胶囊分段（标签一行 + 控件一行），
+	// 窄到分段放不下时给可换行分段行的标签/控件矩形，两者都由同一函数给出。
+	const SSettingsContentMetrics Metrics = ResolveSettingsContentMetrics(1000.0f);
+	const CUIRect Wide{0.0f, 0.0f, 600.0f, Metrics.m_LineHeight};
+	const CUIRect Narrow{0.0f, 0.0f, 300.0f, Metrics.m_LineHeight};
+	const float Measured = 52.0f; // 小字号下「本地+他人」的量级
+
+	const SSettingsSegmentedRowLayout WideLayout = ResolveSettingsSegmentedRowLayout(Wide, 6, Metrics, Measured);
+	EXPECT_TRUE(WideLayout.m_Capsule);
+	EXPECT_FLOAT_EQ(WideLayout.m_Height, Metrics.m_LineHeight + Metrics.m_LineSpacing + Metrics.m_ButtonHeight);
+	EXPECT_FLOAT_EQ(WideLayout.m_ContainerRect.y, Metrics.m_LineHeight + Metrics.m_LineSpacing);
+	EXPECT_FLOAT_EQ(WideLayout.m_ContainerRect.w, Wide.w);
+
+	// 窄窗口必须退回可换行分段行，且行高/控件矩形与普通分段行一致。
+	const SSettingsSegmentedRowLayout NarrowLayout = ResolveSettingsSegmentedRowLayout(Narrow, 6, Metrics, Measured);
+	EXPECT_FALSE(NarrowLayout.m_Capsule);
+	const SSettingsRadioRowLayout NarrowRadio = ResolveSettingsRadioRowLayout(Narrow, 6, Metrics);
+	EXPECT_FLOAT_EQ(NarrowLayout.m_Height, NarrowRadio.m_Height);
+	EXPECT_FLOAT_EQ(NarrowLayout.m_ContainerRect.w, NarrowRadio.m_ButtonsRect.w);
+
+	// 不给量测宽度时退回保守估算（72px 下限），不能因此永远选胶囊：
+	// 400 放不下六档，600 按胶囊真实几何够（旧阈值多扣一列标签宽时会误判）。
+	EXPECT_FALSE(ResolveSettingsSegmentedRowLayout({0.0f, 0.0f, 400.0f, Metrics.m_LineHeight}, 6, Metrics, 0.0f).m_Capsule);
+	EXPECT_TRUE(ResolveSettingsSegmentedRowLayout(Wide, 6, Metrics, 0.0f).m_Capsule);
+	EXPECT_TRUE(ResolveSettingsSegmentedRowLayout({0.0f, 0.0f, 1000.0f, Metrics.m_LineHeight}, 6, Metrics, 0.0f).m_Capsule);
+
+	// 宽度为 0 不能出现半成品布局；档位少时宽窗口仍走胶囊。
+	const SSettingsSegmentedRowLayout Zero = ResolveSettingsSegmentedRowLayout({0.0f, 0.0f, 0.0f, 0.0f}, 6, Metrics, Measured);
+	EXPECT_FLOAT_EQ(Zero.m_Height, 0.0f);
+	EXPECT_FALSE(Zero.m_Capsule);
+	EXPECT_FLOAT_EQ(ResolveSettingsSegmentedRowLayout(Wide, 2, Metrics, Measured).m_ContainerRect.w, Wide.w);
+
+	// 阈值单调：宽度递增时只从「可换行」切到「胶囊」一次。
+	bool SeenCapsule = false;
+	for(float Width = 100.0f; Width <= 900.0f; Width += 4.0f)
+	{
+		const SSettingsSegmentedRowLayout Layout = ResolveSettingsSegmentedRowLayout({0.0f, 0.0f, Width, Metrics.m_LineHeight}, 6, Metrics, Measured);
+		if(Layout.m_Capsule)
+			SeenCapsule = true;
+		else
+			EXPECT_FALSE(SeenCapsule) << "宽度 " << Width << " 又退回可换行分段行";
+	}
+}
+
+TEST(QmNewUiMenuBranches, SegmentedRowCapsuleFitsTwoColumnCardWidth)
+{
+	// 意图：胶囊分段的标签独占上一行、控件行用满整行宽度，阈值里不能再预扣一列标签宽。
+	// 1920 宽窗口的新 UI 用两列卡片，卡片内容宽约 464：旧阈值（约 148 + 5 + 6×60 ≈ 513）
+	// 会让「显示昵称」白白退回旧分段行，与同页「钩索强度范围」的胶囊外观对不上。
+	const SSettingsContentMetrics Metrics = ResolveSettingsContentMetrics(1000.0f);
+	const CUIRect CardContent{0.0f, 0.0f, 464.0f, Metrics.m_LineHeight};
+	const float ShowScopeOptionWidth = 52.0f; // 小字号下「本地+他人」的量级
+	const float HookScopeOptionWidth = 28.0f; // 小字号下「强钩」的量级
+
+	const SSettingsSegmentedRowLayout ShowScope = ResolveSettingsSegmentedRowLayout(CardContent, 6, Metrics, ShowScopeOptionWidth);
+	EXPECT_TRUE(ShowScope.m_Capsule);
+	EXPECT_FLOAT_EQ(ShowScope.m_ContainerRect.w, CardContent.w);
+	EXPECT_TRUE(ResolveSettingsSegmentedRowLayout(CardContent, 5, Metrics, HookScopeOptionWidth).m_Capsule);
+
+	// 真放不下的判定仍然保留：六档各要 52+8 时，356 退回可换行分段行，360 才够。
+	EXPECT_FALSE(ResolveSettingsSegmentedRowLayout({0.0f, 0.0f, 356.0f, Metrics.m_LineHeight}, 6, Metrics, ShowScopeOptionWidth).m_Capsule);
+	EXPECT_TRUE(ResolveSettingsSegmentedRowLayout({0.0f, 0.0f, 360.0f, Metrics.m_LineHeight}, 6, Metrics, ShowScopeOptionWidth).m_Capsule);
 }
 
 TEST(QmNewUiMenuBranches, CapsuleSegmentKeepsBudgetedTextPipeline)
@@ -1101,6 +1283,120 @@ TEST(QmDemoCutRender, UsesExportedCutAsRenderSource)
 	EXPECT_EQ(SlicePopup.find("str_copy(m_aPendingDemoRenderSelectionName, m_aCurrentDemoSelectionName"), std::string::npos);
 }
 
+TEST(QmDemoDisplay, PreviewAndVideoUseTheSameProfile)
+{
+	CConfig Config{};
+	Config.m_ClShowDirection = 3;
+	Config.m_ClVideoShowDirection = 0;
+	Config.m_ClNamePlatesStrong = 0;
+	Config.m_QmDemoShowDirection = 2;
+	Config.m_QmDemoShowStrongWeak = 2;
+	Config.m_QmDemoStrongWeakScope = 4;
+	Config.m_QmDemoShowHud = 1;
+	Config.m_QmDemoShowChat = 0;
+	for(bool Rendering : {false, true})
+	{
+		const auto Display = qm_demo_display::Resolve(Config, true, Rendering);
+		EXPECT_EQ(Display.m_Direction, 2);
+		EXPECT_EQ(Display.m_StrongWeak, 2);
+		EXPECT_EQ(Display.m_StrongWeakScope, 4);
+		EXPECT_TRUE(Display.m_Hud);
+		EXPECT_FALSE(Display.m_Chat);
+	}
+}
+
+TEST(QmDemoDisplay, ChangingDemoOptionsDoesNotChangeGameplay)
+{
+	CConfig Config{};
+	Config.m_ClShowDirection = 3;
+	Config.m_ClNamePlatesStrong = 1;
+	Config.m_QmNameplateHookStrongWeakScope = 2;
+	Config.m_ClShowhud = 1;
+	Config.m_ClShowChat = 1;
+	for(int Direction = 0; Direction <= 3; ++Direction)
+	{
+		Config.m_QmDemoShowDirection = Direction;
+		for(int StrongWeak = 0; StrongWeak <= 2; ++StrongWeak)
+		{
+			Config.m_QmDemoShowStrongWeak = StrongWeak;
+			const auto Demo = qm_demo_display::Resolve(Config, true, false);
+			EXPECT_EQ(Demo.m_Direction, Direction);
+			EXPECT_EQ(Demo.m_StrongWeak, StrongWeak);
+			const auto Game = qm_demo_display::Resolve(Config, false, false);
+			EXPECT_EQ(Game.m_Direction, 3);
+			EXPECT_EQ(Game.m_StrongWeak, 1);
+			EXPECT_EQ(Game.m_StrongWeakScope, 2);
+			EXPECT_TRUE(Game.m_Hud);
+			EXPECT_TRUE(Game.m_Chat);
+		}
+	}
+}
+
+TEST(QmDemoCut, RequiresASelectionAndResolvesOpenEnds)
+{
+	SDemoSliceSegment Range;
+	EXPECT_FALSE(qm_demo_cut::ResolveRange(-1, -1, 100, 500, Range));
+	ASSERT_TRUE(qm_demo_cut::ResolveRange(175, -1, 100, 500, Range));
+	EXPECT_EQ(Range.m_StartTick, 175);
+	EXPECT_EQ(Range.m_EndTick, 500);
+	ASSERT_TRUE(qm_demo_cut::ResolveRange(-1, 325, 100, 500, Range));
+	EXPECT_EQ(Range.m_StartTick, 100);
+	EXPECT_EQ(Range.m_EndTick, 325);
+}
+
+TEST(QmDemoCut, RejectsEmptyReversedAndOutOfBoundsCuts)
+{
+	SDemoSliceSegment Range;
+	EXPECT_FALSE(qm_demo_cut::ResolveRange(200, 200, 100, 500, Range));
+	EXPECT_FALSE(qm_demo_cut::ResolveRange(300, 200, 100, 500, Range));
+	EXPECT_FALSE(qm_demo_cut::ResolveRange(600, -1, 100, 500, Range));
+	EXPECT_FALSE(qm_demo_cut::ResolveRange(-1, 50, 100, 500, Range));
+	EXPECT_FALSE(qm_demo_cut::ResolveRange(100, 200, 500, 100, Range));
+	EXPECT_FALSE(qm_demo_cut::ResolveRange(100, 200, 100, 100, Range));
+	ASSERT_TRUE(qm_demo_cut::ResolveRange(50, 550, 100, 500, Range));
+	EXPECT_EQ(Range.m_StartTick, 100);
+	EXPECT_EQ(Range.m_EndTick, 500);
+}
+
+TEST(QmDemoCut, TimeDisplayRetainsSubsecondTicks)
+{
+	EXPECT_EQ(qm_demo_cut::ToCentiseconds(1, 50), 2);
+	EXPECT_EQ(qm_demo_cut::ToCentiseconds(25, 50), 50);
+	EXPECT_EQ(qm_demo_cut::ToCentiseconds(51, 50), 102);
+	EXPECT_EQ(qm_demo_cut::ToCentiseconds(180001, 50), 360002);
+	EXPECT_EQ(qm_demo_cut::ToCentiseconds(2000000000, 50), 4000000000LL);
+}
+
+TEST(QmDemoCut, PreviewStopsAtTheEndIncludingSkippedFrames)
+{
+	qm_demo_cut::CPreview Preview;
+	EXPECT_FALSE(Preview.IsActive());
+	ASSERT_TRUE(Preview.Start({100, 200}));
+	EXPECT_FALSE(Preview.Update(199));
+	EXPECT_TRUE(Preview.IsActive());
+	EXPECT_TRUE(Preview.Update(200));
+	EXPECT_FALSE(Preview.IsActive());
+	EXPECT_TRUE(Preview.IsFinished());
+	EXPECT_FALSE(Preview.Update(201));
+	ASSERT_TRUE(Preview.Start({100, 200}));
+	EXPECT_TRUE(Preview.Update(203));
+	EXPECT_FALSE(Preview.IsActive());
+}
+
+TEST(QmDemoCut, PreviewCanBeCancelledAndCannotStartAnInvalidCut)
+{
+	qm_demo_cut::CPreview Preview;
+	ASSERT_TRUE(Preview.Start({100, 200}));
+	Preview.Reset();
+	EXPECT_FALSE(Preview.IsActive());
+	EXPECT_FALSE(Preview.IsFinished());
+	EXPECT_FALSE(Preview.Update(250));
+	EXPECT_FALSE(Preview.Start({200, 100}));
+	EXPECT_FALSE(Preview.Start({200, 200}));
+	EXPECT_FALSE(Preview.Start({-1, 200}));
+	EXPECT_FALSE(Preview.IsActive());
+}
+
 TEST(QmNewUiMenuBranches, BrowserUsesExplicitQmNewUiShellBranch)
 {
 	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
@@ -1490,7 +1786,11 @@ TEST(QmNewUiMenuBranches, GaussianBlurSettingReplacesBetterScoreboardAndIsVersio
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmBetterScoreboard, qm_better_scoreboard, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE"), std::string::npos);
 	EXPECT_NE(MiniFeaturesContent.find("RenderCheckbox(&g_Config.m_QmBetterScoreboard, \"Better scoreboard\", &g_Config.m_QmBetterScoreboard);"), std::string::npos);
 	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(pId, pText, Localize(pText), pValue, &Row, PrewarmOnly);"), std::string::npos);
-	EXPECT_NE(MenusSource.find("case EQmModuleId::MiniFeatures: return Rows(19.0f);"), std::string::npos);
+	EXPECT_NE(MenusSource.find("case EQmModuleId::MiniFeatures: return Rows(21.0f);"), std::string::npos);
+	// Realtime channel 与 Sponsor reminder 是卡片末尾的常驻行，测量行数必须跟着内容一起涨，
+	// 否则最后一个开关会贴到卡片底边。
+	EXPECT_NE(MiniFeaturesContent.find("RenderCheckbox(&g_Config.m_QmWebSocket, \"Realtime channel\", &g_Config.m_QmWebSocket);"), std::string::npos);
+	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(&g_Config.m_QmSponsorNudge, \"Sponsor reminder\""), std::string::npos);
 	EXPECT_NE(MenusToml.find("key = \"Better scoreboard\""), std::string::npos);
 	EXPECT_NE(MenusToml.find("simplified_chinese = \"更好的计分板\""), std::string::npos);
 	EXPECT_NE(VersionSource.find("#define QMCLIENT_VERSION \""), std::string::npos);
@@ -2207,8 +2507,9 @@ TEST(QmNewUiMenuBranches, NameplateOthersModeSuppressesLocalIdentityRows)
 	EXPECT_EQ(RenderNamePlateGame.find("IsLocalClient &&\n\t\tm_pData->m_CoordXAlignFrame.m_LocalAligned"), std::string::npos);
 	EXPECT_EQ(RenderNamePlateGame.find("const bool OwnNameplateScopeVisible"), std::string::npos);
 	EXPECT_NE(RenderNamePlateGame.find("Data.m_ShowName = ShouldShowQmNameplateName("), std::string::npos);
-	EXPECT_NE(RenderNamePlateGame.find("g_Config.m_QmNameplateOwnScope,"), std::string::npos);
-	EXPECT_NE(RenderNamePlateGame.find("g_Config.m_QmNameplateOthersScope,"), std::string::npos);
+	EXPECT_NE(RenderNamePlateGame.find("g_Config.m_QmNameplateShowScope,"), std::string::npos);
+	EXPECT_EQ(RenderNamePlateGame.find("g_Config.m_QmNameplateOwnScope,"), std::string::npos);
+	EXPECT_EQ(RenderNamePlateGame.find("g_Config.m_QmNameplateOthersScope,"), std::string::npos);
 	EXPECT_EQ(RenderNamePlateGame.find("Data.m_ShowName = pPlayerInfo->m_Local ? g_Config.m_ClNamePlatesOwn : g_Config.m_ClNamePlates;"), std::string::npos);
 	EXPECT_NE(RenderNamePlateGame.find("Data.m_ShowClientId = Data.m_ShowName && (g_Config.m_Debug || g_Config.m_ClNamePlatesIds) && !HideIdentity;"), std::string::npos);
 	EXPECT_NE(RenderNamePlateGame.find("Data.m_ShowClan = Data.m_ShowName && g_Config.m_ClNamePlatesClan && !HideIdentity;"), std::string::npos);
@@ -2250,12 +2551,56 @@ TEST(QmNewUiMenuBranches, NameplatePreviewShowsPlayerStrongHookMarker)
 	const std::string Source = ReadTextFile("src/game/client/components/nameplates.cpp");
 	const std::string BuildPreviewData = FunctionBody(Source, "static void BuildNamePlatePreviewData");
 
-	EXPECT_NE(BuildPreviewData.find("const bool PreviewIsLocal = DummyIdx == g_Config.m_ClDummy;"), std::string::npos);
+	EXPECT_NE(BuildPreviewData.find("const bool PreviewIsCurrentChar = DummyIdx == g_Config.m_ClDummy;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("if(DummyIdx == g_Config.m_ClDummy)"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_HookStrongWeakState = EHookStrongWeakState::NEUTRAL;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_HookStrongWeakState = Data.m_HookStrongWeakId == 2 ? EHookStrongWeakState::STRONG : EHookStrongWeakState::WEAK;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_ShowHookStrongWeak = NameplateScopeAllowsPreview && (Data.m_ShowHookStrongWeakId || (g_Config.m_ClNamePlatesStrong > 0 && ShouldShowQmHookStrongWeakScope(g_Config.m_QmNameplateHookStrongWeakScope, true, false, false)));"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_ShowHookStrongWeak = NameplateScopeAllowsPreview && g_Config.m_ClNamePlatesStrong > 0 && ShouldShowQmHookStrongWeakScope(g_Config.m_QmNameplateHookStrongWeakScope, false, Strong, Weak);"), std::string::npos);
+}
+
+TEST(QmNameplateIndicatorLayout, HookToggleAndSizeDoNotMoveKeys)
+{
+	for(const float HookHeight : {0.0f, 13.0f, 29.0f, 43.0f})
+	{
+		SCOPED_TRACE(HookHeight);
+		const auto aBaselines = QmNameplateCoreRowBaselines({24.0f, 20.0f, HookHeight, 29.0f, 36.0f});
+		EXPECT_FLOAT_EQ(aBaselines[static_cast<size_t>(ENameplateCoreRow::HOOK)], -44.0f);
+		EXPECT_FLOAT_EQ(aBaselines[static_cast<size_t>(ENameplateCoreRow::KEYS)], -102.0f);
+		// 坐标行继续沿用现有堆叠行为，本次只解除方向键对强弱钩高度的依赖。
+		EXPECT_FLOAT_EQ(aBaselines[static_cast<size_t>(ENameplateCoreRow::COORDS)], -44.0f - HookHeight);
+
+		const auto aOnlyIndicators = QmNameplateCoreRowBaselines({0.0f, 0.0f, HookHeight, 0.0f, 36.0f});
+		EXPECT_FLOAT_EQ(aOnlyIndicators[static_cast<size_t>(ENameplateCoreRow::HOOK)], 0.0f);
+		EXPECT_FLOAT_EQ(aOnlyIndicators[static_cast<size_t>(ENameplateCoreRow::KEYS)], -29.0f);
+	}
+}
+
+TEST(QmNameplateIndicatorLayout, KeysToggleAndSizeDoNotMoveHook)
+{
+	for(const float KeysHeight : {0.0f, 12.0f, 36.0f, 57.0f})
+	{
+		SCOPED_TRACE(KeysHeight);
+		const auto aBaselines = QmNameplateCoreRowBaselines({24.0f, 20.0f, 29.0f, 29.0f, KeysHeight});
+		EXPECT_FLOAT_EQ(aBaselines[static_cast<size_t>(ENameplateCoreRow::HOOK)], -44.0f);
+		EXPECT_FLOAT_EQ(aBaselines[static_cast<size_t>(ENameplateCoreRow::KEYS)], -102.0f);
+	}
+}
+
+TEST(QmNameplateIndicatorLayout, PreviewSpaceStaysFixedAndContainsIndicatorSizeLimits)
+{
+	for(const float HookHeight : {0.0f, 13.0f, 29.0f, 43.0f})
+	{
+		for(const float KeysHeight : {0.0f, 12.0f, 36.0f, 57.0f})
+		{
+			const std::array<float, kNameplateCoreRowCount> aHeights = {24.0f, 20.0f, HookHeight, 29.0f, KeysHeight};
+			const float Span = QmNameplatePreviewContentSpan(aHeights);
+			EXPECT_FLOAT_EQ(Span, 159.0f);
+			const auto aBaselines = QmNameplateCoreRowBaselines(aHeights);
+			for(size_t RowIndex = 0; RowIndex < aHeights.size(); ++RowIndex)
+				EXPECT_GE(Span, -aBaselines[RowIndex] + aHeights[RowIndex]);
+		}
+	}
 }
 
 TEST(QmNewUiMenuBranches, NameplateStrongHookRowReservesLayoutWithoutContentWidth)
@@ -2284,7 +2629,8 @@ TEST(QmNewUiMenuBranches, NameplatePreviewNameScopeGatesPlateExceptDirectionKeys
 	const std::string BuildPreviewData = FunctionBody(Source, "static void BuildNamePlatePreviewData");
 
 	EXPECT_NE(BuildPreviewData.find("const bool IsOwnPreview = DummyIdx == 0;"), std::string::npos);
-	EXPECT_NE(BuildPreviewData.find("const bool NameplateScopeAllowsPreview = ForceNameplateScopeAll || (IsOwnPreview ? g_Config.m_ClNamePlatesOwn : g_Config.m_ClNamePlates);"), std::string::npos);
+	EXPECT_NE(BuildPreviewData.find("const bool PreviewIsCurrentChar = DummyIdx == g_Config.m_ClDummy;"), std::string::npos);
+	EXPECT_NE(BuildPreviewData.find("const bool NameplateScopeAllowsPreview = ForceNameplateScopeAll || ShouldShowQmNameplateName(g_Config.m_QmNameplateShowScope, PreviewIsCurrentChar, true);"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("const bool CoordModuleAllowsPreview = IsOwnPreview ? g_Config.m_QmNameplateCoordsOwn : g_Config.m_QmNameplateCoords;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_ShowName = NameplateScopeAllowsPreview;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_ShowClientId = Data.m_ShowName && (g_Config.m_Debug || g_Config.m_ClNamePlatesIds);"), std::string::npos);
@@ -2292,9 +2638,9 @@ TEST(QmNewUiMenuBranches, NameplatePreviewNameScopeGatesPlateExceptDirectionKeys
 	EXPECT_NE(BuildPreviewData.find("Data.m_ShowCoords = CoordModuleAllowsPreview;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_ShowCoordX = Data.m_ShowCoords && g_Config.m_QmNameplateCoordX != 0;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_ShowCoordY = Data.m_ShowCoords && g_Config.m_QmNameplateCoordY != 0;"), std::string::npos);
-	EXPECT_NE(BuildPreviewData.find("case 1: // Others\n\t\tData.m_ShowDirection = !PreviewIsLocal;"), std::string::npos);
+	EXPECT_NE(BuildPreviewData.find("case 1: // Others\n\t\tData.m_ShowDirection = !PreviewIsCurrentChar;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("case 2: // Everyone\n\t\tData.m_ShowDirection = true;"), std::string::npos);
-	EXPECT_NE(BuildPreviewData.find("case 3: // Only self\n\t\tData.m_ShowDirection = PreviewIsLocal;"), std::string::npos);
+	EXPECT_NE(BuildPreviewData.find("case 3: // Only self\n\t\tData.m_ShowDirection = PreviewIsCurrentChar;"), std::string::npos);
 	EXPECT_NE(BuildPreviewData.find("Data.m_ShowHookStrongWeakId = NameplateScopeAllowsPreview && g_Config.m_ClNamePlatesStrong == 2;"), std::string::npos);
 	EXPECT_EQ(BuildPreviewData.find("Data.m_ShowHookStrongWeakId = g_Config.m_ClNamePlatesStrong == 2;"), std::string::npos);
 	EXPECT_EQ(BuildPreviewData.find("Data.m_ShowName = g_Config.m_ClNamePlates || g_Config.m_ClNamePlatesOwn;"), std::string::npos);
@@ -2320,7 +2666,7 @@ TEST(QmNewUiMenuBranches, NameplatePreviewUsesFullScopeReferenceFrame)
 	EXPECT_NE(RenderNamePlatePreview.find("NamePlate.Render(*GameClient(), NameplateBottomMiddle, pFrameNamePlate);"), std::string::npos);
 	EXPECT_NE(Source.find("float ContentSpan(const CNamePlate *pLayoutReference = nullptr) const"), std::string::npos);
 	EXPECT_NE(Source.find("LayoutCoreRowSize(const SCoreRowParts &CoreRow, const CNamePlate *pLayoutReference) const"), std::string::npos);
-	EXPECT_NE(Source.find("Position.y -= LayoutSize.y;"), std::string::npos);
+	EXPECT_NE(Source.find("QmNameplateCoreRowBaselines(LayoutCoreRowHeights(pLayoutReference))"), std::string::npos);
 	// 拖动边界改成预览框本身：不再有 3 倍基准框，白框也就不会画到卡片外面。
 	EXPECT_EQ(Source.find("NAMEPLATE_FREE_MOVE_FRAME_SCALE"), std::string::npos);
 	EXPECT_EQ(Source.find("ScaleFrameAroundCenter"), std::string::npos);
@@ -2338,7 +2684,8 @@ TEST(QmNewUiMenuBranches, NameplateGameUsesFullScopeReferenceFrame)
 
 	EXPECT_NE(Source.find("CNamePlate m_aNamePlateFrameReferences[MAX_CLIENTS];"), std::string::npos);
 	EXPECT_NE(RenderNamePlateGame.find("CNamePlate *pLayoutReference = nullptr;"), std::string::npos);
-	EXPECT_NE(RenderNamePlateGame.find("if(Alpha > 0.0f && NameplateFreeMoveEnabled() && (!g_Config.m_ClNamePlates || !g_Config.m_ClNamePlatesOwn))"), std::string::npos);
+	// 自由移动参考框：只有该玩家当前画不出昵称行时才需要按参考框定行基线。
+	EXPECT_NE(RenderNamePlateGame.find("if(Alpha > 0.0f && NameplateFreeMoveEnabled() && !Data.m_ShowName)"), std::string::npos);
 	EXPECT_NE(RenderNamePlateGame.find("CNamePlateData FrameData = Data;"), std::string::npos);
 	EXPECT_NE(RenderNamePlateGame.find("FrameData.m_ShowName = true;"), std::string::npos);
 	EXPECT_NE(RenderNamePlateGame.find("const bool FrameShowLocalAlignedCoordX = CoordModuleAllowsCoords && CoordXAlignHintEnabled && LocalCoordXAligned;"), std::string::npos);

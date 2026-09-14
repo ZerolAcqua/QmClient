@@ -183,15 +183,40 @@ namespace ui_token::ime
 
 namespace ui_token::motion
 {
-	inline constexpr const SUiAnimTransition &HOVER_FADE = ui_curve::DECELERATE;
-	inline constexpr const SUiAnimTransition &PRESS_SCALE = ui_curve::ACCELERATE;
-	inline constexpr const SUiAnimTransition &MODAL_FADE_SCALE = ui_curve::EMPHASIZED;
-	inline constexpr const SUiAnimTransition &PAGE_SLIDE = ui_curve::STANDARD;
-	inline constexpr const SUiAnimTransition &TAB_SWITCH = ui_curve::DECELERATE;
-	inline constexpr const SUiAnimTransition &INPUT_FOCUS_RING = ui_curve::DECELERATE;
-	inline constexpr const SUiAnimTransition &TOAST_SLIDE = ui_curve::EMPHASIZED;
-	inline constexpr const SUiAnimTransition &TOOLTIP_FADE = ui_curve::DECELERATE;
-	inline constexpr const SUiSpringConfig &TOGGLE_SPRING = ui_spring::SNAPPY;
+	// 菜单反馈快速起步、平稳收尾；语义参数独立于通用曲线预设。
+	inline constexpr SUiAnimTransition HOVER_FADE = {
+		.m_DurationSec = 0.12f,
+		.m_Easing = EEasing::EASE_OUT_QUART,
+	};
+	inline constexpr SUiAnimTransition PRESS_SCALE = {
+		.m_DurationSec = 0.08f,
+		.m_Easing = EEasing::EASE_OUT_QUART,
+	};
+	inline constexpr SUiAnimTransition MODAL_FADE_SCALE = {
+		.m_DurationSec = 0.20f,
+		.m_Easing = EEasing::EASE_OUT_QUART,
+		.m_Spring = {1.0f, 400.0f, 40.0f, 0.001f, 0.01f},
+	};
+	inline constexpr SUiAnimTransition PAGE_SLIDE = {
+		.m_DurationSec = 0.22f,
+		.m_Easing = EEasing::EASE_OUT_QUART,
+	};
+	inline constexpr SUiAnimTransition TAB_SWITCH = {
+		.m_DurationSec = 0.16f,
+		.m_Easing = EEasing::EASE_OUT_QUART,
+	};
+	inline constexpr const SUiAnimTransition &INPUT_FOCUS_RING = HOVER_FADE;
+	inline constexpr SUiAnimTransition TOAST_SLIDE = {
+		.m_DurationSec = 0.22f,
+		.m_Easing = EEasing::EASE_OUT_QUART,
+		.m_Spring = MODAL_FADE_SCALE.m_Spring,
+	};
+	inline constexpr SUiAnimTransition TOOLTIP_FADE = {
+		.m_DurationSec = 0.12f,
+		.m_Easing = EEasing::EASE_OUT_QUART,
+	};
+	inline constexpr SUiSpringConfig NAVIGATION_SPRING{1.0f, 500.0f, 42.0f, 0.05f, 0.4f};
+	inline constexpr SUiSpringConfig TOGGLE_SPRING{1.0f, 620.0f, 44.0f, 0.01f, 0.05f};
 	inline constexpr SUiSpringConfig CARD_REORDER{1.0f, 900.0f, 48.0f, 0.01f, 0.05f};
 
 	inline constexpr const SUiAnimTransition &BTN_HOVER = HOVER_FADE;

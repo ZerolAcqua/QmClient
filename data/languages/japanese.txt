@@ -28,9 +28,6 @@
 %d items selected
 == %d 個のアイテムが選択されました
 
-%d more cut segments
-== さらに %d 個のカットセグメント
-
 %d of %d server
 == %d/%d サーバー
 
@@ -60,6 +57,9 @@
 
 %d users
 == %d ユーザー
+
+%d. %s | main: %s | dummy: %s
+== %d. %s | メイン：%s | ダミー：%s
 
 %d/%d KiB (%.1f KiB/s)
 == %d/%d KiB (%.1f KiB/s)
@@ -259,6 +259,9 @@ A demo with this name already exists
 
 A folder with this name already exists
 == この名前のフォルダーは既に存在します
+
+A save is already being restored. Please wait.
+== セーブを復元中です。お待ちください。
 
 A screenshot with this name already exists
 == この名前のスクリーンショットは既に存在します
@@ -691,9 +694,6 @@ Animate settings card lists when entering a page
 
 Animate settings card reorder and layout reflow
 == 設定カードの並べ替えとレイアウト再配置をアニメーション化
-
-Animated styles override the fallback title color
-== アニメーションスタイルの色は基本のタイトル色より優先されます
 
 Animated title style id
 == タイトルのアニメーションスタイル ID
@@ -1427,8 +1427,14 @@ Bit flags for disabling settings tabs
 Black
 == 黒
 
+Black Flash
+== 黒閃
+
 Blend mode
 == ブレンドモード
+
+Blend strength
+== ブレンド強度
 
 Blink the active local tee
 == 操作中のローカルキャラクターを点滅させる
@@ -1897,6 +1903,12 @@ Clearable text...
 
 Clears the voting options
 == 投票オプションをクリア
+
+Click a part on the right to edit its color, blend mode and strength.
+== 右側のパーツをクリックして、色、ブレンドモード、強度を調整します。
+
+Click again to find the next location.
+== もう一度クリックすると次の場所を検索します。
 
 Click to add this community to favorites
 == クリックしてこのコミュニティをお気に入りに追加
@@ -2483,9 +2495,6 @@ Current: Score
 Current: Time
 == 現在：時間
 
-Cursed Flame
-== 呪焔・黒閃
-
 Custom
 == カスタム
 
@@ -2555,6 +2564,9 @@ Customize translate button and menu colors
 Customize vote display and interaction
 == Customize vote display and interaction
 
+Cut end: %s
+== 終了: %s
+
 Cut interval
 == カット間隔
 
@@ -2563,6 +2575,9 @@ Cut length
 
 Cut segments
 == カットセグメント
+
+Cut start: %s
+== 開始: %s
 
 Cute:
 == かわいい：
@@ -2702,6 +2717,9 @@ Debug SQL.
 Debug tile layer clipping.
 == デバッグタイルレイヤークリッピング
 
+Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)
+== 専用 WebSocket エンドポイント（空欄なら wss://qmclient.icu/ws を使用）
+
 Deep freeze color
 == ディープフリーズ色
 
@@ -2825,8 +2843,20 @@ Delete this preset
 Demo
 == デモ
 
+Demo display
+== デモ表示
+
 Demo effects
 == デモエフェクト
+
+Demo hook strength (0=Off 1=Icon 2=Icon and number)
+== デモのフック強弱（0=非表示 1=アイコン 2=アイコンと番号）
+
+Demo hook strength scope (0=Own 1=Others 2=Strong 3=Weak 4=All)
+== デモのフック強弱表示範囲（0=自分 1=他人 2=強い 3=弱い 4=全員）
+
+Demo key presses (0=Off 1=Others 2=All 3=Own)
+== デモのキー入力（0=非表示 1=他人 2=全員 3=自分）
 
 Demo marker added
 == デモマーカーを追加しました
@@ -3482,9 +3512,6 @@ Enable chat with all/team mode
 Enable cheats for your current team's run, but you can't earn a rank
 == 現在のチームのランでチートを有効にしますが、ランクは獲得できません
 
-Enable client stutter diagnostics at startup
-== 起動時にクライアントのスタッター診断を有効にする
-
 Enable colored console output
 == コンソールのカラー出力を有効にする
 
@@ -3610,9 +3637,6 @@ Enable lyrics
 
 Enable macOS graphics diagnostics and Instruments signposts
 == macOS グラフィックス診断と Instruments サインポストを有効にする
-
-Enable main thread and render stage performance debug logging
-== メインスレッドとレンダリングフェーズのパフォーマンスデバッグログを有効化
 
 Enable map compatibility mode using the specified bug (example: grenade-doubleexplosion@ddnet.tw)
 == 指定されたバグを使用してマップ互換モードを有効化 (例: grenade-doubleexplosion@ddnet.tw)
@@ -3761,6 +3785,9 @@ Enable Tee trail
 Enable tee trails
 == Tee の軌跡を有効化
 
+Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
+== QmClient 専用 WebSocket サービスを有効化（HTTP ポーリングへのフォールバックなし）
+
 Enable thinking mode (slower)
 == 思考モードを有効にする（低速）
 
@@ -3835,6 +3862,9 @@ Endpoint (optional)
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == /practice モードに入るか再起動してください。そうしないと 60 秒後にチーム全員が処刑されます
+
+Enter a CP number from 1 to 255.
+== 1～255 の CP 番号を入力してください。
 
 Enter Password
 == パスワードを入力
@@ -3950,6 +3980,9 @@ Execute the specified file
 Existing Player
 == 既存のプレイヤー
 
+Exo
+== Exo エネルギー
+
 Export
 == エクスポート
 
@@ -4055,9 +4088,6 @@ Fake CTF flags
 Fallback simple noise reduction strength
 == フォールバック簡易ノイズ低減強度
 
-Fallback title color
-== 基本のタイトル色
-
 Fast input
 == 高速入力
 
@@ -4160,8 +4190,14 @@ Filter out spectators from player count
 Filtered word console color
 == ブロックワードコンソール色
 
+Find / Next
+== 検索 / 次へ
+
 Find all ban records for the specified IP address
 == 指定された IP アドレスのすべての禁止記録を検索
+
+Find CP
+== CP を検索
 
 Find QmClient communities and project links
 == Find QmClient communities and project links
@@ -4180,6 +4216,9 @@ Finish name
 
 Finish Name:
 == フィニッシュネーム:
+
+Finish or reset the current race before restoring a save.
+== 現在のレースを終了またはリセットしてからセーブを復元してください。
 
 Finished
 == 完了
@@ -4585,9 +4624,6 @@ Go forward one tick
 
 Go forward the specified duration
 == 指定時間だけ進む
-
-Golden Grace
-== 黄金・祝福
 
 Gores
 == ゴア
@@ -5066,6 +5102,9 @@ I am away from the game window
 I muted you
 == ミュートしました
 
+Icon and number
+== アイコンと番号
+
 Icons
 == アイコン
 
@@ -5179,6 +5218,9 @@ Indicator size
 
 Indicator transparency
 == インジケーターの透明度
+
+Inferno
+== 冥炎
 
 Infinite hook for super players on/off.
 == スーパープレイヤーの無限フックのオン/オフ。
@@ -5314,6 +5356,9 @@ Invalid ID
 
 Invalid option
 == 無効なオプションです
+
+Invalid save number. Use a number from the save list.
+== セーブ番号が無効です。一覧の番号を指定してください。
 
 Invalid spectator id used
 == 無効な観戦対象IDです
@@ -5621,6 +5666,9 @@ Left-click a Frankenstein part to tint it. Drag parts to replace them. Right-cli
 Left/right channel width
 == 左右チャンネル幅
 
+Legacy option: connections that skip TLS verification are rejected
+== 旧オプション：TLS 検証を省略する接続は拒否されます
+
 Length
 == 長さ
 
@@ -5855,6 +5903,9 @@ Locked
 Log output filename
 == ログ出力ファイル名
 
+Log realtime WebSocket channel events
+== リアルタイム WebSocket チャンネルのイベントを記録
+
 Log the network
 == ネットワークをログに記録
 
@@ -6011,14 +6062,8 @@ Margin when notification is docked
 Mark demo
 == デモをマーク
 
-Mark the beginning of a cut (right click to reset)
-== カットの開始をマーク（右クリックでリセット）
-
 Mark the beginning of a demo cut
 == デモカットの開始をマーク
-
-Mark the end of a cut (right click to reset)
-== カットの終了をマーク（右クリックでリセット）
 
 Mark the end of a demo cut
 == デモカットの終了をマーク
@@ -6514,6 +6559,9 @@ Name: %s
 
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 == ネームプレートフック強度アイコン範囲（0=自分 1=他人 2=強フック 3=弱フック 4=全プレイヤー）
+
+Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)
+== ネームプレートのニックネーム範囲（0=なし 1=現在のキャラクター 2=自分のキャラクター 3=他のプレイヤー 4=他のプレイヤーと自分以外のキャラクター 5=すべて）
 
 Nameplate position X
 == ネームプレートに X 座標を表示
@@ -7151,9 +7199,6 @@ Other
 Other players' hook line width
 == 他のプレイヤーのフックラインの幅
 
-Other players' nameplate scope (0=All players 1=Friends only)
-== 他人のネームプレート範囲（0=全プレイヤー 1=フレンドのみ）
-
 Others
 == 他人
 
@@ -7234,9 +7279,6 @@ Overwrite clan even if empty
 
 Own hook line width
 == 自分のフックラインの幅
-
-Own nameplate scope (0=Current character 1=All local characters)
-== 自分のネームプレート範囲（0=現在のキャラクター 1=ローカルの全キャラクター）
 
 p = Ping latency
 == p = Ping レイテンシ
@@ -7339,9 +7381,6 @@ Penalty in seconds for saving or swapping positions
 
 Per-name volume (name=percent)
 == 名前ごとの個別音量（name=percent）
-
-Performance debug log threshold (ms)
-== パフォーマンスデバッグログのしきい値（ms）
 
 Permanent access; up to 4 online IP addresses
 == 永久資格・同時接続は4つのIPまで
@@ -7754,6 +7793,9 @@ Preview built with %d skipped slot(s).
 Preview button visibility while the editor is active.
 == エディターがアクティブな間、ボタンの表示状態をプレビューします。
 
+Preview cut (P)
+== カットをプレビュー (P)
+
 Preview dummy nameplate
 == ダミーのネームプレートをプレビュー
 
@@ -8080,6 +8122,18 @@ Ratio threshold for local target language detection
 
 Really? Not even a little?
 == 本当に？少しも考えてくれないんですか？
+
+Realtime channel
+== リアルタイムチャンネル
+
+Realtime channel heartbeat interval (seconds, 0 uses default)
+== リアルタイムチャンネルのハートビート間隔（秒、0 で既定値）
+
+Realtime channel reconnect backoff base (ms)
+== リアルタイムチャンネルの再接続バックオフ基準（ミリ秒）
+
+Realtime channel reconnect backoff cap (ms)
+== リアルタイムチャンネルの再接続バックオフ上限（ミリ秒）
 
 Reason
 == 理由
@@ -8588,8 +8642,14 @@ Restart the client
 Restarting. Please wait…
 == 再起動しています。お待ちください…
 
+Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
+== 2人用セーブを復元しますか？ /qm Yes で最新、/qm Yes 番号 で別のセーブを選択、/qm No で閉じます。
+
 Restore old single-segment hook collision line behavior
 == 旧式の単一セグメントフック衝突線動作を復元
+
+Restoring save %d: main '%s', dummy '%s'.
+== セーブ %d を復元中：メイン「%s」、ダミー「%s」。
 
 Retrying…
 == 再試行中…
@@ -8780,6 +8840,12 @@ Save ghost
 Save last %d min
 == 最後の %d 分を保存
 
+Save loaded; local record removed.
+== セーブを読み込み、ローカルの記録を削除しました。
+
+Save loaded; the local record could not be removed.
+== セーブは読み込まれましたが、ローカルの記録を削除できませんでした。
+
 Save player names in replay
 == リプレイにプレイヤー名を保存
 
@@ -8788,6 +8854,15 @@ Save power by lowering update rate (higher input latency)
 
 Save replay of best time per game
 == ゲームごとのベストタイムのリプレイを保存
+
+Save restore dismissed.
+== セーブの復元をキャンセルしました。
+
+Save restore stopped without confirming success. The local record was kept.
+== 読み込み成功を確認できなかったため復元を停止しました。ローカルの記録は保持されています。
+
+Save restore stopped: connection, names or team were not ready. The local record was kept.
+== 接続、名前、またはチームの準備が整わず、復元を停止しました。ローカルの記録は保持されています。
 
 Save settings file on exit
 == 終了時に設定ファイルを保存
@@ -8933,6 +9008,9 @@ Search skins and manage the skin queue
 Searching
 == 検索中
 
+Sec-WebSocket-Protocol sent during the realtime handshake
+== リアルタイムハンドシェイクで送信する Sec-WebSocket-Protocol
+
 Secondary
 == セカンダリ
 
@@ -8980,6 +9058,9 @@ Selected candidate %d/%d under cursor.
 
 Selected item color
 == 選択項目の色
+
+Selected part: %d
+== 選択中のパーツ：%d
 
 Selected server
 == 選択したサーバー
@@ -9158,6 +9239,12 @@ Set color
 Set current demo speed
 == 現在のデモ速度を設定
 
+Set cut end at current position (O, right click to reset)
+== 現在位置をカットの終了点に設定（O、右クリックでリセット）
+
+Set cut start at current position (I, right click to reset)
+== 現在位置をカットの開始点に設定（I、右クリックでリセット）
+
 Set ddrace team for a player
 == プレイヤーの DDRace チームを設定
 
@@ -9325,6 +9412,9 @@ Show chat (2 always show large chat area)
 
 Show chat bubbles above players
 == プレイヤーの上にチャットバブルを表示
+
+Show chat in demo preview and video
+== デモプレビューと動画にチャットを表示
 
 Show chat messages above players
 == プレイヤーの上にチャットメッセージを表示
@@ -9632,6 +9722,9 @@ Show in-game HUD (spectator HUD)
 Show in-game HUD (timer)
 == ゲーム内 HUD を表示（タイマー）
 
+Show in-game HUD in demo preview and video
+== デモプレビューと動画にゲーム HUD を表示
+
 Show in-game HUD when rendering video
 == 動画レンダリング時にゲーム内 HUD を表示
 
@@ -9673,6 +9766,9 @@ Show katan on frozen players
 
 Show katana on frozen players (restores old behavior)
 == フリーズしたプレイヤーに刀を表示 (旧動作を復元)
+
+Show key presses
+== キー入力表示
 
 Show key presses (1 = others, 2 = all, 3 = own only)
 == キー入力を表示（1 = 他人、2 = 全員、3 = 自分のみ）
@@ -10157,6 +10253,9 @@ Simple noise reduction strength
 Single color
 == 単色
 
+Single color and Rainbow override the color of animated styles; the style keeps its motion
+== 単色とレインボーはアニメーションスタイルの色を上書きします（スタイルの動きは残ります）
+
 Size
 == サイズ
 
@@ -10195,6 +10294,21 @@ Skin list sort mode (0=Name, 1=Release date)
 
 Skin options
 == スキンオプション
+
+Skin outline color
+== スキンの輪郭の色
+
+Skin outline for other players
+== 他のプレイヤーのスキンの輪郭
+
+Skin outline for self and dummy
+== 自分とダミーのスキンの輪郭
+
+Skin outline opacity
+== スキンの輪郭の不透明度
+
+Skin outline width
+== スキンの輪郭の太さ
 
 Skin prefix
 == スキンプレフィックス
@@ -10511,8 +10625,8 @@ Sphere
 Spin pop
 == スピンポップ
 
-Spirit Light
-== 霊光・蛍火
+Spirit
+== 霊光
 
 Sponsor code
 == 認証コード
@@ -10630,6 +10744,9 @@ Stop key input on switch (0=off, 1=dummy, 2=player)
 
 Stop practice
 == 練習を停止
+
+Stop preview (P)
+== プレビューを停止 (P)
 
 Stop record
 == 録画を停止
@@ -10988,8 +11105,8 @@ Tee trail color
 Tee trail color mode (1=Solid, 2=Current Tee color, 3=Rainbow, 4=Tee speed, 5=Random)
 == Tee トレイルの色モード（1=単色、2=現在の Tee 色、3=虹色、4=Tee 速度、5=ランダム）
 
-Tee trail style (0=Original, 1=Cursed flame, 2=Violet lightning, 3=Spirit light, 4=Void shadow, 5=Golden grace)
-== Tee トレイルのスタイル（0=オリジナル、1=呪焔黒閃、2=紫電雷切、3=霊光蛍火、4=虚空の影、5=黄金の祝福）
+Tee trail style (0=Original, 1=Black Flash, 2=Exo, 3=Spirit, 4=Void, 5=Inferno)
+== Tee トレイルのスタイル (0=オリジナル, 1=黒閃, 2=Exo エネルギー, 3=霊光, 4=虚無, 5=冥炎)
 
 Tee Trails
 == Tee トレイル
@@ -11165,6 +11282,9 @@ There are unsaved changes in the touch controls editor. Saving first is recommen
 There is no checkpoint teleporter with that index on the map.
 == そのマップにはそのインデックスのチェックポイントテレポーターはありません
 
+There is no pending save restore prompt.
+== 現在、セーブ復元の確認待ちはありません。
+
 There is no teleporter with that index on the map.
 == そのマップにはそのインデックスのテレポーターはありません
 
@@ -11195,6 +11315,9 @@ Thin
 Thinking mode requires a reasoning model
 == 思考モードを使用するには推論モデルが必要です
 
+This connection cannot change names while connected. Reconnect with the saved names first.
+== この接続では接続中に名前を変更できません。保存された名前で再接続してください。
+
 This ID is not connected
 == この ID は接続されていません
 
@@ -11203,6 +11326,9 @@ This is the master switch for all interface animation categories
 
 This name cannot be used for files and folders
 == この名前はファイルやフォルダーに使用できません
+
+This save is no longer in the local save file.
+== このセーブはローカルのセーブファイルに存在しません。
 
 This server has an initial chat delay, you will be able to talk in %s seconds.
 == このサーバーには初期チャット遅延があります。あと %s 秒で話せるようになります。
@@ -11335,6 +11461,9 @@ Title bob angular speed in 1/100 rad/s
 
 Title bob wavelength in pixels
 == タイトルの波長（ピクセル）
+
+Title color
+== タイトル色
 
 Title color (single color)
 == タイトル色（単色）
@@ -11900,6 +12029,9 @@ URL for downloading skins
 Usage: %s %s
 == 使用方法: %s %s
 
+Use /qm Yes [number] to restore a save, or /qm No to dismiss.
+== /qm Yes [番号] でセーブを復元、/qm No で通知を閉じます。
+
 Use 12 hour clock
 == 12 時間制を使用
 
@@ -12107,9 +12239,6 @@ View the developers and contributors
 View the people supporting QmClient development
 == View the people supporting QmClient development
 
-Violet Lightning
-== 紫電・雷切
-
 Virtual joystick which always uses fire.
 == 常に発射を使用するバーチャルジョイスティック。
 
@@ -12218,8 +12347,8 @@ Voice test mode (0=Off 1=Local 2=Server Loopback)
 Voice whitelist (comma-separated)
 == 音声ホワイトリスト（カンマ区切り）
 
-Void Shadow
-== 虚空・影
+Void
+== 虚無
 
 Volume
 == 音量
@@ -12559,9 +12688,6 @@ Word filter action: 0=replace matching words, 1=hide entire message
 
 Write local console contents to a text file
 == ローカルコンソールの内容をテキストファイルに書き出す
-
-Write performance debug logs to dedicated file
-== パフォーマンスデバッグログを専用ファイルに書き込む
 
 Write remote console contents to a text file
 == リモートコンソールの内容をテキストファイルに書き出す
@@ -12927,6 +13053,46 @@ Zoom to current mouse target
 == ⚠️ テンセントクラウド API が設定されていません
 
 [Assets editor blend mode]
+Color
+== カラー
+
+[Assets editor blend mode]
+Color Burn
+== 焼き込みカラー
+
+[Assets editor blend mode]
+Color Dodge
+== 覆い焼きカラー
+
+[Assets editor blend mode]
+Darken
+== 比較（暗）
+
+[Assets editor blend mode]
+Difference
+== 差の絶対値
+
+[Assets editor blend mode]
+Exclusion
+== 除外
+
+[Assets editor blend mode]
+Hard Light
+== ハードライト
+
+[Assets editor blend mode]
+Hue
+== 色相
+
+[Assets editor blend mode]
+Lighten
+== 比較（明）
+
+[Assets editor blend mode]
+Luminosity
+== 輝度
+
+[Assets editor blend mode]
 Multiply
 == 乗算
 
@@ -12939,8 +13105,16 @@ Overlay
 == オーバーレイ
 
 [Assets editor blend mode]
+Saturation
+== 彩度
+
+[Assets editor blend mode]
 Screen
 == スクリーン
+
+[Assets editor blend mode]
+Soft Light
+== ソフトライト
 
 [Auto camera]
 Active
@@ -13163,32 +13337,24 @@ All
 == すべて
 
 [Show name plates]
+Current
+== 現在
+
+[Show name plates]
+Current + Local
+== 現在+ローカル
+
+[Show name plates]
+Local + Others
+== ローカル+他人
+
+[Show name plates]
 None
 == なし
 
 [Show name plates]
 Others
 == 他人
-
-[Show name plates]
-Own
-== 自身
-
-[Show name plates scope]
-All
-== すべて
-
-[Show name plates scope]
-Current
-== 現在
-
-[Show name plates scope]
-Friends
-== フレンド
-
-[Show name plates scope]
-Local
-== ローカル
 
 [Show players' key presses]
 All

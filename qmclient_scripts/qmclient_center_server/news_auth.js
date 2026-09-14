@@ -90,7 +90,7 @@ function CreateNewsService({
 	};
 }
 
-function RegisterNewsRoutes(App, Service, { CheckRateLimit, ClientIp })
+function RegisterNewsRoutes(App, Service, { CheckRateLimit, ClientIp, OnChanged })
 {
 	for(const [Method, Route, Handle] of [
 		["get", "current", () => Service.Current()],
@@ -105,6 +105,7 @@ function RegisterNewsRoutes(App, Service, { CheckRateLimit, ClientIp })
 			{
 				const Reply = Handle(Req);
 				Res.status(Reply.statusCode).json(Reply.response);
+				if(Method === "post" && Reply.statusCode === 200 && OnChanged) OnChanged();
 			}
 			catch
 			{

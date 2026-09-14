@@ -37,6 +37,22 @@ using namespace std::chrono_literals;
 
 namespace
 {
+	const ColorRGBA DEMO_ACCENT(0.04f, 0.48f, 1.0f, 0.95f);
+	const ColorRGBA DEMO_SURFACE(0.09f, 0.10f, 0.13f, 0.92f);
+
+	void DrawDemoCard(CUi *pUi, const CUIRect &Rect)
+	{
+		// 悬浮卡片只在底层做一次模糊，控件保持清晰。
+		pUi->RenderGaussianBlur(Rect, 1.0f, IGraphics::CORNER_ALL, 18.0f);
+		CUiScopedGaussianBlurSuppression BlurSuppression(pUi);
+		CUIRect Shadow = Rect;
+		Shadow.y += 4.0f;
+		Shadow.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f), IGraphics::CORNER_ALL, 18.0f);
+		Rect.Draw(ColorRGBA(0.65f, 0.69f, 0.77f, 0.25f), IGraphics::CORNER_ALL, 18.0f);
+		CUIRect Inner;
+		Rect.Margin(0.6f, &Inner);
+		Inner.Draw(DEMO_SURFACE, IGraphics::CORNER_ALL, 17.4f);
+	}
 
 	bool IsScreenshotBrowserFile(const char *pName)
 	{
@@ -62,6 +78,62 @@ namespace
 
 }
 
+void CMenus::RenderDemoDisplaySettings(CUIRect View, bool Enabled)
+{
+	CUiScopedGaussianBlurSuppression BlurSuppression(Ui());
+	View.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 12.0f);
+	View.Margin(8.0f, &View);
+	CUIRect Row;
+	View.HSplitTop(18.0f, &Row, &View);
+	Ui()->DoLabel(&Row, Localize("Demo display"), 12.0f, TEXTALIGN_ML);
+	View.HSplitTop(2.0f, nullptr, &View);
+
+	const auto Segments = [&](const char *pLabel, int *pValue, const char *const *ppLabels, int Count, CButtonContainer *pButtons) {
+		CUIRect Label, Options;
+		View.HSplitTop(24.0f, &Row, &View);
+		View.HSplitTop(4.0f, nullptr, &View);
+		Row.VSplitLeft(std::min(116.0f, Row.w * 0.27f), &Label, &Options);
+		Ui()->DoLabel(&Label, pLabel, 11.0f, TEXTALIGN_ML, {.m_MaxWidth = Label.w - 4.0f});
+		Options.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f), IGraphics::CORNER_ALL, 12.0f);
+		const float Width = Options.w / Count;
+		for(int i = 0; i < Count; ++i)
+		{
+			CUIRect Option{Options.x + Width * i, Options.y, Width, Options.h};
+			Option.Margin(2.0f, &Option);
+			const ColorRGBA Fill = *pValue == i ? DEMO_ACCENT : ColorRGBA(1.0f, 1.0f, 1.0f, 0.02f);
+			if(DoButton_Menu(&pButtons[i], ppLabels[i], Enabled ? 0 : -1, &Option, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 10.0f, 0.0f, Fill, nullptr, 10.0f) && Enabled)
+				*pValue = i;
+		}
+	};
+	static CButtonContainer s_aDirectionButtons[4], s_aStrongWeakButtons[3], s_aScopeButtons[5];
+	const char *apDirection[] = {Localize("None", "Show players' key presses"), Localize("Others", "Show players' key presses"), Localize("All", "Show players' key presses"), Localize("Own", "Show players' key presses")};
+	Segments(Localize("Show key presses"), &g_Config.m_QmDemoShowDirection, apDirection, std::size(apDirection), s_aDirectionButtons);
+	const char *apStrength[] = {Localize("Off"), Localize("Icons"), Localize("Icon and number")};
+	Segments(Localize("Strong Weak Hook"), &g_Config.m_QmDemoShowStrongWeak, apStrength, std::size(apStrength), s_aStrongWeakButtons);
+	const char *apScope[] = {Localize("Self"), Localize("Others"), Localize("Strong hook"), Localize("Weak hook"), Localize("All")};
+	Segments(Localize("Hook strength scope"), &g_Config.m_QmDemoStrongWeakScope, apScope, std::size(apScope), s_aScopeButtons);
+
+	IUiContext Context;
+	Context.m_pUi = Ui();
+	Context.m_pAnim = &GameClient()->UiRuntimeV2()->AnimRuntime();
+	Context.m_ScopeHash = MakeUiScopeHash("demo_display");
+	Context.m_FrameDt = GameClient()->UiRuntimeV2()->FrameDt();
+	View.HSplitTop(24.0f, &Row, &View);
+	CUIRect Hud, Chat;
+	Row.VSplitMid(&Hud, &Chat, 16.0f);
+	const auto Toggle = [&](CUIRect Rect, const char *pLabel, int *pValue) {
+		CUIRect Switch;
+		Rect.VSplitRight(34.0f, &Rect, &Switch);
+		Switch.HMargin(2.0f, &Switch);
+		Ui()->DoLabel(&Rect, pLabel, 11.0f, TEXTALIGN_ML, {.m_MaxWidth = Rect.w - 4.0f});
+		bool Value = *pValue != 0;
+		if(ui_widget::Toggle(Context, pValue, &Value, Switch, Enabled))
+			*pValue = Value;
+	};
+	Toggle(Hud, Localize("Show ingame HUD"), &g_Config.m_QmDemoShowHud);
+	Toggle(Chat, Localize("Show chat"), &g_Config.m_QmDemoShowChat);
+}
+
 bool CMenus::DemoFilterChat(const void *pData, int Size, void *pUser)
 {
 	bool DoFilterChat = *(bool *)pUser;
@@ -80,19 +152,23 @@ bool CMenus::DemoFilterChat(const void *pData, int Size, void *pUser)
 	return !Unpacker.Error() && !Sys && Msg == NETMSGTYPE_SV_CHAT;
 }
 
-void CMenus::HandleDemoSeeking(float PositionToSeek, float TimeToSeek)
+void CMenus::HandleDemoSeeking(float PositionToSeek, float TimeToSeek, int TickToSeek)
 {
-	if((PositionToSeek >= 0.0f && PositionToSeek <= 1.0f) || TimeToSeek != 0.0f)
+	if((PositionToSeek >= 0.0f && PositionToSeek <= 1.0f) || TimeToSeek != 0.0f || TickToSeek >= 0)
 	{
+		m_DemoCutPreview.Reset();
 		GameClient()->m_Chat.Reset();
 		GameClient()->m_DamageInd.OnReset();
 		GameClient()->m_InfoMessages.OnReset();
 		GameClient()->m_Particles.OnReset();
+		GameClient()->m_Trails.OnReset();
 		GameClient()->m_Sounds.OnReset();
 		GameClient()->m_Scoreboard.OnReset();
 		GameClient()->m_Statboard.OnReset();
 		GameClient()->m_SuppressEvents = true;
-		if(TimeToSeek != 0.0f)
+		if(TickToSeek >= 0)
+			DemoPlayer()->SetPos(TickToSeek + 1);
+		else if(TimeToSeek != 0.0f)
 			DemoPlayer()->SeekTime(TimeToSeek);
 		else
 			DemoPlayer()->SeekPercent(PositionToSeek);
@@ -109,6 +185,8 @@ void CMenus::HandleDemoSeeking(float PositionToSeek, float TimeToSeek)
 
 void CMenus::DemoSeekTick(IDemoPlayer::ETickOffset TickOffset)
 {
+	m_DemoCutPreview.Reset();
+	GameClient()->m_Trails.OnReset();
 	GameClient()->m_SuppressEvents = true;
 	DemoPlayer()->SeekTick(TickOffset);
 	GameClient()->m_SuppressEvents = false;
@@ -139,6 +217,17 @@ void CMenus::ResetDemoBrowserFolder()
 void CMenus::RenderDemoPlayer(CUIRect MainView)
 {
 	const IDemoPlayer::CInfo *pInfo = DemoPlayer()->BaseInfo();
+	if(m_DemoCutPreview.Update(pInfo->m_CurrentTick))
+	{
+		const int EndTick = m_DemoCutPreview.EndTick();
+		if(pInfo->m_CurrentTick > EndTick)
+		{
+			const auto FinishedPreview = m_DemoCutPreview;
+			HandleDemoSeeking(-1.0f, 0.0f, EndTick);
+			m_DemoCutPreview = FinishedPreview;
+		}
+		DemoPlayer()->Pause();
+	}
 	const int CurrentTick = pInfo->m_CurrentTick - pInfo->m_FirstTick;
 	const int TotalTicks = pInfo->m_LastTick - pInfo->m_FirstTick;
 
@@ -202,9 +291,37 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		m_SkipDurationIndex = maximum(0, NumDurationLabels - 1);
 
 	const auto &&NormalizePendingSlice = [&]() {
-		const int StartTick = g_Config.m_ClDemoSliceBegin == -1 ? pInfo->m_FirstTick : g_Config.m_ClDemoSliceBegin;
-		const int EndTick = g_Config.m_ClDemoSliceEnd == -1 ? pInfo->m_LastTick : g_Config.m_ClDemoSliceEnd;
-		return SDemoCutSegment{StartTick, EndTick};
+		SDemoCutSegment Range;
+		qm_demo_cut::ResolveRange(g_Config.m_ClDemoSliceBegin, g_Config.m_ClDemoSliceEnd, pInfo->m_FirstTick, pInfo->m_LastTick, Range);
+		return Range;
+	};
+	const auto SetCutStart = [&]() {
+		m_DemoCutPreview.Reset();
+		Client()->DemoSliceBegin();
+		if(g_Config.m_ClDemoSliceEnd < g_Config.m_ClDemoSliceBegin)
+			g_Config.m_ClDemoSliceEnd = -1;
+	};
+	const auto SetCutEnd = [&]() {
+		m_DemoCutPreview.Reset();
+		Client()->DemoSliceEnd();
+		if(g_Config.m_ClDemoSliceBegin > g_Config.m_ClDemoSliceEnd)
+			g_Config.m_ClDemoSliceBegin = -1;
+	};
+	const auto PreviewCut = [&]() {
+		if(VideoRendering)
+			return;
+		if(m_DemoCutPreview.IsActive())
+		{
+			m_DemoCutPreview.Reset();
+			DemoPlayer()->Pause();
+			return;
+		}
+		const SDemoCutSegment Range = NormalizePendingSlice();
+		if(Range.m_StartTick < 0 || Range.m_StartTick >= Range.m_EndTick)
+			return;
+		HandleDemoSeeking(-1.0f, 0.0f, Range.m_StartTick);
+		if(DemoPlayer()->IsPlaying() && m_DemoCutPreview.Start(Range))
+			DemoPlayer()->Unpause();
 	};
 	const auto &&AddPendingSlice = [&]() {
 		if(g_Config.m_ClDemoSliceBegin == -1 && g_Config.m_ClDemoSliceEnd == -1)
@@ -218,6 +335,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 				return false;
 		}
 		m_vDemoCutSegments.push_back(Segment);
+		m_DemoCutPreview.Reset();
 		g_Config.m_ClDemoSliceBegin = -1;
 		g_Config.m_ClDemoSliceEnd = -1;
 		return true;
@@ -226,8 +344,18 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	// handle keyboard shortcuts independent of active menu
 	float PositionToSeek = -1.0f;
 	float TimeToSeek = 0.0f;
-	if(!GameClient()->m_GameConsole.IsActive() && m_DemoPlayerState == DEMOPLAYER_NONE && g_Config.m_ClDemoKeyboardShortcuts && !Ui()->IsPopupOpen())
+	// 旁观 HUD 输入编号和回车查找时，不触发 Demo 的跳转或暂停快捷键。
+	if(!GameClient()->m_GameConsole.IsActive() && !GameClient()->m_Spectator.IsEditingTeleNumber() && m_DemoPlayerState == DEMOPLAYER_NONE && g_Config.m_ClDemoKeyboardShortcuts && !Ui()->IsPopupOpen())
 	{
+		if(!VideoRendering && !Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && !Input()->AltIsPressed())
+		{
+			if(Input()->KeyPress(KEY_I))
+				SetCutStart();
+			if(Input()->KeyPress(KEY_O))
+				SetCutEnd();
+			if(Input()->KeyPress(KEY_P))
+				PreviewCut();
+		}
 		// increase/decrease speed
 		if(!Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && !Input()->AltIsPressed())
 		{
@@ -246,6 +374,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		// pause/unpause
 		if(Input()->KeyPress(KEY_SPACE) || Input()->KeyPress(KEY_RETURN) || Input()->KeyPress(KEY_KP_ENTER) || Input()->KeyPress(KEY_K))
 		{
+			m_DemoCutPreview.Reset();
 			if(pInfo->m_Paused)
 			{
 				DemoPlayer()->Unpause();
@@ -309,11 +438,13 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		}
 	}
 
-	const float SeekBarHeight = 15.0f;
-	const float ButtonbarHeight = 20.0f;
-	const float NameBarHeight = 20.0f;
-	const float Margins = 5.0f;
-	const float TotalHeight = SeekBarHeight + ButtonbarHeight + NameBarHeight + Margins * 3;
+	const float SeekBarHeight = 16.0f;
+	const float ButtonbarHeight = 24.0f;
+	const float NameBarHeight = 24.0f;
+	const float CutBarHeight = 30.0f;
+	const float Margins = 4.0f;
+	const float DisplayHeight = m_DemoDisplayExpanded ? 152.0f : 0.0f;
+	const float TotalHeight = 152.0f + DisplayHeight;
 
 	if(!m_MenuActive)
 	{
@@ -354,7 +485,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 			m_LastSpeedChange = 0.0f;
 	}
 
-	if(CurrentTick == TotalTicks)
+	if(pInfo->m_CurrentTick == pInfo->m_LastTick && !m_DemoCutPreview.IsFinished())
 	{
 		DemoPlayer()->Pause();
 		PositionToSeek = 0.0f;
@@ -367,31 +498,29 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		return;
 	}
 
-	CUIRect DemoControls;
-	MainView.HSplitBottom(TotalHeight, nullptr, &DemoControls);
-	DemoControls.VSplitLeft(50.0f, nullptr, &DemoControls);
-	DemoControls.VSplitLeft(minimum(760.0f, DemoControls.w), &DemoControls, nullptr);
+	// 固定底部留白，居中悬浮；展开显示面板后仍将整张卡片限制在屏幕内。
+	CUIRect DemoControls{MainView.x + 12.0f, MainView.y + MainView.h - TotalHeight - 16.0f, MainView.w - 24.0f, TotalHeight};
+	DemoControls.w = std::min(760.0f, DemoControls.w);
+	DemoControls.x = MainView.x + (MainView.w - DemoControls.w) * 0.5f;
 	const CUIRect DemoControlsOriginal = DemoControls;
-	DemoControls.x += m_DemoControlsPositionOffset.x;
-	DemoControls.y += m_DemoControlsPositionOffset.y;
-	int Corners = IGraphics::CORNER_NONE;
-	if(DemoControls.x > 0.0f && DemoControls.y > 0.0f)
-		Corners |= IGraphics::CORNER_TL;
-	if(DemoControls.x < MainView.w - DemoControls.w && DemoControls.y > 0.0f)
-		Corners |= IGraphics::CORNER_TR;
-	if(DemoControls.x > 0.0f && DemoControls.y < MainView.h - DemoControls.h)
-		Corners |= IGraphics::CORNER_BL;
-	if(DemoControls.x < MainView.w - DemoControls.w && DemoControls.y < MainView.h - DemoControls.h)
-		Corners |= IGraphics::CORNER_BR;
-	DemoControls.Draw(ui_token::color::SURFACE_ELEVATED, Corners, ui_token::radius::CARD);
+	DemoControls.x = std::clamp(DemoControls.x + m_DemoControlsPositionOffset.x, MainView.x, MainView.x + MainView.w - DemoControls.w);
+	DemoControls.y = std::clamp(DemoControls.y + m_DemoControlsPositionOffset.y, MainView.y, MainView.y + MainView.h - DemoControls.h);
+	DrawDemoCard(Ui(), DemoControls);
+	CUiScopedGaussianBlurSuppression DemoControlsBlurSuppression(Ui());
 	const CUIRect DemoControlsDragRect = DemoControls;
 
-	CUIRect SeekBar, ButtonBar, NameBar, SpeedBar;
-	DemoControls.Margin(5.0f, &DemoControls);
-	DemoControls.HSplitTop(SeekBarHeight, &SeekBar, &ButtonBar);
-	ButtonBar.HSplitTop(Margins, nullptr, &ButtonBar);
-	ButtonBar.HSplitBottom(NameBarHeight, &ButtonBar, &NameBar);
-	NameBar.HSplitTop(4.0f, nullptr, &NameBar);
+	CUIRect SeekBar, TimeBar, ButtonBar, NameBar, SpeedBar, CutBar, DisplayBar;
+	DemoControls.Margin(12.0f, &DemoControls);
+	DemoControls.HSplitTop(NameBarHeight, &NameBar, &DemoControls);
+	DemoControls.HSplitTop(8.0f, nullptr, &DemoControls);
+	DemoControls.HSplitTop(SeekBarHeight, &SeekBar, &DemoControls);
+	DemoControls.HSplitTop(16.0f, &TimeBar, &DemoControls);
+	DemoControls.HSplitTop(ButtonbarHeight, &ButtonBar, &DemoControls);
+	DemoControls.HSplitTop(8.0f, nullptr, &DemoControls);
+	DemoControls.HSplitTop(CutBarHeight, &CutBar, &DemoControls);
+	DemoControls.HSplitTop(8.0f, nullptr, &DisplayBar);
+	ButtonBar.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.045f), IGraphics::CORNER_ALL, 12.0f);
+	ButtonBar.VMargin(std::max(0.0f, (ButtonBar.w - 404.0f) * 0.5f), &ButtonBar);
 
 	// handle draggable demo controls
 	{
@@ -465,13 +594,13 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	{
 		// draw seek bar
 		const float Rounding = 5.0f;
-		SeekBar.Draw(ui_token::color::SURFACE_OVERLAY.WithMultipliedAlpha(1.15f), IGraphics::CORNER_ALL, Rounding);
+		SeekBar.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.28f), IGraphics::CORNER_ALL, Rounding);
 
 		// draw filled bar
 		float Amount = CurrentTick / (float)TotalTicks;
 		CUIRect FilledBar = SeekBar;
 		FilledBar.w = 2 * Rounding + (FilledBar.w - 2 * Rounding) * Amount;
-		FilledBar.Draw(ui_token::color::ACCENT_PRIMARY_DIM.WithMultipliedAlpha(1.9f), IGraphics::CORNER_ALL, Rounding);
+		FilledBar.Draw(DEMO_ACCENT.WithAlpha(0.40f), IGraphics::CORNER_ALL, Rounding);
 
 		// draw highlighting
 		for(const auto &Segment : m_vDemoCutSegments)
@@ -484,7 +613,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 			Graphics()->TextureClear();
 			Graphics()->QuadsBegin();
 			Graphics()->SetColor(ui_token::color::ACCENT_PRIMARY_DIM);
-			IGraphics::CQuadItem QuadItem(2 * Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * RatioBegin, SeekBar.y, Span, SeekBar.h);
+			IGraphics::CQuadItem QuadItem(Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * RatioBegin, SeekBar.y, Span, SeekBar.h);
 			Graphics()->QuadsDrawTL(&QuadItem, 1);
 			Graphics()->QuadsEnd();
 		}
@@ -496,8 +625,8 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 			float Span = ((SeekBar.w - 2 * Rounding) * RatioEnd) - ((SeekBar.w - 2 * Rounding) * RatioBegin);
 			Graphics()->TextureClear();
 			Graphics()->QuadsBegin();
-			Graphics()->SetColor(ui_token::color::DANGER.WithMultipliedAlpha(0.28f));
-			IGraphics::CQuadItem QuadItem(2 * Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * RatioBegin, SeekBar.y, Span, SeekBar.h);
+			Graphics()->SetColor(DEMO_ACCENT.WithAlpha(0.36f));
+			IGraphics::CQuadItem QuadItem(Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * RatioBegin, SeekBar.y, Span, SeekBar.h);
 			Graphics()->QuadsDrawTL(&QuadItem, 1);
 			Graphics()->QuadsEnd();
 		}
@@ -506,7 +635,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		for(int i = 0; i < pInfo->m_NumTimelineMarkers; i++)
 		{
 			const float Ratio = (pInfo->m_aTimelineMarkers[i] - pInfo->m_FirstTick) / (float)TotalTicks;
-			const float MarkerX = 2 * Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * Ratio;
+			const float MarkerX = Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * Ratio;
 			const float MarkerWidth = maximum(2.0f, Ui()->PixelSize() * 2.0f);
 			Graphics()->TextureClear();
 			Graphics()->QuadsBegin();
@@ -528,8 +657,8 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 			float Ratio = (g_Config.m_ClDemoSliceBegin - pInfo->m_FirstTick) / (float)TotalTicks;
 			Graphics()->TextureClear();
 			Graphics()->QuadsBegin();
-			Graphics()->SetColor(ui_token::color::DANGER);
-			IGraphics::CQuadItem QuadItem(2 * Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * Ratio, SeekBar.y, Ui()->PixelSize(), SeekBar.h);
+			Graphics()->SetColor(DEMO_ACCENT);
+			IGraphics::CQuadItem QuadItem(Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * Ratio, SeekBar.y - 2.0f, 3.0f, SeekBar.h + 4.0f);
 			Graphics()->QuadsDrawTL(&QuadItem, 1);
 			Graphics()->QuadsEnd();
 		}
@@ -540,20 +669,22 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 			float Ratio = (g_Config.m_ClDemoSliceEnd - pInfo->m_FirstTick) / (float)TotalTicks;
 			Graphics()->TextureClear();
 			Graphics()->QuadsBegin();
-			Graphics()->SetColor(ui_token::color::DANGER);
-			IGraphics::CQuadItem QuadItem(2 * Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * Ratio, SeekBar.y, Ui()->PixelSize(), SeekBar.h);
+			Graphics()->SetColor(DEMO_ACCENT);
+			IGraphics::CQuadItem QuadItem(Rounding + SeekBar.x + (SeekBar.w - 2 * Rounding) * Ratio, SeekBar.y - 2.0f, 3.0f, SeekBar.h + 4.0f);
 			Graphics()->QuadsDrawTL(&QuadItem, 1);
 			Graphics()->QuadsEnd();
 		}
 
 		// draw time
 		char aCurrentTime[32];
-		str_time((int64_t)CurrentTick / Client()->GameTickSpeed() * 100, TIME_HOURS, aCurrentTime, sizeof(aCurrentTime));
+		str_time(qm_demo_cut::ToCentiseconds((int64_t)CurrentTick, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aCurrentTime, sizeof(aCurrentTime));
 		char aTotalTime[32];
-		str_time((int64_t)TotalTicks / Client()->GameTickSpeed() * 100, TIME_HOURS, aTotalTime, sizeof(aTotalTime));
+		str_time(qm_demo_cut::ToCentiseconds((int64_t)TotalTicks, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aTotalTime, sizeof(aTotalTime));
 		char aSeekBarLabel[128];
 		str_format(aSeekBarLabel, sizeof(aSeekBarLabel), "%s / %s", aCurrentTime, aTotalTime);
-		Ui()->DoLabel(&SeekBar, aSeekBarLabel, SeekBar.h * 0.70f, TEXTALIGN_MC);
+		Ui()->DoLabel(&TimeBar, aSeekBarLabel, 10.0f, TEXTALIGN_MC);
+		CUIRect Playhead{SeekBar.x + Rounding + (SeekBar.w - 2.0f * Rounding) * Amount - 2.0f, SeekBar.y - 2.0f, 4.0f, SeekBar.h + 4.0f};
+		Playhead.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.95f), IGraphics::CORNER_ALL, 2.0f);
 
 		// do the logic
 		const auto &&SnapToTimelineMarker = [&](float AmountSeek) {
@@ -623,7 +754,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 			const float HoveredAmount = SnapToTimelineMarker(std::clamp((Ui()->MouseX() - SeekBar.x - Rounding) / (SeekBar.w - 2 * Rounding), 0.0f, 1.0f));
 			const int HoveredTick = (int)(HoveredAmount * TotalTicks);
 			static char s_aHoveredTime[32];
-			str_time((int64_t)HoveredTick / Client()->GameTickSpeed() * 100, TIME_HOURS, s_aHoveredTime, sizeof(s_aHoveredTime));
+			str_time(qm_demo_cut::ToCentiseconds((int64_t)HoveredTick, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, s_aHoveredTime, sizeof(s_aHoveredTime));
 			GameClient()->m_Tooltips.DoToolTip(&s_SeekBarId, &SeekBar, s_aHoveredTime);
 		}
 	}
@@ -636,8 +767,9 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	// combined play and pause button
 	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
 	static CButtonContainer s_PlayPauseButton;
-	if(Ui()->DoButton_FontIcon(&s_PlayPauseButton, pInfo->m_Paused ? FONT_ICON_PLAY : FONT_ICON_PAUSE, false, &Button, BUTTONFLAG_LEFT))
+	if(Ui()->DoButton_FontIcon(&s_PlayPauseButton, pInfo->m_Paused ? FONT_ICON_PLAY : FONT_ICON_PAUSE, false, &Button, BUTTONFLAG_LEFT, IGraphics::CORNER_ALL, true, DEMO_ACCENT))
 	{
+		m_DemoCutPreview.Reset();
 		if(pInfo->m_Paused)
 		{
 			DemoPlayer()->Unpause();
@@ -662,7 +794,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_ResetButton, &Button, Localize("Stop the current demo"));
 
 	// skip time back
-	ButtonBar.VSplitLeft(Margins + 10.0f, nullptr, &ButtonBar);
+	ButtonBar.VSplitLeft(Margins + 4.0f, nullptr, &ButtonBar);
 	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
 	static CButtonContainer s_TimeBackButton;
 	if(Ui()->DoButton_FontIcon(&s_TimeBackButton, FONT_ICON_BACKWARD, 0, &Button, BUTTONFLAG_LEFT))
@@ -675,7 +807,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	if(NumDurationLabels >= 2)
 	{
 		ButtonBar.VSplitLeft(Margins, nullptr, &ButtonBar);
-		ButtonBar.VSplitLeft(4 * ButtonbarHeight, &Button, &ButtonBar);
+		ButtonBar.VSplitLeft(64.0f, &Button, &ButtonBar);
 
 		static std::vector<std::string> s_vDurationNames;
 		static std::vector<const char *> s_vpDurationNames;
@@ -711,7 +843,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_TimeForwardButton, &Button, Localize("Go forward the specified duration"));
 
 	// one tick back
-	ButtonBar.VSplitLeft(Margins + 10.0f, nullptr, &ButtonBar);
+	ButtonBar.VSplitLeft(Margins + 4.0f, nullptr, &ButtonBar);
 	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
 	static CButtonContainer s_OneTickBackButton;
 	if(Ui()->DoButton_FontIcon(&s_OneTickBackButton, FONT_ICON_BACKWARD_STEP, 0, &Button, BUTTONFLAG_LEFT))
@@ -731,7 +863,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_OneTickForwardButton, &Button, Localize("Go forward one tick"));
 
 	// one marker back
-	ButtonBar.VSplitLeft(Margins + 10.0f, nullptr, &ButtonBar);
+	ButtonBar.VSplitLeft(Margins + 4.0f, nullptr, &ButtonBar);
 	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
 	static CButtonContainer s_OneMarkerBackButton;
 	if(Ui()->DoButton_FontIcon(&s_OneMarkerBackButton, FONT_ICON_BACKWARD_FAST, 0, &Button, BUTTONFLAG_LEFT))
@@ -751,7 +883,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_OneMarkerForwardButton, &Button, Localize("Go forward one marker"));
 
 	// slowdown
-	ButtonBar.VSplitLeft(Margins + 10.0f, nullptr, &ButtonBar);
+	ButtonBar.VSplitLeft(Margins + 4.0f, nullptr, &ButtonBar);
 	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
 	static CButtonContainer s_SlowDownButton;
 	if(Ui()->DoButton_FontIcon(&s_SlowDownButton, FONT_ICON_CHEVRON_DOWN, 0, &Button, BUTTONFLAG_LEFT))
@@ -767,47 +899,14 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_SpeedUpButton, &Button, Localize("Speed up the demo"));
 
 	// speed meter
-	ButtonBar.VSplitLeft(Margins * 12, &SpeedBar, &ButtonBar);
+	ButtonBar.VSplitLeft(44.0f, &SpeedBar, &ButtonBar);
 	char aBuffer[64];
 	str_format(aBuffer, sizeof(aBuffer), "×%g", pInfo->m_Speed);
 	Ui()->DoLabel(&SpeedBar, aBuffer, Button.h * 0.7f, TEXTALIGN_MC);
 
-	// slice begin button
-	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
-	static CButtonContainer s_SliceBeginButton;
-	const int SliceBeginButtonResult = Ui()->DoButton_FontIcon(&s_SliceBeginButton, FONT_ICON_RIGHT_FROM_BRACKET, 0, &Button, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
-	if(SliceBeginButtonResult == 1)
-	{
-		Client()->DemoSliceBegin();
-		if(CurrentTick > (g_Config.m_ClDemoSliceEnd - pInfo->m_FirstTick))
-			g_Config.m_ClDemoSliceEnd = -1;
-	}
-	else if(SliceBeginButtonResult == 2)
-	{
-		g_Config.m_ClDemoSliceBegin = -1;
-	}
-	GameClient()->m_Tooltips.DoToolTip(&s_SliceBeginButton, &Button, Localize("Mark the beginning of a cut (right click to reset)"));
-
-	// slice end button
-	ButtonBar.VSplitLeft(Margins, nullptr, &ButtonBar);
-	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
-	static CButtonContainer s_SliceEndButton;
-	const int SliceEndButtonResult = Ui()->DoButton_FontIcon(&s_SliceEndButton, FONT_ICON_RIGHT_TO_BRACKET, 0, &Button, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
-	if(SliceEndButtonResult == 1)
-	{
-		Client()->DemoSliceEnd();
-		if(CurrentTick < (g_Config.m_ClDemoSliceBegin - pInfo->m_FirstTick))
-			g_Config.m_ClDemoSliceBegin = -1;
-	}
-	else if(SliceEndButtonResult == 2)
-	{
-		g_Config.m_ClDemoSliceEnd = -1;
-	}
-	GameClient()->m_Tooltips.DoToolTip(&s_SliceEndButton, &Button, Localize("Mark the end of a cut (right click to reset)"));
-
 	// add slice button
-	ButtonBar.VSplitLeft(Margins, nullptr, &ButtonBar);
-	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
+	CutBar.VSplitLeft(Margins, nullptr, &CutBar);
+	CutBar.VSplitLeft(ButtonbarHeight, &Button, &CutBar);
 	static CButtonContainer s_SliceAddButton;
 	static CUi::SMessagePopupContext s_SliceAddMessagePopupContext;
 	if(Ui()->DoButton_FontIcon(&s_SliceAddButton, FONT_ICON_PLUS, 0, &Button, BUTTONFLAG_LEFT))
@@ -822,12 +921,13 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_SliceAddButton, &Button, Localize("Add current cut to the export list"));
 
 	// clear slices button
-	ButtonBar.VSplitLeft(Margins, nullptr, &ButtonBar);
-	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
+	CutBar.VSplitLeft(Margins, nullptr, &CutBar);
+	CutBar.VSplitLeft(ButtonbarHeight, &Button, &CutBar);
 	static CButtonContainer s_SliceClearButton;
 	const int SliceClearButtonResult = Ui()->DoButton_FontIcon(&s_SliceClearButton, FONT_ICON_TRASH, 0, &Button, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
 	if(SliceClearButtonResult == 1)
 	{
+		m_DemoCutPreview.Reset();
 		if(g_Config.m_ClDemoSliceBegin == -1 && g_Config.m_ClDemoSliceEnd == -1)
 		{
 			m_vDemoCutSegments.clear();
@@ -840,31 +940,74 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	}
 	else if(SliceClearButtonResult == 2)
 	{
+		m_DemoCutPreview.Reset();
 		m_vDemoCutSegments.clear();
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_SliceClearButton, &Button, Localize("Clear current cut (right click to clear all cuts)"));
 
-	// slice save button
-#if defined(CONF_VIDEORECORDER)
-	const bool SliceEnabled = IVideo::Current() == nullptr;
-#else
-	const bool SliceEnabled = true;
-#endif
-	ButtonBar.VSplitLeft(Margins, nullptr, &ButtonBar);
-	ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
-	static CButtonContainer s_SliceSaveButton;
-	if(Ui()->DoButton_FontIcon(&s_SliceSaveButton, FONT_ICON_ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, BUTTONFLAG_LEFT, IGraphics::CORNER_ALL, SliceEnabled) && SliceEnabled)
+	// 独立剪辑栏：标记、预览和导出使用明确的文字入口。
+	CUIRect CutStartButton, CutEndButton, CutPreviewButton, CutExportButton;
+	CUIRect CutLeft, CutRight;
+	CutBar.VSplitMid(&CutLeft, &CutRight, Margins);
+	CutLeft.VSplitMid(&CutStartButton, &CutEndButton, Margins);
+	CutRight.VSplitMid(&CutPreviewButton, &CutExportButton, Margins);
+	const bool CutControlsEnabled = !VideoRendering && m_DemoPlayerState == DEMOPLAYER_NONE && !Ui()->IsPopupOpen();
+	char aCutTime[32], aCutLabel[128];
+	if(g_Config.m_ClDemoSliceBegin >= 0)
+		str_time(qm_demo_cut::ToCentiseconds((int64_t)g_Config.m_ClDemoSliceBegin - pInfo->m_FirstTick, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aCutTime, sizeof(aCutTime));
+	else
+		str_copy(aCutTime, "--:--.--");
+	str_format(aCutLabel, sizeof(aCutLabel), Localize("Cut start: %s"), aCutTime);
+	static CButtonContainer s_CutStartButton;
+	const int CutStartResult = DoButton_Menu(&s_CutStartButton, aCutLabel, CutControlsEnabled ? 0 : -1, &CutStartButton, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT, nullptr, IGraphics::CORNER_ALL, 15.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f), nullptr, 11.0f);
+	if(CutControlsEnabled && CutStartResult == 1)
+		SetCutStart();
+	else if(CutControlsEnabled && CutStartResult == 2)
 	{
-		char aDemoName[IO_MAX_PATH_LENGTH];
+		m_DemoCutPreview.Reset();
+		g_Config.m_ClDemoSliceBegin = -1;
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_CutStartButton, &CutStartButton, Localize("Set cut start at current position (I, right click to reset)"));
+
+	if(g_Config.m_ClDemoSliceEnd >= 0)
+		str_time(qm_demo_cut::ToCentiseconds((int64_t)g_Config.m_ClDemoSliceEnd - pInfo->m_FirstTick, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aCutTime, sizeof(aCutTime));
+	else
+		str_copy(aCutTime, "--:--.--");
+	str_format(aCutLabel, sizeof(aCutLabel), Localize("Cut end: %s"), aCutTime);
+	static CButtonContainer s_CutEndButton;
+	const int CutEndResult = DoButton_Menu(&s_CutEndButton, aCutLabel, CutControlsEnabled ? 0 : -1, &CutEndButton, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT, nullptr, IGraphics::CORNER_ALL, 15.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f), nullptr, 11.0f);
+	if(CutControlsEnabled && CutEndResult == 1)
+		SetCutEnd();
+	else if(CutControlsEnabled && CutEndResult == 2)
+	{
+		m_DemoCutPreview.Reset();
+		g_Config.m_ClDemoSliceEnd = -1;
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_CutEndButton, &CutEndButton, Localize("Set cut end at current position (O, right click to reset)"));
+
+	const SDemoCutSegment PendingCut = NormalizePendingSlice();
+	const bool PreviewEnabled = CutControlsEnabled && PendingCut.m_StartTick >= 0 && PendingCut.m_StartTick < PendingCut.m_EndTick;
+	static CButtonContainer s_CutPreviewButton;
+	if(DoButton_Menu(&s_CutPreviewButton, m_DemoCutPreview.IsActive() ? Localize("Stop preview (P)") : Localize("Preview cut (P)"), PreviewEnabled ? 0 : -1, &CutPreviewButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 15.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f), nullptr, 11.0f) && PreviewEnabled)
+		PreviewCut();
+
+	static CButtonContainer s_CutExportButton;
+	const bool ExportEnabled = CutControlsEnabled && (PreviewEnabled || !m_vDemoCutSegments.empty());
+	if(DoButton_Menu(&s_CutExportButton, Localize("Export"), ExportEnabled ? 0 : -1, &CutExportButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 15.0f, 0.0f, DEMO_ACCENT, nullptr, 12.0f) && ExportEnabled)
+	{
+		m_DemoCutPreview.Reset();
+		DemoPlayer()->Pause();
+		char aDemoName[IO_MAX_PATH_LENGTH], aCutName[IO_MAX_PATH_LENGTH];
 		DemoPlayer()->GetDemoName(aDemoName, sizeof(aDemoName));
-		m_DemoSliceInput.Set(aDemoName);
+		str_format(aCutName, sizeof(aCutName), "%s_cut", aDemoName);
+		m_DemoSliceInput.Set(aCutName);
 		Ui()->SetActiveItem(&m_DemoSliceInput);
 		m_DemoPlayerState = DEMOPLAYER_SLICE_SAVE;
 	}
-	GameClient()->m_Tooltips.DoToolTip(&s_SliceSaveButton, &Button, Localize("Export cut as a separate demo"));
+	GameClient()->m_Tooltips.DoToolTip(&s_CutExportButton, &CutExportButton, Localize("Export cut as a separate demo"));
 
 	// close button
-	ButtonBar.VSplitRight(ButtonbarHeight, &ButtonBar, &Button);
+	NameBar.VSplitRight(ButtonbarHeight, &NameBar, &Button);
 	static CButtonContainer s_ExitButton;
 	if(Ui()->DoButton_FontIcon(&s_ExitButton, FONT_ICON_XMARK, 0, &Button, BUTTONFLAG_LEFT) || (Input()->KeyPress(KEY_C) && !GameClient()->m_GameConsole.IsActive() && m_DemoPlayerState == DEMOPLAYER_NONE))
 	{
@@ -875,8 +1018,8 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_ExitButton, &Button, Localize("Close the demo player"));
 
 	// toggle keyboard shortcuts button
-	ButtonBar.VSplitRight(Margins, &ButtonBar, nullptr);
-	ButtonBar.VSplitRight(ButtonbarHeight, &ButtonBar, &Button);
+	NameBar.VSplitRight(Margins, &NameBar, nullptr);
+	NameBar.VSplitRight(ButtonbarHeight, &NameBar, &Button);
 	static CButtonContainer s_KeyboardShortcutsButton;
 	if(Ui()->DoButton_FontIcon(&s_KeyboardShortcutsButton, FONT_ICON_KEYBOARD, 0, &Button, BUTTONFLAG_LEFT, IGraphics::CORNER_ALL, g_Config.m_ClDemoKeyboardShortcuts != 0))
 	{
@@ -887,8 +1030,8 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	// auto camera button (only available when it is possible to use)
 	if(GameClient()->m_Camera.CanUseAutoSpecCamera())
 	{
-		ButtonBar.VSplitRight(Margins, &ButtonBar, nullptr);
-		ButtonBar.VSplitRight(ButtonbarHeight, &ButtonBar, &Button);
+		NameBar.VSplitRight(Margins, &NameBar, nullptr);
+		NameBar.VSplitRight(ButtonbarHeight, &NameBar, &Button);
 		static CButtonContainer s_AutoCameraButton;
 		if(Ui()->DoButton_FontIcon(&s_AutoCameraButton, FONT_ICON_CAMERA, 0, &Button, BUTTONFLAG_LEFT, IGraphics::CORNER_ALL, GameClient()->m_Camera.m_AutoSpecCamera))
 		{
@@ -896,6 +1039,15 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		}
 		GameClient()->m_Tooltips.DoToolTip(&s_AutoCameraButton, &Button, Localize("Toggle auto camera"));
 	}
+
+	NameBar.VSplitRight(Margins, &NameBar, nullptr);
+	NameBar.VSplitRight(96.0f, &NameBar, &Button);
+	static CButtonContainer s_DisplayButton;
+	if(DoButton_Menu(&s_DisplayButton, Localize("Demo display"), CutControlsEnabled ? 0 : -1, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 12.0f, 0.0f, m_DemoDisplayExpanded ? DEMO_ACCENT : ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), nullptr, 11.0f) && CutControlsEnabled)
+		m_DemoDisplayExpanded = !m_DemoDisplayExpanded;
+	NameBar.VSplitRight(8.0f, &NameBar, nullptr);
+	if(DisplayHeight > 0.0f && m_DemoPlayerState == DEMOPLAYER_NONE && m_Popup == POPUP_NONE)
+		RenderDemoDisplaySettings(DisplayBar, CutControlsEnabled);
 
 	// demo name
 	char aDemoName[IO_MAX_PATH_LENGTH];
@@ -906,7 +1058,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	Props.m_MaxWidth = NameBar.w;
 	Props.m_EllipsisAtEnd = true;
 	Props.m_EnableWidthCheck = false;
-	Ui()->DoLabel(&NameBar, aBuf, Button.h * 0.5f, TEXTALIGN_ML, Props);
+	Ui()->DoLabel(&NameBar, aBuf, 12.0f, TEXTALIGN_ML, Props);
 
 	if(IncreaseDemoSpeed)
 	{
@@ -937,36 +1089,30 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 {
 	const IDemoPlayer::CInfo *pInfo = DemoPlayer()->BaseInfo();
 
-	CUIRect Box;
-	const float PopupMargin = QmUiCenteredMargin(MainView, 150.0f, 300.0f, 300.0f);
-	MainView.Margin(PopupMargin, &Box);
-	const float VerticalExpansion = std::min(60.0f, PopupMargin);
-	Box.y -= VerticalExpansion;
-	Box.h += VerticalExpansion * 2.0f;
-
-	// background
-	Box.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_ALL, 15.0f);
-	Box.Margin(24.0f, &Box);
+	const float Width = std::min(680.0f, MainView.w - 32.0f);
+	const float Height = std::min(496.0f, MainView.h - 32.0f);
+	CUIRect Box{MainView.x + (MainView.w - Width) * 0.5f, MainView.y + (MainView.h - Height) * 0.5f, Width, Height};
+	DrawDemoCard(Ui(), Box);
+	Box.Margin(20.0f, &Box);
 
 	// title
 	CUIRect Title;
 	Box.HSplitTop(24.0f, &Title, &Box);
-	Box.HSplitTop(20.0f, nullptr, &Box);
-	Ui()->DoLabel(&Title, Localize("Export demo cut"), 24.0f, TEXTALIGN_MC);
+	Box.HSplitTop(10.0f, nullptr, &Box);
+	Ui()->DoLabel(&Title, Localize("Export demo cut"), 22.0f, TEXTALIGN_MC);
 
 	// slice times
 	CUIRect SliceTimesBar, SliceInterval, SliceLength;
 	Box.HSplitTop(24.0f, &SliceTimesBar, &Box);
 	SliceTimesBar.VSplitMid(&SliceInterval, &SliceLength, 40.0f);
-	Box.HSplitTop(20.0f, nullptr, &Box);
+	Box.HSplitTop(10.0f, nullptr, &Box);
 
 	std::vector<SDemoCutSegment> vExportSegments = m_vDemoCutSegments;
 	if(vExportSegments.empty() && (g_Config.m_ClDemoSliceBegin != -1 || g_Config.m_ClDemoSliceEnd != -1))
 	{
-		const int StartTick = g_Config.m_ClDemoSliceBegin == -1 ? pInfo->m_FirstTick : g_Config.m_ClDemoSliceBegin;
-		const int EndTick = g_Config.m_ClDemoSliceEnd == -1 ? pInfo->m_LastTick : g_Config.m_ClDemoSliceEnd;
-		if(StartTick < EndTick)
-			vExportSegments.push_back({StartTick, EndTick});
+		SDemoCutSegment Range;
+		if(qm_demo_cut::ResolveRange(g_Config.m_ClDemoSliceBegin, g_Config.m_ClDemoSliceEnd, pInfo->m_FirstTick, pInfo->m_LastTick, Range))
+			vExportSegments.push_back(Range);
 	}
 	std::sort(vExportSegments.begin(), vExportSegments.end(), [](const SDemoCutSegment &Left, const SDemoCutSegment &Right) {
 		if(Left.m_StartTick != Right.m_StartTick)
@@ -976,10 +1122,10 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 	int64_t TotalCutTicks = 0;
 	for(const auto &Segment : vExportSegments)
 	{
-		TotalCutTicks += maximum(0, Segment.m_EndTick - Segment.m_StartTick + 1);
+		TotalCutTicks += maximum<int64_t>(0, (int64_t)Segment.m_EndTick - Segment.m_StartTick + 1);
 	}
 	char aSliceLength[32];
-	str_time(TotalCutTicks / Client()->GameTickSpeed() * 100, TIME_HOURS, aSliceLength, sizeof(aSliceLength));
+	str_time(qm_demo_cut::ToCentiseconds(maximum<int64_t>(0, TotalCutTicks - 1), Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aSliceLength, sizeof(aSliceLength));
 	char aBuf[256];
 	if(vExportSegments.size() > 1)
 	{
@@ -990,26 +1136,24 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 		const int64_t RealSliceBegin = vExportSegments.empty() ? 0 : vExportSegments[0].m_StartTick - pInfo->m_FirstTick;
 		const int64_t RealSliceEnd = vExportSegments.empty() ? 0 : vExportSegments[0].m_EndTick - pInfo->m_FirstTick;
 		char aSliceBegin[32];
-		str_time(RealSliceBegin / Client()->GameTickSpeed() * 100, TIME_HOURS, aSliceBegin, sizeof(aSliceBegin));
+		str_time(qm_demo_cut::ToCentiseconds(RealSliceBegin, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aSliceBegin, sizeof(aSliceBegin));
 		char aSliceEnd[32];
-		str_time(RealSliceEnd / Client()->GameTickSpeed() * 100, TIME_HOURS, aSliceEnd, sizeof(aSliceEnd));
+		str_time(qm_demo_cut::ToCentiseconds(RealSliceEnd, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aSliceEnd, sizeof(aSliceEnd));
 		str_format(aBuf, sizeof(aBuf), "%s: %s – %s", Localize("Cut interval"), aSliceBegin, aSliceEnd);
 	}
-	Ui()->DoLabel(&SliceInterval, aBuf, 18.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&SliceInterval, aBuf, 13.0f, TEXTALIGN_ML);
 	str_format(aBuf, sizeof(aBuf), "%s: %s", Localize("Cut length"), aSliceLength);
-	Ui()->DoLabel(&SliceLength, aBuf, 18.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&SliceLength, aBuf, 13.0f, TEXTALIGN_ML);
 
 	if(!m_vDemoCutSegments.empty())
 	{
 		CUIRect SegmentsHeader, SegmentsList;
-		constexpr float RemainingControlsHeight = 112.0f;
+		constexpr float RemainingControlsHeight = 258.0f;
 		constexpr float SegmentsHeaderHeight = 20.0f;
-		constexpr float SegmentRowHeight = 20.0f;
-		constexpr float MoreSegmentsHeight = 16.0f;
+		constexpr float SegmentRowHeight = 22.0f;
 		constexpr float SegmentSpacing = 10.0f;
 		const int DesiredVisibleSegments = minimum<int>((int)m_vDemoCutSegments.size(), 4);
-		const float DesiredSegmentsHeight = SegmentsHeaderHeight + DesiredVisibleSegments * SegmentRowHeight +
-						    ((int)m_vDemoCutSegments.size() > DesiredVisibleSegments ? MoreSegmentsHeight : 0.0f) + SegmentSpacing;
+		const float DesiredSegmentsHeight = SegmentsHeaderHeight + DesiredVisibleSegments * SegmentRowHeight + SegmentSpacing;
 		const float SegmentsAreaHeight = std::clamp(Box.h - RemainingControlsHeight, 0.0f, DesiredSegmentsHeight);
 		CUIRect SegmentsArea;
 		Box.HSplitTop(SegmentsAreaHeight, &SegmentsArea, &Box);
@@ -1019,33 +1163,57 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 
 		const int NumVisibleSegments = QmUiVisibleRows(SegmentsArea.h, 0.0f, SegmentRowHeight, (int)m_vDemoCutSegments.size(), 4);
 		SegmentsArea.HSplitTop(NumVisibleSegments * SegmentRowHeight, &SegmentsList, &SegmentsArea);
-		for(int SegmentIndex = 0; SegmentIndex < NumVisibleSegments; ++SegmentIndex)
+		if(NumVisibleSegments > 0)
 		{
-			CUIRect SegmentRow, SegmentLabel, DeleteButton;
-			SegmentsList.HSplitTop(SegmentRowHeight, &SegmentRow, &SegmentsList);
-			SegmentRow.VSplitRight(20.0f, &SegmentLabel, &DeleteButton);
-			const SDemoCutSegment &Segment = m_vDemoCutSegments[SegmentIndex];
-			char aSliceBegin[32];
-			str_time((Segment.m_StartTick - pInfo->m_FirstTick) / Client()->GameTickSpeed() * 100, TIME_HOURS, aSliceBegin, sizeof(aSliceBegin));
-			char aSliceEnd[32];
-			str_time((Segment.m_EndTick - pInfo->m_FirstTick) / Client()->GameTickSpeed() * 100, TIME_HOURS, aSliceEnd, sizeof(aSliceEnd));
-			str_format(aBuf, sizeof(aBuf), "#%d  %s – %s", SegmentIndex + 1, aSliceBegin, aSliceEnd);
-			Ui()->DoLabel(&SegmentLabel, aBuf, 12.0f, TEXTALIGN_ML);
-
-			static CButtonContainer s_aDeleteSegmentButtons[4];
-			if(Ui()->DoButton_FontIcon(&s_aDeleteSegmentButtons[SegmentIndex], FONT_ICON_XMARK, 0, &DeleteButton, BUTTONFLAG_LEFT))
+			static CListBox s_CutSegmentsList;
+			static std::vector<CButtonContainer> s_vDeleteButtons;
+			static std::vector<CButtonContainer> s_vPreviewButtons;
+			s_vDeleteButtons.resize(m_vDemoCutSegments.size());
+			s_vPreviewButtons.resize(m_vDemoCutSegments.size());
+			int DeleteIndex = -1;
+			int PreviewIndex = -1;
+			s_CutSegmentsList.SetActive(!Ui()->IsPopupOpen() && !m_DemoSliceInput.IsActive());
+			s_CutSegmentsList.DoStart(SegmentRowHeight, (int)m_vDemoCutSegments.size(), 1, 3, -1, &SegmentsList, false);
+			for(size_t SegmentIndex = 0; SegmentIndex < m_vDemoCutSegments.size(); ++SegmentIndex)
 			{
-				m_vDemoCutSegments.erase(m_vDemoCutSegments.begin() + SegmentIndex);
+				const SDemoCutSegment &Segment = m_vDemoCutSegments[SegmentIndex];
+				const CListboxItem Item = s_CutSegmentsList.DoNextItem(&Segment);
+				if(!Item.m_Visible)
+					continue;
+				CUIRect SegmentLabel, DeleteButton, PreviewButton;
+				Item.m_Rect.VSplitRight(SegmentRowHeight, &SegmentLabel, &DeleteButton);
+				SegmentLabel.VSplitRight(SegmentRowHeight, &SegmentLabel, &PreviewButton);
+				char aSliceBegin[32], aSliceEnd[32];
+				str_time(qm_demo_cut::ToCentiseconds((int64_t)Segment.m_StartTick - pInfo->m_FirstTick, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aSliceBegin, sizeof(aSliceBegin));
+				str_time(qm_demo_cut::ToCentiseconds((int64_t)Segment.m_EndTick - pInfo->m_FirstTick, Client()->GameTickSpeed()), TIME_HOURS_CENTISECS, aSliceEnd, sizeof(aSliceEnd));
+				str_format(aBuf, sizeof(aBuf), "#%d  %s – %s", (int)SegmentIndex + 1, aSliceBegin, aSliceEnd);
+				Ui()->DoLabel(&SegmentLabel, aBuf, 12.0f, TEXTALIGN_ML);
+				if(Ui()->DoButton_FontIcon(&s_vDeleteButtons[SegmentIndex], FONT_ICON_XMARK, 0, &DeleteButton, BUTTONFLAG_LEFT, IGraphics::CORNER_ALL, !Ui()->IsPopupOpen()))
+					DeleteIndex = (int)SegmentIndex;
+				if(Ui()->DoButton_FontIcon(&s_vPreviewButtons[SegmentIndex], FONT_ICON_PLAY, 0, &PreviewButton, BUTTONFLAG_LEFT, IGraphics::CORNER_ALL, !Ui()->IsPopupOpen()))
+					PreviewIndex = (int)SegmentIndex;
+				GameClient()->m_Tooltips.DoToolTip(&s_vPreviewButtons[SegmentIndex], &PreviewButton, Localize("Preview"));
+			}
+			s_CutSegmentsList.DoEnd();
+			// 结束列表裁剪后再变更容器，避免悬空的行和按钮状态。
+			if(DeleteIndex >= 0)
+			{
+				m_vDemoCutSegments.erase(m_vDemoCutSegments.begin() + DeleteIndex);
+				Ui()->SetActiveItem(nullptr);
 				return;
 			}
-		}
-
-		if((int)m_vDemoCutSegments.size() > NumVisibleSegments && SegmentsArea.h >= MoreSegmentsHeight)
-		{
-			CUIRect MoreSegments;
-			SegmentsArea.HSplitTop(MoreSegmentsHeight, &MoreSegments, &SegmentsArea);
-			str_format(aBuf, sizeof(aBuf), Localize("%d more cut segments"), (int)m_vDemoCutSegments.size() - NumVisibleSegments);
-			Ui()->DoLabel(&MoreSegments, aBuf, 12.0f, TEXTALIGN_ML);
+			if(PreviewIndex >= 0)
+			{
+				const SDemoCutSegment Segment = m_vDemoCutSegments[PreviewIndex];
+				g_Config.m_ClDemoSliceBegin = Segment.m_StartTick;
+				g_Config.m_ClDemoSliceEnd = Segment.m_EndTick;
+				HandleDemoSeeking(-1.0f, 0.0f, Segment.m_StartTick);
+				if(DemoPlayer()->IsPlaying() && m_DemoCutPreview.Start(Segment))
+					DemoPlayer()->Unpause();
+				m_DemoPlayerState = DEMOPLAYER_NONE;
+				Ui()->SetActiveItem(nullptr);
+				return;
+			}
 		}
 	}
 
@@ -1059,10 +1227,10 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 	// file name
 	CUIRect NameLabel, NameBox;
 	Box.HSplitTop(24.0f, &NameLabel, &Box);
-	Box.HSplitTop(20.0f, nullptr, &Box);
+	Box.HSplitTop(10.0f, nullptr, &Box);
 	NameLabel.VSplitLeft(150.0f, &NameLabel, &NameBox);
 	NameBox.VSplitLeft(20.0f, nullptr, &NameBox);
-	Ui()->DoLabel(&NameLabel, Localize("New name:"), 18.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&NameLabel, Localize("New name:"), 14.0f, TEXTALIGN_ML);
 	ui_widget::SInputFieldOptions SliceNameInputOptions;
 	SliceNameInputOptions.m_pPlaceholder = Localize("New name");
 	SliceNameInputOptions.m_FontSize = 12.0f;
@@ -1073,7 +1241,7 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 
 	CUIRect CheckBoxBar, RemoveChatCheckBox, RenderCutCheckBox;
 	Box.HSplitTop(24.0f, &CheckBoxBar, &Box);
-	Box.HSplitTop(20.0f, nullptr, &Box);
+	Box.HSplitTop(10.0f, nullptr, &Box);
 	CheckBoxBar.VSplitMid(&RemoveChatCheckBox, &RenderCutCheckBox, 40.0f);
 	if(DoButton_CheckBox(&s_RemoveChat, Localize("Remove chat"), s_RemoveChat, &RemoveChatCheckBox))
 	{
@@ -1087,20 +1255,30 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 	}
 #endif
 
+	CUIRect DisplayOptions;
+	Box.HSplitTop(144.0f, &DisplayOptions, &Box);
+	RenderDemoDisplaySettings(DisplayOptions, !Ui()->IsPopupOpen());
+	Box.HSplitTop(8.0f, nullptr, &Box);
+
 	// buttons
 	CUIRect ButtonBar, AbortButton, OkButton;
-	Box.HSplitBottom(24.0f, &Box, &ButtonBar);
+	Box.HSplitBottom(30.0f, &Box, &ButtonBar);
 	ButtonBar.VSplitMid(&AbortButton, &OkButton, 40.0f);
 
-	static CButtonContainer s_ButtonAbort;
-	if(DoButton_Menu(&s_ButtonAbort, Localize("Abort"), 0, &AbortButton) || (!Ui()->IsPopupOpen() && Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE)))
-		m_DemoPlayerState = DEMOPLAYER_NONE;
-
 	static CUi::SConfirmPopupContext s_ConfirmPopupContext;
-	static CButtonContainer s_ButtonOk;
-	if(DoButton_Menu(&s_ButtonOk, Localize("Ok"), 0, &OkButton) || (!Ui()->IsPopupOpen() && Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER)))
+	static CButtonContainer s_ButtonAbort;
+	if(DoButton_Menu(&s_ButtonAbort, Localize("Abort"), 0, &AbortButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 15.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f), nullptr, 12.0f) || (!Ui()->IsPopupOpen() && Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE)))
 	{
-		if(str_endswith(m_DemoSliceInput.GetString(), ".demo"))
+		s_ConfirmPopupContext.Reset();
+		m_DemoPlayerState = DEMOPLAYER_NONE;
+		Ui()->SetActiveItem(nullptr);
+		return;
+	}
+
+	static CButtonContainer s_ButtonOk;
+	if(DoButton_Menu(&s_ButtonOk, Localize("Export"), 0, &OkButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 15.0f, 0.0f, DEMO_ACCENT, nullptr, 12.0f) || (!Ui()->IsPopupOpen() && Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER)))
+	{
+		if(str_endswith_nocase(m_DemoSliceInput.GetString(), ".demo"))
 		{
 			char aNameWithoutExt[IO_MAX_PATH_LENGTH];
 			fs_split_file_extension(m_DemoSliceInput.GetString(), aNameWithoutExt, sizeof(aNameWithoutExt));
@@ -1110,7 +1288,7 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 		static CUi::SMessagePopupContext s_MessagePopupContext;
 		char aDemoName[IO_MAX_PATH_LENGTH];
 		DemoPlayer()->GetDemoName(aDemoName, sizeof(aDemoName));
-		if(str_comp(aDemoName, m_DemoSliceInput.GetString()) == 0)
+		if(str_comp_nocase(aDemoName, m_DemoSliceInput.GetString()) == 0)
 		{
 			s_MessagePopupContext.ErrorColor();
 			str_copy(s_MessagePopupContext.m_aMessage, Localize("Please use a different filename"));
@@ -1148,9 +1326,10 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 
 	if(s_ConfirmPopupContext.m_Result == CUi::SConfirmPopupContext::CONFIRMED)
 	{
+		// 先消费确认，失败后由用户重试，避免每帧再次写入。
+		s_ConfirmPopupContext.Reset();
 		char aPath[IO_MAX_PATH_LENGTH];
 		str_format(aPath, sizeof(aPath), "%s/%s.demo", m_aCurrentDemoFolder, m_DemoSliceInput.GetString());
-		str_format(m_aCurrentDemoSelectionName, sizeof(m_aCurrentDemoSelectionName), "%s.demo", m_DemoSliceInput.GetString());
 
 		std::vector<SDemoSliceSegment> vDemoSliceSegments;
 		vDemoSliceSegments.reserve(vExportSegments.size());
@@ -1164,9 +1343,13 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 			Ui()->ShowPopupMessage(Ui()->MouseX(), ButtonBar.y - 5.0f, &s_MessagePopupContext);
 			return;
 		}
+		str_format(m_aCurrentDemoSelectionName, sizeof(m_aCurrentDemoSelectionName), "%s.demo", m_DemoSliceInput.GetString());
 		DemolistPopulate();
 		DemolistOnUpdate(false);
 		m_vDemoCutSegments.clear();
+		g_Config.m_ClDemoSliceBegin = -1;
+		g_Config.m_ClDemoSliceEnd = -1;
+		m_DemoCutPreview.Reset();
 		m_DemoPlayerState = DEMOPLAYER_NONE;
 #if defined(CONF_VIDEORECORDER)
 		if(s_RenderCut)
@@ -3188,6 +3371,7 @@ void CMenus::PopupConfirmPlayDemo()
 	char aBuf[IO_MAX_PATH_LENGTH];
 	str_format(aBuf, sizeof(aBuf), "%s/%s", m_aCurrentDemoFolder, pSelectedDemo->m_aFilename);
 	const char *pError = Client()->DemoPlayer_Play(aBuf, pSelectedDemo->m_StorageType);
+	m_DemoCutPreview.Reset();
 	m_vDemoCutSegments.clear();
 	g_Config.m_ClDemoSliceBegin = -1;
 	g_Config.m_ClDemoSliceEnd = -1;

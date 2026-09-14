@@ -6,6 +6,7 @@
 #include <base/str.h>
 #include <base/vmath.h>
 
+#include <engine/engine.h>
 #include <engine/graphics.h>
 #include <engine/keys.h>
 #include <engine/shared/config.h>
@@ -46,6 +47,38 @@ namespace
 
 } // namespace
 
+static bool GetInputOverlayModifiedTime(IStorage *pStorage, const std::vector<std::string> &vPaths, time_t &OutModified)
+{
+	bool Found = false;
+	time_t Latest = 0;
+	time_t Created;
+	time_t Modified;
+
+	auto CheckFile = [&](const std::string &Path) {
+		if(Path.empty())
+			return;
+		for(int Type = IStorage::TYPE_SAVE; Type < pStorage->NumPaths(); ++Type)
+		{
+			if(!pStorage->FileExists(Path.c_str(), Type))
+				continue;
+			if(pStorage->RetrieveTimes(Path.c_str(), Type, &Created, &Modified))
+			{
+				if(!Found || Modified > Latest)
+					Latest = Modified;
+				Found = true;
+				break;
+			}
+		}
+	};
+
+	for(const std::string &Path : vPaths)
+		CheckFile(Path);
+
+	if(Found)
+		OutModified = Latest;
+	return Found;
+}
+
 void CInputOverlay::OnInit()
 {
 	LoadConfiguration(IStorage::TYPE_ALL);
@@ -59,6 +92,12 @@ void CInputOverlay::OnInit()
 		m_ConfigModifiedTime = Modified;
 		m_HasConfigModifiedTime = true;
 	}
+}
+
+void CInputOverlay::OnWindowResize()
+{
+	for(SElement &Element : m_vElements)
+		Element.m_LabelWidth = -1.0f;
 }
 
 void CInputOverlay::OnRender()
@@ -75,20 +114,28 @@ void CInputOverlay::OnRender()
 	if(!m_ConfigLoaded)
 		LoadConfiguration(IStorage::TYPE_ALL);
 
+	std::optional<time_t> Modified;
+	if(m_pFileTimeJob && m_pFileTimeJob->TryGetResult(Modified))
+	{
+		m_pFileTimeJob.reset();
+		if(Modified && (!m_HasConfigModifiedTime || *Modified != m_ConfigModifiedTime))
+		{
+			LoadConfiguration(IStorage::TYPE_ALL);
+			m_ConfigModifiedTime = *Modified;
+			m_HasConfigModifiedTime = true;
+		}
+	}
 	m_ConfigCheckTimer += Client()->RenderFrameTime();
-	if(m_ConfigCheckTimer >= 0.5f)
+	if(m_ConfigCheckTimer >= 0.5f && !m_pFileTimeJob)
 	{
 		m_ConfigCheckTimer = 0.0f;
-		time_t Modified;
-		if(GetConfigModifiedTime(Modified))
-		{
-			if(!m_HasConfigModifiedTime || Modified != m_ConfigModifiedTime)
-			{
-				LoadConfiguration(IStorage::TYPE_ALL);
-				m_ConfigModifiedTime = Modified;
-				m_HasConfigModifiedTime = true;
-			}
-		}
+		m_pFileTimeJob = std::make_shared<CQmInputOverlayFileTimeJob>([pStorage = Storage(), vPaths = ConfigPaths()]() -> std::optional<time_t> {
+			time_t Latest;
+			if(GetInputOverlayModifiedTime(pStorage, vPaths, Latest))
+				return Latest;
+			return std::nullopt;
+		});
+		Engine()->AddJob(m_pFileTimeJob);
 	}
 
 	if(!m_ConfigValid)
@@ -449,7 +496,19 @@ void CInputOverlay::OnRender()
 
 	Graphics()->QuadsEnd();
 
-	for(const SElement &Element : m_vElements)
+	float X0, Y0, X1, Y1;
+	Graphics()->GetScreen(&X0, &Y0, &X1, &Y1);
+	const vec2 LabelScreenScale(Graphics()->ScreenWidth() / (X1 - X0), Graphics()->ScreenHeight() / (Y1 - Y0));
+	const unsigned LabelRenderFlags = TextRender()->GetRenderFlags();
+	const int LabelFontPreset = (int)TextRender()->GetFontPreset();
+	if(m_LabelScreenScale != LabelScreenScale || m_LabelRenderFlags != LabelRenderFlags || m_LabelFontPreset != LabelFontPreset)
+	{
+		OnWindowResize();
+		m_LabelScreenScale = LabelScreenScale;
+		m_LabelRenderFlags = LabelRenderFlags;
+		m_LabelFontPreset = LabelFontPreset;
+	}
+	for(SElement &Element : m_vElements)
 	{
 		if(Element.m_Label.empty() || !Element.m_Style.m_TextEnabled)
 			continue;
@@ -469,7 +528,12 @@ void CInputOverlay::OnRender()
 		const float CenterY = Y + H * 0.5f + Style.m_TextOffsetY * Scale;
 
 		const float TextSize = Style.m_TextSize * Scale;
-		const float TextWidth = TextRender()->TextWidth(TextSize, Element.m_Label.c_str());
+		if(Element.m_LabelWidth < 0.0f || Element.m_LabelTextSize != TextSize)
+		{
+			Element.m_LabelWidth = TextRender()->TextWidth(TextSize, Element.m_Label.c_str());
+			Element.m_LabelTextSize = TextSize;
+		}
+		const float TextWidth = Element.m_LabelWidth;
 		const float TextX = CenterX - TextWidth * 0.5f;
 		const float TextY = CenterY - TextSize * 0.5f;
 
@@ -1479,40 +1543,20 @@ bool CInputOverlay::IsObsActive(const SObsElement &Element) const
 	}
 }
 
-bool CInputOverlay::GetConfigModifiedTime(time_t &OutModified) const
+std::vector<std::string> CInputOverlay::ConfigPaths() const
 {
-	bool Found = false;
-	time_t Latest = 0;
-	time_t Created;
-	time_t Modified;
-
-	auto CheckFile = [&](const std::string &Path) {
-		if(Path.empty())
-			return;
-		for(int Type = IStorage::TYPE_SAVE; Type < Storage()->NumPaths(); ++Type)
-		{
-			if(!Storage()->FileExists(Path.c_str(), Type))
-				continue;
-			if(Storage()->RetrieveTimes(Path.c_str(), Type, &Created, &Modified))
-			{
-				if(!Found || Modified > Latest)
-					Latest = Modified;
-				Found = true;
-				break;
-			}
-		}
-	};
-
-	CheckFile(CONFIGURATION_FILENAME);
+	std::vector<std::string> vPaths = {CONFIGURATION_FILENAME};
 	for(const SObsLayout &Layout : m_vObsLayouts)
 	{
-		CheckFile(Layout.m_LayoutPath);
-		CheckFile(Layout.m_ImagePath);
+		vPaths.push_back(Layout.m_LayoutPath);
+		vPaths.push_back(Layout.m_ImagePath);
 	}
+	return vPaths;
+}
 
-	if(Found)
-		OutModified = Latest;
-	return Found;
+bool CInputOverlay::GetConfigModifiedTime(time_t &OutModified) const
+{
+	return GetInputOverlayModifiedTime(Storage(), ConfigPaths(), OutModified);
 }
 
 int CInputOverlay::DetectObsPressedOffset(const CImageInfo &Image, const std::vector<SObsElement> &Elements) const

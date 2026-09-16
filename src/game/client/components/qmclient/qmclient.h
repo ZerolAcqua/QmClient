@@ -15,6 +15,7 @@
 
 #include <memory>
 #include <mutex>
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,17 @@ typedef struct _json_value json_value;
 class CQmClient : public CComponent
 {
 public:
+	struct SQmRemoteEmoticonEvent
+	{
+		int m_PlayerId = -1;
+		int m_Emoticon = -1;
+		bool m_LaunchMode = false;
+		bool m_SuperLaunch = false;
+		uint64_t m_Sequence = 0;
+		std::string m_ClientId;
+		std::string m_PlayerName;
+		std::string m_ServerAddress;
+	};
 	// 「新功能」弹窗状态：内容来自中心服广播，本地只保留最近一次成功结果。
 	enum class EQmNewsStatus
 	{
@@ -113,6 +125,7 @@ private:
 	std::shared_ptr<const json_value> m_pQmRealtimeUsersPayload;
 	char m_aQmRealtimeUsersServer[NETADDR_MAXSTRSIZE] = "";
 	int64_t m_QmRealtimeUsersExpireTick = 0;
+	std::deque<SQmRemoteEmoticonEvent> m_QmRemoteEmoticonEvents;
 	void HandleQmRealtimeMessage(const SQmRealtimeMessage &Message);
 	void ApplyQmRealtimeState(const SQmRealtimeMessage &Message);
 	void ApplyQmRealtimeBroadcast(const SQmRealtimeMessage &Message);
@@ -209,6 +222,7 @@ public:
 	// 实时通道状态（供设置界面与诊断使用）。
 	bool QmRealtimeAvailable() const { return m_pQmRealtime != nullptr && m_pQmRealtime->Available(); }
 	bool QmRealtimeConnected() const { return m_pQmRealtime != nullptr && m_pQmRealtime->State() == EQmWebSocketState::CONNECTED; }
+	const char *QmClientId() const { return m_aQmClientPlaytimeClientId; }
 	const char *QmRealtimeStateName() const { return m_pQmRealtime != nullptr ? m_pQmRealtime->StateName() : "off"; }
 	const char *QmRealtimeLastError() const { return m_pQmRealtime != nullptr ? m_pQmRealtime->LastError() : ""; }
 	int QmRealtimePingRttMs() const { return m_pQmRealtime != nullptr ? m_pQmRealtime->LastPingRttMs() : -1; }
@@ -217,6 +231,8 @@ public:
 	void QmRealtimeRestart();
 	// 请求服务端重推当前服务器的头衔名单（兑换/保存头衔、发现服务端变更后调用）。
 	void QmRealtimeRequestTitleRefresh();
+	void SendQmRealtimeEmoticon(int Emoticon, int PlayerId, bool LaunchMode, bool SuperLaunch);
+	bool PollQmRemoteEmoticonEvent(SQmRemoteEmoticonEvent &OutEvent);
 };
 
 #endif

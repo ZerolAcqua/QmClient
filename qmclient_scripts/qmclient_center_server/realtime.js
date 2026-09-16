@@ -6,6 +6,7 @@ const { WebSocket, WebSocketServer } = require("ws");
 const IsToken = (Value) => typeof Value === "string" && /^[a-f0-9]{64}$/i.test(Value);
 const IsText = (Value, Max) => typeof Value === "string" && Buffer.byteLength(Value) <= Max && !/[\u0000-\u001f\u007f]/.test(Value);
 const IsLoopback = (Ip) => Ip === "::1" || Ip === "127.0.0.1" || Ip === "::ffff:127.0.0.1";
+const MAX_EMOTICON_ID = 15;
 
 function NormalizePresence(Body)
 {
@@ -29,6 +30,7 @@ function CreateRealtimeServer(Server, { Recognition, DeveloperService, TitleServ
 		handleProtocols: (Protocols) => Protocols.has("qmclient-json") ? "qmclient-json" : false });
 	const Sessions = new Map();
 	const DirtyServers = new Set();
+	let EmoticonSequence = 0;
 	let FlushPending = null;
 	let Closed = false;
 
@@ -104,6 +106,36 @@ function CreateRealtimeServer(Server, { Recognition, DeveloperService, TitleServ
 		const Result = TitleService.Profile("Bearer " + Session.TitleToken);
 		Send(Socket, "title_profile", { status: Result.statusCode, ...Result.response });
 	}
+	function Emoticon(Socket, Session, Body)
+	{
+		const EmoticonId = Body.emoticon;
+		const PlayerId = Body.player_id;
+		const LaunchMode = Body.launch_mode === true;
+		const SuperLaunch = Body.super_launch === true;
+		if(!Session.Presence.server_address || !Number.isInteger(EmoticonId) || EmoticonId < 0 || EmoticonId > MAX_EMOTICON_ID ||
+			!Number.isInteger(PlayerId) || PlayerId < 0 || PlayerId >= 128 || (!LaunchMode && !SuperLaunch))
+			return Error(Socket, "invalid_emoticon");
+
+		const Player = Session.Presence.players.find((Entry) => Entry.player_id === PlayerId);
+		if(!Player)
+			return Error(Socket, "invalid_emoticon_player");
+
+		const Event = {
+			client_id: Session.ClientId,
+			player_id: Player.player_id,
+			player_name: Player.player_name,
+			server_address: Session.Presence.server_address,
+			emoticon: EmoticonId,
+			launch_mode: LaunchMode,
+			super_launch: SuperLaunch,
+			sequence: ++EmoticonSequence
+		};
+		for(const [Target, TargetSession] of Sessions)
+		{
+			if(TargetSession.Presence.server_address === Session.Presence.server_address)
+				Send(Target, "emoticon", Event);
+		}
+	}
 	function Upgrade(Req, Socket, Head)
 	{
 		if(Req.url === "/ws/editor") return;
@@ -165,6 +197,7 @@ function CreateRealtimeServer(Server, { Recognition, DeveloperService, TitleServ
 				case "news": Send(Socket, "broadcast", NewsService.Current().response); break;
 				case "ping": Send(Socket, "pong", { ts: NowSec() }); break;
 				case "pong": break;
+				case "emoticon": Emoticon(Socket, Session, Body); break;
 				case "stop": {
 					const Result = Playtime("stop", { client_id: Session.ClientId, player_name: Session.PlayerName, stop_at: Body.stop_at });
 					if(Result.statusCode === 200) Send(Socket, "playtime", { ...Result.response, ts: NowSec() });

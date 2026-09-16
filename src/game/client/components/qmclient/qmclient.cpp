@@ -694,6 +694,7 @@ void CQmClient::OnShutdown()
 	m_pQmClientUsersParseJob.reset();
 	m_pQmRealtimeUsersPayload.reset();
 	m_pQmDdnetPlayerParseJob.reset();
+	m_QmRemoteEmoticonEvents.clear();
 }
 
 void CQmClient::OnUpdate()
@@ -724,6 +725,7 @@ void CQmClient::OnStateChange(int NewState, int OldState)
 		GameClient()->ClearQmVoiceSyncMarks();
 		ResetTitlePresences();
 		m_aQmDeveloperSessionId[0] = '\0';
+		m_QmRemoteEmoticonEvents.clear();
 	}
 	m_QmRealtimePresenceBody.clear();
 	m_QmRealtimeNextPresenceCheck = 0;
@@ -1427,6 +1429,37 @@ void CQmClient::QmRealtimeRequestTitleRefresh()
 	m_QmRealtimeNextPresenceCheck = 0;
 }
 
+void CQmClient::SendQmRealtimeEmoticon(int Emoticon, int PlayerId, bool LaunchMode, bool SuperLaunch)
+{
+	if(!QmRealtimeConnected() || Emoticon < 0 || Emoticon >= NUM_EMOTICONS || PlayerId < 0 || PlayerId >= MAX_CLIENTS || (!LaunchMode && !SuperLaunch))
+		return;
+
+	CJsonStringWriter Writer;
+	Writer.BeginObject();
+	Writer.WriteAttribute("type");
+	Writer.WriteStrValue("emoticon");
+	Writer.WriteAttribute("emoticon");
+	Writer.WriteIntValue(Emoticon);
+	Writer.WriteAttribute("player_id");
+	Writer.WriteIntValue(PlayerId);
+	Writer.WriteAttribute("launch_mode");
+	Writer.WriteBoolValue(LaunchMode);
+	Writer.WriteAttribute("super_launch");
+	Writer.WriteBoolValue(SuperLaunch);
+	Writer.EndObject();
+	const std::string Body = Writer.GetOutputString();
+	m_pQmRealtime->SendText(Body.c_str(), Body.size());
+}
+
+bool CQmClient::PollQmRemoteEmoticonEvent(SQmRemoteEmoticonEvent &OutEvent)
+{
+	if(m_QmRemoteEmoticonEvents.empty())
+		return false;
+	OutEvent = std::move(m_QmRemoteEmoticonEvents.front());
+	m_QmRemoteEmoticonEvents.pop_front();
+	return true;
+}
+
 void CQmClient::LogQmRealtimeEvent(const char *pStage, const char *pDetail) const
 {
 	if(!g_Config.m_QmWebSocketLog)
@@ -1553,6 +1586,30 @@ void CQmClient::HandleQmRealtimeMessage(const SQmRealtimeMessage &Message)
 		break;
 	case EQmRealtimeEvent::TITLES:
 		ApplyQmRealtimeTitles(Message);
+		break;
+	case EQmRealtimeEvent::EMOTICON:
+		if(Message.m_HasEmoticon && Client()->State() == IClient::STATE_ONLINE && Client()->ServerAddress())
+		{
+			char aServer[NETADDR_MAXSTRSIZE] = "";
+			net_addr_str(Client()->ServerAddress(), aServer, sizeof(aServer), true);
+			if(str_comp(Message.m_EmoticonServerAddress.c_str(), aServer) == 0 &&
+				Message.m_EmoticonPlayerName.size() <= MAX_NAME_LENGTH &&
+				Message.m_EmoticonClientId.size() <= 64)
+			{
+				SQmRemoteEmoticonEvent Event;
+				Event.m_PlayerId = Message.m_PlayerId;
+				Event.m_Emoticon = Message.m_Emoticon;
+				Event.m_LaunchMode = Message.m_LaunchMode;
+				Event.m_SuperLaunch = Message.m_SuperLaunch;
+				Event.m_Sequence = Message.m_EmoticonSequence;
+				Event.m_ClientId = Message.m_EmoticonClientId;
+				Event.m_PlayerName = Message.m_EmoticonPlayerName;
+				Event.m_ServerAddress = Message.m_EmoticonServerAddress;
+				if(m_QmRemoteEmoticonEvents.size() >= 128)
+					m_QmRemoteEmoticonEvents.pop_front();
+				m_QmRemoteEmoticonEvents.push_back(std::move(Event));
+			}
+		}
 		break;
 	case EQmRealtimeEvent::USERS:
 	case EQmRealtimeEvent::DEVELOPERS:

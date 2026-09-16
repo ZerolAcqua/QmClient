@@ -1379,13 +1379,16 @@ void CPlayers::RenderPlayer(
 
 			int QuadOffset = QuadOffsetToEmoticon + GameClient()->m_aClients[ClientId].m_Emoticon;
 			Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[GameClient()->m_aClients[ClientId].m_Emoticon]);
+			const bool IsSuperEmote = GameClient()->m_Emoticon.IsLocalSuperHeadEmoticon(ClientId, GameClient()->m_aClients[ClientId].m_Emoticon);
+			const float EmoticonScale = IsSuperEmote ? 2.35f : 1.0f;
+			const float SuperYOffset = IsSuperEmote ? 44.0f * h : 0.0f;
 			if(g_Config.m_QmEmoticonShadow)
 			{
 				Graphics()->SetColor(0.0f, 0.0f, 0.0f, a * Alpha * EmoticonShadowOpacity);
-				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + EmoticonShadowOffsetX * h, Position.y - 23.f - 32.f * h + EmoticonShadowOffsetY * h, h, h);
+				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + EmoticonShadowOffsetX * h, Position.y - 23.f - 32.f * h - SuperYOffset + EmoticonShadowOffsetY * h, h * EmoticonScale, h * EmoticonScale);
 			}
 			Graphics()->SetColor(1.0f, 1.0f, 1.0f, a * Alpha);
-			Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x, Position.y - 23.f - 32.f * h, h, h);
+			Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x, Position.y - 23.f - 32.f * h - SuperYOffset, h * EmoticonScale, h * EmoticonScale);
 
 			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 			Graphics()->QuadsSetRotation(0);

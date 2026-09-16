@@ -40,6 +40,7 @@ enum class EQmRealtimeEvent
 	TIME,
 	TITLE_PROFILE,
 	TITLE_STATUS,
+	EMOTICON,
 	ERROR,
 };
 
@@ -66,6 +67,15 @@ struct SQmRealtimeMessage
 	std::shared_ptr<const json_value> m_pPayload;
 	// data 字段存在且是 JSON 对象。
 	bool m_HasRealtimeData = false;
+	bool m_HasEmoticon = false;
+	int m_Emoticon = -1;
+	int m_PlayerId = -1;
+	bool m_LaunchMode = false;
+	bool m_SuperLaunch = false;
+	uint64_t m_EmoticonSequence = 0;
+	std::string m_EmoticonClientId;
+	std::string m_EmoticonPlayerName;
+	std::string m_EmoticonServerAddress;
 };
 
 // 解析一条实时通道文本消息。返回 false 表示消息无法解析为协议事件（调用方应忽略）。

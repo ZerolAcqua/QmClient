@@ -11,6 +11,24 @@
 #include <game/client/components/tclient/bindwheel.h>
 #include <game/client/ui.h>
 
+#include <string>
+
+class CCollision;
+
+struct CEmoticonProjectile
+{
+	vec2 m_Pos;
+	vec2 m_Vel;
+	float m_Angle;
+	float m_AngVel;
+	int m_EmoticonID;
+	float m_LifeTime;
+	float m_SizeScale;
+	bool m_Active;
+
+	void Init(vec2 Pos, vec2 Vel, int EmoticonID, float SizeScale = 1.0f);
+	void Update(float Dt, CCollision *pCollision);
+};
 struct SQmLocalBlinkState
 {
 	static constexpr int DURATION_TICKS = 4;
@@ -47,10 +65,33 @@ class CEmoticon : public CComponent
 
 	CUi::CTouchState m_TouchState;
 	bool m_TouchPressedOutside;
+	bool m_LaunchModeActive = false;
+	enum
+	{
+		MAX_PROJECTILES = 64
+	};
+	CEmoticonProjectile m_aProjectiles[MAX_PROJECTILES];
+	float m_SuperChargeSeconds = 0.0f;
+	float m_SuperChargeProgress = 0.0f;
+	int m_SuperChargeTrackedEmote = -1;
+	int m_SuperChargeRingEmote = -1;
+	float m_SuperChargeRingPhase = 0.0f;
+	float m_SuperChargeRingCharge = 0.0f;
+	int m_SuperChargeRingExitEmote = -1;
+	float m_SuperChargeRingExitPhase = 0.0f;
+	float m_SuperChargeRingExitCharge = 0.0f;
+	bool m_SuperLaunchPending = false;
+	int m_LocalSuperHeadEmoticon = -1;
+	int m_LocalSuperHeadExpireTick = -1;
+	int m_aRemoteSuperHeadEmoticons[MAX_CLIENTS] = {};
+	int m_aRemoteSuperHeadExpireTicks[MAX_CLIENTS] = {};
 
 	static void ConKeyEmoticon(IConsole::IResult *pResult, void *pUserData);
 	static void ConEmote(IConsole::IResult *pResult, void *pUserData);
 	static void ConLocalBlink(IConsole::IResult *pResult, void *pUserData);
+	static void ConSuperEmote(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleLaunchMode(IConsole::IResult *pResult, void *pUserData);
+	void ToggleLaunchMode();
 
 public:
 	CEmoticon();
@@ -64,9 +105,12 @@ public:
 	bool OnInput(const IInput::CEvent &Event) override;
 
 	void Emote(int Emoticon);
+	void SuperEmote(int Emoticon);
 	void EyeEmote(int EyeEmote);
 	void TriggerLocalBlink();
 	bool ShouldRenderLocalBlink(int ClientId) const;
+	bool IsLocalSuperHeadEmoticon(int ClientId, int Emoticon) const;
+	bool IsLaunchModeActive() const { return m_LaunchModeActive; }
 
 	bool IsActive() const { return m_Active; }
 

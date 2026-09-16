@@ -113,3 +113,46 @@ test("重连重新下发快照，已连连接不能替换游玩时长身份", as
 	await WaitFor(Other.Messages, "broadcast");
 	await WaitFor(Other.Messages, "users");
 });
+
+test("表情事件只广播给同一游戏服务器，且不回放历史", async (T) => {
+	const F = await Fixture(T);
+	const One = await F.Connect();
+	const Two = await F.Connect();
+	const OtherRoom = await F.Connect();
+	One.Socket.send(JSON.stringify(Hello("one:8303")));
+	Two.Socket.send(JSON.stringify({ ...Hello("one:8303"), client_id: "qm2222222222", session_id: "session-2", player_name: "另一个玩家", players: [{ player_id: 2, player_name: "另一个玩家", dummy: false }] }));
+	OtherRoom.Socket.send(JSON.stringify({ ...Hello("two:8303"), client_id: "qm3333333333", session_id: "session-3", player_name: "其他房间", players: [{ player_id: 3, player_name: "其他房间", dummy: false }] }));
+	await WaitFor(One.Messages, "users");
+	await WaitFor(Two.Messages, "users");
+	await WaitFor(OtherRoom.Messages, "users");
+	One.Messages.length = 0;
+	Two.Messages.length = 0;
+	OtherRoom.Messages.length = 0;
+
+	One.Socket.send(JSON.stringify({ type: "emoticon", emoticon: 4, player_id: 1, launch_mode: true, super_launch: true }));
+	const Event = await WaitFor(Two.Messages, "emoticon");
+	assert.deepEqual(Event.data, {
+		client_id: "qm1234567890",
+		player_id: 1,
+		player_name: "玩家",
+		server_address: "one:8303",
+		emoticon: 4,
+		launch_mode: true,
+		super_launch: true,
+		sequence: 1
+	});
+	assert.equal(One.Messages.some((Message) => Message.type === "emoticon"), true);
+	await new Promise((Resolve) => setTimeout(25));
+	assert.equal(OtherRoom.Messages.some((Message) => Message.type === "emoticon"), false);
+});
+
+test("表情事件必须来自当前握手声明的玩家", async (T) => {
+	const F = await Fixture(T);
+	const C = await F.Connect();
+	C.Socket.send(JSON.stringify(Hello()));
+	await WaitFor(C.Messages, "users");
+	C.Messages.length = 0;
+	C.Socket.send(JSON.stringify({ type: "emoticon", emoticon: 4, player_id: 7, launch_mode: true, super_launch: false }));
+	const Error = await WaitFor(C.Messages, "error");
+	assert.equal(Error.data.error, "invalid_emoticon_player");
+});

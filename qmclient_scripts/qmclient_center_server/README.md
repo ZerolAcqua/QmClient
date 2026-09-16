@@ -30,6 +30,41 @@ AUTH_SECRET="replace-with-random-long-secret" PORT=8080 npm start
 
 不要在没有路径映射的情况下把 `qm_voice_server` 直接指向本服务端口。修改固定中心 HTTP 地址时，检查 `src/game/client/components/qmclient/qmclient.cpp` 中的 `TCLIENT_INFO_URL`、`QMCLIENT_HEALTH_URL` 和 `QMCLIENT_PLAYTIME_*_URL`；修改识别服务地址时使用配置项 `qm_voice_server`。
 
+## 匿名表情实时事件
+
+客户端复用 `/ws` 的 `qmclient-json` WebSocket，不使用账号认证，也不建立第二条连接。握手后的客户端可发送：
+
+```json
+{
+  "type": "emoticon",
+  "emoticon": 4,
+  "player_id": 1,
+  "launch_mode": true,
+  "super_launch": true
+}
+```
+
+服务端只接受握手 `presence.players` 中声明的 `player_id`，并仅广播给相同 `server_address` 的连接：
+
+```json
+{
+  "type": "emoticon",
+  "v": 2,
+  "data": {
+    "client_id": "qm1234567890",
+    "player_id": 1,
+    "player_name": "玩家",
+    "server_address": "one:8303",
+    "emoticon": 4,
+    "launch_mode": true,
+    "super_launch": true,
+    "sequence": 1
+  }
+}
+```
+
+事件不持久化、不回放，服务端只保留连接级状态；客户端用匿名 `client_id` 过滤自己的事件，并再次校验服务器地址、玩家编号和当前昵称。
+
 ## 路由
 
 | 方法 | 路径 | 用途 |

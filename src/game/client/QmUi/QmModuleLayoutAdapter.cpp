@@ -90,7 +90,6 @@ namespace qm_module
 		case EQmModuleId::ChatBubble: return "qm:chat_bubble";
 		case EQmModuleId::GoresActor: return "qm:gores_actor";
 		case EQmModuleId::Gores: return "qm:gores";
-		case EQmModuleId::FocusMode: return "qm:focus_mode";
 		case EQmModuleId::KeyBinds: return "qm:key_binds";
 		case EQmModuleId::MiniFeatures: return "qm:mini_features";
 		case EQmModuleId::JumpHint: return "qm:jump_hint";
@@ -105,13 +104,13 @@ namespace qm_module
 		case EQmModuleId::TranslateUi: return "qm:translate_ui";
 		case EQmModuleId::QiaFen: return "qm:qiafen"; // 持久化 key，非 UI 名 keyword_reply
 		case EQmModuleId::PieMenu: return "qm:pie_menu";
+		case EQmModuleId::Emoticons: return "qm:emoticons";
 		case EQmModuleId::EntityOverlay: return "qm:entity_overlay";
 		case EQmModuleId::Laser: return "qm:laser";
 		case EQmModuleId::PlayerStats: return "qm:player_stats";
 		case EQmModuleId::CollisionHitbox: return "qm:collision_hitbox";
 		case EQmModuleId::FavoriteMaps: return "qm:favorite_maps";
 		case EQmModuleId::HJAssist: return "qm:hj_assist";
-		case EQmModuleId::SpeedrunTimer: return "qm:speedrun_timer";
 		case EQmModuleId::DebugGraph: return "qm:debug_graph";
 		case EQmModuleId::InputOverlay: return "qm:input_overlay";
 		case EQmModuleId::HudNotifications: return "qm:hud_notifications";
@@ -124,6 +123,7 @@ namespace qm_module
 		case EQmModuleId::WeaponAnimation: return "qm:weapon_animation";
 		case EQmModuleId::DebugMode: return "qm:debug_mode";
 		case EQmModuleId::BindStatusHud: return "qm:bind_status_hud";
+		case EQmModuleId::MapUpload: return "qm:map_upload";
 		}
 		return nullptr;
 	}
@@ -627,6 +627,36 @@ namespace qm_module
 			str_append(pOut, ";", OutSize);
 		}
 		return true;
+	}
+
+	void RemoveLegacyZenModeLayoutConfig()
+	{
+		// 原地移除专属条目，其他卡片的顺序、附加字段与未知 key 均保持原样。
+		const auto RemoveEntries = [](char *pConfig, const char *pKey) {
+			const int KeyLength = str_length(pKey);
+			char *pRead = pConfig;
+			char *pWrite = pConfig;
+			while(*pRead != '\0')
+			{
+				char *pEnd = pRead;
+				while(*pEnd != '\0' && *pEnd != ';')
+					++pEnd;
+				char *pNext = *pEnd == ';' ? pEnd + 1 : pEnd;
+				const bool Matches = pEnd - pRead >= KeyLength && str_comp_num(pRead, pKey, KeyLength) == 0 &&
+						     (pEnd - pRead == KeyLength || pRead[KeyLength] == ':' || pRead[KeyLength] == '|');
+				if(!Matches)
+				{
+					const size_t Length = pNext - pRead;
+					mem_move(pWrite, pRead, Length);
+					pWrite += Length;
+				}
+				pRead = pNext;
+			}
+			*pWrite = '\0';
+		};
+		RemoveEntries(g_Config.m_QmGlobalCardOrder, "qm:focus_mode");
+		RemoveEntries(g_Config.m_QmSidebarCardOrder, "focus_mode");
+		RemoveEntries(g_Config.m_QmSidebarCardCollapsed, "focus_mode");
 	}
 
 	bool MigrateQmLayoutToGlobalCardOrder(const std::vector<SQmModuleEntry> &vDefaults)

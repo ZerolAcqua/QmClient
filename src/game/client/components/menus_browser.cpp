@@ -23,6 +23,8 @@
 #include <game/client/animstate.h>
 #include <game/client/components/chat.h>
 #include <game/client/components/countryflags.h>
+#include <game/client/components/qmclient/friend_heart_icon.h>
+#include <game/client/components/qmclient/friends_category_drag.h>
 #include <game/client/components/qmclient/map_history_ui.h>
 #include <game/client/components/qmclient/perf_logging.h>
 #include <game/client/gameclient.h>
@@ -274,42 +276,6 @@ static std::vector<SLocalSaveDisplayEntry> LoadLocalSaveDisplayEntries(IStorage 
 
 	free(pFileContent);
 	return vEntries;
-}
-
-static const CServerInfo *FindSortedServerByAddress(IServerBrowser *pServerBrowser, const char *pAddress, int *pIndex = nullptr)
-{
-	if(pIndex != nullptr)
-		*pIndex = -1;
-	if(pServerBrowser == nullptr || pAddress == nullptr || pAddress[0] == '\0')
-		return nullptr;
-
-	for(int i = 0; i < pServerBrowser->NumSortedServers(); ++i)
-	{
-		const CServerInfo *pServerInfo = pServerBrowser->SortedGet(i);
-		if(pServerInfo != nullptr && str_comp(pServerInfo->m_aAddress, pAddress) == 0)
-		{
-			if(pIndex != nullptr)
-				*pIndex = i;
-			return pServerInfo;
-		}
-	}
-
-	return nullptr;
-}
-
-static const CServerInfo *FindServerByAddress(IServerBrowser *pServerBrowser, const char *pAddress)
-{
-	if(pServerBrowser == nullptr || pAddress == nullptr || pAddress[0] == '\0')
-		return nullptr;
-
-	for(int i = 0; i < pServerBrowser->NumServers(); ++i)
-	{
-		const CServerInfo *pServerInfo = pServerBrowser->Get(i);
-		if(pServerInfo != nullptr && str_comp(pServerInfo->m_aAddress, pAddress) == 0)
-			return pServerInfo;
-	}
-
-	return nullptr;
 }
 
 static bool IsClanMembersCategory(const char *pCategory)
@@ -609,9 +575,10 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 
 		if(Col.m_Id == COL_FRIENDS)
 		{
-			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			// 好友爱心用默认字体的实体心形：图标字体 Phosphor 只有中空心形。
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-			Ui()->DoLabel(&Col.m_Rect, FONT_ICON_HEART, 14.0f, TEXTALIGN_MC);
+			Ui()->DoLabel(&Col.m_Rect, QM_FRIEND_HEART_ICON, 14.0f, TEXTALIGN_MC);
 			TextRender()->SetRenderFlags(0);
 			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		}
@@ -791,9 +758,9 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	}
 	m_SelectedIndex = -1;
 
-	const auto &&RenderBrowserIcons = [this](CUIElement::SUIElementRect &UIRect, CUIRect *pRect, const ColorRGBA &TextColor, const ColorRGBA &TextOutlineColor, const char *pText, int TextAlign, bool SmallFont = false) {
+	const auto &&RenderBrowserIcons = [this](CUIElement::SUIElementRect &UIRect, CUIRect *pRect, const ColorRGBA &TextColor, const ColorRGBA &TextOutlineColor, const char *pText, int TextAlign, bool SmallFont = false, EFontPreset FontPreset = EFontPreset::ICON_FONT) {
 		const float FontSize = SmallFont ? 6.0f : 14.0f;
-		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		TextRender()->SetFontPreset(FontPreset);
 		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
 		TextRender()->TextColor(TextColor);
 		TextRender()->TextOutlineColor(TextOutlineColor);
@@ -969,7 +936,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			{
 				if(pItem->m_FriendState != IFriends::FRIEND_NO)
 				{
-					RenderBrowserIcons(*pUiElement->Rect(UI_ELEM_FRIEND_ICON), &Button, ColorRGBA(0.94f, 0.4f, 0.4f, 1.0f), TextRender()->DefaultTextOutlineColor(), FONT_ICON_HEART, TEXTALIGN_MC);
+					RenderBrowserIcons(*pUiElement->Rect(UI_ELEM_FRIEND_ICON), &Button, ColorRGBA(0.94f, 0.4f, 0.4f, 1.0f), TextRender()->DefaultTextOutlineColor(), QM_FRIEND_HEART_ICON, TEXTALIGN_MC, false, EFontPreset::DEFAULT_FONT);
 
 					if(pItem->m_FriendNum > 1)
 					{
@@ -2211,16 +2178,8 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	const ColorRGBA CategoryDragOutlineColor(1.0f, 0.85f, 0.2f, 0.9f);
 	const ColorRGBA CategoryDragGhostColor(0.08f, 0.09f, 0.12f, 0.55f);
 
-	struct SFriendsCategoryDragState
-	{
-		int m_PressedIndex = -1;
-		int m_DraggingIndex = -1;
-		vec2 m_GrabOffset = vec2(0.0f, 0.0f);
-		float m_DraggedWidth = 0.0f;
-		float m_DraggedHeight = 0.0f;
-		bool m_HasDragRect = false;
-	};
 	static SFriendsCategoryDragState s_CategoryDragState;
+	static SFriendsPlayerDragState s_FriendDragState;
 
 	struct SFriendsCategoryDropPreview
 	{
@@ -2241,6 +2200,11 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	auto ResetCategoryDragState = [&]() {
 		s_CategoryDragState = SFriendsCategoryDragState();
 		s_CategoryDropPreview = SFriendsCategoryDropPreview();
+	};
+	auto ResetFriendDragState = [&]() {
+		if(Ui()->IsActiveItem(&s_FriendDragState) || (s_FriendDragState.m_pPressedItem != nullptr && Ui()->IsActiveItem(s_FriendDragState.m_pPressedItem)))
+			Ui()->SetActiveItem(nullptr);
+		s_FriendDragState = SFriendsPlayerDragState();
 	};
 
 	auto DrawCategoryDragOutline = [&](const CUIRect &Rect) {
@@ -2281,6 +2245,33 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 
 	if(s_CategoryDragState.m_DraggingIndex >= NumCategories || s_CategoryDragState.m_PressedIndex >= NumCategories)
 		ResetCategoryDragState();
+	if(s_CategoryDragState.m_PressedIndex >= 0 &&
+		(!Ui()->IsActiveItem(&m_vFriendsCategoryExpanded[s_CategoryDragState.m_PressedIndex]) || Ui()->IsPopupOpen()))
+		ResetCategoryDragState();
+	if(s_CategoryDragState.Update(vec2(Ui()->MouseX(), Ui()->MouseY()), Ui()->MouseButton(0)))
+	{
+		// 拖动期间只显示分组标题，不修改或保存各分组原本的展开状态。
+		List.y -= ScrollOffset.y;
+		s_ScrollRegion.SetScrollOffsetY(0.0f);
+	}
+	const bool DraggingAnyHeader = s_CategoryDragState.m_DraggingIndex >= 0;
+	if(s_FriendDragState.m_pPressedItem != nullptr)
+	{
+		const void *pDragActiveId = s_FriendDragState.m_Dragging || Ui()->IsActiveItem(&s_FriendDragState) ? &s_FriendDragState : s_FriendDragState.m_pPressedItem;
+		if(Ui()->IsPopupOpen() || !Ui()->CheckActiveItem(pDragActiveId))
+			ResetFriendDragState();
+		else if(s_FriendDragState.Update(vec2(Ui()->MouseX(), Ui()->MouseY()), Ui()->MouseButton(0)))
+		{
+			// 好友行临时隐藏后，使用独立 ID 持续接收拖动，避免松手被识别为加入服务器。
+			Ui()->SetActiveItem(&s_FriendDragState);
+			List.y -= ScrollOffset.y;
+			s_ScrollRegion.SetScrollOffsetY(0.0f);
+		}
+	}
+	const bool DraggingFriend = s_FriendDragState.m_Dragging;
+	int FriendDropCategoryIndex = -1;
+	if(DraggingFriend)
+		Ui()->SetHotItem(&s_FriendDragState);
 
 	std::vector<SFriendsCategoryHeaderInfo> vCategoryHeaders;
 	vCategoryHeaders.reserve(NumCategories);
@@ -2299,42 +2290,12 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		CUIRect HeaderAction;
 		SplitFriendsCategoryHeaderRects(Header, &HeaderAction, nullptr);
 		const bool HeaderInside = Ui()->MouseHovered(&HeaderAction);
-		if(Input()->ModifierIsPressed() && Ui()->MouseButtonClicked(0) && HeaderInside && Ui()->ActiveItem() == nullptr)
-		{
-			s_CategoryDragState.m_PressedIndex = CategoryIndex;
-			s_CategoryDragState.m_DraggingIndex = -1;
-		}
-
-		if(s_CategoryDragState.m_PressedIndex == CategoryIndex && Ui()->MouseButton(0) && Input()->ModifierIsPressed() && s_CategoryDragState.m_DraggingIndex < 0)
-		{
-			if(HeaderInside)
-			{
-				s_CategoryDragState.m_DraggingIndex = CategoryIndex;
-				s_CategoryDragState.m_GrabOffset = vec2(Ui()->MouseX() - Header.x, Ui()->MouseY() - Header.y);
-				s_CategoryDragState.m_DraggedWidth = Header.w;
-				s_CategoryDragState.m_DraggedHeight = Header.h;
-				s_CategoryDragState.m_HasDragRect = true;
-
-				bool ExpandedChanged = false;
-				for(int CollapseIndex = 0; CollapseIndex < NumCategories && CollapseIndex < (int)m_vFriendsCategoryExpanded.size(); ++CollapseIndex)
-				{
-					if(m_vFriendsCategoryExpanded[CollapseIndex])
-					{
-						m_vFriendsCategoryExpanded[CollapseIndex] = false;
-						ExpandedChanged = true;
-					}
-				}
-				if(ExpandedChanged)
-					SaveFriendsCategoryExpandedState();
-			}
-		}
-		else if(s_CategoryDragState.m_PressedIndex == CategoryIndex && !Input()->ModifierIsPressed() && s_CategoryDragState.m_DraggingIndex < 0)
-		{
-			ResetCategoryDragState();
-		}
+		const bool FriendDropHovered = DraggingFriend && HeaderInside && Ui()->MouseHovered(&ListViewport);
+		const bool FriendDropAllowed = s_FriendDragState.CanDropTo(pCategoryName);
+		if(FriendDropHovered && FriendDropAllowed)
+			FriendDropCategoryIndex = CategoryIndex;
 
 		const bool DraggingThisHeader = s_CategoryDragState.m_DraggingIndex == CategoryIndex;
-		const bool DraggingAnyHeader = s_CategoryDragState.m_DraggingIndex >= 0;
 		const bool HeaderHovered = HeaderInside || DraggingThisHeader;
 		const bool PopupOpen = Ui()->IsPopupOpen(&m_FriendsCategoryPopupContext) && m_FriendsCategoryPopupContext.m_CategoryIndex == CategoryIndex;
 		ColorRGBA HeaderColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
@@ -2343,12 +2304,14 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		else if(IsClanMembersCategory(pCategoryName))
 			HeaderColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClFriendsListClanColor));
 		HeaderColor.a = HeaderHovered || PopupOpen ? 0.4f : 0.25f;
+		if(FriendDropHovered)
+			HeaderColor = FriendDropAllowed ? ColorRGBA(0.2f, 0.9f, 0.4f, 0.5f) : ColorRGBA(0.9f, 0.25f, 0.2f, 0.4f);
 		DrawRoundedSurface(Ui(), Header, HeaderColor, ColorRGBA(), 5.0f);
 		Header.VSplitLeft(Header.h, &GroupIcon, &GroupLabel);
 		GroupIcon.Margin(2.0f, &GroupIcon);
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 		TextRender()->TextColor(HeaderHovered ? TextRender()->DefaultTextColor() : ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
-		Ui()->DoLabel(&GroupIcon, m_vFriendsCategoryExpanded[CategoryIndex] ? FONT_ICON_SQUARE_MINUS : FONT_ICON_SQUARE_PLUS, GroupIcon.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
+		Ui()->DoLabel(&GroupIcon, m_vFriendsCategoryExpanded[CategoryIndex] && !DraggingAnyHeader && !DraggingFriend ? FONT_ICON_SQUARE_MINUS : FONT_ICON_SQUARE_PLUS, GroupIcon.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		SplitFriendsCategoryHeaderRects(Header, nullptr, &ManageButton);
@@ -2366,26 +2329,28 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 			const CUIRect Panel = CMenus::SecondaryPanelRect(Ui()->MouseX(), Ui()->MouseY(), 300.0f, CMenus::FriendsCategoryActionsPopupHeight(), *Ui()->Screen());
 			Ui()->DoPopupMenu(&m_FriendsCategoryPopupContext, Panel.x, Panel.y, Panel.w, Panel.h, &m_FriendsCategoryPopupContext, PopupFriendsCategory);
 		};
-		if(Ui()->DoButton_FontIcon(&m_vFriendsCategoryManageButtons[CategoryIndex], FONT_ICON_GEAR, 0, &ManageButton, BUTTONFLAG_LEFT))
+		if(Ui()->DoButton_FontIcon(&m_vFriendsCategoryManageButtons[CategoryIndex], FONT_ICON_GEAR, 0, &ManageButton, BUTTONFLAG_LEFT) && !DraggingAnyHeader && !DraggingFriend)
 		{
 			OpenCategoryManagePopup();
 		}
 		GameClient()->m_Tooltips.DoToolTip(&m_vFriendsCategoryManageButtons[CategoryIndex], &ManageButton, Localize("Manage categories"));
-		GameClient()->m_Tooltips.DoToolTip(&m_vFriendsCategoryExpanded[CategoryIndex], &HeaderAction, Localize("Right-click or use the gear to manage categories"));
+		GameClient()->m_Tooltips.DoToolTip(&m_vFriendsCategoryExpanded[CategoryIndex], &HeaderAction, Localize("Drag to reorder; click to expand or collapse. Right-click or use the gear to manage categories"));
 
 		const int HeaderResult = Ui()->DoButtonLogic(&m_vFriendsCategoryExpanded[CategoryIndex], 0, &HeaderAction, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
-		if(!DraggingAnyHeader && HeaderResult == 2)
+		if(!DraggingAnyHeader && !DraggingFriend && Ui()->MouseButtonClicked(0) && HeaderInside && !Ui()->IsPopupOpen() && Ui()->IsActiveItem(&m_vFriendsCategoryExpanded[CategoryIndex]))
+			s_CategoryDragState.Begin(CategoryIndex, Header, vec2(Ui()->MouseX(), Ui()->MouseY()));
+		if(!DraggingAnyHeader && HeaderResult == 2 && !DraggingFriend)
 		{
 			OpenCategoryManagePopup();
 		}
-		else if(!DraggingAnyHeader && HeaderResult == 1)
+		else if(!DraggingAnyHeader && HeaderResult == 1 && !DraggingFriend)
 		{
 			m_vFriendsCategoryExpanded[CategoryIndex] = !m_vFriendsCategoryExpanded[CategoryIndex];
 			SaveFriendsCategoryExpandedState();
 		}
 
 		// entries
-		if(m_vFriendsCategoryExpanded[CategoryIndex])
+		if(m_vFriendsCategoryExpanded[CategoryIndex] && !DraggingAnyHeader && !DraggingFriend)
 		{
 			for(size_t FriendIndex = 0; FriendIndex < vvFriends[CategoryIndex].size(); ++FriendIndex)
 			{
@@ -2420,10 +2385,11 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 					continue;
 				++VisibleFriendItems;
 
+				const CUIRect FriendRow = Rect;
 				const bool Inside = Ui()->MouseHovered(&Rect);
 				int ButtonResult = Ui()->DoButtonLogic(pListItemId, 0, &Rect, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
 
-				if(Friend.ServerInfo() || HasNote)
+				if(Friend.ServerInfo() || HasNote || IsPlayerFriend)
 				{
 					std::string &TooltipText = m_vFriendTooltipText[FriendTooltipIndex];
 					TooltipText.clear();
@@ -2439,11 +2405,17 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 					{
 						TooltipText = Localize("Click to select server. Double click to join your friend.");
 					}
-					else
+					else if(HasNote)
 					{
 						TooltipText = Localize("Note:");
 						TooltipText.append(" ");
 						TooltipText.append(pNote);
+					}
+					if(IsPlayerFriend)
+					{
+						if(!TooltipText.empty())
+							TooltipText.append("\n");
+						TooltipText.append(Localize("Drag to another category to move this friend."));
 					}
 					GameClient()->m_Tooltips.DoToolTip(pListItemId, &Rect, TooltipText.c_str(), 320.0f);
 				}
@@ -2582,6 +2554,15 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 						ButtonResult = 0;
 					}
 					GameClient()->m_Tooltips.DoToolTip(pRemoveButtonId, &RemoveButton, Friend.FriendState() == IFriends::FRIEND_PLAYER ? Localize("Click to remove this player from your friends list.") : Localize("Click to remove this clan from your friends list."));
+				}
+
+				const bool InsideFriendAction = Ui()->MouseHovered(&CopyButton) || Ui()->MouseHovered(&RemoveButton) || (Friend.ServerInfo() && Ui()->MouseHovered(&FollowButton));
+				if(IsPlayerFriend && Ui()->MouseButtonClicked(0) && Inside && !InsideFriendAction && !Ui()->IsPopupOpen() && (Ui()->IsActiveItem(pListItemId) || Ui()->ActiveItem() == nullptr))
+				{
+					s_FriendDragState.Begin(pListItemId, Friend.FriendState(), Friend.Name(), Friend.Clan(), GameClient()->Friends()->GetFriendCategory(Friend.Name(), Friend.Clan()), FriendRow, vec2(Ui()->MouseX(), Ui()->MouseY()));
+					// 头像等提示区域没有按钮 ActiveItem，也允许从这些位置起拖。
+					if(Ui()->ActiveItem() == nullptr)
+						Ui()->SetActiveItem(&s_FriendDragState);
 				}
 
 				if(ButtonResult == 2)
@@ -2784,6 +2765,7 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 
 	if(s_CategoryDragState.m_DraggingIndex >= 0)
 	{
+		s_ScrollRegion.DoEdgeScrolling();
 		UpdateCategoryDropPreview();
 		if(s_CategoryDropPreview.m_Active && s_CategoryDropPreview.m_Valid)
 			s_CategoryDropPreview.m_LineRect.Draw(CategoryDropPreviewColor, IGraphics::CORNER_ALL, CategoryDropPreviewThickness);
@@ -2791,11 +2773,37 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	}
 
 	const bool MouseReleased = !Ui()->MouseButton(0) && Ui()->LastMouseButton(0);
-	if(MouseReleased)
+	if(DraggingFriend)
 	{
-		if(s_CategoryDragState.m_DraggingIndex >= 0)
+		s_ScrollRegion.DoEdgeScrolling();
+		CUIRect Ghost{Ui()->MouseX() - s_FriendDragState.m_GrabOffset.x, Ui()->MouseY() - s_FriendDragState.m_GrabOffset.y, s_FriendDragState.m_DraggedWidth, s_FriendDragState.m_DraggedHeight};
+		Ghost.Draw(CategoryDragGhostColor, IGraphics::CORNER_ALL, 5.0f);
+		DrawCategoryDragOutline(Ghost);
+		CUIRect NameLabel, TargetLabel;
+		Ghost.Margin(3.0f, &Ghost);
+		Ghost.HSplitTop(FontSize + 1.0f, &NameLabel, &TargetLabel);
+		SLabelProperties GhostLabelProps;
+		GhostLabelProps.m_MaxWidth = Ghost.w;
+		Ui()->DoLabel(&NameLabel, s_FriendDragState.m_aName, FontSize, TEXTALIGN_ML, GhostLabelProps);
+		Ui()->DoLabel(&TargetLabel, FriendDropCategoryIndex >= 0 ? LocalizeFriendsCategory(GameClient()->Friends()->GetCategory(FriendDropCategoryIndex)) : Localize("Move to category"), FontSize - 1.0f, TEXTALIGN_ML, GhostLabelProps);
+
+		if(MouseReleased && FriendDropCategoryIndex >= 0)
+		{
+			const char *pCategory = GameClient()->Friends()->GetCategory(FriendDropCategoryIndex);
+			if(GameClient()->Friends()->SetFriendCategory(s_FriendDragState.m_aName, s_FriendDragState.m_aClan, pCategory))
+			{
+				m_FriendAddCategoryIndex = FriendDropCategoryIndex;
+				FriendlistOnUpdate();
+				Client()->ServerBrowserUpdate();
+			}
+		}
+	}
+	if(!Ui()->MouseButton(0))
+	{
+		if(MouseReleased && s_CategoryDragState.m_DraggingIndex >= 0)
 			CommitCategoryDropPreview();
 		ResetCategoryDragState();
+		ResetFriendDragState();
 	}
 
 	s_ScrollRegion.End();
@@ -3344,125 +3352,6 @@ void CMenus::PopupCancelRemoveFriend()
 	m_RemoveFriendState = IFriends::FRIEND_NO;
 }
 
-void CMenus::RenderServerbrowserQm(CUIRect View)
-{
-	const float RowHeight = 18.0f;
-	const float FontSize = (RowHeight - 4.0f) * CUi::ms_FontmodHeight;
-	const auto &vQmServers = GameClient()->m_QmClient.QmClientServerDistribution();
-	const int QmUsers = GameClient()->m_QmClient.QmClientOnlineUserCount();
-	const int QmDummies = GameClient()->m_QmClient.QmClientOnlineDummyCount();
-
-	View.Margin(5.0f, &View);
-
-	CUIRect Header, Summary, List, Row;
-	View.HSplitTop(15.0f, &Header, &View);
-	Ui()->DoLabel(&Header, Localize("QmClient online distribution"), FontSize, TEXTALIGN_ML);
-	View.HSplitTop(5.0f, nullptr, &View);
-	View.HSplitTop(28.0f, &Summary, &View);
-
-	if(!GameClient()->m_QmClient.HasQmClientRecognitionService())
-	{
-		Ui()->DoLabel(&Summary, Localize("Set a voice server to enable QmClient distribution"), 9.0f, TEXTALIGN_ML);
-		return;
-	}
-
-	char aSummary[128];
-	if(QmDummies > 0)
-		str_format(aSummary, sizeof(aSummary), Localize("%d servers, %d users, %d dummies"), (int)vQmServers.size(), QmUsers, QmDummies);
-	else
-		str_format(aSummary, sizeof(aSummary), Localize("%d servers, %d users"), (int)vQmServers.size(), QmUsers);
-	Ui()->DoLabel(&Summary, aSummary, 9.0f, TEXTALIGN_ML);
-
-	if(vQmServers.empty())
-	{
-		View.HSplitTop(2.0f, nullptr, &View);
-		View.HSplitTop(RowHeight, &Row, &View);
-		Ui()->DoLabel(&Row, Localize("No active QmClient reports yet"), FontSize, TEXTALIGN_ML);
-		return;
-	}
-
-	View.HSplitTop(2.0f, nullptr, &View);
-	List = View;
-
-	int SelectedQmIndex = -1;
-	for(size_t i = 0; i < vQmServers.size(); ++i)
-	{
-		if(str_comp(vQmServers[i].m_ServerAddress.c_str(), g_Config.m_UiServerAddress) == 0)
-		{
-			SelectedQmIndex = (int)i;
-			break;
-		}
-	}
-
-	static CListBox s_QmServerListBox;
-	static std::vector<int> s_vQmServerItemIds;
-	s_vQmServerItemIds.resize(vQmServers.size());
-	s_QmServerListBox.DoAutoSpacing(2.0f);
-	s_QmServerListBox.DoStart(40.0f, vQmServers.size(), 1, 3, SelectedQmIndex, &List, false, IGraphics::CORNER_NONE);
-
-	for(size_t i = 0; i < vQmServers.size(); ++i)
-	{
-		const SQmClientServerDistribution &Entry = vQmServers[i];
-		int SortedServerIndex = -1;
-		const CServerInfo *pSortedServer = FindSortedServerByAddress(ServerBrowser(), Entry.m_ServerAddress.c_str(), &SortedServerIndex);
-		const CServerInfo *pKnownServer = pSortedServer != nullptr ? pSortedServer : FindServerByAddress(ServerBrowser(), Entry.m_ServerAddress.c_str());
-
-		const CListboxItem Item = s_QmServerListBox.DoNextItem(&s_vQmServerItemIds[i], SelectedQmIndex == (int)i);
-		if(!Item.m_Visible)
-			continue;
-		auto GaussianBlurSuppression = Item.SuppressGaussianBlur();
-
-		CUIRect ItemRect, TextRect, CountRect, TitleRect, DetailRect, UsersRect, DummiesRect;
-		Item.m_Rect.Margin(4.0f, &ItemRect);
-		if(Item.m_Selected)
-			ItemRect.Draw(BrowserOpacityColor(ColorRGBA(0.23f, 0.51f, 0.82f, 0.12f)), IGraphics::CORNER_ALL, 6.0f);
-
-		ItemRect.VSplitRight(100.0f, &TextRect, &CountRect);
-		TextRect.HSplitTop(18.0f, &TitleRect, &DetailRect);
-		CountRect.HSplitTop(18.0f, &UsersRect, &DummiesRect);
-
-		const char *pTitle = pKnownServer != nullptr && pKnownServer->m_aName[0] != '\0' ? pKnownServer->m_aName : Entry.m_ServerAddress.c_str();
-		Ui()->DoLabel(&TitleRect, pTitle, FontSize, TEXTALIGN_ML);
-
-		char aDetail[128];
-		if(pSortedServer != nullptr && Item.m_Selected)
-			str_format(aDetail, sizeof(aDetail), "%s | %s", Localize("Selected server"), pSortedServer->m_aAddress);
-		else if(pSortedServer != nullptr)
-			str_copy(aDetail, pSortedServer->m_aAddress, sizeof(aDetail));
-		else if(pKnownServer != nullptr)
-			str_format(aDetail, sizeof(aDetail), "%s | %s", Localize("Not in the current browser list"), pKnownServer->m_aAddress);
-		else
-			str_copy(aDetail, Localize("Not in the current browser list"), sizeof(aDetail));
-		Ui()->DoLabel(&DetailRect, aDetail, 8.0f, TEXTALIGN_ML);
-
-		char aUsers[48];
-		str_format(aUsers, sizeof(aUsers), Localize(Entry.m_UserCount == 1 ? "%d user" : "%d users"), Entry.m_UserCount);
-		Ui()->DoLabel(&UsersRect, aUsers, 9.0f, TEXTALIGN_MR);
-
-		if(Entry.m_DummyCount > 0)
-		{
-			char aDummies[48];
-			str_format(aDummies, sizeof(aDummies), Localize(Entry.m_DummyCount == 1 ? "%d dummy" : "%d dummies"), Entry.m_DummyCount);
-			Ui()->DoLabel(&DummiesRect, aDummies, 8.0f, TEXTALIGN_MR);
-		}
-	}
-
-	const int NewSelected = s_QmServerListBox.DoEnd();
-	if((s_QmServerListBox.WasItemSelected() || s_QmServerListBox.WasItemActivated()) &&
-		NewSelected >= 0 &&
-		NewSelected < (int)vQmServers.size())
-	{
-		int SortedServerIndex = -1;
-		const CServerInfo *pServerInfo = FindSortedServerByAddress(ServerBrowser(), vQmServers[NewSelected].m_ServerAddress.c_str(), &SortedServerIndex);
-		if(pServerInfo != nullptr && SortedServerIndex >= 0)
-		{
-			m_SelectedIndex = SortedServerIndex;
-			str_copy(g_Config.m_UiServerAddress, pServerInfo->m_aAddress);
-			m_ServerBrowserShouldRevealSelection = true;
-		}
-	}
-}
-
 void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 {
 	const QmMapHistoryUi::SWorkspaceMetrics Layout = QmMapHistoryUi::WorkspaceMetrics(View.h);
@@ -3945,23 +3834,19 @@ enum
 	UI_TOOLBOX_PAGE_FILTERS = 0,
 	UI_TOOLBOX_PAGE_INFO,
 	UI_TOOLBOX_PAGE_FRIENDS,
-	UI_TOOLBOX_PAGE_QM,
 	NUM_UI_TOOLBOX_PAGES,
 };
 
 void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)
 {
-	CUIRect FilterTabButton, InfoTabButton, FriendsTabButton, QmTabButton;
+	CUIRect FilterTabButton, InfoTabButton, FriendsTabButton;
 	const bool UseNewUi = g_Config.m_QmNewUi != 0;
-	TabBar.VSplitLeft(TabBar.w / 4.0f, &FilterTabButton, &TabBar);
-	TabBar.VSplitLeft(TabBar.w / 3.0f, &InfoTabButton, &TabBar);
-	TabBar.VSplitLeft(TabBar.w / 2.0f, &FriendsTabButton, &QmTabButton);
+	TabBar.VSplitLeft(TabBar.w / 3.0f, &FilterTabButton, &TabBar);
+	TabBar.VSplitLeft(TabBar.w / 2.0f, &InfoTabButton, &FriendsTabButton);
 	FilterTabButton.VSplitRight(3.0f, &FilterTabButton, nullptr);
 	InfoTabButton.VSplitLeft(3.0f, nullptr, &InfoTabButton);
 	InfoTabButton.VSplitRight(3.0f, &InfoTabButton, nullptr);
 	FriendsTabButton.VSplitLeft(3.0f, nullptr, &FriendsTabButton);
-	FriendsTabButton.VSplitRight(3.0f, &FriendsTabButton, nullptr);
-	QmTabButton.VSplitLeft(3.0f, nullptr, &QmTabButton);
 
 	const ColorRGBA ColorActive = UseNewUi ? BrowserPanelElevatedColor(0.92f) : ms_ColorTabbarActive;
 	const ColorRGBA ColorInactive = UseNewUi ? BrowserPanelColor(0.70f) : ms_ColorTabbarInactive;
@@ -3976,8 +3861,8 @@ void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)
 	if(UseNewUi)
 	{
 		// 胶囊 Tabbar：槽位先算完，再画容器与滑块，最后画页签图标/文字。
-		const CUIRect aToolboxTabSlots[] = {FilterTabButton, InfoTabButton, FriendsTabButton, QmTabButton};
-		const int aToolboxTabPages[] = {UI_TOOLBOX_PAGE_FILTERS, UI_TOOLBOX_PAGE_INFO, UI_TOOLBOX_PAGE_FRIENDS, UI_TOOLBOX_PAGE_QM};
+		const CUIRect aToolboxTabSlots[] = {FilterTabButton, InfoTabButton, FriendsTabButton};
+		const int aToolboxTabPages[] = {UI_TOOLBOX_PAGE_FILTERS, UI_TOOLBOX_PAGE_INFO, UI_TOOLBOX_PAGE_FRIENDS};
 		int ActiveToolboxTab = -1;
 		for(size_t Tab = 0; Tab < std::size(aToolboxTabSlots); ++Tab)
 		{
@@ -4000,17 +3885,12 @@ void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)
 			g_Config.m_UiToolboxPage = UI_TOOLBOX_PAGE_INFO;
 		GameClient()->m_Tooltips.DoToolTip(&s_InfoTabButton, &InfoTabButton, Localize("Server info"));
 
+		// 好友页签画实体爱心，临时切到默认字体所在的心形。
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		static CButtonContainer s_FriendsTabButton;
-		if(DoButton_MenuTab(&s_FriendsTabButton, FONT_ICON_HEART, g_Config.m_UiToolboxPage == UI_TOOLBOX_PAGE_FRIENDS, &FriendsTabButton, IGraphics::CORNER_ALL, &m_aAnimatorsSmallPage[SMALL_TAB_BROWSER_FRIENDS], nullptr, nullptr, nullptr, 10.0f, nullptr, nullptr, -1.0f, true))
+		if(DoButton_MenuTab(&s_FriendsTabButton, QM_FRIEND_HEART_ICON, g_Config.m_UiToolboxPage == UI_TOOLBOX_PAGE_FRIENDS, &FriendsTabButton, IGraphics::CORNER_ALL, &m_aAnimatorsSmallPage[SMALL_TAB_BROWSER_FRIENDS], nullptr, nullptr, nullptr, 10.0f, nullptr, nullptr, -1.0f, true))
 			g_Config.m_UiToolboxPage = UI_TOOLBOX_PAGE_FRIENDS;
 		GameClient()->m_Tooltips.DoToolTip(&s_FriendsTabButton, &FriendsTabButton, Localize("Friends"));
-
-		TextRender()->SetRenderFlags(0);
-		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-		static CButtonContainer s_QmTabButton;
-		if(DoButton_MenuTab(&s_QmTabButton, Localize("Qm"), g_Config.m_UiToolboxPage == UI_TOOLBOX_PAGE_QM, &QmTabButton, IGraphics::CORNER_ALL, &m_aAnimatorsSmallPage[SMALL_TAB_BROWSER_QM], nullptr, nullptr, nullptr, 10.0f, nullptr, nullptr, -1.0f, true))
-			g_Config.m_UiToolboxPage = UI_TOOLBOX_PAGE_QM;
-		GameClient()->m_Tooltips.DoToolTip(&s_QmTabButton, &QmTabButton, Localize("QmClient"));
 
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
@@ -4034,21 +3914,14 @@ void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_InfoTabButton, &InfoTabButton, Localize("Server info"));
 
+	// 好友页签画实体爱心，临时切到默认字体所在的心形。
+	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 	static CButtonContainer s_FriendsTabButton;
-	if(DoButton_MenuTab(&s_FriendsTabButton, FONT_ICON_HEART, g_Config.m_UiToolboxPage == UI_TOOLBOX_PAGE_FRIENDS, &FriendsTabButton, IGraphics::CORNER_ALL, &m_aAnimatorsSmallPage[SMALL_TAB_BROWSER_FRIENDS], &ColorInactive, &ColorActive, &ColorHover))
+	if(DoButton_MenuTab(&s_FriendsTabButton, QM_FRIEND_HEART_ICON, g_Config.m_UiToolboxPage == UI_TOOLBOX_PAGE_FRIENDS, &FriendsTabButton, IGraphics::CORNER_ALL, &m_aAnimatorsSmallPage[SMALL_TAB_BROWSER_FRIENDS], &ColorInactive, &ColorActive, &ColorHover))
 	{
 		g_Config.m_UiToolboxPage = UI_TOOLBOX_PAGE_FRIENDS;
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_FriendsTabButton, &FriendsTabButton, Localize("Friends"));
-
-	TextRender()->SetRenderFlags(0);
-	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-	static CButtonContainer s_QmTabButton;
-	if(DoButton_MenuTab(&s_QmTabButton, Localize("Qm"), g_Config.m_UiToolboxPage == UI_TOOLBOX_PAGE_QM, &QmTabButton, IGraphics::CORNER_ALL, &m_aAnimatorsSmallPage[SMALL_TAB_BROWSER_QM], &ColorInactive, &ColorActive, &ColorHover))
-	{
-		g_Config.m_UiToolboxPage = UI_TOOLBOX_PAGE_QM;
-	}
-	GameClient()->m_Tooltips.DoToolTip(&s_QmTabButton, &QmTabButton, Localize("QmClient"));
 
 	TextRender()->SetRenderFlags(0);
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
@@ -4085,9 +3958,6 @@ void CMenus::RenderServerbrowserToolBox(CUIRect ToolBox)
 		break;
 	case UI_TOOLBOX_PAGE_FRIENDS:
 		RenderServerbrowserFriends(ToolBox);
-		break;
-	case UI_TOOLBOX_PAGE_QM:
-		RenderServerbrowserQm(ToolBox);
 		break;
 	default:
 		dbg_assert_failed("ui_toolbox_page invalid");

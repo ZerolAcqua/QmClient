@@ -4,7 +4,7 @@
 
 ## 范围与行为
 
-- 在线识别、远程粒子、语音在线状态、开发者认证、头衔名单、游玩时长和服务端时间、新功能广播统一走长连接。
+- 在线识别、语音在线状态、开发者认证、头衔名单、游玩时长和服务端时间、新功能广播统一走长连接。
 - 新客户端删除这些功能的 HTTP 定时查询、定时上报和断线回退。重连后重新发送身份及当前状态，重新接收完整快照。
 - 玩家身份和配置变化立即上报；短租约通过 WS 保活续期。断线后认证标记按现有租约失效。
 - 语音音频保留 UDP。第三方 DDNet 查询、下载和用户主动发起的赞助码兑换、资料修改、广播发布保留原方式。
@@ -56,7 +56,7 @@ Findings（实现期间发现并已修复）：
 | 语音服务 `cargo build --release --manifest-path /home/ubuntu/qmclient-ws-stage-20260914/voice/Cargo.toml` | release 产物构建成功并部署；Tokio 固定 1.48.0，更新并保存 Cargo.lock |
 | `node --check`（中心应用和新增 WS 模块） | 语法检查通过 |
 | 暂存部署脚本 `probe_realtime.js ws://127.0.0.1:18080/ws` | 六类初始消息、时长 stop 确认、协作创建/加入/推送/退出通过 |
-| 暂存识别链路检查 | 主 WS 上报经内部 WS 进入语音进程，返回 users 推送；粒子/语音字段存在且不含 IP |
+| 暂存识别链路检查 | 主 WS 上报经内部 WS 进入语音进程，返回 users 推送；语音字段存在且不含 IP |
 | 公网 `probe_realtime.js wss://qmclient.icu/ws` | 主服务和编辑器协作检查通过；最终中心服务切换后再次通过 |
 | 本机 Python SSL 连接公网两个入口 | 证书及域名验证通过，TLS 1.3、HTTP 101、Sec-WebSocket-Accept 匹配 |
 | `nginx -t` 与 systemd 状态 | 配置有效；语音、中心、Nginx active；原独立称号进程 inactive |
@@ -67,3 +67,38 @@ Findings（实现期间发现并已修复）：
 
 已补充 C++ 协议解析、传输可用性及 TLS 验证约束测试，以及 Node 初始快照、换服、身份固定、协作推送和 Rust 内部识别测试。按照仓库约定，未执行游戏编译、testrunner、npm test 或 cargo test，也未做真实游戏客户端与真实凭据的联机验证。
 
+
+## 2026-09-15：移除实时通道开关
+
+用户确认：自有服务 WebSocket 始终启用，断线自动重连，旧配置 `qm_websocket 0` 也不能关闭；语音音频 UDP、用户主动操作的 HTTP 接口及旧版客户端兼容接口继续保留。
+
+实现：删除设置页“实时通道”开关、`QmWebSocket` 配置定义和连接关闭分支；识别服务可用性仅由传输可用性决定。小功能卡片从 21 行调整为 20 行，同步移除两条翻译源及 12 个语言文件中的产物。版本从 3.6.1 更新为 3.6.2。
+
+### 只读审查
+
+Findings：没有发现本次改动的阻断问题。修正配置头中仍声称断线回退 HTTP 的旧注释；确认更新循环继续维护 WS 连接，退出流程与自动重连逻辑保持原行为。
+
+结论：客户端开关已从界面、配置注册和运行时连接判断中移除。补充 `RealtimeServiceHasNoDisableSetting` 回归测试代码，并调整卡片行数断言；按用户要求未运行测试或编译客户端。
+
+### 服务器核实
+
+本次仅检查现有部署，没有修改配置、部署程序或重启服务。
+
+- 通过既有 SSH 入口 `ubuntu@42.194.185.210:22` 检查，`voicesrv.service`、`qmclient-center-server.service`、`nginx.service` 均为 active；语音和中心服务的自动重启次数均为 0。
+- TCP 9987、8080、443 及 UDP 9987 正在监听；本机 8080 和 9987 的 `/healthz` 均返回正常状态。
+- `qmclient.icu` 解析到 `42.194.185.210`。公网 `/ws` 与 `/ws/editor` 均通过证书及域名校验，以 TLS 1.3 返回 HTTP 101，握手 accept 与 `qmclient-json` 子协议匹配。
+- Nginx 两个 WS 路径均代理至 127.0.0.1:8080；中心服务内部地址为 `ws://127.0.0.1:9987/qm/realtime`。既有内部连接处于 established，额外只读连接收到 users 快照。
+- 9987 并非客户端主通道的公网入口；客户端继续使用 `wss://qmclient.icu/ws`。
+
+### 验证证据
+
+- `python qmclient_scripts/gate/check_gate.py --mode quick`：PASS，11 项通过、0 项失败。日志：`tmp/ws_always_on_quick_gate.log`。
+- `python qmclient_scripts/languages_qmclient/extract_strings.py`：完成提取与缓存同步。
+- `generate_all.py` 两次因语言文件写入 `OSError: [Errno 22]` 中途退出。对尚未更新的文件补齐两条已删除词条的清理；与改前文件逐一比对，12 个语言文件均仅包含本次两条删除。
+- `python qmclient_scripts/languages_qmclient/validate.py`：全量检查通过，12 个语言文件同步有效；另有 3 条与本次无关的译文长度警告。日志：`tmp/ws_always_on_validate.log`。
+- `python qmclient_scripts/languages_qmclient/review_duplicate_entries.py --show-groups 3 --show-unused 3`：完成，重复 key、空译文、候选未使用条目均为 0。日志：`tmp/ws_always_on_duplicates.log`。
+- 本次 C++ 文件 `git diff --check` 通过。未执行游戏编译、测试运行或真实客户端联机验证。
+
+## 2026-09-17 语音音频迁移
+
+用户确认将原先保留的 UDP 音频迁移到独立 `wss://qmclient.icu/ws/voice`，不兼容旧版 UDP，本次不部署。此前部署记录保持为历史状态；本次源码、行为边界和验证记录见 [语音音频迁移](voice_websocket_migration.md)。

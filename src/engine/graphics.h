@@ -509,6 +509,12 @@ public:
 	virtual CTextureHandle LoadTextureRaw(const CImageInfo &Image, int Flags, const char *pTexName = nullptr) = 0;
 	virtual CTextureHandle LoadTextureRawMove(CImageInfo &Image, int Flags, const char *pTexName = nullptr) = 0;
 	virtual CTextureHandle LoadTexture(const char *pFilename, int StorageType, int Flags = 0) = 0;
+	/**
+	 * 句柄是否仍指向当前图形纪元里真正分配着的纹理。设备重建（纪元自增）或槽位被释放之后，
+	 * 旧句柄的 IsValid() 依旧为真，但 TextureSet 会把它降级成「无贴图」，
+	 * 于是绘制出来的是一块没有贴图的实心色块。绘制前可用它判断资源是否还活着。
+	 */
+	virtual bool IsTextureHandleAllocated(CTextureHandle Handle) const = 0;
 	virtual void TextureSet(CTextureHandle Texture) = 0;
 	void TextureClear() { TextureSet(CTextureHandle()); }
 

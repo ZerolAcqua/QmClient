@@ -19,12 +19,6 @@
 %c Team %d
 == %c Équipe %d
 
-%d dummies
-== %d dummies
-
-%d dummy
-== %d dummy
-
 %d items selected
 == %d éléments sélectionnés
 
@@ -43,20 +37,8 @@
 %d selected items were deleted, but %d items could not be deleted. The first failing item was '%s'.
 == %d éléments sélectionnés ont été supprimés, mais %d éléments n'ont pas pu être supprimés. Le premier élément en échec était '%s'.
 
-%d servers, %d users
-== %d serveurs, %d utilisateurs
-
-%d servers, %d users, %d dummies
-== %d serveurs, %d utilisateurs, %d dummies
-
 %d teams
 == %d équipes
-
-%d user
-== %d utilisateur
-
-%d users
-== %d utilisateurs
 
 %d. %s | main: %s | dummy: %s
 == %d. %s | principal : %s | dummy : %s
@@ -259,6 +241,9 @@ A demo with this name already exists
 
 A folder with this name already exists
 == Un dossier avec ce nom existe déjà
+
+A player name is required.
+== Un nom de joueur est requis.
 
 A save is already being restored. Please wait.
 == Une sauvegarde est déjà en cours de restauration. Patientez.
@@ -554,6 +539,9 @@ After hammer fly, whether dummy switches back to previous weapon
 After Load
 == Après chargement
 
+After uploading again, use: reload or hot_reload
+== Après un nouvel envoi, utilisez : reload ou hot_reload
+
 Afterimage pop
 == Effet de rémanence
 
@@ -779,9 +767,6 @@ Apply a saved profile by 1-based index to the current tee
 Apply a writable preset and edit first
 == Appliquez d'abord un préréglage modifiable
 
-Apply Best input to other Tees
-== Appliquer Best input aux autres Tees
-
 Apply Changes
 == Appliquer les modifications
 
@@ -965,9 +950,6 @@ Auto chat when dying in water
 Auto concurrency: %d (smart default)
 == Concurrence automatique : %d (par défaut intelligent)
 
-Auto disable when time expires
-== Désactiver automatiquement à l'expiration du temps
-
 Auto enable in Gores mode
 == Activer automatiquement en mode Gores
 
@@ -1066,9 +1048,6 @@ Auto-close chat after unfreeze
 
 Auto-create CSV on game end
 == Créer automatiquement un CSV à la fin de la partie
-
-Auto-disable speedrun timer when time runs out
-== Désactiver automatiquement le chronomètre de speedrun après expiration du temps
 
 Auto-fetch all players' skins for dummy rotation queue
 == Récupérer automatiquement les skins des joueurs de la carte entière et les utiliser comme file d’attente de rotation pour le Dummy
@@ -1363,24 +1342,6 @@ Benchmark frame times for number of seconds to file, then quit
 
 Best
 == Meilleur
-
-Best input
-== Meilleure entrée
-
-Best input delay compensation percentage
-== Pourcentage de compensation de latence Best input
-
-Best input interpolation mode (1=linear 2=cubic 3=smooth)
-== Mode d'interpolation Best input (1=linéaire 2=cubique 3=lissé)
-
-Best input others
-== Meilleure entrée des autres
-
-Best input prediction offset (0.01 tick)
-== Meilleure prédiction d'entrée (0.01 tick)
-
-Best input smooth percentage
-== Pourcentage de lissage Best input
 
 Better scoreboard
 == Tableau des scores amélioré
@@ -1723,6 +1684,9 @@ Chat command
 
 Chat command (e.g. showall 1)
 == Commande de chat (ex. : showall 1)
+
+Chat export cancelled
+== Exportation du chat annulée
 
 Chat export failed
 == Échec de l'exportation du chat
@@ -2189,8 +2153,8 @@ Configure QmClient HUD elements
 Configure remaining DDNet client preferences
 == Configure remaining DDNet client preferences
 
-Configure skin colors, eyes, and filters
-== Configure skin colors, eyes, and filters
+Configure skin downloads, prefix, and default eyes
+== Configurer les téléchargements de skins, le préfixe et les yeux par défaut
 
 Configure sound and audio packs
 == Configurer le son et les packs audio
@@ -2257,6 +2221,9 @@ Connecting dummy
 
 Connecting to
 == Connexion à
+
+Connecting to voice server
+== Connexion au serveur vocal
 
 Connection disconnected
 == Connexion interrompue
@@ -2404,6 +2371,9 @@ Could not load touch controls from file. See local console for details.
 
 Could not preview this image
 == Impossible de prévisualiser cette image
+
+Could not read the map file.
+== Impossible de lire le fichier de la carte.
 
 Could not resolve connect address '%s'. See local console for details.
 == Impossible de résoudre l'adresse de connexion '%s'. Voir la console locale pour plus de détails.
@@ -3113,6 +3083,9 @@ Door Laser Outline Color
 Door laser outline color
 == Couleur du contour du laser de porte
 
+Double-click: left applies to main, right applies to dummy
+== Double-clic : gauche pour le joueur, droite pour le dummy
+
 Download community skins
 == Télécharger les skins communautaires
 
@@ -3145,6 +3118,12 @@ Draft file is empty
 
 Drag HUD modules with the left mouse button
 == Faites glisser les modules HUD avec le bouton gauche de la souris
+
+Drag to another category to move this friend.
+== Faites glisser cet ami vers une autre catégorie pour le déplacer.
+
+Drag to reorder; click to expand or collapse. Right-click or use the gear to manage categories
+== Faites glisser pour réorganiser ; cliquez pour développer ou réduire. Faites un clic droit ou utilisez l'engrenage pour gérer les catégories
 
 Dragger Inner Color
 == Couleur intérieure du tracteur
@@ -3626,6 +3605,12 @@ Enable keyboard shortcuts in replay player
 Enable keyword reply
 == Activer la réponse par mot-clé
 
+Enable Kugou Music hook integration
+== Activer l'intégration Hook de Kugou Music
+
+Enable Kugou Music lyrics
+== Activer les paroles de Kugou Music
+
 Enable left swipe offset on chat fade
 == Activer le décalage vers la gauche lors du fondu des messages de chat
 
@@ -3685,6 +3670,12 @@ Enable practice mode for teams. Allows /rescue but scores not recorded
 
 Enable QmClient style background 3D particles
 == Activer les particules 3D d'arrière-plan de style QmClient
+
+Enable QQ Music hook integration
+== Activer l'intégration Hook de QQ Music
+
+Enable QQ Music lyrics
+== Activer les paroles de QQ Music
 
 Enable rainbow rendering for hook
 == Activer le rendu arc-en-ciel pour le crochet
@@ -3746,9 +3737,6 @@ Enable sound when rendering video
 Enable spectator cursor (if available)
 == Activer le curseur du spectateur (si disponible)
 
-Enable speedrun timer
-== Activer le chronomètre de speedrun
-
 Enable Spotify lyric integration
 == Activer l'intégration des paroles de Spotify
 
@@ -3785,9 +3773,6 @@ Enable Tee trail
 Enable tee trails
 == Activer les traînées de tee
 
-Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
-== Activer le service WebSocket dédié de QmClient (aucun repli sur l’interrogation HTTP)
-
 Enable thinking mode (slower)
 == Activer le mode de réflexion (plus lent)
 
@@ -3823,12 +3808,6 @@ Enable warlist
 
 Enable word filter list
 == Activer la liste de filtrage de mots
-
-Enable Zen Mode
-== Activer le mode Zen (Zen Mode)
-
-Enable Zen mode
-== Activer le mode Zen
 
 Enable/disable infinite hook.
 == Activer/désactiver le grappin infini
@@ -4010,6 +3989,9 @@ Exported %d chat messages
 Exported to %s
 == Exporté vers %s
 
+Exporting chat images: %d
+== Exportation des images du chat : %d
+
 Expose playback controls to the operating system
 == Expose playback controls to the operating system
 
@@ -4154,6 +4136,9 @@ File for storing ranks if sv_use_sql is disabled or as backup SQL server.
 File with announcements, one per line.
 == Fichier avec les annonces, une par ligne.
 
+File: %s
+== Fichier : %s
+
 Fill
 == Remplissage
 
@@ -4235,9 +4220,6 @@ First page in console
 Flip:
 == Retourner :
 
-Focus mode
-== Mode focus
-
 Folder
 == Dossier
 
@@ -4246,9 +4228,6 @@ Folder Link
 
 Follow
 == Suivre
-
-Follow server
-== Suivre le serveur
 
 Follow Tee
 == Suivre le Tee
@@ -4742,38 +4721,8 @@ Helpful for Gores: allow negative internal certainty for more conservative predi
 Hi!
 == Salut !
 
-Hide basic system info (join, version, rules) in Zen mode
-== Masquer les informations système de base (entrée, version, règles, etc.) en mode Zen
-
 Hide chat messages from players marked as enemies
 == Masquer les messages de chat des joueurs marqués comme ennemis
-
-Hide death/respawn effects
-== Cacher les effets de mort/résurrection
-
-Hide death/respawn effects in Zen Mode
-== Masquer les effets de mort/réapparition en mode zen
-
-Hide direction in Zen mode
-== Masquer la direction en mode zen
-
-Hide direction indicators
-== Cacher les indicateurs de direction
-
-Hide Echo messages
-== Cacher les messages Echo
-
-Hide Echo messages in Zen mode
-== Masquer les messages Echo en mode Zen
-
-Hide explosion effects
-== Cacher les effets d'explosion
-
-Hide freeze effects
-== Cacher les effets de gel
-
-Hide freeze effects in Zen Mode
-== Masquer les effets de gel en mode zen
 
 Hide ghosts of frozen players
 == Cacher les fantômes des joueurs gelés
@@ -4781,56 +4730,14 @@ Hide ghosts of frozen players
 Hide guide lines
 == Cacher les lignes de guidage
 
-Hide hammer effects
-== Cacher les effets de marteau
-
-Hide hammer effects in Zen Mode
-== Masquer les effets de coup de marteau en mode zen
-
 Hide helper lines in Gores mode
 == Masquer les lignes d’aide en mode Gores
-
-Hide helper lines in Zen mode
-== Masquer les lignes d’aide en mode zen
-
-Hide HUD
-== Cacher le HUD
-
-Hide HUD in Zen mode
-== Masquer le HUD en mode Zen
 
 Hide indicator for tees on your screen
 == Cacher l'indicateur pour les tees sur votre écran
 
 Hide input emoticon
 == Cacher l'émoticône de saisie
-
-Hide join/version prompts
-== Cacher les invites de connexion/version
-
-Hide jump effects
-== Cacher les effets de saut
-
-Hide jump effects in Zen Mode
-== Masquer les effets de saut en mode zen
-
-Hide kill and finish messages in Zen mode
-== Masquer les messages de kill et de fin en mode zen
-
-Hide kill/finish messages
-== Cacher les messages de mise à mort/fin
-
-Hide map progress
-== Cacher la progression de la carte
-
-Hide map progress bar in Zen mode
-== Masquer la barre de progression de la carte en mode zen
-
-Hide nameplates
-== Cacher les plaques nominatives
-
-Hide names
-== Cacher les noms
 
 Hide non-friend names/clans and show client ID
 == Masquer les noms/clans des non-amis et afficher l'ID client
@@ -4844,35 +4751,11 @@ Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
 == Cacher les messages des joueurs
 
-Hide player messages in Zen mode
-== Masquer les messages des joueurs en mode zen
-
-Hide player name plates in Zen Mode
-== Masquer les plaques de noms des joueurs en mode zen
-
-Hide player names in Zen Mode
-== Masquer les noms des joueurs en mode zen
-
-Hide projectile effects in Zen Mode
-== Masquer les effets de tir au canon en mode zen
-
-Hide scoreboard
-== Cacher le tableau des scores
-
-Hide scoreboard in Zen mode
-== Masquer le tableau des scores en mode zen
-
 Hide sensitive info like /save password
 == Masquer les informations sensibles comme le mot de passe /save
 
 Hide server information on join
 == Masquer les informations du serveur à l'arrivée
-
-Hide server prompt notifications
-== Cacher les notifications d'invite du serveur
-
-Hide server tip notifications (including notification bar) in Zen mode
-== Masquer les notifications d’indice du serveur (y compris la barre de notification) en mode zen
 
 Hide Settings Tabs
 == Cacher les onglets des paramètres
@@ -4891,15 +4774,6 @@ Hide toast
 
 Hide typing emoji during input
 == Ne pas afficher les émoticônes de frappe pendant la saisie
-
-Hide UI for focused gameplay
-== Cacher l'interface utilisateur pour un jeu concentré
-
-Hide weapon fire effects in Zen Mode
-== Masquer les effets de flamme des armes en mode zen
-
-Hide weapon muzzle flashes
-== Cacher les flashs de bouche d'arme
 
 High Detail
 == Haut détail
@@ -5014,9 +4888,6 @@ Horizontal position
 
 Hostname of DNSBL provider for IP verification
 == Nom d'hôte du fournisseur DNSBL pour la vérification IP
-
-Hours
-== Heures
 
 Hover for tooltip
 == Survoler pour l'infobulle
@@ -5288,9 +5159,6 @@ Input overlay X position (percent)
 Input overlay Y position (percent)
 == Position Y de la superposition d'entrée (pourcentage)
 
-Input smoothing
-== Lissage d'entrée
-
 Input switch
 == Commutateur d'entrée
 
@@ -5299,9 +5167,6 @@ Insane
 
 Installing update. Please wait...
 == Installation de la mise à jour. Veuillez patienter...
-
-Interface
-== Interface
 
 Interface accent color
 == Couleur d'accent de l'interface
@@ -5333,9 +5198,6 @@ Internet
 Internet (From online source)
 == Internet (Depuis une source en ligne)
 
-Interpolation
-== Interpolation
-
 Interval for auto-saving current editor map copy to "auto" folder (0=off)
 == Intervalle de sauvegarde automatique de la copie de la carte actuelle dans l'éditeur vers le dossier "auto" (0 = désactivé)
 
@@ -5353,6 +5215,9 @@ Invalid Demo
 
 Invalid ID
 == ID invalide
+
+Invalid map file or filename.
+== Fichier de carte ou nom de fichier invalide.
 
 Invalid option
 == Option invalide
@@ -5446,6 +5311,9 @@ Jump hint
 
 Jump hint color
 == Couleur de l'indice de saut
+
+Jump hint defaults migration completed flag
+== Indicateur de migration terminée des paramètres par défaut de l'indice de saut
 
 Jump hint font size
 == Taille de police de l'indice de saut
@@ -5558,6 +5426,12 @@ Kills a player and announces the kill
 Kills team and disables practice mode
 == Tue l'équipe et désactive le mode entraînement
 
+Kugou hook heartbeat timeout (milliseconds)
+== Délai d'expiration du heartbeat de Kugou Hook (millisecondes)
+
+Kugou hook helper path (empty=beside QmClient)
+== Chemin de l'assistant Kugou Hook (vide = à côté de QmClient)
+
 l = Local time
 == l = Heure locale
 
@@ -5578,6 +5452,12 @@ Language
 
 Language file to use
 == Fichier de langue à utiliser
+
+Large emoticons and launch mode
+== Large emoticons and launch mode
+
+Large emoticons and launched emoticons
+== Large emoticons and launched emoticons
 
 Large text announcement for friend joining
 == Annonce en gros texte pour l'arrivée d'un ami
@@ -5626,9 +5506,6 @@ Last page in console
 
 Latency
 == Latence
-
-Latency compensation
-== Compensation de latence
 
 Latency Jitter
 == Gigue de latence
@@ -5870,12 +5747,6 @@ Local console log category filter mask (bit flags)
 Local only
 == Local uniquement
 
-Local particle effects
-== Effets de particules locaux
-
-Local particles: show particles behind own Tee (e.g. freeze snow)
-== Particules locales : affiche les particules tombant derrière votre Tee (ex. flocons de gel)
-
 Local saves
 == Sauvegardes locales
 
@@ -6011,6 +5882,12 @@ Map danger border
 Map download send window
 == Fenêtre d'envoi de téléchargement de carte
 
+Map exceeds the client limit of 64 MiB.
+== La carte dépasse la limite du client de 64 MiB.
+
+Map folders
+== Dossiers de cartes
+
 Map play history
 == Historique de jeu des cartes
 
@@ -6055,6 +5932,21 @@ Map to use on server
 
 Map type:
 == Type de carte :
+
+Map upload
+== Envoi de carte
+
+Map upload cancelled.
+== Envoi de la carte annulé.
+
+Map upload in progress...
+== Envoi de la carte en cours...
+
+Map upload network error.
+== Erreur réseau lors de l’envoi de la carte.
+
+Map uploaded successfully.
+== Carte envoyée avec succès.
 
 Margin when notification is docked
 == Marge de réserve lorsque la barre de notifications est alignée sur le bord
@@ -6260,9 +6152,6 @@ Microphone volume
 Microphone volume (percent)
 == Volume du microphone (pourcentage)
 
-Milliseconds
-== Millisecondes
-
 Milliseconds to apply quick input early
 == Millisecondes pour appliquer l'entrée rapide en avance
 
@@ -6322,9 +6211,6 @@ Minimum time between map votes (in seconds)
 
 Minimum width for name column in server browser
 == Largeur minimale pour la colonne du nom dans le navigateur de serveurs
-
-Minutes
-== Minutes
 
 Minutes on server before a player can call a map change vote (0 = disabled)
 == Minutes sur le serveur avant qu'un joueur puisse demander un vote de changement de carte (0 = désactivé)
@@ -6386,6 +6272,9 @@ Mouse sensitivity in menu/editor
 Mouse size
 == Taille de la souris
 
+Move a friend category to a position
+== Déplacer une catégorie d'amis vers une position
+
 Move left
 == Déplacer à gauche
 
@@ -6413,32 +6302,14 @@ Multi-View
 Mute
 == Mute
 
-Mute death/respawn sound in Zen Mode
-== Couper les sons de mort/réapparition en mode zen
-
-Mute death/respawn sounds
-== Couper les sons de mort/résurrection
-
 Mute emoticons
 == Muter les émoticônes
 
 Mute flag sounds
 == Couper les sons du drapeau
 
-Mute hammer sound in Zen mode
-== Couper les sons de coup de marteau en mode zen
-
-Mute hammer sounds
-== Couper les sons de marteau
-
 Mute hook sound
 == Couper le son du crochet
-
-Mute jump sound in Zen Mode
-== Couper les sons de saut en mode zen
-
-Mute jump sounds
-== Couper les sons de saut
 
 Mute map sounds
 == Couper les sons de la carte
@@ -6557,6 +6428,9 @@ Name:
 Name: %s
 == Nom : %s
 
+Nameplate count that still keeps full text effect quality; beyond it effect layers scale down by count (higher=keep more)
+== Nombre de pseudos gardant la qualité complète ; au-delà, les couches diminuent selon le nombre (plus haut = en garder plus)
+
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 == Portée de l'icône de force du crochet du nametag (0=Soi 1=Autres 2=Crochet fort 3=Crochet faible 4=Tous les joueurs)
 
@@ -6583,6 +6457,9 @@ Nameplate text border color
 
 Nameplate text border range
 == Étendue de la bordure du texte du nametag
+
+Nameplate text effect auto LOD (0=Off 1=On: trim outer effect layers when crowded)
+== LOD auto des effets de texte (0=Non, 1=Oui : réduire les couches externes en foule)
 
 Nameplate text effects (1=Border 2=Gradient 4=Rainbow 8=Glow)
 == Effets du texte du nametag (1=Bordure 2=Dégradé 4=Arc-en-ciel 8=Lueur)
@@ -6710,9 +6587,6 @@ Nickname
 No
 == Non
 
-No active QmClient reports yet
-== Aucun rapport QmClient actif pour le moment
-
 No animation
 == Aucune animation
 
@@ -6800,6 +6674,9 @@ No login required
 No map play history yet
 == Pas encore d'historique de jeu de carte
 
+No map selected
+== Aucune carte sélectionnée
+
 No matching assets.
 == Aucun élément correspondant.
 
@@ -6841,6 +6718,9 @@ No results
 
 No safe position found
 == Aucune position sûre trouvée
+
+No saved maps found
+== Aucune carte enregistrée trouvée
 
 No saved profiles available yet. Save one first.
 == Aucun profil sauvegardé disponible. Sauvegardez-en un d'abord.
@@ -6910,9 +6790,6 @@ Not downloaded
 
 Not enabled
 == Non activé
-
-Not in the current browser list
-== Pas dans la liste actuelle du navigateur
 
 Not open, check input device or mic permission
 == Non ouvert, vérifiez le périphérique d'entrée ou l'autorisation du micro
@@ -7592,6 +7469,9 @@ Player stats
 Player stats and info display
 == Affichage des statistiques et informations du joueur
 
+Player: %s
+== Joueur : %s
+
 Players
 == Joueurs
 
@@ -7751,8 +7631,8 @@ Prediction margin
 Prediction margin when frozen
 == Marge de prédiction lorsqu'il est gelé
 
-Prediction offset
-== Décalage de prédiction
+Preparing chat export: %d%%
+== Préparation de l’exportation du chat : %d%%
 
 Preparing demo playback
 == Préparation de la lecture de la démo
@@ -7777,6 +7657,9 @@ Press ESC to close. Watch the scale-in spring on open.
 
 Press Esc to exit the HUD editor
 == Appuyez sur Échap pour quitter l'éditeur HUD
+
+Press F2, log in, then use: change_map map_name
+== Appuyez sur F2, connectez-vous, puis utilisez : change_map map_name
 
 Prev. weapon
 == Arme préc.
@@ -7808,8 +7691,8 @@ Preview import file
 Preview laser bodies, outlines, and impacts
 == Preview laser bodies, outlines, and impacts
 
-Preview player and dummy appearance
-== Preview player and dummy appearance
+Preview player and dummy appearance and colors
+== Aperçu de l'apparence et des couleurs du joueur et du dummy
 
 Preview player and dummy nameplates
 == Preview player and dummy nameplates
@@ -7970,9 +7853,6 @@ Pyramid
 q = Connection quality
 == q = Qualité de la connexion
 
-Qm
-== Qm
-
 Qm UI custom icon color
 == Couleur personnalisée des icônes Qm UI
 
@@ -8009,9 +7889,6 @@ QmClient community and project information
 QmClient information and project links
 == QmClient information and project links
 
-QmClient online distribution
-== Distribution en ligne de QmClient
-
 QmClient Settings
 == Paramètres QmClient
 
@@ -8030,6 +7907,12 @@ QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
 QQ group: 1076765929 (click to copy)
 == Groupe QQ : 1076765929 (cliquez pour copier)
 
+QQ Music hook heartbeat timeout (milliseconds)
+== Délai d'expiration du heartbeat de QQ Music Hook (millisecondes)
+
+QQ Music hook helper path (empty=beside QmClient)
+== Chemin de l'assistant QQ Music Hook (vide = à côté de QmClient)
+
 Quads are used for background decoration
 == Les quads sont utilisés pour la décoration de fond
 
@@ -8042,8 +7925,8 @@ Queue preset: %s
 Quick action menu for players
 == Menu d'action rapide pour les joueurs
 
-Quick input mode (0=Fast 3=Best 4=Saiko+; 1/2 legacy mapped to Best)
-== Mode de saisie rapide (0=Rapide 3=Meilleur 4=Saiko+ ; 1/2 compatibles avec les anciennes valeurs et mappés sur Meilleur)
+Quick input mode (0=Fast 4=Saiko+; legacy values fall back to Fast)
+== Mode de saisie rapide (0=Fast 4=Saiko+ ; les anciennes valeurs reviennent à Fast)
 
 Quit
 == Quitter
@@ -8122,9 +8005,6 @@ Ratio threshold for local target language detection
 
 Really? Not even a little?
 == Vraiment ? Même pas un peu ?
-
-Realtime channel
-== Canal temps réel
 
 Realtime channel heartbeat interval (seconds, 0 uses default)
 == Intervalle de battement du canal temps réel (secondes, 0 utilise la valeur par défaut)
@@ -8275,12 +8155,6 @@ Remote console password for helper (limited access)
 
 Remote console password for moderator (limited access)
 == Mot de passe de la console distante pour le modérateur (accès limité)
-
-Remote particle effects
-== Effets de particules distants
-
-Remote particles: sync and render other players via central server (requires both local+remote enabled)
-== Particules à distance : synchronisation et rendu des autres joueurs via le serveur central (nécessite que l'autre active local + distant)
 
 Remove
 == Retirer
@@ -8645,6 +8519,9 @@ Restarting. Please wait…
 Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
 == Restaurer une sauvegarde à deux ? /qm Yes charge la plus récente ; /qm Yes numéro en choisit une autre ; /qm No ignore.
 
+Restore Kugou files
+== Restaurer les fichiers Kugou
+
 Restore old single-segment hook collision line behavior
 == Restaurer l'ancien comportement de la ligne de collision de crochet à segment unique
 
@@ -8674,9 +8551,6 @@ Rifle laser outline color
 
 Right jump
 == Saut droit
-
-Right-click or use the gear to manage categories
-== Clic droit ou utilisez l'engrenage pour gérer les catégories
 
 Right-click to disable auto-translate
 == Clic droit pour désactiver la traduction automatique
@@ -8993,6 +8867,9 @@ Search
 Search and navigate settings
 == Rechercher et parcourir les paramètres
 
+Search and pick skins and manage the skin queue
+== Rechercher et choisir des skins, et gérer la file de rotation
+
 Search donor asset
 == Rechercher un élément donneur
 
@@ -9002,9 +8879,6 @@ Search main asset
 Search settings by title, feature, or keyword
 == Search settings by title, feature, or keyword
 
-Search skins and manage the skin queue
-== Search skins and manage the skin queue
-
 Searching
 == Recherche
 
@@ -9013,9 +8887,6 @@ Sec-WebSocket-Protocol sent during the realtime handshake
 
 Secondary
 == Secondaire
-
-Seconds
-== Secondes
 
 Seconds to wait before reconnecting (0=off, when server is full)
 == Secondes d'attente avant de se reconnecter (0 = désactivé, quand le serveur est plein)
@@ -9029,6 +8900,9 @@ SecretId
 SecretKey
 == Clé secrète
 
+Select a saved .map file (client limit: 64 MiB).
+== Choisissez un fichier .map enregistré (limite du client : 64 MiB).
+
 Select all chat
 == Sélectionner tout le chat
 
@@ -9037,6 +8911,9 @@ Select button by touch
 
 Select export
 == Sélectionner l'exportation
+
+Select map
+== Choisir une carte
 
 Select the country flag for each player
 == Select the country flag for each player
@@ -9061,9 +8938,6 @@ Selected item color
 
 Selected part: %d
 == Partie sélectionnée : %d
-
-Selected server
-== Serveur sélectionné
 
 Selected timertype is not supported by your client
 == Le type de chronomètre sélectionné n'est pas pris en charge par votre client
@@ -9188,9 +9062,6 @@ Server hostname (0.7 only)
 Server info
 == Informations du serveur
 
-Server IP
-== IP du serveur
-
 Server kick/spec votes are no longer actively moderated.
 == Les votes d'exclusion/mise en spectateur du serveur ne sont plus modérés activement.
 
@@ -9221,8 +9092,11 @@ Server stress (debug builds only).
 Server type (novice, moderate, etc.)
 == Type de serveur (novice, modéré, etc.)
 
-Set a voice server to enable QmClient distribution
-== Définissez un serveur vocal pour activer la distribution de QmClient
+Server URL
+== URL du serveur
+
+Server-assigned style
+== Style attribué par le serveur
 
 Set all to Rifle
 == Tout mettre au fusil
@@ -9277,6 +9151,9 @@ Set team for all players (spectators = -1, game = 0)
 
 Set timeout protection code s
 == Définir le code de protection contre les timeouts s
+
+Set up Kugou lyrics
+== Configurer les paroles Kugou
 
 Set voice input device
 == Définir le périphérique d'entrée vocale
@@ -9884,6 +9761,12 @@ Show other players' hook collision lines (2 always shown)
 Show other players' hook collision lines when rendering video
 == Afficher les lignes de collision de crochet des autres joueurs lors du rendu vidéo
 
+Show other players' large emoticons
+== Show other players' large emoticons
+
+Show other players' launched emoticons
+== Show other players' launched emoticons
+
 Show other team players (2=own team only)
 == Afficher les joueurs des autres équipes (2 = équipe uniquement)
 
@@ -10274,6 +10157,9 @@ Size of strength/weakness icon and number
 Skin
 == Skin
 
+Skin copying is only available for 0.6 skins
+== Seuls les skins de la version 0.6 peuvent être copiés
+
 Skin could not be found.
 == Skin introuvable.
 
@@ -10594,30 +10480,6 @@ Speed up the demo
 
 Speed:
 == Vitesse :
-
-Speedrun countdown timer
-== Minuteur de compte à rebours de speedrun
-
-Speedrun Timer
-== Minuteur de speedrun
-
-Speedrun timer
-== Chronomètre de speedrun
-
-Speedrun timer hours
-== Heures du chronomètre de speedrun
-
-Speedrun timer milliseconds
-== Millisecondes du chronomètre de speedrun
-
-Speedrun timer minutes
-== Minutes du chronomètre de speedrun
-
-Speedrun timer seconds
-== Secondes du chronomètre de speedrun
-
-Speedrun timer time (MM:SS, legacy)
-== Temps du chronomètre de speedrun (format MMSS, compatible avec l'ancienne version)
 
 Sphere
 == Sphère
@@ -11261,6 +11123,9 @@ The selected part stays highlighted while you adjust its color.
 The server is running a non-standard tuning on a pure game type.
 == Le serveur exécute un réglage non standard sur un type de jeu pur.
 
+The server rejected the map upload.
+== Le serveur a refusé l’envoi de la carte.
+
 The update is ready and will be installed when you exit.
 == La mise à jour est prête et sera installée à la fermeture.
 
@@ -11414,9 +11279,6 @@ Time client is banned if economy authentication fails. 0 just closes connection.
 Time client is banned if remote console auth fails. 0 to only use kick
 == Temps de bannissement du client si l'authentification de la console distante échoue. 0 pour seulement expulser
 
-TIME EXPIRED!
-== TEMPS ÉCOULÉ !
-
 Time in seconds before economy authentication timeout.
 == Temps en secondes avant le délai d'authentification économique
 
@@ -11527,6 +11389,9 @@ Toggle dummy
 
 Toggle dyncam
 == Basculer dyncam
+
+Toggle emote launcher
+== Toggle emote launcher
 
 Toggle fast practice mode
 == Activer/désactiver le mode pratique rapide
@@ -11795,9 +11660,6 @@ UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or netwo
 UDP seems to be filtered.
 == L'UDP semble être filtré.
 
-UDP socket not open
-== Socket UDP non ouvert
-
 UI color
 == Couleur de l'interface utilisateur
 
@@ -11887,6 +11749,9 @@ Uncertainty duration
 
 Unclassified audio issue
 == Problème audio non classifié
+
+Unexpected map upload response.
+== Réponse inattendue lors de l’envoi de la carte.
 
 Unfinished
 == Inachevé
@@ -12014,6 +11879,15 @@ Update Rate
 Update rate for mapping 64 player IDs to vanilla IDs
 == Taux de mise à jour pour le mappage de 64 ID de joueurs vers des ID vanilla
 
+Upload .map files. Server and admin passwords: s.
+== Envoyez des fichiers .map. Mots de passe du serveur et admin : s.
+
+Upload a saved map to the public test server
+== Envoyer une carte enregistrée au serveur public de test
+
+Upload map
+== Envoyer la carte
+
 Uploading map data to GPU
 == Téléchargement des données de la carte vers le GPU
 
@@ -12097,6 +11971,9 @@ Use high bandwidth mode (doubles server bandwidth, LAN only)
 
 Use k key to kill (restart), q to pause and watch other players. See settings for other key binds.
 == Utilisez la touche K pour vous tuer (redémarrer), Q pour faire une pause et regarder les autres joueurs. Consultez les paramètres pour les autres touches.
+
+Use large emote
+== Use large emote
 
 Use mouse sensitivity when dynamic camera is on
 == Utiliser la sensibilité de la souris lorsque la caméra dynamique est activée
@@ -12332,8 +12209,8 @@ Voice protocol version
 Voice room token (optional)
 == Token de salon vocal (optionnel)
 
-Voice server address host:port
-== Adresse du serveur vocal host:port
+Voice server URL (ws:// or wss://)
+== URL du serveur vocal (ws:// ou wss://)
 
 Voice stereo output
 == Sortie stéréo vocale
@@ -12998,12 +12875,6 @@ Your timeout code has been set. 0.7 clients can not reclaim their tees on timeou
 z = Zoom
 == z = Zoom | Référence chinois simplifié : z = 缩放
 
-Zen Mode
-== Mode Zen
-
-Zen mode key
-== Touche du mode Zen
-
 Zhipu AI
 == Zhipu AI
 
@@ -13051,6 +12922,15 @@ Zoom to current mouse target
 
 ⚠️ Tencent Cloud API not configured
 == ⚠️ API Tencent Cloud non configurée
+
+发射表情按键
+== 发射表情按键
+
+显示他人发射表情
+== 显示他人发射表情
+
+显示他人大表情
+== 显示他人大表情
 
 [Assets editor blend mode]
 Color
@@ -13439,6 +13319,10 @@ required
 [Team status]
 solo
 == solo
+
+[Title color mode]
+Use style colors
+== Utiliser les couleurs du style
 
 [Touch button behavior]
 Bind

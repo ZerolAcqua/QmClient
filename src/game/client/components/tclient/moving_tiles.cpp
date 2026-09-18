@@ -200,6 +200,10 @@ void CMovingTiles::OnRender()
 	if(g_Config.m_ClOverlayEntities != 100 || !g_Config.m_TcMovingTilesEntities || m_vQuads.empty())
 		return;
 
+	// 保存调用方坐标系，避免地图分组的偏移和视差影响后续名牌等组件。
+	float SavedScreenX0, SavedScreenY0, SavedScreenX1, SavedScreenY1;
+	Graphics()->GetScreen(&SavedScreenX0, &SavedScreenY0, &SavedScreenX1, &SavedScreenY1);
+
 	const vec2 Center = GameClient()->m_Camera.m_Center;
 	const float Zoom = GameClient()->m_Camera.m_Zoom;
 	const bool RenderMovingWater = !m_HasAxiomOrGoresOnlyQuads || ShouldRenderMovingWater();
@@ -344,4 +348,5 @@ void CMovingTiles::OnRender()
 	// 移动方块全部走透明通道，避免再遍历一次不会提交任何绘制的通道。
 	RenderPass();
 	Graphics()->ClipDisable();
+	Graphics()->MapScreen(SavedScreenX0, SavedScreenY0, SavedScreenX1, SavedScreenY1);
 }

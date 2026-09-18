@@ -563,7 +563,8 @@ SSettingsCardDeckResult CSettingsCardDeck::RenderInternal(const IUiContext &Ctx,
 		{
 			Result.m_AutoScrollDelta = SettingsCardDeckAutoScrollDelta(Input.m_MouseY, ScrollViewport, Ctx.m_UiScale);
 			if(Result.m_AutoScrollDelta != 0.0f)
-				pScrollRegion->ScrollRelativeDirect(Result.m_AutoScrollDelta * std::max(0.0f, Input.m_FrameDt));
+				// 拖拽边缘滚动是当前输入，恢复前台时不补做后台期间的交互位移。
+				pScrollRegion->ScrollRelativeDirect(Result.m_AutoScrollDelta * std::clamp(Input.m_FrameDt, 0.0f, 1.0f / 15.0f));
 		}
 
 		if(Input.m_MouseReleased)

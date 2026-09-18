@@ -1120,22 +1120,6 @@ turkish = "Apple Media kullanıcı-medya-belirteci"
 polish = "Apple Music  token użytkownika multimediów"
 
 [[message]]
-key = "Apply Best input to other Tees"
-[message.translations]
-simplified_chinese = "将 Best input 应用于其他 Tee"
-traditional_chinese = "將 Best input 應用於其他 Tee"
-japanese = "Best input を他の Tee に適用"
-korean = "Best input을 다른 Tee에 적용"
-russian = "Применить Best input к другим Tee"
-german = "Best input auf andere Tees anwenden"
-spanish = "Aplicar Best input a otros Tees"
-french = "Appliquer Best input aux autres Tees"
-brazilian_portuguese = "Aplicar Best input a outros Tees"
-portuguese = "Aplicar Best input a outros Tees"
-turkish = "Best input'u diğer Tee'lere uygula"
-polish = "Zastosuj Best input do innych Tee"
-
-[[message]]
 key = "Apply Saiko+ to other Tees"
 [message.translations]
 simplified_chinese = "将 Saiko+ 应用于其他 Tee"
@@ -1358,22 +1342,6 @@ brazilian_portuguese = "Concorrência automática: %d (padrão inteligente)"
 portuguese = "Concorrência automática: %d (padrão inteligente)"
 turkish = "Otomatik eşzamanlılık: %d (akıllı varsayılan)"
 polish = "Automatyczna współbieżność: %d (inteligentne ustawienie domyślne)"
-
-[[message]]
-key = "Auto disable when time expires"
-[message.translations]
-simplified_chinese = "时间耗尽后自动禁用"
-traditional_chinese = "時間耗盡後自動禁用"
-japanese = "時間切れで自動無効化"
-korean = "시간이 만료되면 자동 비활성화"
-russian = "Автоотключение по истечении времени"
-german = "Automatisch deaktivieren bei Zeitablauf"
-spanish = "Desactivar automáticamente cuando se acabe el tiempo"
-french = "Désactiver automatiquement à l'expiration du temps"
-brazilian_portuguese = "Desativar automaticamente quando o tempo expirar"
-portuguese = "Desativar automaticamente quando o tempo expirar"
-turkish = "Süre dolduğunda otomatik devre dışı bırak"
-polish = "Automatycznie wyłącz po upływie czasu"
 
 [[message]]
 key = "Auto enable in Gores mode"
@@ -1726,22 +1694,6 @@ brazilian_portuguese = "Fechar chat automaticamente após descongelar"
 portuguese = "Fechar chat automaticamente após descongelar"
 turkish = "Çözülmeden sonra sohbeti otomatik kapat"
 polish = "Automatyczne zamykanie czatu po odmrożeniu"
-
-[[message]]
-key = "Auto-disable speedrun timer when time runs out"
-[message.translations]
-simplified_chinese = "时间耗尽后自动禁用速通计时器"
-traditional_chinese = "時間耗盡後自動禁用速通計時器"
-japanese = "時間切れ後にスピードラインタイマーを自動無効化"
-korean = "시간 초과 후 스피드런 타이머 자동 비활성화"
-russian = "Автоматически отключать таймер спидран-заезда по истечении времени"
-german = "Speedrun-Timer nach Zeitablauf automatisch deaktivieren"
-spanish = "Desactivar automáticamente el temporizador de speedrun al agotarse el tiempo"
-french = "Désactiver automatiquement le chronomètre de speedrun après expiration du temps"
-brazilian_portuguese = "Desativar automaticamente o cronômetro de speedrun após o tempo acabar"
-portuguese = "Desativar automaticamente o temporizador de speedrun após o tempo expirar"
-turkish = "Süre dolduğunda hızlı geçiş zamanlayıcısını otomatik devre dışı bırak"
-polish = "Automatycznie wyłącz timer speedruna po upływie czasu"
 
 [[message]]
 key = "Auto-fetch all players' skins for dummy rotation queue"
@@ -2462,70 +2414,6 @@ brazilian_portuguese = "Baseado em uma pilha de... coisas do Windows"
 portuguese = "Baseado numa pilha de coisas do Windows..."
 turkish = "Bir yığın Windows... şeyine dayanmaktadır"
 polish = "Oparte na stercie Windows... rzeczy"
-
-[[message]]
-key = "Best input delay compensation percentage"
-[message.translations]
-simplified_chinese = "Best input 延迟补偿百分比"
-traditional_chinese = "Best input 延遲補償百分比"
-japanese = "Best input 遅延補正パーセンテージ"
-korean = "Best input 지연 보상 비율"
-russian = "Процент компенсации задержки Best input"
-german = "Best input Latenzkompensationsprozentsatz"
-spanish = "Best input compensación de retardo porcentual"
-french = "Pourcentage de compensation de latence Best input"
-brazilian_portuguese = "Melhor entrada - compensação de atraso percentual"
-portuguese = "Melhor entrada compensação de atraso percentual"
-turkish = "Best input gecikme telafisi yüzdesi"
-polish = "Procent kompensacji opóźnienia Best input"
-
-[[message]]
-key = "Best input interpolation mode (1=linear 2=cubic 3=smooth)"
-[message.translations]
-simplified_chinese = "Best input 插值模式（1=线性，2=三次，3=平滑）"
-traditional_chinese = "Best input 插值模式（1=linear 2=cubic 3=smooth）"
-japanese = "Best input 補間モード（1=linear 2=cubic 3=smooth）"
-korean = "Best input 보간 모드 (1=linear 2=cubic 3=smooth)"
-russian = "Режим интерполяции Best input (1=linear 2=cubic 3=smooth)"
-german = "Best input Interpolationsmodus (1=linear 2=kubisch 3=glatt)"
-spanish = "Best input modo de interpolación (1=lineal 2=cúbico 3=suave)"
-french = "Mode d'interpolation Best input (1=linéaire 2=cubique 3=lissé)"
-brazilian_portuguese = "Melhor entrada - modo de interpolação (1=linear 2=cúbico 3=suave)"
-portuguese = "Melhor entrada modo de interpolação (1=linear 2=cúbico 3=suave)"
-turkish = "Best input enterpolasyon modu (1=linear 2=cubic 3=smooth)"
-polish = "Tryb interpolacji Best input (1=linear 2=cubic 3=smooth)"
-
-[[message]]
-key = "Best input prediction offset (0.01 tick)"
-[message.translations]
-simplified_chinese = "Best input 预测偏移（0.01 tick）"
-traditional_chinese = "Best input 預測偏移（0.01 tick）"
-japanese = "Best input 予測オフセット（0.01 tick）"
-korean = "Best input 예측 오프셋 (0.01 tick)"
-russian = "Смещение прогноза Best input (0.01 tick)"
-german = "Best input Vorhersageversatz (0.01 Tick)"
-spanish = "Best input desplazamiento de predicción (0.01 tick)"
-french = "Meilleure prédiction d'entrée (0.01 tick)"
-brazilian_portuguese = "Melhor entrada - deslocamento de previsão (0.01 tick)"
-portuguese = "Melhor entrada deslocamento de previsão (0.01 tick)"
-turkish = "Best input tahmin kayması (0.01 tick)"
-polish = "Przesunięcie predykcji Best input (0.01 tick)"
-
-[[message]]
-key = "Best input smooth percentage"
-[message.translations]
-simplified_chinese = "Best input 平滑百分比"
-traditional_chinese = "Best input 平滑百分比"
-japanese = "Best input スムージングパーセンテージ"
-korean = "Best input 평활화 비율"
-russian = "Процент сглаживания Best input"
-german = "Best input Glättungsprozentsatz"
-spanish = "Best input suavizado porcentual"
-french = "Pourcentage de lissage Best input"
-brazilian_portuguese = "Melhor entrada - suavização percentual"
-portuguese = "Melhor entrada suavização percentual"
-turkish = "Best input yumuşatma yüzdesi"
-polish = "Procent wygładzania Best input"
 
 [[message]]
 key = "Best match"
@@ -6272,22 +6160,6 @@ turkish = "Cilt değiştirme animasyonunu etkinleştir"
 polish = "Włącz animację zmiany skórki"
 
 [[message]]
-key = "Enable speedrun timer"
-[message.translations]
-simplified_chinese = "启用速通计时器"
-traditional_chinese = "啟用速通計時器"
-japanese = "スピードランのタイマーを有効にする"
-korean = "스피드런 타이머 활성화"
-russian = "Включить таймер спидран"
-german = "Speedrun-Timer aktivieren"
-spanish = "Activar temporizador de speedrun"
-french = "Activer le chronomètre de speedrun"
-brazilian_portuguese = "Ativar cronômetro de speedrun"
-portuguese = "Ativar temporizador de speedrun"
-turkish = "Hızlı koşu zamanlayıcısını etkinleştir"
-polish = "Włącz timer speedrun"
-
-[[message]]
 key = "Enable squishy Tee deformation"
 [message.translations]
 simplified_chinese = "启用 Q 弹 Tee 形变"
@@ -6494,38 +6366,6 @@ brazilian_portuguese = "Enable karaoke word highlighting"
 portuguese = "Enable karaoke word highlighting"
 turkish = "Enable karaoke word highlighting"
 polish = "Enable karaoke word highlighting"
-
-[[message]]
-key = "Enable Zen Mode"
-[message.translations]
-simplified_chinese = "启用禅模式（Zen Mode）"
-traditional_chinese = "啟用禪模式（Zen Mode）"
-japanese = "禅モード（Zen Mode）を有効化"
-korean = "젠 모드(Zen Mode) 활성화"
-russian = "Включить режим дзен (Zen Mode)"
-german = "Zen-Modus aktivieren"
-spanish = "Activar modo Zen (Zen Mode)"
-french = "Activer le mode Zen (Zen Mode)"
-brazilian_portuguese = "Ativar Modo Zen (Zen Mode)"
-portuguese = "Ativar modo Zen (Zen Mode)"
-turkish = "Zen Modu’nu etkinleştir"
-polish = "Włącz tryb Zen (Zen Mode)"
-
-[[message]]
-key = "Enable Zen mode"
-[message.translations]
-simplified_chinese = "启用禅模式"
-traditional_chinese = "啟用禪模式"
-japanese = "Zen モードを有効にする"
-korean = "Zen 모드 활성화"
-russian = "Включить Zen-режим"
-german = "Zen-Modus aktivieren"
-spanish = "Activar modo Zen"
-french = "Activer le mode Zen"
-brazilian_portuguese = "Ativar modo Zen"
-portuguese = "Ativar modo Zen"
-turkish = "Zen modunu etkinleştir"
-polish = "Włącz tryb Zen"
 
 [[message]]
 key = "Endless hook has been activated"
@@ -7616,166 +7456,6 @@ turkish = "Merhaba!"
 polish = "Cześć!"
 
 [[message]]
-key = "Hide basic system info (join, version, rules) in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏入场、版本和规则等基础系统信息"
-traditional_chinese = "禪模式下隱藏入場、版本和規則等基礎系統信息"
-japanese = "禅モードで入場、バージョン、ルールなどの基本システム情報を非表示"
-korean = "선 모드에서 입장, 버전, 규칙 등 기본 시스템 정보 숨기기"
-russian = "Скрывать базовые системные сообщения (вход, версия, правила и т.д.) в режиме дзен"
-german = "Grundlegende Systeminformationen (Beitritt, Version, Regeln usw.) im Zen-Modus ausblenden"
-spanish = "Ocultar mensajes básicos del sistema (entrada, versión, reglas) en modo Zen"
-french = "Masquer les informations système de base (entrée, version, règles, etc.) en mode Zen"
-brazilian_portuguese = "Ocultar mensagens básicas do sistema (entrada, versão, regras) no modo Zen"
-portuguese = "Ocultar informações básicas do sistema (entrada, versão, regras, etc.) no modo Zen"
-turkish = "Zen modunda giriş, sürüm ve kurallar gibi temel sistem mesajlarını gizle"
-polish = "Ukryj podstawowe informacje systemowe (wejście, wersja, zasady) w trybie Zen"
-
-[[message]]
-key = "Hide death/respawn effects"
-[message.translations]
-simplified_chinese = "隐藏死亡/重生特效"
-traditional_chinese = "隱藏死亡/重生特效"
-japanese = "死亡/復活エフェクトを非表示"
-korean = "사망/부활 효과 숨기기"
-russian = "Скрыть эффекты смерти/возрождения"
-german = "Todes-/Wiederbelebungseffekte ausblenden"
-spanish = "Ocultar efectos de muerte/resurrección"
-french = "Cacher les effets de mort/résurrection"
-brazilian_portuguese = "Ocultar efeitos de morte/renascimento"
-portuguese = "Ocultar efeitos de morte/renascimento"
-turkish = "Ölüm/yeniden doğma efektlerini gizle"
-polish = "Ukryj efekty śmierci/odrodzenia"
-
-[[message]]
-key = "Hide death/respawn effects in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏死亡/重生特效"
-traditional_chinese = "禪模式下隱藏死亡/重生特效"
-japanese = "禅モードで死亡/復活エフェクトを非表示"
-korean = "선 모드에서 사망/부활 효과 숨기기"
-russian = "Скрыть эффекты смерти/возрождения в режиме дзен"
-german = "Todes-/Wiederbelebungseffekte im Zen-Modus ausblenden"
-spanish = "Ocultar efectos de muerte/resurrección en modo Zen"
-french = "Masquer les effets de mort/réapparition en mode zen"
-brazilian_portuguese = "Ocultar efeitos de morte/renascimento no modo Zen"
-portuguese = "Esconder efeitos de morte/renascimento no modo Zen"
-turkish = "Zen modunda ölüm/doğma efektlerini gizle"
-polish = "Ukryj efekty śmierci/odrodzenia w trybie Zen"
-
-[[message]]
-key = "Hide direction in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏方向"
-traditional_chinese = "禪模式下隱藏方向"
-japanese = "禅モードで方向を非表示"
-korean = "선 모드에서 방향 숨기기"
-russian = "Скрыть направление в режиме дзен"
-german = "Richtung im Zen-Modus ausblenden"
-spanish = "Ocultar dirección en modo Zen"
-french = "Masquer la direction en mode zen"
-brazilian_portuguese = "Ocultar direção no modo Zen"
-portuguese = "Esconder direção no modo Zen"
-turkish = "Zen modunda yönü gizle"
-polish = "Ukryj kierunek w trybie Zen"
-
-[[message]]
-key = "Hide direction indicators"
-[message.translations]
-simplified_chinese = "隐藏方向"
-traditional_chinese = "隱藏方向"
-japanese = "方向インジケーターを非表示"
-korean = "방향 표시기 숨기기"
-russian = "Скрыть индикаторы направления"
-german = "Richtungsanzeiger ausblenden"
-spanish = "Ocultar indicadores de dirección"
-french = "Cacher les indicateurs de direction"
-brazilian_portuguese = "Ocultar indicadores de direção"
-portuguese = "Ocultar indicadores de direção"
-turkish = "Yön göstergelerini gizle"
-polish = "Ukryj wskaźniki kierunku"
-
-[[message]]
-key = "Hide Echo messages"
-[message.translations]
-simplified_chinese = "隐藏 Echo 消息"
-traditional_chinese = "隱藏 Echo 消息"
-japanese = "Echo メッセージを非表示"
-korean = "Echo 메시지 숨기기"
-russian = "Скрыть сообщения Echo"
-german = "Echo-Nachrichten ausblenden"
-spanish = "Ocultar mensajes de Echo"
-french = "Cacher les messages Echo"
-brazilian_portuguese = "Ocultar mensagens Echo"
-portuguese = "Ocultar mensagens Echo"
-turkish = "Echo mesajlarını gizle"
-polish = "Ukryj wiadomości Echo"
-
-[[message]]
-key = "Hide Echo messages in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏 Echo 消息"
-traditional_chinese = "禪模式下隱藏 Echo 消息"
-japanese = "禅モードで Echo メッセージを非表示"
-korean = "선 모드에서 Echo 메시지 숨기기"
-russian = "Скрывать сообщения Echo в режиме дзен"
-german = "Echo-Nachrichten im Zen-Modus ausblenden"
-spanish = "Ocultar mensajes Echo en modo Zen"
-french = "Masquer les messages Echo en mode Zen"
-brazilian_portuguese = "Ocultar mensagens Echo no modo Zen"
-portuguese = "Ocultar mensagens Echo no modo Zen"
-turkish = "Zen modunda Echo mesajlarını gizle"
-polish = "Ukryj komunikaty Echo w trybie Zen"
-
-[[message]]
-key = "Hide explosion effects"
-[message.translations]
-simplified_chinese = "隐藏炮击特效"
-traditional_chinese = "隱藏炮擊特效"
-japanese = "爆発エフェクトを非表示"
-korean = "폭발 효과 숨기기"
-russian = "Скрыть эффекты взрывов"
-german = "Explosionseffekte ausblenden"
-spanish = "Ocultar efectos de explosión"
-french = "Cacher les effets d'explosion"
-brazilian_portuguese = "Ocultar efeitos de explosão"
-portuguese = "Ocultar efeitos de explosão"
-turkish = "Patlama efektlerini gizle"
-polish = "Ukryj efekty eksplozji"
-
-[[message]]
-key = "Hide freeze effects"
-[message.translations]
-simplified_chinese = "隐藏冻结特效"
-traditional_chinese = "隱藏凍結特效"
-japanese = "フリーズエフェクトを非表示"
-korean = "얼음 효과 숨기기"
-russian = "Скрыть эффекты заморозки"
-german = "Freeze-Effekte ausblenden"
-spanish = "Ocultar efectos de congelación"
-french = "Cacher les effets de gel"
-brazilian_portuguese = "Ocultar efeitos de congelamento"
-portuguese = "Ocultar efeitos de congelamento"
-turkish = "Donma efektlerini gizle"
-polish = "Ukryj efekty zamrożenia"
-
-[[message]]
-key = "Hide freeze effects in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏冻结特效"
-traditional_chinese = "禪模式下隱藏凍結特效"
-japanese = "禅モードでフリーズエフェクトを非表示"
-korean = "선 모드에서 빙결 효과 숨기기"
-russian = "Скрывать эффект заморозки в режиме дзен"
-german = "Freeze-Effekte im Zen-Modus ausblenden"
-spanish = "Ocultar efectos de congelación en modo Zen"
-french = "Masquer les effets de gel en mode zen"
-brazilian_portuguese = "Ocultar efeitos de congelamento no modo Zen"
-portuguese = "Ocultar efeitos de congelamento no modo Zen"
-turkish = "Zen modunda donma efektlerini gizle"
-polish = "Ukryj efekty zamrożenia w trybie Zen"
-
-[[message]]
 key = "Hide guide lines"
 [message.translations]
 simplified_chinese = "隐藏辅助线"
@@ -7790,38 +7470,6 @@ brazilian_portuguese = "Ocultar linhas guia"
 portuguese = "Ocultar linhas de guia"
 turkish = "Kılavuz çizgilerini gizle"
 polish = "Ukryj linie prowadzące"
-
-[[message]]
-key = "Hide hammer effects"
-[message.translations]
-simplified_chinese = "隐藏锤击特效"
-traditional_chinese = "隱藏錘擊特效"
-japanese = "ハンマーエフェクトを非表示"
-korean = "망치 효과 숨기기"
-russian = "Скрыть эффекты молота"
-german = "Hammereffekte ausblenden"
-spanish = "Ocultar efectos de martillo"
-french = "Cacher les effets de marteau"
-brazilian_portuguese = "Ocultar efeitos de martelo"
-portuguese = "Ocultar efeitos de martelo"
-turkish = "Çekiç efektlerini gizle"
-polish = "Ukryj efekty młotka"
-
-[[message]]
-key = "Hide hammer effects in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏锤击特效"
-traditional_chinese = "禪模式下隱藏錘擊特效"
-japanese = "禅モードでハンマーエフェクトを非表示"
-korean = "선 모드에서 망치 효과 숨기기"
-russian = "Скрыть эффекты удара молотом в режиме дзен"
-german = "Hammereffekte im Zen-Modus ausblenden"
-spanish = "Ocultar efectos de martillazo en modo Zen"
-french = "Masquer les effets de coup de marteau en mode zen"
-brazilian_portuguese = "Ocultar efeitos de martelada no modo Zen"
-portuguese = "Esconder efeitos de martelada no modo Zen"
-turkish = "Zen modunda çekiç efektlerini gizle"
-polish = "Ukryj efekty uderzenia młotkiem w trybie Zen"
 
 [[message]]
 key = "Hide helper lines in Gores mode"
@@ -7840,54 +7488,6 @@ turkish = "Gores modunda yardımcı çizgileri gizle"
 polish = "Ukryj linie pomocnicze w trybie Gores"
 
 [[message]]
-key = "Hide helper lines in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏辅助线"
-traditional_chinese = "禪模式下隱藏輔助線"
-japanese = "禅モードで補助線を非表示"
-korean = "선 모드에서 안내선 숨기기"
-russian = "Скрыть вспомогательные линии в режиме дзен"
-german = "Hilfslinien im Zen-Modus ausblenden"
-spanish = "Ocultar líneas auxiliares en modo Zen"
-french = "Masquer les lignes d’aide en mode zen"
-brazilian_portuguese = "Ocultar linhas auxiliares no modo Zen"
-portuguese = "Esconder linhas de apoio no modo Zen"
-turkish = "Zen modunda yardımcı çizgileri gizle"
-polish = "Ukryj linie pomocnicze w trybie Zen"
-
-[[message]]
-key = "Hide HUD"
-[message.translations]
-simplified_chinese = "隐藏 HUD"
-traditional_chinese = "隱藏 HUD"
-japanese = "HUD を非表示"
-korean = "HUD 숨기기"
-russian = "Скрыть HUD"
-german = "HUD ausblenden"
-spanish = "Ocultar HUD"
-french = "Cacher le HUD"
-brazilian_portuguese = "Ocultar HUD"
-portuguese = "Ocultar HUD"
-turkish = "HUD'u gizle"
-polish = "Ukryj HUD"
-
-[[message]]
-key = "Hide HUD in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏 HUD"
-traditional_chinese = "禪模式下隱藏 HUD"
-japanese = "禅モードで HUD を非表示"
-korean = "선 모드에서 HUD 숨기기"
-russian = "Скрывать HUD в режиме дзен"
-german = "HUD im Zen-Modus ausblenden"
-spanish = "Ocultar HUD en modo Zen"
-french = "Masquer le HUD en mode Zen"
-brazilian_portuguese = "Ocultar HUD no modo Zen"
-portuguese = "Ocultar HUD no modo Zen"
-turkish = "Zen modunda HUD'u gizle"
-polish = "Ukryj HUD w trybie Zen"
-
-[[message]]
 key = "Hide input emoticon"
 [message.translations]
 simplified_chinese = "隐藏输入表情"
@@ -7902,86 +7502,6 @@ brazilian_portuguese = "Ocultar emoticon de entrada"
 portuguese = "Ocultar emoticon de entrada"
 turkish = "Giriş ifadesini gizle"
 polish = "Ukryj emotkę wejścia"
-
-[[message]]
-key = "Hide join/version prompts"
-[message.translations]
-simplified_chinese = "隐藏入场/版本提示"
-traditional_chinese = "隱藏入場/版本提示"
-japanese = "参加/バージョンプロンプトを非表示"
-korean = "입장/버전 알림 숨기기"
-russian = "Скрыть подсказки о входе/версии"
-german = "Beitritts-/Versionshinweise ausblenden"
-spanish = "Ocultar avisos de entrada/versión"
-french = "Cacher les invites de connexion/version"
-brazilian_portuguese = "Ocultar avisos de entrada/versão"
-portuguese = "Ocultar avisos de entrada/versão"
-turkish = "Katılma/sürüm uyarılarını gizle"
-polish = "Ukryj powiadomienia o dołączeniu/wersji"
-
-[[message]]
-key = "Hide jump effects"
-[message.translations]
-simplified_chinese = "隐藏跳跃特效"
-traditional_chinese = "隱藏跳躍特效"
-japanese = "ジャンプエフェクトを非表示"
-korean = "점프 효과 숨기기"
-russian = "Скрыть эффекты прыжка"
-german = "Sprungeffekte ausblenden"
-spanish = "Ocultar efectos de salto"
-french = "Cacher les effets de saut"
-brazilian_portuguese = "Ocultar efeitos de pulo"
-portuguese = "Ocultar efeitos de salto"
-turkish = "Zıplama efektlerini gizle"
-polish = "Ukryj efekty skoku"
-
-[[message]]
-key = "Hide jump effects in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏跳跃特效"
-traditional_chinese = "禪模式下隱藏跳躍特效"
-japanese = "禅モードでジャンプエフェクトを非表示"
-korean = "선 모드에서 점프 효과 숨기기"
-russian = "Скрыть эффекты прыжка в режиме дзен"
-german = "Sprungeffekte im Zen-Modus ausblenden"
-spanish = "Ocultar efectos de salto en modo Zen"
-french = "Masquer les effets de saut en mode zen"
-brazilian_portuguese = "Ocultar efeitos de pulo no modo Zen"
-portuguese = "Esconder efeitos de salto no modo Zen"
-turkish = "Zen modunda zıplama efektlerini gizle"
-polish = "Ukryj efekty skoku w trybie Zen"
-
-[[message]]
-key = "Hide kill and finish messages in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏击杀和完成消息"
-traditional_chinese = "禪模式下隱藏擊殺和完成消息"
-japanese = "禅モードでキルと完了メッセージを非表示"
-korean = "선 모드에서 처치 및 완료 메시지 숨기기"
-russian = "Скрыть сообщения об убийствах и завершении в режиме дзен"
-german = "Tötungs- und Abschlussnachrichten im Zen-Modus ausblenden"
-spanish = "Ocultar mensajes de muerte y finalización en modo Zen"
-french = "Masquer les messages de kill et de fin en mode zen"
-brazilian_portuguese = "Ocultar mensagens de kill e conclusão no modo Zen"
-portuguese = "Esconder mensagens de morte e conclusão no modo Zen"
-turkish = "Zen modunda öldürme ve bitirme mesajlarını gizle"
-polish = "Ukryj komunikaty o zabójstwach i ukończeniu w trybie Zen"
-
-[[message]]
-key = "Hide kill/finish messages"
-[message.translations]
-simplified_chinese = "隐藏死亡/完成消息"
-traditional_chinese = "隱藏死亡/完成消息"
-japanese = "キル/フィニッシュメッセージを非表示"
-korean = "사망/완료 메시지 숨기기"
-russian = "Скрыть сообщения об убийстве/финише"
-german = "Todes-/Ziel-Nachrichten ausblenden"
-spanish = "Ocultar mensajes de muerte/finalización"
-french = "Cacher les messages de mise à mort/fin"
-brazilian_portuguese = "Ocultar mensagens de morte/finalização"
-portuguese = "Ocultar mensagens de morte/finalização"
-turkish = "Öldürme/bitirme mesajlarını gizle"
-polish = "Ukryj wiadomości o zabiciu/ukończeniu"
 
 [[message]]
 key = "Hide lyrics on pause"
@@ -8048,70 +7568,6 @@ turkish = "Medya duraklatıldığında şarkı sözlerini gizle"
 polish = "Ukryj tekst utworu, gdy multimedia są wstrzymane"
 
 [[message]]
-key = "Hide map progress"
-[message.translations]
-simplified_chinese = "隐藏地图进度"
-traditional_chinese = "隱藏地圖進度"
-japanese = "マップ進行度を非表示"
-korean = "맵 진행도 숨기기"
-russian = "Скрыть прогресс карты"
-german = "Kartenfortschritt ausblenden"
-spanish = "Ocultar progreso del mapa"
-french = "Cacher la progression de la carte"
-brazilian_portuguese = "Ocultar progresso do mapa"
-portuguese = "Ocultar progresso do mapa"
-turkish = "Harita ilerlemesini gizle"
-polish = "Ukryj postęp mapy"
-
-[[message]]
-key = "Hide map progress bar in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏地图进度条"
-traditional_chinese = "禪模式下隱藏地圖進度條"
-japanese = "禅モードでマップ進行バーを非表示"
-korean = "선 모드에서 맵 진행률 표시줄 숨기기"
-russian = "Скрыть индикатор прогресса карты в режиме дзен"
-german = "Kartenfortschrittsbalken im Zen-Modus ausblenden"
-spanish = "Ocultar barra de progreso del mapa en modo Zen"
-french = "Masquer la barre de progression de la carte en mode zen"
-brazilian_portuguese = "Ocultar barra de progresso do mapa no modo Zen"
-portuguese = "Esconder barra de progresso do mapa no modo Zen"
-turkish = "Zen modunda harita ilerleme çubuğunu gizle"
-polish = "Ukryj pasek postępu mapy w trybie Zen"
-
-[[message]]
-key = "Hide nameplates"
-[message.translations]
-simplified_chinese = "隐藏名字板"
-traditional_chinese = "隱藏名字板"
-japanese = "ネームプレートを非表示"
-korean = "이름표 숨기기"
-russian = "Скрыть таблички с именами"
-german = "Namensschilder ausblenden"
-spanish = "Ocultar placas de nombre"
-french = "Cacher les plaques nominatives"
-brazilian_portuguese = "Ocultar placas de nome"
-portuguese = "Ocultar placas de nome"
-turkish = "İsim levhalarını gizle"
-polish = "Ukryj tabliczki z nazwami"
-
-[[message]]
-key = "Hide names"
-[message.translations]
-simplified_chinese = "隐藏名字"
-traditional_chinese = "隱藏名字"
-japanese = "名前を非表示"
-korean = "이름 숨기기"
-russian = "Скрыть имена"
-german = "Namen ausblenden"
-spanish = "Ocultar nombres"
-french = "Cacher les noms"
-brazilian_portuguese = "Ocultar nomes"
-portuguese = "Ocultar nomes"
-turkish = "İsimleri gizle"
-polish = "Ukryj nazwy"
-
-[[message]]
 key = "Hide non-friend names/clans and show client ID"
 [message.translations]
 simplified_chinese = "隐藏非好友姓名/战队并显示客户端 ID"
@@ -8160,102 +7616,6 @@ turkish = "Oyuncu mesajlarını gizle"
 polish = "Ukryj wiadomości graczy"
 
 [[message]]
-key = "Hide player messages in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏玩家消息"
-traditional_chinese = "禪模式下隱藏玩家消息"
-japanese = "禅モードでプレイヤーメッセージを非表示"
-korean = "선 모드에서 플레이어 메시지 숨기기"
-russian = "Скрыть сообщения игроков в режиме дзен"
-german = "Spielernachrichten im Zen-Modus ausblenden"
-spanish = "Ocultar mensajes de jugadores en modo Zen"
-french = "Masquer les messages des joueurs en mode zen"
-brazilian_portuguese = "Ocultar mensagens de jogadores no modo Zen"
-portuguese = "Esconder mensagens dos jogadores no modo Zen"
-turkish = "Zen modunda oyuncu mesajlarını gizle"
-polish = "Ukryj wiadomości graczy w trybie Zen"
-
-[[message]]
-key = "Hide player name plates in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏玩家名字板"
-traditional_chinese = "禪模式下隱藏玩家名字板"
-japanese = "禅モードでプレイヤー名板を非表示"
-korean = "선 모드에서 플레이어 이름표 숨기기"
-russian = "Скрыть таблички с именами игроков в режиме дзен"
-german = "Spieler-Namensschild im Zen-Modus ausblenden"
-spanish = "Ocultar carteles de nombres de jugadores en modo Zen"
-french = "Masquer les plaques de noms des joueurs en mode zen"
-brazilian_portuguese = "Ocultar placas de nomes de jogadores no modo Zen"
-portuguese = "Esconder placas de nomes dos jogadores no modo Zen"
-turkish = "Zen modunda oyuncu isim tabelalarını gizle"
-polish = "Ukryj tabliczki z nazwami graczy w trybie Zen"
-
-[[message]]
-key = "Hide player names in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏玩家名字"
-traditional_chinese = "禪模式下隱藏玩家名字"
-japanese = "禅モードでプレイヤー名を非表示"
-korean = "선 모드에서 플레이어 이름 숨기기"
-russian = "Скрыть имена игроков в режиме дзен"
-german = "Spielernamen im Zen-Modus ausblenden"
-spanish = "Ocultar nombres de jugadores en modo Zen"
-french = "Masquer les noms des joueurs en mode zen"
-brazilian_portuguese = "Ocultar nomes de jogadores no modo Zen"
-portuguese = "Esconder nomes dos jogadores no modo Zen"
-turkish = "Zen modunda oyuncu isimlerini gizle"
-polish = "Ukryj nazwy graczy w trybie Zen"
-
-[[message]]
-key = "Hide projectile effects in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏投射物特效"
-traditional_chinese = "禪模式下隱藏炮擊特效"
-japanese = "禅モードで砲撃エフェクトを非表示"
-korean = "선 모드에서 포격 효과 숨기기"
-russian = "Скрыть эффекты обстрела в режиме дзен"
-german = "Einschlagseffekte im Zen-Modus ausblenden"
-spanish = "Ocultar efectos de bombardeo en modo Zen"
-french = "Masquer les effets de tir au canon en mode zen"
-brazilian_portuguese = "Ocultar efeitos de tiro de canhão no modo Zen"
-portuguese = "Esconder efeitos de bombardeio no modo Zen"
-turkish = "Zen modunda topçu efektlerini gizle"
-polish = "Ukryj efekty ostrzału w trybie Zen"
-
-[[message]]
-key = "Hide scoreboard"
-[message.translations]
-simplified_chinese = "隐藏计分板"
-traditional_chinese = "隱藏計分板"
-japanese = "スコアボードを非表示"
-korean = "점수판 숨기기"
-russian = "Скрыть таблицу очков"
-german = "Anzeigetafel ausblenden"
-spanish = "Ocultar marcador"
-french = "Cacher le tableau des scores"
-brazilian_portuguese = "Ocultar placar"
-portuguese = "Ocultar quadro de pontuação"
-turkish = "Skor tablosunu gizle"
-polish = "Ukryj tablicę wyników"
-
-[[message]]
-key = "Hide scoreboard in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏计分板"
-traditional_chinese = "禪模式下隱藏計分板"
-japanese = "禅モードでスコアボードを非表示"
-korean = "선 모드에서 점수판 숨기기"
-russian = "Скрыть таблицу счёта в режиме дзен"
-german = "Punkteanzeige im Zen-Modus ausblenden"
-spanish = "Ocultar marcador en modo Zen"
-french = "Masquer le tableau des scores en mode zen"
-brazilian_portuguese = "Ocultar placar no modo Zen"
-portuguese = "Esconder placar no modo Zen"
-turkish = "Zen modunda skor tablosunu gizle"
-polish = "Ukryj tablicę wyników w trybie Zen"
-
-[[message]]
 key = "Hide server information on join"
 [message.translations]
 simplified_chinese = "进图时隐藏服务器信息"
@@ -8270,38 +7630,6 @@ brazilian_portuguese = "Ocultar informações do servidor ao entrar"
 portuguese = "Ocultar informações do servidor ao entrar"
 turkish = "Girerken sunucu bilgisini gizle"
 polish = "Ukryj informacje o serwerze po wejściu"
-
-[[message]]
-key = "Hide server prompt notifications"
-[message.translations]
-simplified_chinese = "隐藏服务器提示通知"
-traditional_chinese = "隱藏伺服器提示通知"
-japanese = "サーバープロンプト通知を非表示"
-korean = "서버 알림 숨기기"
-russian = "Скрыть уведомления-подсказки сервера"
-german = "Server-Prompt-Benachrichtigungen ausblenden"
-spanish = "Ocultar notificaciones de avisos del servidor"
-french = "Cacher les notifications d'invite du serveur"
-brazilian_portuguese = "Ocultar notificações de aviso do servidor"
-portuguese = "Ocultar notificações de aviso do servidor"
-turkish = "Sunucu uyarı bildirimlerini gizle"
-polish = "Ukryj powiadomienia z serwera"
-
-[[message]]
-key = "Hide server tip notifications (including notification bar) in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏服务器提示通知（包括通知栏）"
-traditional_chinese = "禪模式下隱藏伺服器提示通知（包括通知欄）"
-japanese = "禅モードでサーバー通知（通知バーを含む）を非表示"
-korean = "선 모드에서 서버 알림 숨기기 (알림 표시줄 포함)"
-russian = "Скрыть уведомления сервера (включая панель уведомлений) в режиме дзен"
-german = "Server-Hinweisbenachrichtigungen (einschließlich Benachrichtigungsleiste) im Zen-Modus ausblenden"
-spanish = "Ocultar notificaciones de avisos del servidor (incluyendo barra de notificaciones) en modo Zen"
-french = "Masquer les notifications d’indice du serveur (y compris la barre de notification) en mode zen"
-brazilian_portuguese = "Ocultar notificações de dica do servidor (incluindo barra de notificações) no modo Zen"
-portuguese = "Esconder notificações de dica do servidor (incluindo barra de notificações) no modo Zen"
-turkish = "Zen modunda sunucu ipucu bildirimlerini (bildirim çubuğu dahil) gizle"
-polish = "Ukryj powiadomienia serwera (włącznie z paskiem powiadomień) w trybie Zen"
 
 [[message]]
 key = "Hide sponsor QR code"
@@ -8334,54 +7662,6 @@ brazilian_portuguese = "Não mostrar emoticon de digitação ao digitar"
 portuguese = "Não mostrar emotes de digitação durante a entrada"
 turkish = "Yazarken Yazma İfadesini Gösterme"
 polish = "Nie pokazuj emotek podczas pisania"
-
-[[message]]
-key = "Hide UI for focused gameplay"
-[message.translations]
-simplified_chinese = "隐去 UI 专注游戏"
-traditional_chinese = "隱去 UI 專注遊戲"
-japanese = "集中プレイのためにUIを非表示"
-korean = "집중 플레이를 위해 UI 숨기기"
-russian = "Скрыть UI для сосредоточенной игры"
-german = "UI für fokussiertes Gameplay ausblenden"
-spanish = "Ocultar la interfaz para una jugabilidad enfocada"
-french = "Cacher l'interface utilisateur pour un jeu concentré"
-brazilian_portuguese = "Ocultar UI para jogabilidade focada"
-portuguese = "Ocultar IU para jogabilidade focada"
-turkish = "Odaklanmış oyun için arayüzü gizle"
-polish = "Ukryj interfejs dla skupionej rozgrywki"
-
-[[message]]
-key = "Hide weapon fire effects in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下隐藏武器开火特效"
-traditional_chinese = "禪模式下隱藏武器火焰特效"
-japanese = "禅モードで武器炎エフェクトを非表示"
-korean = "선 모드에서 무기 불꽃 효과 숨기기"
-russian = "Скрыть эффекты пламени оружия в режиме дзен"
-german = "Waffenflammeneffekte im Zen-Modus ausblenden"
-spanish = "Ocultar efectos de fuego de armas en modo Zen"
-french = "Masquer les effets de flamme des armes en mode zen"
-brazilian_portuguese = "Ocultar efeito de chama da arma no modo Zen"
-portuguese = "Esconder efeitos de fogo das armas no modo Zen"
-turkish = "Zen modunda silah alev efektlerini gizle"
-polish = "Ukryj efekty ognia broni w trybie Zen"
-
-[[message]]
-key = "Hide weapon muzzle flashes"
-[message.translations]
-simplified_chinese = "隐藏武器火焰"
-traditional_chinese = "隱藏武器火焰"
-japanese = "武器の発射炎を非表示"
-korean = "무기 총구 섬광 숨기기"
-russian = "Скрыть вспышки оружия"
-german = "Waffenmündungsblitze ausblenden"
-spanish = "Ocultar destellos del cañón del arma"
-french = "Cacher les flashs de bouche d'arme"
-brazilian_portuguese = "Ocultar flashes de boca da arma"
-portuguese = "Ocultar clarões de boca da arma"
-turkish = "Silah namlu flaşlarını gizle"
-polish = "Ukryj błyski wylotu broni"
 
 [[message]]
 key = "Hide when no lyrics found (instead of showing hint)"
@@ -8622,22 +7902,6 @@ brazilian_portuguese = "Posição horizontal"
 portuguese = "Posição horizontal"
 turkish = "Yatay konum"
 polish = "Pozycja pozioma"
-
-[[message]]
-key = "Hours"
-[message.translations]
-simplified_chinese = "小时"
-traditional_chinese = "小時"
-japanese = "時間"
-korean = "시간"
-russian = "Часы"
-german = "Stunden"
-spanish = "Horas"
-french = "Heures"
-brazilian_portuguese = "Horas"
-portuguese = "Horas"
-turkish = "Saat"
-polish = "Godziny"
 
 [[message]]
 key = "HUD editor layout"
@@ -9342,6 +8606,22 @@ brazilian_portuguese = "Cor do aviso de pulo"
 portuguese = "Cor do aviso de salto"
 turkish = "Zıplama İpucu Rengi"
 polish = "Kolor podpowiedzi skoku"
+
+[[message]]
+key = "Jump hint defaults migration completed flag"
+[message.translations]
+simplified_chinese = "跳跃提示默认设置迁移完成标记"
+traditional_chinese = "跳躍提示預設設定遷移完成標記"
+japanese = "ジャンプヒントの初期設定の移行完了フラグ"
+korean = "점프 힌트 기본 설정 마이그레이션 완료 플래그"
+russian = "Флаг завершения миграции настроек подсказки о прыжке по умолчанию"
+german = "Kennzeichen für die abgeschlossene Migration der Sprunghinweis-Standardeinstellungen"
+spanish = "Indicador de migración completada de la configuración predeterminada del aviso de salto"
+french = "Indicateur de migration terminée des paramètres par défaut de l'indice de saut"
+brazilian_portuguese = "Indicador de migração concluída das configurações padrão do aviso de pulo"
+portuguese = "Indicador de migração concluída das definições predefinidas do aviso de salto"
+turkish = "Zıplama ipucu varsayılan ayarları taşıma tamamlandı işareti"
+polish = "Flaga ukończenia migracji domyślnych ustawień podpowiedzi skoku"
 
 [[message]]
 key = "Jump hint font size"
@@ -10350,38 +9630,6 @@ brazilian_portuguese = "Apenas local"
 portuguese = "Apenas local"
 turkish = "Yalnızca yerel"
 polish = "Tylko lokalny"
-
-[[message]]
-key = "Local particle effects"
-[message.translations]
-simplified_chinese = "本地粒子效果"
-traditional_chinese = "本地粒子效果"
-japanese = "ローカルパーティクルエフェクト"
-korean = "로컬 파티클 효과"
-russian = "Локальные эффекты частиц"
-german = "Lokale Partikeleffekte"
-spanish = "Efectos de partículas locales"
-french = "Effets de particules locaux"
-brazilian_portuguese = "Efeitos de partículas locais"
-portuguese = "Efeitos de partículas locais"
-turkish = "Yerel parçacık efektleri"
-polish = "Lokalne efekty cząsteczkowe"
-
-[[message]]
-key = "Local particles: show particles behind own Tee (e.g. freeze snow)"
-[message.translations]
-simplified_chinese = "本地粒子：显示自己 Tee 身后的粒子（例如冻结雪花）"
-traditional_chinese = "本地粒子：顯示自己 Tee 身後掉落的粒子（如凍結雪花）"
-japanese = "ローカルパーティクル：自分の Tee の後ろに落ちるパーティクル（凍結雪など）を表示"
-korean = "로컬 파티클: 자신의 Tee 뒤에 떨어지는 파티클 표시 (예: 얼음 결정)"
-russian = "Локальные частицы: показывать частицы, падающие за вашим Tee (например, снежинки заморозки)"
-german = "Lokale Partikel: Zeige Partikel, die hinter deinem eigenen Tee fallen (z.B. Frostschnee)"
-spanish = "Partículas locales: mostrar partículas que caen detrás de tu Tee (ej. copos de congelación)"
-french = "Particules locales : affiche les particules tombant derrière votre Tee (ex. flocons de gel)"
-brazilian_portuguese = "Partículas locais: mostrar partículas caindo atrás do seu Tee (ex.: flocos de gelo congelados)"
-portuguese = "Partículas locais: mostrar partículas a cair atrás do seu Tee (por exemplo, flocos de neve de congelamento)"
-turkish = "Yerel parçacıklar: Kendi Tee'nizin arkasına düşen parçacıkları göster (donma kar taneleri gibi)"
-polish = "Lokalne cząsteczki: pokazuj cząsteczki spadające za własnym Tee (np. płatki śniegu podczas zamrożenia)"
 
 [[message]]
 key = "Local test mode"
@@ -11776,22 +11024,6 @@ turkish = "Mikrofon ses seviyesi (yüzde)"
 polish = "Głośność mikrofonu (procent)"
 
 [[message]]
-key = "Milliseconds"
-[message.translations]
-simplified_chinese = "毫秒"
-traditional_chinese = "毫秒"
-japanese = "ミリ秒"
-korean = "밀리초"
-russian = "Миллисекунды"
-german = "Millisekunden"
-spanish = "Milisegundos"
-french = "Millisecondes"
-brazilian_portuguese = "Milissegundos"
-portuguese = "Milissegundos"
-turkish = "Milisaniye"
-polish = "Milisekundy"
-
-[[message]]
 key = "Min size"
 [message.translations]
 simplified_chinese = "最小尺寸"
@@ -11872,22 +11104,6 @@ turkish = "Minimum eşleşme karakteri"
 polish = "Minimalna liczba pasujących znaków"
 
 [[message]]
-key = "Minutes"
-[message.translations]
-simplified_chinese = "分钟"
-traditional_chinese = "分鐘"
-japanese = "分"
-korean = "분"
-russian = "Минуты"
-german = "Minuten"
-spanish = "Minutos"
-french = "Minutes"
-brazilian_portuguese = "Minutos"
-portuguese = "Minutos"
-turkish = "Dakika"
-polish = "Minuty"
-
-[[message]]
 key = "Mixed"
 [message.translations]
 simplified_chinese = "混合"
@@ -11918,102 +11134,6 @@ brazilian_portuguese = "Modelo"
 portuguese = "Modelo"
 turkish = "Model"
 polish = "Model"
-
-[[message]]
-key = "Mute death/respawn sound in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下静音死亡/重生音效"
-traditional_chinese = "禪模式下靜音死亡/重生音效"
-japanese = "禅モードで死亡/復活サウンドをミュート"
-korean = "선 모드에서 사망/부활 소리 음소거"
-russian = "Отключить звуки смерти/возрождения в режиме дзен"
-german = "Todes-/Wiederbelebungsgeräusche im Zen-Modus stummschalten"
-spanish = "Silenciar sonidos de muerte/resurrección en modo Zen"
-french = "Couper les sons de mort/réapparition en mode zen"
-brazilian_portuguese = "Silenciar sons de morte/renascimento no modo Zen"
-portuguese = "Silenciar sons de morte/renascimento no modo Zen"
-turkish = "Zen modunda ölüm/doğma seslerini sustur"
-polish = "Wycisz dźwięki śmierci/odrodzenia w trybie Zen"
-
-[[message]]
-key = "Mute death/respawn sounds"
-[message.translations]
-simplified_chinese = "静音死亡/重生"
-traditional_chinese = "靜音死亡/重生"
-japanese = "死亡/復活音をミュート"
-korean = "사망/부활 소리 음소거"
-russian = "Отключить звуки смерти/возрождения"
-german = "Todes-/Wiederbelebungsgeräusche stummschalten"
-spanish = "Silenciar sonidos de muerte/resurrección"
-french = "Couper les sons de mort/résurrection"
-brazilian_portuguese = "Silenciar sons de morte/renascimento"
-portuguese = "Silenciar sons de morte/renascimento"
-turkish = "Ölüm/yeniden doğma seslerini sessize al"
-polish = "Wycisz dźwięki śmierci/odrodzenia"
-
-[[message]]
-key = "Mute hammer sound in Zen mode"
-[message.translations]
-simplified_chinese = "禅模式下静音锤击音效"
-traditional_chinese = "禪模式下靜音錘擊音效"
-japanese = "禅モードでハンマーサウンドをミュート"
-korean = "선 모드에서 망치 소리 음소거"
-russian = "Отключить звуки удара молотом в режиме дзен"
-german = "Hammerschlaggeräusche im Zen-Modus stummschalten"
-spanish = "Silenciar sonidos de martillazo en modo Zen"
-french = "Couper les sons de coup de marteau en mode zen"
-brazilian_portuguese = "Silenciar sons de martelada no modo Zen"
-portuguese = "Silenciar sons de martelada no modo Zen"
-turkish = "Zen modunda çekiç seslerini sustur"
-polish = "Wycisz dźwięki uderzenia młotkiem w trybie Zen"
-
-[[message]]
-key = "Mute hammer sounds"
-[message.translations]
-simplified_chinese = "静音锤击"
-traditional_chinese = "靜音錘擊"
-japanese = "ハンマーサウンドをミュート"
-korean = "망치 소리 음소거"
-russian = "Отключить звуки молота"
-german = "Hammerschläge stummschalten"
-spanish = "Silenciar sonidos de martillo"
-french = "Couper les sons de marteau"
-brazilian_portuguese = "Silenciar sons de martelo"
-portuguese = "Silenciar sons de martelo"
-turkish = "Çekiç seslerini sessize al"
-polish = "Wycisz dźwięki młotka"
-
-[[message]]
-key = "Mute jump sound in Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式下静音跳跃音效"
-traditional_chinese = "禪模式下靜音跳躍音效"
-japanese = "禅モードでジャンプサウンドをミュート"
-korean = "선 모드에서 점프 소리 음소거"
-russian = "Отключить звуки прыжка в режиме дзен"
-german = "Sprunggeräusche im Zen-Modus stummschalten"
-spanish = "Silenciar sonidos de salto en modo Zen"
-french = "Couper les sons de saut en mode zen"
-brazilian_portuguese = "Silenciar sons de pulo no modo Zen"
-portuguese = "Silenciar sons de salto no modo Zen"
-turkish = "Zen modunda zıplama seslerini sustur"
-polish = "Wycisz dźwięki skoku w trybie Zen"
-
-[[message]]
-key = "Mute jump sounds"
-[message.translations]
-simplified_chinese = "静音跳跃"
-traditional_chinese = "靜音跳躍"
-japanese = "ジャンプサウンドをミュート"
-korean = "점프 소리 음소거"
-russian = "Отключить звуки прыжка"
-german = "Sprunggeräusche stummschalten"
-spanish = "Silenciar sonidos de salto"
-french = "Couper les sons de saut"
-brazilian_portuguese = "Silenciar sons de pulo"
-portuguese = "Silenciar sons de salto"
-turkish = "Zıplama seslerini sessize al"
-polish = "Wycisz dźwięki skoku"
 
 [[message]]
 key = "Mute microphone"
@@ -15280,20 +14400,20 @@ turkish = "Oyuncular için hızlı işlem menüsü"
 polish = "Menu szybkich akcji dla graczy"
 
 [[message]]
-key = "Quick input mode (0=Fast 3=Best 4=Saiko+; 1/2 legacy mapped to Best)"
+key = "Quick input mode (0=Fast 4=Saiko+; legacy values fall back to Fast)"
 [message.translations]
-simplified_chinese = "快速输入模式（0=Fast 3=Best 4=Saiko+；1/2 兼容旧值并映射到 Best）"
-traditional_chinese = "快速輸入模式（0=Fast 3=Best 4=Saiko+；1/2 兼容舊值並映射到 Best）"
-japanese = "クイック入力モード（0=Fast 3=Best 4=Saiko+；1/2 は旧値互換で Best にマッピング）"
-korean = "빠른 입력 모드（0=Fast 3=Best 4=Saiko+；1/2는 이전 값 호환 및 Best로 매핑）"
-russian = "Режим быстрого ввода (0=Fast 3=Best 4=Saiko+; 1/2 совместимы со старыми значениями и отображаются на Best)"
-german = "Schnelleingabemodus (0=Fast 3=Best 4=Saiko+; 1/2 kompatibel mit alten Werten und auf Best abgebildet)"
-spanish = "Modo de entrada rápida (0=Fast 3=Best 4=Saiko+; 1/2 son compatibles con valores antiguos y se asignan a Best)"
-french = "Mode de saisie rapide (0=Rapide 3=Meilleur 4=Saiko+ ; 1/2 compatibles avec les anciennes valeurs et mappés sur Meilleur)"
-brazilian_portuguese = "Modo de entrada rápida (0=Rápido 3=Melhor 4=Saiko+; 1/2 compatível com valores antigos e mapeado para Melhor)"
-portuguese = "Modo de entrada rápida (0=Fast 3=Best 4=Saiko+; 1/2 compatível com valores antigos e mapeado para Best)"
-turkish = "Hızlı giriş modu (0=Fast 3=Best 4=Saiko+; 1/2 eski değerlerle uyumludur ve Best'e eşlenir)"
-polish = "Tryb szybkiego wejścia (0=Fast 3=Best 4=Saiko+; 1/2 zgodne wstecznie i mapowane na Best)"
+simplified_chinese = "快速输入模式（0=Fast 4=Saiko+；历史值回落到 Fast）"
+traditional_chinese = "快速輸入模式（0=Fast 4=Saiko+；歷史值回落到 Fast）"
+japanese = "クイック入力モード（0=Fast 4=Saiko+；旧値は Fast にフォールバック）"
+korean = "빠른 입력 모드 (0=Fast 4=Saiko+; 이전 값은 Fast로 폴백)"
+russian = "Режим быстрого ввода (0=Fast 4=Saiko+; старые значения возвращаются к Fast)"
+german = "Schnelleingabemodus (0=Fast 4=Saiko+; alte Werte fallen auf Fast zurück)"
+spanish = "Modo de entrada rápida (0=Fast 4=Saiko+; los valores antiguos vuelven a Fast)"
+french = "Mode de saisie rapide (0=Fast 4=Saiko+ ; les anciennes valeurs reviennent à Fast)"
+brazilian_portuguese = "Modo de entrada rápida (0=Fast 4=Saiko+; valores antigos voltam para Fast)"
+portuguese = "Modo de entrada rápida (0=Fast 4=Saiko+; valores antigos revertem para Fast)"
+turkish = "Hızlı giriş modu (0=Fast 4=Saiko+; eski değerler Fast'e döner)"
+polish = "Tryb szybkiego wejścia (0=Fast 4=Saiko+; stare wartości wracają do Fast)"
 
 [[message]]
 key = "Quickly locate feature modules"
@@ -15582,38 +14702,6 @@ brazilian_portuguese = "Expressão regular"
 portuguese = "Expressão regular"
 turkish = "Düzenli ifade"
 polish = "Wyrażenie regularne"
-
-[[message]]
-key = "Remote particle effects"
-[message.translations]
-simplified_chinese = "远程粒子效果"
-traditional_chinese = "遠程粒子效果"
-japanese = "リモートパーティクルエフェクト"
-korean = "원격 파티클 효과"
-russian = "Удалить из избранного"
-german = "Remote-Partikeleffekte"
-spanish = "Efectos de partículas remotos"
-french = "Effets de particules distants"
-brazilian_portuguese = "Efeitos de partículas remotas"
-portuguese = "Efeitos de partículas remotas"
-turkish = "Uzak parçacık efektleri"
-polish = "Zdalne efekty cząsteczkowe"
-
-[[message]]
-key = "Remote particles: sync and render other players via central server (requires both local+remote enabled)"
-[message.translations]
-simplified_chinese = "远程粒子：通过中心服同步并渲染其他玩家（需对方开启本地+远程）"
-traditional_chinese = "遠程粒子：通過中心服同步並渲染其他玩家（需對方開啟本地+遠程）"
-japanese = "リモートパーティクル：中央サーバー経由で他のプレイヤーを同期・レンダリング（相手がローカル＋リモートを有効にする必要あり）"
-korean = "원격 파티클: 중앙 서버를 통해 다른 플레이어 동기화 및 렌더링 (상대방이 로컬+원격을 켜야 함)"
-russian = "Удалённые частицы: синхронизация и отображение других игроков через центральный сервер (требуется включение локального + удалённого у собеседника)"
-german = "Remote-Partikel: Synchronisiere und rendere andere Spieler über den Zentralserver (erfordert, dass der andere lokale + Remote-Partikel aktiviert hat)"
-spanish = "Partículas remotas: sincronizar y renderizar otros jugadores a través del servidor central (el otro debe tener activado local+remoto)"
-french = "Particules à distance : synchronisation et rendu des autres joueurs via le serveur central (nécessite que l'autre active local + distant)"
-brazilian_portuguese = "Partículas remotas: sincronizar e renderizar outros jogadores através do servidor central (o outro lado precisa ativar local + remoto)"
-portuguese = "Partículas remotas: sincronizar e renderizar outros jogadores através do servidor central (requer que o outro ative local + remoto)"
-turkish = "Uzaktaki parçacıklar: Merkez sunucu aracılığıyla diğer oyuncuları senkronize et ve işle (karşı tarafın yerel+uzak seçeneğini açması gerekir)"
-polish = "Zdalne cząsteczki: synchronizuj i renderuj innych graczy przez serwer centralny (wymaga włączenia lokalnego + zdalnego u drugiej osoby)"
 
 [[message]]
 key = "Remove from favorites"
@@ -16256,22 +15344,6 @@ turkish = "Kaydırma hızı"
 polish = "Prędkość przewijania"
 
 [[message]]
-key = "Seconds"
-[message.translations]
-simplified_chinese = "秒"
-traditional_chinese = "秒"
-japanese = "秒"
-korean = "초"
-russian = "Секунды"
-german = "Sekunden"
-spanish = "Segundos"
-french = "Secondes"
-brazilian_portuguese = "Segundos"
-portuguese = "Segundos"
-turkish = "Saniye"
-polish = "Sekundy"
-
-[[message]]
 key = "SecretId"
 [message.translations]
 simplified_chinese = "密钥 ID"
@@ -16686,6 +15758,22 @@ brazilian_portuguese = "O RTT do servidor está elevado, o caminho de resposta e
 portuguese = "O RTT do servidor está elevado, o caminho de resposta está instável"
 turkish = "Sunucu RTT değeri yüksek, yanıt yolu kararsız"
 polish = "RTT serwera jest podwyższone, ścieżka odpowiedzi jest niestabilna"
+
+[[message]]
+key = "Server-assigned style"
+[message.translations]
+simplified_chinese = "服务器分配风格"
+traditional_chinese = "伺服器分配風格"
+japanese = "サーバー指定のスタイル"
+korean = "서버 지정 스타일"
+russian = "Стиль, назначенный сервером"
+german = "Vom Server zugewiesener Stil"
+spanish = "Estilo asignado por el servidor"
+french = "Style attribué par le serveur"
+brazilian_portuguese = "Estilo atribuído pelo servidor"
+portuguese = "Estilo atribuído pelo servidor"
+turkish = "Sunucunun atadığı stil"
+polish = "Styl przypisany przez serwer"
 
 [[message]]
 key = "Set color"
@@ -18526,118 +17614,6 @@ brazilian_portuguese = "Limiar de ativação de fala"
 portuguese = "Limiar de ativação de fala"
 turkish = "Konuşma tetikleme eşiği"
 polish = "Próg wyzwalania mowy"
-
-[[message]]
-key = "Speedrun countdown timer"
-[message.translations]
-simplified_chinese = "速通倒计时器"
-traditional_chinese = "速通倒計時器"
-japanese = "スピードランのカウントダウンタイマー"
-korean = "스피드런 카운트다운 타이머"
-russian = "Таймер обратного отсчёта спидран"
-german = "Speedrun-Countdown-Timer"
-spanish = "Temporizador de cuenta atrás de speedrun"
-french = "Minuteur de compte à rebours de speedrun"
-brazilian_portuguese = "Cronômetro de contagem regressiva de speedrun"
-portuguese = "Temporizador de contagem decrescente de speedrun"
-turkish = "Hızlı koşu geri sayım zamanlayıcısı"
-polish = "Licznik czasu odliczania speedruna"
-
-[[message]]
-key = "Speedrun Timer"
-[message.translations]
-simplified_chinese = "速通计时器"
-traditional_chinese = "速通計時器"
-japanese = "スピードランタイマー"
-korean = "스피드런 타이머"
-russian = "Таймер спидран"
-german = "Speedrun-Timer"
-spanish = "Temporizador de speedrun"
-french = "Minuteur de speedrun"
-brazilian_portuguese = "Temporizador de Speedrun"
-portuguese = "Temporizador de speedrun"
-turkish = "Hızlı koşu zamanlayıcısı"
-polish = "Licznik czasu speedruna"
-
-[[message]]
-key = "Speedrun timer hours"
-[message.translations]
-simplified_chinese = "速通计时器小时"
-traditional_chinese = "速通計時器小時"
-japanese = "スピードラインタイマーの時"
-korean = "스피드런 타이머 시간"
-russian = "Часы таймера спидран-забега"
-german = "Speedrun-Timer Stunden"
-spanish = "Horas del temporizador de speedrun"
-french = "Heures du chronomètre de speedrun"
-brazilian_portuguese = "Horas do cronômetro de speedrun"
-portuguese = "Horas do temporizador de speedrun"
-turkish = "Hızlı geçiş sayacı saat"
-polish = "Godziny licznika czasu speedrun"
-
-[[message]]
-key = "Speedrun timer milliseconds"
-[message.translations]
-simplified_chinese = "速通计时器毫秒"
-traditional_chinese = "速通計時器毫秒"
-japanese = "スピードラインタイマーのミリ秒"
-korean = "스피드런 타이머 밀리초"
-russian = "Миллисекунды таймера спидран-забега"
-german = "Speedrun-Timer Millisekunden"
-spanish = "Milisegundos del temporizador de speedrun"
-french = "Millisecondes du chronomètre de speedrun"
-brazilian_portuguese = "Milissegundos do cronômetro de speedrun"
-portuguese = "Milissegundos do temporizador de speedrun"
-turkish = "Hızlı geçiş sayacı milisaniye"
-polish = "Milisekundy licznika czasu speedrun"
-
-[[message]]
-key = "Speedrun timer minutes"
-[message.translations]
-simplified_chinese = "速通计时器分钟"
-traditional_chinese = "速通計時器分鐘"
-japanese = "スピードラインタイマーの分"
-korean = "스피드런 타이머 분"
-russian = "Минуты таймера спидран-забега"
-german = "Speedrun-Timer Minuten"
-spanish = "Minutos del temporizador de speedrun"
-french = "Minutes du chronomètre de speedrun"
-brazilian_portuguese = "Minutos do cronômetro de speedrun"
-portuguese = "Minutos do temporizador de speedrun"
-turkish = "Hızlı geçiş sayacı dakika"
-polish = "Minuty licznika czasu speedrun"
-
-[[message]]
-key = "Speedrun timer seconds"
-[message.translations]
-simplified_chinese = "速通计时器秒"
-traditional_chinese = "速通計時器秒"
-japanese = "スピードラインタイマーの秒"
-korean = "스피드런 타이머 초"
-russian = "Секунды таймера спидран-забега"
-german = "Speedrun-Timer Sekunden"
-spanish = "Segundos del temporizador de speedrun"
-french = "Secondes du chronomètre de speedrun"
-brazilian_portuguese = "Segundos do cronômetro de speedrun"
-portuguese = "Segundos do temporizador de speedrun"
-turkish = "Hızlı geçiş sayacı saniye"
-polish = "Sekundy licznika czasu speedrun"
-
-[[message]]
-key = "Speedrun timer time (MM:SS, legacy)"
-[message.translations]
-simplified_chinese = "速通计时器时间（MM:SS 格式，兼容旧版）"
-traditional_chinese = "速通計時器時間（MMSS 格式，兼容舊版）"
-japanese = "スピードラインタイマーの時間（MMSS 形式、旧バージョン互換）"
-korean = "스피드런 타이머 시간 (MMSS 형식, 구버전 호환)"
-russian = "Время таймера спидран-забега (формат MMSS, совместимость со старыми версиями)"
-german = "Speedrun-Timer Zeit (MMSS-Format, kompatibel mit älteren Versionen)"
-spanish = "Tiempo del temporizador de speedrun (formato MMSS, compatible con versiones antiguas)"
-french = "Temps du chronomètre de speedrun (format MMSS, compatible avec l'ancienne version)"
-brazilian_portuguese = "Tempo do cronômetro de speedrun (formato MMSS, compatível com versões antigas)"
-portuguese = "Tempo do temporizador de speedrun (formato MMSS, compatível com versões antigas)"
-turkish = "Hızlı geçiş sayacı süresi (MMSS formatı, eski sürümle uyumlu)"
-polish = "Czas licznika speedrun (format MMSS, zgodny ze starszymi wersjami)"
 
 [[message]]
 key = "Sphere"
@@ -21152,6 +20128,23 @@ turkish = "Dinamik Ada orijinal stili kullan"
 polish = "Dynamic Island używa oryginalnego stylu"
 
 [[message]]
+key = "Use style colors"
+context = "Title color mode"
+[message.translations]
+simplified_chinese = "使用风格颜色"
+traditional_chinese = "使用風格顏色"
+japanese = "スタイルの色を使用"
+korean = "스타일 색상 사용"
+russian = "Использовать цвета стиля"
+german = "Stilfarben verwenden"
+spanish = "Usar los colores del estilo"
+french = "Utiliser les couleurs du style"
+brazilian_portuguese = "Usar as cores do estilo"
+portuguese = "Usar as cores do estilo"
+turkish = "Stilin renklerini kullan"
+polish = "Użyj kolorów stylu"
+
+[[message]]
 key = "Use the top tabs to browse QmClient features by category"
 [message.translations]
 simplified_chinese = "通过顶部页签按分类浏览 QmClient 功能"
@@ -23406,38 +22399,6 @@ brazilian_portuguese = "Seu código de timeout foi definido. Clientes 0.7 não p
 portuguese = "O teu código de timeout foi definido. Clientes 0.7 não podem reclamar os seus tees em timeout; no entanto, um cliente 0.6 pode reclamar o teu tee"
 turkish = "Zaman aşımı kodunuz ayarlandı. 0.7 istemcileri zaman aşımında teelerini geri alamaz; ancak bir 0.6 istemcisi teenizi alabilir"
 polish = "Twój kod timeout został ustawiony. Klienci 0.7 nie mogą odzyskać swoich Tee po timeout; jednak klient 0.6 może przejąć twoje Tee"
-
-[[message]]
-key = "Zen Mode"
-[message.translations]
-simplified_chinese = "禅模式"
-traditional_chinese = "禪模式"
-japanese = "禅モード"
-korean = "선 모드"
-russian = "Режим Дзен"
-german = "Zen-Modus"
-spanish = "Modo Zen"
-french = "Mode Zen"
-brazilian_portuguese = "Modo Zen"
-portuguese = "Modo Zen"
-turkish = "Zen Modu"
-polish = "Tryb Zen"
-
-[[message]]
-key = "Zen mode key"
-[message.translations]
-simplified_chinese = "禅模式按键"
-traditional_chinese = "禪模式按鍵"
-japanese = "禅モードキー"
-korean = "선 모드 키"
-russian = "Клавиша режима Дзен"
-german = "Zen-Modus-Taste"
-spanish = "Tecla del modo Zen"
-french = "Touche du mode Zen"
-brazilian_portuguese = "Tecla do modo Zen"
-portuguese = "Tecla do modo Zen"
-turkish = "Zen modu tuşu"
-polish = "Klawisz trybu Zen"
 
 [[message]]
 key = "Zhipu AI"
@@ -28055,38 +27016,6 @@ turkish = "Demo önizlemesinde ve videoda sohbeti göster"
 polish = "Pokaż czat w podglądzie demo i wideo"
 
 [[message]]
-key = "Realtime channel"
-[message.translations]
-simplified_chinese = "实时通道"
-traditional_chinese = "即時通道"
-japanese = "リアルタイムチャンネル"
-korean = "실시간 채널"
-russian = "Канал реального времени"
-german = "Echtzeit-Kanal"
-spanish = "Canal en tiempo real"
-french = "Canal temps réel"
-brazilian_portuguese = "Canal em tempo real"
-portuguese = "Canal em tempo real"
-turkish = "Gerçek zamanlı kanal"
-polish = "Kanał czasu rzeczywistego"
-
-[[message]]
-key = "Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)"
-[message.translations]
-simplified_chinese = "启用 QmClient 专用 WebSocket 服务（不回退 HTTP 轮询）"
-traditional_chinese = "啟用 QmClient 專用 WebSocket 服務（不回退 HTTP 輪詢）"
-japanese = "QmClient 専用 WebSocket サービスを有効化（HTTP ポーリングへのフォールバックなし）"
-korean = "QmClient 전용 WebSocket 서비스 활성화 (HTTP 폴링 대체 없음)"
-russian = "Включить выделенный сервис WebSocket QmClient (без отката к опросу по HTTP)"
-german = "Dedizierten QmClient-WebSocket-Dienst aktivieren (kein Rückfall auf HTTP-Abfragen)"
-spanish = "Activar el servicio WebSocket dedicado de QmClient (sin recurrir a sondeos HTTP)"
-french = "Activer le service WebSocket dédié de QmClient (aucun repli sur l’interrogation HTTP)"
-brazilian_portuguese = "Ativar o serviço WebSocket dedicado do QmClient (sem fallback para polling HTTP)"
-portuguese = "Ativar o serviço WebSocket dedicado do QmClient (sem recurso a polling HTTP)"
-turkish = "QmClient'e özel WebSocket hizmetini etkinleştir (HTTP yoklamasına dönüş yok)"
-polish = "Włącz dedykowaną usługę WebSocket QmClient (bez powrotu do odpytywania HTTP)"
-
-[[message]]
 key = "Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)"
 [message.translations]
 simplified_chinese = "专用 WebSocket 地址（留空使用 wss://qmclient.icu/ws）"
@@ -28213,3 +27142,51 @@ brazilian_portuguese = "Escopo dos apelidos nas placas de nome (0=Nenhum 1=Perso
 portuguese = "Âmbito das alcunhas nas placas de nome (0=Nenhum 1=Personagem atual 2=Personagens próprios 3=Outros jogadores 4=Outros jogadores e personagens próprios inativos 5=Todos)"
 turkish = "İsim levhası takma ad kapsamı (0=Yok 1=Geçerli karakter 2=Kendi karakterlerim 3=Diğer oyuncular 4=Diğer oyuncular ve kendi etkin olmayan karakterlerim 5=Tümü)"
 polish = "Zakres pseudonimów na tabliczkach (0=Brak 1=Bieżąca postać 2=Własne postacie 3=Inni gracze 4=Inni gracze i własne nieaktywne postacie 5=Wszystkie)"
+
+[[message]]
+key = "Connecting to voice server"
+[message.translations]
+simplified_chinese = "正在连接语音服务器"
+traditional_chinese = "正在連線至語音伺服器"
+japanese = "ボイスサーバーに接続中"
+korean = "음성 서버에 연결 중"
+russian = "Подключение к голосовому серверу"
+german = "Verbindung zum Sprachserver wird hergestellt"
+spanish = "Conectando al servidor de voz"
+french = "Connexion au serveur vocal"
+brazilian_portuguese = "Conectando ao servidor de voz"
+portuguese = "A ligar ao servidor de voz"
+turkish = "Ses sunucusuna bağlanılıyor"
+polish = "Łączenie z serwerem głosowym"
+
+[[message]]
+key = "Server URL"
+[message.translations]
+simplified_chinese = "服务器 URL"
+traditional_chinese = "伺服器 URL"
+japanese = "サーバー URL"
+korean = "서버 URL"
+russian = "URL сервера"
+german = "Server-URL"
+spanish = "URL del servidor"
+french = "URL du serveur"
+brazilian_portuguese = "URL do servidor"
+portuguese = "URL do servidor"
+turkish = "Sunucu URL’si"
+polish = "URL serwera"
+
+[[message]]
+key = "Voice server URL (ws:// or wss://)"
+[message.translations]
+simplified_chinese = "语音服务器 URL（ws:// 或 wss://）"
+traditional_chinese = "語音伺服器 URL（ws:// 或 wss://）"
+japanese = "ボイスサーバー URL（ws:// または wss://）"
+korean = "음성 서버 URL (ws:// 또는 wss://)"
+russian = "URL голосового сервера (ws:// или wss://)"
+german = "Sprachserver-URL (ws:// oder wss://)"
+spanish = "URL del servidor de voz (ws:// o wss://)"
+french = "URL du serveur vocal (ws:// ou wss://)"
+brazilian_portuguese = "URL do servidor de voz (ws:// ou wss://)"
+portuguese = "URL do servidor de voz (ws:// ou wss://)"
+turkish = "Ses sunucusu URL’si (ws:// veya wss://)"
+polish = "URL serwera głosowego (ws:// lub wss://)"

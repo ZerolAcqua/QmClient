@@ -13,6 +13,8 @@
 
 #include <game/client/QmUi/QmAnimResolve.h>
 #include <game/client/animstate.h>
+#include <game/client/components/qmclient/friend_heart_icon.h>
+#include <game/client/components/qmclient/spectator_friend_priority.h>
 #include <game/client/components/qmclient/spectator_tele_search.h>
 #include <game/client/gameclient.h>
 #include <game/collision.h>
@@ -534,27 +536,58 @@ void CSpectator::OnRender()
 
 	float x = -(ObjWidth - 35.0f), y = StartY;
 
+	// 好友优先：先把非观战玩家收进显示序列，再按「好友在前、其余在后」重排下标。
+	// 好友判定只用快照缓存的 m_Friend（与爱心图标同源），下标全部落在栈上，
+	// 渲染路径不查好友表、不加锁、不分配。
+	const CNetObj_PlayerInfo *apDisplayPlayers[MAX_CLIENTS];
+	bool aIsFriend[MAX_CLIENTS];
+	int aDisplayOrder[MAX_CLIENTS];
+	int DisplayCount = 0;
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+	{
+		const CNetObj_PlayerInfo *pInfo = GameClient()->m_Snap.m_apInfoByDDTeamName[i];
+		if(pInfo == nullptr || pInfo->m_Team == TEAM_SPECTATORS)
+			continue;
+
+		apDisplayPlayers[DisplayCount] = pInfo;
+		aIsFriend[DisplayCount] = GameClient()->m_aClients[pInfo->m_ClientId].m_Friend;
+		++DisplayCount;
+	}
+	const int FriendCount = qm_spectator_friends::BuildFriendFirstOrder(aIsFriend, DisplayCount, aDisplayOrder);
+
+	// 分组标题画在分组首行之前，只让出标题高度、不占网格槽位，因此不会多出一列；
+	// 高度上限压在 15 像素以内，满员小布局下也不会把末行推到 CP 查找栏上。
+	const float TitleHeight = std::clamp(LineHeight * 0.5f, 12.0f, 15.0f);
+	const float TitleFontSize = TitleHeight * 0.8f;
+	const auto DrawGroupTitle = [&](const char *pTitle, const ColorRGBA &TitleColor) {
+		const float TitleLeft = CenterX + x - 10.0f + BoxOffset;
+		const float TitleTop = CenterY + y + BoxMove;
+		TextRender()->TextColor(TitleColor.WithMultipliedAlpha(ContentAlpha));
+		TextRender()->Text(TitleLeft, TitleTop + (TitleHeight - TitleFontSize) / 2.0f, TitleFontSize, pTitle, -1.0f);
+		Graphics()->DrawRect(TitleLeft, TitleTop + TitleHeight - 1.0f, 270.0f - BoxOffset, 1.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f * ContentAlpha), IGraphics::CORNER_NONE, 0.0f);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		y += TitleHeight;
+	};
+
 	int OldDDTeam = -1;
 
-	// 预先做一次逆序扫描，求出每个下标之后最近的「非观战者」队伍，
+	// 预先做一次逆序扫描，求出每个显示位之后最近的「非观战者」队伍，
 	// 取代原先在循环内为每个玩家各做一次前向线性扫描（满员时是 O(N²)）。
 	// 语义与逐点前向扫描逐位一致：找不到后续非观战者时取 0（与原 NextDDTeam 初值相同）。
+	// 好友分组会把同一队伍切成两段，因此这里按显示序列而不是原始下标计算。
 	int aNextDDTeam[MAX_CLIENTS];
 	{
 		int DDTeamAfter = 0;
-		for(int j = MAX_CLIENTS - 1; j >= 0; --j)
+		for(int j = DisplayCount - 1; j >= 0; --j)
 		{
 			aNextDDTeam[j] = DDTeamAfter;
-			const CNetObj_PlayerInfo *pInfoNext = GameClient()->m_Snap.m_apInfoByDDTeamName[j];
-			if(pInfoNext != nullptr && pInfoNext->m_Team != TEAM_SPECTATORS)
-				DDTeamAfter = GameClient()->m_Teams.Team(pInfoNext->m_ClientId);
+			DDTeamAfter = GameClient()->m_Teams.Team(apDisplayPlayers[aDisplayOrder[j]]->m_ClientId);
 		}
 	}
 
-	for(int i = 0, Count = 0; i < MAX_CLIENTS; ++i)
+	for(int i = 0, Count = 0; i < DisplayCount; ++i)
 	{
-		if(!GameClient()->m_Snap.m_apInfoByDDTeamName[i] || GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_Team == TEAM_SPECTATORS)
-			continue;
+		const CNetObj_PlayerInfo *pInfo = apDisplayPlayers[aDisplayOrder[i]];
 
 		++Count;
 
@@ -564,7 +597,12 @@ void CSpectator::OnRender()
 			y = StartY;
 		}
 
-		const CNetObj_PlayerInfo *pInfo = GameClient()->m_Snap.m_apInfoByDDTeamName[i];
+		// 好友单独成组：好友组与其余玩家各自带分组标题，标题在组首行之前各出现一次。
+		if(FriendCount > 0 && i == 0)
+			DrawGroupTitle(Localize("Friends"), color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageFriendColor)));
+		else if(FriendCount > 0 && i == FriendCount)
+			DrawGroupTitle(Localize("Others"), ColorRGBA(1.0f, 1.0f, 1.0f, 0.85f));
+
 		int DDTeam = GameClient()->m_Teams.Team(pInfo->m_ClientId);
 		const int NextDDTeam = aNextDDTeam[i];
 
@@ -572,7 +610,8 @@ void CSpectator::OnRender()
 		{
 			for(int j = i - 1; j >= 0; j--)
 			{
-				const CNetObj_PlayerInfo *pInfo2 = GameClient()->m_Snap.m_apInfoByDDTeamName[j];
+				// 显示序列里的每一项都是非观战玩家，取显示位 j 的队伍即可。
+				const CNetObj_PlayerInfo *pInfo2 = apDisplayPlayers[aDisplayOrder[j]];
 
 				if(!pInfo2 || pInfo2->m_Team == TEAM_SPECTATORS)
 					continue;
@@ -594,7 +633,7 @@ void CSpectator::OnRender()
 		}
 		OldDDTeam = DDTeam;
 
-		if((Client()->State() == IClient::STATE_DEMOPLAYBACK && GameClient()->m_DemoSpecId == GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId) || (Client()->State() != IClient::STATE_DEMOPLAYBACK && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId == GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId))
+		if((Client()->State() == IClient::STATE_DEMOPLAYBACK && GameClient()->m_DemoSpecId == pInfo->m_ClientId) || (Client()->State() != IClient::STATE_DEMOPLAYBACK && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId == pInfo->m_ClientId))
 		{
 			Graphics()->DrawRect(CenterX + x - 10.0f + BoxOffset, CenterY + y + BoxMove, 270.0f - BoxOffset, LineHeight, ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f * ContentAlpha), IGraphics::CORNER_ALL, RoundRadius);
 		}
@@ -603,7 +642,7 @@ void CSpectator::OnRender()
 		if(CanSelect && m_SelectorMouse.x >= x - 10.0f && m_SelectorMouse.x < x + 260.0f &&
 			m_SelectorMouse.y >= y - (LineHeight / 6.0f) && m_SelectorMouse.y < y + (LineHeight * 5.0f / 6.0f))
 		{
-			m_SelectedSpectatorId = GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId;
+			m_SelectedSpectatorId = pInfo->m_ClientId;
 			PlayerSelected = true;
 			if(MousePressed)
 			{
@@ -639,7 +678,7 @@ void CSpectator::OnRender()
 		float TeeAlpha;
 		float NameAlpha;
 		if(Client()->State() == IClient::STATE_DEMOPLAYBACK &&
-			!GameClient()->m_Snap.m_aCharacters[GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId].m_Active)
+			!GameClient()->m_Snap.m_aCharacters[pInfo->m_ClientId].m_Active)
 		{
 			NameAlpha = 0.25f;
 			TeeAlpha = 0.5f;
@@ -656,7 +695,7 @@ void CSpectator::OnRender()
 		NameCursor.m_FontSize = FontSize;
 		NameCursor.m_Flags |= TEXTFLAG_ELLIPSIS_AT_END;
 		NameCursor.m_LineWidth = 180.0f;
-		const int ClientId = GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId;
+		const int ClientId = pInfo->m_ClientId;
 		const bool HideIdentity = GameClient()->ShouldHideStreamerIdentity(ClientId);
 		const bool IsFriend = GameClient()->m_aClients[ClientId].m_Friend;
 		char aNameBuf[MAX_NAME_LENGTH];
@@ -705,7 +744,7 @@ void CSpectator::OnRender()
 		TextRender()->TextEx(&NameCursor, aNameBuf);
 		if(GameClient()->m_MultiViewActivated)
 		{
-			if(GameClient()->m_aMultiViewId[GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId])
+			if(GameClient()->m_aMultiViewId[pInfo->m_ClientId])
 			{
 				TextRender()->TextColor(0.1f, 1.0f, 0.1f, (PlayerSelected ? 1.0f : 0.5f) * ContentAlpha);
 				TextRender()->Text(CenterX + x + 50.0f + 180.0f, CenterY + y + BoxMove + (LineHeight - FontSize) / 2.f, FontSize - 3, "⬤", 220.0f);
@@ -719,10 +758,10 @@ void CSpectator::OnRender()
 
 		// flag
 		if(GameClient()->m_Snap.m_pGameInfoObj && (GameClient()->m_Snap.m_pGameInfoObj->m_GameFlags & GAMEFLAG_FLAGS) &&
-			GameClient()->m_Snap.m_pGameDataObj && (GameClient()->m_Snap.m_pGameDataObj->m_FlagCarrierRed == GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId || GameClient()->m_Snap.m_pGameDataObj->m_FlagCarrierBlue == GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId))
+			GameClient()->m_Snap.m_pGameDataObj && (GameClient()->m_Snap.m_pGameDataObj->m_FlagCarrierRed == pInfo->m_ClientId || GameClient()->m_Snap.m_pGameDataObj->m_FlagCarrierBlue == pInfo->m_ClientId))
 		{
 			Graphics()->BlendNormal();
-			if(GameClient()->m_Snap.m_pGameDataObj->m_FlagCarrierBlue == GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId)
+			if(GameClient()->m_Snap.m_pGameDataObj->m_FlagCarrierBlue == pInfo->m_ClientId)
 				Graphics()->TextureSet(GameClient()->m_GameSkin.m_SpriteFlagBlue);
 			else
 				Graphics()->TextureSet(GameClient()->m_GameSkin.m_SpriteFlagRed);
@@ -738,7 +777,7 @@ void CSpectator::OnRender()
 			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 		}
 
-		CTeeRenderInfo TeeInfo = GameClient()->m_aClients[GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId].m_RenderInfo;
+		CTeeRenderInfo TeeInfo = GameClient()->m_aClients[pInfo->m_ClientId].m_RenderInfo;
 		TeeInfo.m_Size *= TeeSizeMod;
 
 		const CAnimState *pIdleState = CAnimState::GetIdle();
@@ -753,11 +792,13 @@ void CSpectator::OnRender()
 		const float IconSize = FontSize >= 10.0f ? FontSize - 2.0f : FontSize;
 		if(IsFriend)
 		{
-			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			// 好友爱心：图标字体没有实心爱心，改用默认字体回退的 U+2665（见 friend_heart_icon.h）。
+			// 相邻的战队图标仍走 ICON_FONT，因此这里单独切预设，不改动下一段的字体。
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 			ColorRGBA FriendIconColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageFriendHeartColor));
 			FriendIconColor.a *= NameAlpha;
 			TextRender()->TextColor(FriendIconColor);
-			TextRender()->Text(IconX, IconY, IconSize, FontIcons::FONT_ICON_HEART, 220.0f);
+			TextRender()->Text(IconX, IconY, IconSize, QM_FRIEND_HEART_ICON, 220.0f);
 			IconX += IconSize - 2.0f;
 		}
 

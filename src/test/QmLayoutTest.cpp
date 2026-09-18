@@ -4,7 +4,9 @@
 #include <game/client/QmUi/QmLayout.h>
 #include <game/client/components/qmclient/afk_presentation.h>
 #include <game/client/components/qmclient/input_overlay.h>
+#include <game/client/components/qmclient/scoreboard_skin.h>
 #include <game/client/components/qmclient/scoreboard_team_modes.h>
+#include <game/client/components/qmclient/tee_skin_apply.h>
 #include <game/client/components/scoreboard.h>
 #include <game/map/render_map.h>
 #include <game/mapitems.h>
@@ -12,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -432,4 +435,131 @@ TEST(QmInputOverlayFiles, MissingFileIsACompletedResult)
 	std::optional<time_t> Modified = 99;
 	EXPECT_TRUE(pCheck->TryGetResult(Modified));
 	EXPECT_FALSE(Modified.has_value());
+}
+
+TEST(QmScoreboardSkin, CopiesSkinAndColorsOnlyToControlledRole)
+{
+	for(const int Dummy : {0, 1})
+	{
+		for(const int UseCustomColor : {0, 1})
+		{
+			auto pConfig = std::make_unique<CConfig>();
+			pConfig->m_ClDummy = Dummy;
+			str_copy(pConfig->m_ClPlayerSkin, "main");
+			str_copy(pConfig->m_ClDummySkin, "dummy");
+			pConfig->m_ClPlayerUseCustomColor = pConfig->m_ClDummyUseCustomColor = 1;
+			pConfig->m_ClPlayerColorBody = pConfig->m_ClDummyColorBody = 11;
+			pConfig->m_ClPlayerColorFeet = pConfig->m_ClDummyColorFeet = 22;
+			str_copy(pConfig->m_PlayerName, "main name");
+			str_copy(pConfig->m_ClDummyName, "dummy name");
+
+			ASSERT_TRUE(QmCopyScoreboardSkin(*pConfig, false, "kitty", UseCustomColor, 12345, 67890));
+
+			EXPECT_STREQ(pConfig->m_ClPlayerSkin, Dummy ? "main" : "kitty");
+			EXPECT_STREQ(pConfig->m_ClDummySkin, Dummy ? "kitty" : "dummy");
+			EXPECT_EQ(pConfig->m_ClPlayerUseCustomColor, Dummy ? 1 : UseCustomColor);
+			EXPECT_EQ(pConfig->m_ClDummyUseCustomColor, Dummy ? UseCustomColor : 1);
+			EXPECT_EQ(pConfig->m_ClPlayerColorBody, Dummy ? 11u : 12345u);
+			EXPECT_EQ(pConfig->m_ClDummyColorBody, Dummy ? 12345u : 11u);
+			EXPECT_EQ(pConfig->m_ClPlayerColorFeet, Dummy ? 22u : 67890u);
+			EXPECT_EQ(pConfig->m_ClDummyColorFeet, Dummy ? 67890u : 22u);
+			EXPECT_STREQ(pConfig->m_PlayerName, "main name");
+			EXPECT_STREQ(pConfig->m_ClDummyName, "dummy name");
+		}
+	}
+}
+
+TEST(QmScoreboardSkin, SixupDoesNotChangeEitherRole)
+{
+	for(const int Dummy : {0, 1})
+	{
+		auto pConfig = std::make_unique<CConfig>();
+		pConfig->m_ClDummy = Dummy;
+		str_copy(pConfig->m_ClPlayerSkin, "main");
+		str_copy(pConfig->m_ClDummySkin, "dummy");
+		pConfig->m_ClPlayerUseCustomColor = 0;
+		pConfig->m_ClDummyUseCustomColor = 1;
+		pConfig->m_ClPlayerColorBody = 11;
+		pConfig->m_ClDummyColorBody = 22;
+		pConfig->m_ClPlayerColorFeet = 33;
+		pConfig->m_ClDummyColorFeet = 44;
+
+		EXPECT_FALSE(QmCopyScoreboardSkin(*pConfig, true, "kitty", 1, 12345, 67890));
+
+		EXPECT_STREQ(pConfig->m_ClPlayerSkin, "main");
+		EXPECT_STREQ(pConfig->m_ClDummySkin, "dummy");
+		EXPECT_EQ(pConfig->m_ClPlayerUseCustomColor, 0);
+		EXPECT_EQ(pConfig->m_ClDummyUseCustomColor, 1);
+		EXPECT_EQ(pConfig->m_ClPlayerColorBody, 11u);
+		EXPECT_EQ(pConfig->m_ClDummyColorBody, 22u);
+		EXPECT_EQ(pConfig->m_ClPlayerColorFeet, 33u);
+		EXPECT_EQ(pConfig->m_ClDummyColorFeet, 44u);
+	}
+}
+
+// 意图：皮肤列表双击左键改本体、双击右键改分身；DoButtonLogic 返回 1=左键 / 2=右键。
+TEST(QmTeeSkinApply, ButtonResultSelectsTheTargetRole)
+{
+	EXPECT_EQ(QmTeeSkinApplyTargetForButton(1), ETeeSkinApplyTarget::MAIN);
+	EXPECT_EQ(QmTeeSkinApplyTargetForButton(2), ETeeSkinApplyTarget::DUMMY);
+	// 0 只作为防御性输入；真实调用点已用 ItemButton != 0 门控。
+	EXPECT_EQ(QmTeeSkinApplyTargetForButton(0), ETeeSkinApplyTarget::MAIN);
+	EXPECT_EQ(QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::MAIN), 0);
+	EXPECT_EQ(QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::DUMMY), 1);
+}
+
+TEST(QmTeeSkinApply, WritesOnlyTheRequestedRoleAndKeepsTheOtherSideUntouched)
+{
+	for(const bool TargetDummy : {false, true})
+	{
+		const ETeeSkinApplyTarget Target = TargetDummy ? ETeeSkinApplyTarget::DUMMY : ETeeSkinApplyTarget::MAIN;
+		auto pConfig = std::make_unique<CConfig>();
+		pConfig->m_ClDummy = TargetDummy ? 0 : 1; // 当前子标签刻意与双击目标相反
+		str_copy(pConfig->m_ClPlayerSkin, "main");
+		str_copy(pConfig->m_ClDummySkin, "dummy");
+		pConfig->m_ClPlayerUseCustomColor = 1;
+		pConfig->m_ClDummyUseCustomColor = 1;
+		pConfig->m_ClPlayerColorBody = 11;
+		pConfig->m_ClDummyColorBody = 22;
+		pConfig->m_ClPlayerColorFeet = 33;
+		pConfig->m_ClDummyColorFeet = 44;
+
+		QmApplyTeeSkinToTarget(*pConfig, Target, "kitty", true, true, 12345, 67890);
+
+		EXPECT_STREQ(pConfig->m_ClPlayerSkin, TargetDummy ? "main" : "kitty");
+		EXPECT_STREQ(pConfig->m_ClDummySkin, TargetDummy ? "kitty" : "dummy");
+		EXPECT_EQ(pConfig->m_ClPlayerColorBody, TargetDummy ? 11u : 12345u);
+		EXPECT_EQ(pConfig->m_ClDummyColorBody, TargetDummy ? 12345u : 22u);
+		EXPECT_EQ(pConfig->m_ClPlayerColorFeet, TargetDummy ? 33u : 67890u);
+		EXPECT_EQ(pConfig->m_ClDummyColorFeet, TargetDummy ? 67890u : 44u);
+		EXPECT_EQ(pConfig->m_ClPlayerUseCustomColor, 1);
+		EXPECT_EQ(pConfig->m_ClDummyUseCustomColor, 1);
+	}
+}
+
+TEST(QmTeeSkinApply, EntryWithoutColorKeyKeepsExistingColorsAndTogglesOff)
+{
+	auto pConfig = std::make_unique<CConfig>();
+	str_copy(pConfig->m_ClPlayerSkin, "main");
+	str_copy(pConfig->m_ClDummySkin, "dummy");
+	pConfig->m_ClPlayerUseCustomColor = 1;
+	pConfig->m_ClDummyUseCustomColor = 1;
+	pConfig->m_ClPlayerColorBody = 11;
+	pConfig->m_ClDummyColorBody = 22;
+	pConfig->m_ClPlayerColorFeet = 33;
+	pConfig->m_ClDummyColorFeet = 44;
+
+	// 条目没有颜色键：只换皮肤名，颜色与开关全部保持原样。
+	QmApplyTeeSkinToTarget(*pConfig, ETeeSkinApplyTarget::MAIN, "kitty", false, false, 0, 0);
+	EXPECT_STREQ(pConfig->m_ClPlayerSkin, "kitty");
+	EXPECT_EQ(pConfig->m_ClPlayerUseCustomColor, 1);
+	EXPECT_EQ(pConfig->m_ClPlayerColorBody, 11u);
+	EXPECT_EQ(pConfig->m_ClPlayerColorFeet, 33u);
+
+	// 颜色键显式关闭自定义颜色：关开关但不写入颜色值。
+	QmApplyTeeSkinToTarget(*pConfig, ETeeSkinApplyTarget::DUMMY, "santa", true, false, 12345, 67890);
+	EXPECT_STREQ(pConfig->m_ClDummySkin, "santa");
+	EXPECT_EQ(pConfig->m_ClDummyUseCustomColor, 0);
+	EXPECT_EQ(pConfig->m_ClDummyColorBody, 22u);
+	EXPECT_EQ(pConfig->m_ClDummyColorFeet, 44u);
 }

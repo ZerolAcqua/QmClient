@@ -2023,7 +2023,6 @@ void CTClient::OnUpdate()
 	UpdateMapHistorySession();
 	MaybeSaveMapCategoryCache();
 	MaybeSaveMapNotes();
-	ApplyFocusModeEffects();
 	ApplyGoresFastInputLink();
 }
 
@@ -2569,19 +2568,18 @@ void CTClient::CheckFriendOnline()
 {
 	const int Enabled = g_Config.m_QmFriendOnlineNotify;
 	const int IgnoreClanSetting = g_Config.m_ClFriendsIgnoreClan;
-	if(m_FriendNotifyPrevEnabled != Enabled || m_FriendNotifyPrevIgnoreClan != IgnoreClanSetting)
+	const uint64_t FriendRevision = GameClient()->Friends()->Revision();
+	if(m_FriendNotifyPrevEnabled != Enabled || m_FriendNotifyPrevIgnoreClan != IgnoreClanSetting || m_FriendNotifyPrevRevision != FriendRevision)
 	{
 		m_FriendNotifyPrevEnabled = Enabled;
 		m_FriendNotifyPrevIgnoreClan = IgnoreClanSetting;
-		m_FriendNotifyNextCheck = 0.0f;
-		m_FriendOnline.clear();
-		m_FriendNotifyScanRunning = false;
-		m_FriendNotifyScanIndex = 0;
-		m_FriendNotifyScanId = 0;
+		m_FriendNotifyPrevRevision = FriendRevision;
+		m_FriendOnlineTracker.Reset();
+		m_FriendOnlineRefreshPending = false;
 		m_FriendAutoRefreshNext = 0.0f;
 	}
 
-	if(!Enabled)
+	if(!Enabled || GameClient()->Friends()->NumFriends() <= 0)
 		return;
 
 	IServerBrowser *pServerBrowser = ServerBrowser();
@@ -2597,7 +2595,58 @@ void CTClient::CheckFriendOnline()
 		m_FriendAutoRefreshNext = 0.0f;
 	}
 
-	const float RefreshInterval = maximum(5.0f, (float)g_Config.m_QmFriendOnlineRefreshSeconds);
+	if(m_FriendOnlineRefreshPending && !pServerBrowser->IsGettingServerlist())
+	{
+		m_FriendOnlineRefreshPending = false;
+		if(!pServerBrowser->IsServerlistError())
+		{
+			// 一次刷新只提交一次观测；同帧收集，避免分帧索引混入下一代名单。
+			const bool IgnoreClan = IgnoreClanSetting != 0;
+			std::unordered_set<std::string> FriendKeys;
+			std::unordered_set<std::string> FriendNames;
+			std::string Key;
+			for(int Index = 0; Index < GameClient()->Friends()->NumFriends(); ++Index)
+			{
+				const CFriendInfo *pFriend = GameClient()->Friends()->GetFriend(Index);
+				if(pFriend->m_aName[0] == '\0')
+					continue;
+				BuildFriendNotifyKey(pFriend->m_aName, pFriend->m_aClan, IgnoreClan, Key);
+				FriendKeys.insert(Key);
+				FriendNames.insert(pFriend->m_aName);
+			}
+
+			std::vector<qm_friend_notify::CFriend> vCurrentFriends;
+			std::unordered_set<std::string> AvailableServers;
+			for(int Index = 0; Index < pServerBrowser->NumHttpServers(); ++Index)
+			{
+				const CServerInfo *pEntry = pServerBrowser->HttpGet(Index);
+				if(!pEntry || pEntry->m_NumAddresses <= 0)
+					continue;
+				char aAddress[NETADDR_MAXSTRSIZE];
+				net_addr_str(&pEntry->m_aAddresses[0], aAddress, sizeof(aAddress), true);
+				if(pEntry->m_NumReceivedClients == pEntry->m_NumClients)
+					AvailableServers.insert(aAddress);
+				for(int ClientIndex = 0; ClientIndex < pEntry->m_NumReceivedClients; ++ClientIndex)
+				{
+					const auto &Client = pEntry->m_aClients[ClientIndex];
+					if(Client.m_aName[0] == '\0' || FriendNames.find(Client.m_aName) == FriendNames.end())
+						continue;
+					BuildFriendNotifyKey(Client.m_aName, Client.m_aClan, IgnoreClan, Key);
+					// 同名玩家改战队时继续跟踪在服状态，避免改回后被误判为上线。
+					vCurrentFriends.push_back({Key, Client.m_aName, pEntry->m_aMap, aAddress, FriendKeys.find(Key) != FriendKeys.end()});
+				}
+			}
+
+			for(const auto &Friend : m_FriendOnlineTracker.Update(vCurrentFriends, AvailableServers))
+			{
+				char aBuf[256];
+				const char *pMap = Friend.m_Map.empty() ? Localize("Unknown") : Friend.m_Map.c_str();
+				str_format(aBuf, sizeof(aBuf), Localize("Your friend %s is online and currently on map %s!"), Friend.m_Name.c_str(), pMap);
+				GameClient()->m_Chat.Echo(aBuf);
+			}
+		}
+	}
+
 	if(Now >= m_FriendAutoRefreshNext && !pServerBrowser->IsGettingServerlist())
 	{
 		const int CurrentType = pServerBrowser->GetCurrentType();
@@ -2605,143 +2654,24 @@ void CTClient::CheckFriendOnline()
 			pServerBrowser->Refresh(CurrentType, false);
 		else
 			pServerBrowser->RefreshHttpServerList();
-		m_FriendAutoRefreshNext = Now + RefreshInterval;
+		m_FriendOnlineRefreshPending = true;
+		m_FriendAutoRefreshNext = Now + maximum(5.0f, (float)g_Config.m_QmFriendOnlineRefreshSeconds);
 	}
+}
 
-	if(GameClient()->Friends()->NumFriends() <= 0)
-	{
-		m_FriendOnline.clear();
-		m_FriendNotifyScanRunning = false;
-		m_FriendNotifyScanIndex = 0;
-		m_FriendNotifyScanId = 0;
-		return;
-	}
-
-	constexpr float FriendOfflineTimeout = 10.0f;
-	auto PruneFriendOffline = [&]() {
-		for(auto It = m_FriendOnline.begin(); It != m_FriendOnline.end();)
-		{
-			if(Now - It->second.m_LastSeen > FriendOfflineTimeout)
-				It = m_FriendOnline.erase(It);
-			else
-				++It;
-		}
-	};
-
-	const bool IgnoreClan = IgnoreClanSetting != 0;
-	if(!m_FriendNotifyScanRunning)
-	{
-		if(Now < m_FriendNotifyNextCheck)
-		{
-			PruneFriendOffline();
-			return;
-		}
-
-		m_FriendNotifyScanRunning = true;
-		m_FriendNotifyScanIndex = 0;
-		++m_FriendNotifyScanId;
-		if(m_FriendNotifyScanId <= 0)
-			m_FriendNotifyScanId = 1;
-	}
-
-	const int NumServers = pServerBrowser->NumHttpServers();
-	if(NumServers <= 0)
-	{
-		m_FriendNotifyScanRunning = false;
-		m_FriendNotifyScanIndex = 0;
-		m_FriendNotifyNextCheck = Now + 1.0f;
-	}
-	else
-	{
-		constexpr int ServersPerFrame = 32;
-		int ProcessedServers = 0;
-		std::string Key;
-		Key.reserve(MAX_NAME_LENGTH + MAX_CLAN_LENGTH + 1);
-		while(m_FriendNotifyScanIndex < NumServers && ProcessedServers < ServersPerFrame)
-		{
-			const CServerInfo *pEntry = pServerBrowser->HttpGet(m_FriendNotifyScanIndex);
-			++m_FriendNotifyScanIndex;
-			++ProcessedServers;
-			if(!pEntry || pEntry->m_NumReceivedClients <= 0)
-				continue;
-
-			for(int ClientIndex = 0; ClientIndex < pEntry->m_NumReceivedClients; ++ClientIndex)
-			{
-				const CServerInfo::CClient &Client = pEntry->m_aClients[ClientIndex];
-				if(Client.m_aName[0] == '\0')
-					continue;
-				if(!GameClient()->Friends()->IsFriend(Client.m_aName, Client.m_aClan, true))
-					continue;
-
-				BuildFriendNotifyKey(Client.m_aName, Client.m_aClan, IgnoreClan, Key);
-				auto It = m_FriendOnline.find(Key);
-				if(It == m_FriendOnline.end())
-				{
-					char aBuf[256];
-					const char *pMap = pEntry->m_aMap[0] != '\0' ? pEntry->m_aMap : Localize("Unknown");
-					str_format(aBuf, sizeof(aBuf), Localize("Your friend %s is online and currently on map %s!"), Client.m_aName, pMap);
-					GameClient()->m_Chat.Echo(aBuf);
-					SFriendOnlineState State;
-					State.m_LastSeen = Now;
-					State.m_Name = Client.m_aName;
-					State.m_Map = pEntry->m_aMap;
-					State.m_LastSeenScanId = m_FriendNotifyScanId;
-					m_FriendOnline.emplace(Key, std::move(State));
-				}
-				else
-				{
-					It->second.m_LastSeenScanId = m_FriendNotifyScanId;
-					if(It->second.m_Name != Client.m_aName)
-						It->second.m_Name = Client.m_aName;
-					if(It->second.m_Map != pEntry->m_aMap)
-						It->second.m_Map = pEntry->m_aMap;
-				}
-			}
-		}
-
-		if(m_FriendNotifyScanIndex >= NumServers)
-		{
-			for(auto It = m_FriendOnline.begin(); It != m_FriendOnline.end();)
-			{
-				if(It->second.m_LastSeenScanId == m_FriendNotifyScanId)
-				{
-					It->second.m_LastSeen = Now;
-					++It;
-				}
-				else if(Now - It->second.m_LastSeen > FriendOfflineTimeout)
-				{
-					It = m_FriendOnline.erase(It);
-				}
-				else
-				{
-					++It;
-				}
-			}
-			m_FriendNotifyScanRunning = false;
-			m_FriendNotifyScanIndex = 0;
-			m_FriendNotifyNextCheck = Now + 1.0f;
-		}
-	}
+void CTClient::ResetFriendEnter()
+{
+	m_FriendEnterTracker.Reset();
+	m_FriendEnterPendingNames.clear();
+	m_FriendEnterPendingSendAt = 0.0f;
+	m_FriendEnterNextCheck = 0.0f;
 }
 
 void CTClient::CheckFriendEnterGreet()
 {
-	auto ClearFriendEnterClientActive = [&]() {
-		for(bool &ClientActive : m_aFriendEnterClientActive)
-			ClientActive = false;
-	};
-
-	if(Client()->State() != IClient::STATE_ONLINE)
+	if(Client()->State() != IClient::STATE_ONLINE || !GameClient()->m_Snap.m_pLocalInfo)
 	{
-		if(m_FriendEnterInitialized || !m_FriendEnterOnline.empty())
-		{
-			m_FriendEnterOnline.clear();
-			m_FriendEnterInitialized = false;
-		}
-		ClearFriendEnterClientActive();
-		m_FriendEnterPendingNames.clear();
-		m_FriendEnterPendingSendAt = 0.0f;
-		m_FriendEnterNextCheck = 0.0f;
+		ResetFriendEnter();
 		return;
 	}
 
@@ -2749,22 +2679,20 @@ void CTClient::CheckFriendEnterGreet()
 	const bool BroadcastEnabled = g_Config.m_QmFriendEnterBroadcast != 0;
 	const int IgnoreClanSetting = g_Config.m_ClFriendsIgnoreClan;
 	const int EnabledMask = (AutoGreetEnabled ? 1 : 0) | (BroadcastEnabled ? 2 : 0);
-	if(m_FriendEnterPrevEnabled != EnabledMask || m_FriendEnterPrevIgnoreClan != IgnoreClanSetting)
+	const uint64_t FriendRevision = GameClient()->Friends()->Revision();
+	if(m_FriendEnterPrevEnabled != EnabledMask || m_FriendEnterPrevIgnoreClan != IgnoreClanSetting ||
+		m_FriendEnterPrevDummy != g_Config.m_ClDummy || m_FriendEnterPrevRevision != FriendRevision)
 	{
 		m_FriendEnterPrevEnabled = EnabledMask;
 		m_FriendEnterPrevIgnoreClan = IgnoreClanSetting;
-		m_FriendEnterOnline.clear();
-		m_FriendEnterInitialized = false;
-		ClearFriendEnterClientActive();
-		m_FriendEnterPendingNames.clear();
-		m_FriendEnterPendingSendAt = 0.0f;
-		m_FriendEnterNextCheck = 0.0f;
+		m_FriendEnterPrevDummy = g_Config.m_ClDummy;
+		m_FriendEnterPrevRevision = FriendRevision;
+		ResetFriendEnter();
 	}
 
-	if(!AutoGreetEnabled && !BroadcastEnabled)
+	if((!AutoGreetEnabled && !BroadcastEnabled) || GameClient()->Friends()->NumFriends() <= 0)
 	{
-		m_FriendEnterPendingNames.clear();
-		m_FriendEnterPendingSendAt = 0.0f;
+		ResetFriendEnter();
 		return;
 	}
 	if(!AutoGreetEnabled)
@@ -2794,59 +2722,25 @@ void CTClient::CheckFriendEnterGreet()
 		m_FriendEnterPendingSendAt = 0.0f;
 	}
 
-	if(GameClient()->Friends()->NumFriends() <= 0)
-	{
-		m_FriendEnterOnline.clear();
-		m_FriendEnterInitialized = false;
-		ClearFriendEnterClientActive();
-		return;
-	}
-
 	if(Now < m_FriendEnterNextCheck)
 		return;
 	m_FriendEnterNextCheck = Now + 0.2f;
 
-	std::unordered_set<std::string> CurrentFriends;
-	CurrentFriends.reserve(32);
-	std::vector<std::string> NewFriends;
-	NewFriends.reserve(8);
-	bool aCurrentClientActive[MAX_CLIENTS] = {};
-	std::string Key;
-	Key.reserve(MAX_NAME_LENGTH + MAX_CLAN_LENGTH + 1);
-	const bool IgnoreClan = IgnoreClanSetting != 0;
+	std::vector<qm_friend_notify::CEnterTracker::CClient> vCurrentClients;
+	vCurrentClients.reserve(MAX_CLIENTS);
 	const int LocalMain = GameClient()->m_aLocalIds[0];
 	const int LocalDummy = GameClient()->m_aLocalIds[1];
 	const bool HasDummy = Client()->DummyConnected();
-
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
 		const auto &Client = GameClient()->m_aClients[ClientId];
 		if(!Client.m_Active)
 			continue;
-		aCurrentClientActive[ClientId] = true;
-		if(ClientId == LocalMain || (HasDummy && ClientId == LocalDummy))
-			continue;
-		if(!GameClient()->Friends()->IsFriend(Client.m_aName, Client.m_aClan, true))
-			continue;
-
-		BuildFriendNotifyKey(Client.m_aName, Client.m_aClan, IgnoreClan, Key);
-		CurrentFriends.insert(Key);
-		if(!m_aFriendEnterClientActive[ClientId])
-			NewFriends.push_back(Client.m_aName);
+		vCurrentClients.push_back({ClientId, Client.m_aName, Client.m_aClan,
+			GameClient()->Friends()->IsFriend(Client.m_aName, Client.m_aClan, true),
+			ClientId == LocalMain || (HasDummy && ClientId == LocalDummy)});
 	}
-
-	if(!m_FriendEnterInitialized)
-	{
-		m_FriendEnterOnline = std::move(CurrentFriends);
-		for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
-			m_aFriendEnterClientActive[ClientId] = aCurrentClientActive[ClientId];
-		m_FriendEnterInitialized = true;
-		return;
-	}
-
-	m_FriendEnterOnline = std::move(CurrentFriends);
-	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
-		m_aFriendEnterClientActive[ClientId] = aCurrentClientActive[ClientId];
+	const auto NewFriends = m_FriendEnterTracker.Update(vCurrentClients, Now, IgnoreClanSetting != 0);
 
 	if(NewFriends.empty())
 		return;
@@ -3349,8 +3243,10 @@ void CTClient::OnStateChange(int NewState, int OldState)
 		}
 		ResetComboState();
 		InvalidateGoresDistanceField();
-		m_FriendEnterOnline.clear();
-		m_FriendEnterInitialized = false;
+		ResetFriendEnter();
+		m_FriendOnlineTracker.Reset();
+		m_FriendOnlineRefreshPending = false;
+		m_FriendAutoRefreshNext = 0.0f;
 		m_aLastLocalSaveHintMap[0] = '\0';
 	}
 	m_aLastGameplayLogicTick[0] = -1;
@@ -4445,58 +4341,6 @@ void CTClient::StepGoresDistanceFieldReachableStartCheck(int Budget)
 		return;
 
 	FailGoresDistanceFieldBuild();
-}
-
-void CTClient::ApplyFocusModeEffects()
-{
-	const bool FocusActive = g_Config.m_QmFocusMode != 0;
-	const auto ApplyFocusOverride = [](SQmFocusConfigOverrideState &State, bool HideActive, int &ConfigValue, int HiddenValue) {
-		bool Changed = false;
-		const int NextValue = ApplyQmFocusConfigOverride(State, HideActive, ConfigValue, HiddenValue, Changed);
-		if(Changed)
-			ConfigValue = NextValue;
-	};
-	const bool StateWasKnown = m_FocusModeStateKnown;
-	const bool HideFocusHud = ShouldHideFocusHud(FocusActive, g_Config.m_QmFocusModeHideHud != 0);
-	const bool HideFocusNameplates = ShouldHideFocusNameplates(FocusActive, g_Config.m_QmFocusModeHideNameplates != 0);
-	const bool HideFocusDirectionIndicators = ShouldHideFocusDirectionIndicators(FocusActive, g_Config.m_QmFocusModeHideDirectionIndicators != 0);
-	if(!m_FocusModeStateKnown)
-	{
-		m_FocusModeStateKnown = true;
-		if(!FocusActive)
-		{
-			m_PrevFocusModeActive = false;
-			return;
-		}
-		m_PrevFocusModeActive = false;
-	}
-
-	if(StateWasKnown && FocusActive != m_PrevFocusModeActive)
-	{
-		char aFocusMsg[128];
-		str_format(aFocusMsg, sizeof(aFocusMsg), "%s%s: %s",
-			FocusActive ? "[[$FF7F7F]]" : "[[$A5FFA5]]",
-			Localize("Zen Mode"),
-			Localize(FocusActive ? "On" : "Off"));
-		GameClient()->Echo(aFocusMsg);
-	}
-
-	ApplyFocusOverride(m_FocusHudOverrideState, HideFocusHud, g_Config.m_ClShowhud, 0);
-	// 昵称现在由六档范围 qm_nameplate_show_scope 统一决定，「无」即隐藏全部昵称。
-	{
-		int NamePlateShowScope = g_Config.m_QmNameplateShowScope;
-		ApplyFocusOverride(m_FocusNamePlatesOverrideState, HideFocusNameplates, NamePlateShowScope, QM_NAMEPLATE_SHOW_SCOPE_OFF);
-		ApplyFocusOverride(m_FocusNamePlatesOwnOverrideState, HideFocusNameplates, NamePlateShowScope, QM_NAMEPLATE_SHOW_SCOPE_OFF);
-		g_Config.m_QmNameplateShowScope = NamePlateShowScope;
-	}
-	ApplyFocusOverride(m_FocusNameplateCoordsOverrideState, HideFocusNameplates, g_Config.m_QmNameplateCoords, 0);
-	ApplyFocusOverride(m_FocusNameplateCoordsOwnOverrideState, HideFocusNameplates, g_Config.m_QmNameplateCoordsOwn, 0);
-	ApplyFocusOverride(m_FocusNameplateCoordXOverrideState, HideFocusNameplates, g_Config.m_QmNameplateCoordX, 0);
-	ApplyFocusOverride(m_FocusNameplateCoordYOverrideState, HideFocusNameplates, g_Config.m_QmNameplateCoordY, 0);
-	ApplyFocusOverride(m_FocusDirectionOverrideState, HideFocusDirectionIndicators, g_Config.m_ClShowDirection, 0);
-	ApplyFocusOverride(m_FocusVideoHudOverrideState, HideFocusHud, g_Config.m_ClVideoShowhud, 0);
-	ApplyFocusOverride(m_FocusVideoDirectionOverrideState, HideFocusDirectionIndicators, g_Config.m_ClVideoShowDirection, 0);
-	m_PrevFocusModeActive = FocusActive;
 }
 
 void CTClient::ApplyGoresFastInputLink(bool AutoMapCheck)

@@ -309,11 +309,6 @@ namespace
 #undef SET_CONFIG_DOMAIN
 		Hash = HashValueFnv1a64(Hash, g_Config.m_QmAutoMargin);
 		Hash = HashValueFnv1a64(Hash, g_Config.m_QmFastInputMode);
-		Hash = HashValueFnv1a64(Hash, g_Config.m_QmBestInputOffset);
-		Hash = HashValueFnv1a64(Hash, g_Config.m_QmBestInputSmoothing);
-		Hash = HashValueFnv1a64(Hash, g_Config.m_QmBestInputLatencyComp);
-		Hash = HashValueFnv1a64(Hash, g_Config.m_QmBestInputInterpolation);
-		Hash = HashValueFnv1a64(Hash, g_Config.m_QmBestInputOthers);
 		Hash = HashValueFnv1a64(Hash, g_Config.m_QmSaikoPlusAmount);
 		Hash = HashValueFnv1a64(Hash, g_Config.m_QmSaikoPlusOthers);
 		Hash = HashValueFnv1a64(Hash, g_Config.m_QmJellyTee);
@@ -557,7 +552,6 @@ static float ColorPickerLabelSize = ui_token::font::BODY;
 static float ColorPickerLineSpacing = ui_token::settings::ROW_GAP;
 static std::vector<CButtonContainer> s_vTinyTeeModeButtons = {{}, {}, {}};
 static CButtonContainer s_FastInputModeFast;
-static CButtonContainer s_FastInputModeBest;
 static CButtonContainer s_FastInputModeSaikoPlus;
 static int s_CountFrozenText = 0;
 static CUi::SDropDownState s_TrailDropDownState;
@@ -2197,55 +2191,33 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView, bool PrewarmOnly)
 			Button = Rows.Next();
 			if(Render)
 			{
-				CUIRect FastButton, BestButton, SaikoButton, ButtonsRest;
+				CUIRect FastButton, SaikoButton, ButtonsRest;
 				const float Spacing = MarginSmall;
-				const float ButtonWidth = (Button.w - Spacing * 2.0f) / 3.0f;
+				const float ButtonWidth = (Button.w - Spacing) / 2.0f;
 				Button.VSplitLeft(ButtonWidth, &FastButton, &ButtonsRest);
-				ButtonsRest.VSplitLeft(Spacing, nullptr, &ButtonsRest);
-				ButtonsRest.VSplitLeft(ButtonWidth, &BestButton, &ButtonsRest);
 				ButtonsRest.VSplitLeft(Spacing, nullptr, &ButtonsRest);
 				SaikoButton = ButtonsRest;
 				FastButton.HMargin(2.0f, &FastButton);
-				BestButton.HMargin(2.0f, &BestButton);
 				SaikoButton.HMargin(2.0f, &SaikoButton);
 				const int UiMode = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode);
 				if(DoButton_Menu(&s_FastInputModeFast, Localize("Fast input"), UiMode == 0, &FastButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 					g_Config.m_QmFastInputMode = 0;
-				if(DoButton_Menu(&s_FastInputModeBest, Localize("Best input"), UiMode == 3, &BestButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
-					g_Config.m_QmFastInputMode = 3;
 				if(DoButton_Menu(&s_FastInputModeSaikoPlus, "Saiko+", UiMode == 4, &SaikoButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 					g_Config.m_QmFastInputMode = 4;
 			}
 			if(Render)
 			{
 				const int UiMode = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode);
+				Button = Rows.Next();
 				if(UiMode == 0)
-				{
-					Button = Rows.Next();
 					DoSliderWithScaledValue(&g_Config.m_TcFastInputAmount, &g_Config.m_TcFastInputAmount, &Button, Localize("Amount"), 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
-				}
-				else if(UiMode == 3)
-				{
-					Button = Rows.Next();
-					DoSliderWithScaledValue(&g_Config.m_QmBestInputOffset, &g_Config.m_QmBestInputOffset, &Button, Localize("Prediction offset"), 0, 1000, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ticks");
-					Button = Rows.Next();
-					DoSliderWithScaledValue(&g_Config.m_QmBestInputSmoothing, &g_Config.m_QmBestInputSmoothing, &Button, Localize("Input smoothing"), 0, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
-					Button = Rows.Next();
-					DoSliderWithScaledValue(&g_Config.m_QmBestInputLatencyComp, &g_Config.m_QmBestInputLatencyComp, &Button, Localize("Latency compensation"), 0, 50, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
-					Button = Rows.Next();
-					DoSliderWithScaledValue(&g_Config.m_QmBestInputInterpolation, &g_Config.m_QmBestInputInterpolation, &Button, Localize("Interpolation"), 1, 3, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "");
-				}
 				else
-				{
-					Button = Rows.Next();
 					DoSliderWithScaledValue(&g_Config.m_QmSaikoPlusAmount, &g_Config.m_QmSaikoPlusAmount, &Button, "Saiko+", 0, 500, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ticks");
-				}
 			}
 			else
 			{
-				const int UiMode = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode);
-				for(int RowIndex = 0; RowIndex < (UiMode == 3 ? 4 : 1); ++RowIndex)
-					Rows.Next();
+				// 模式专属滑块恒为一行，量算路径必须同样吃掉这一行。
+				Rows.Next();
 			}
 			Row = Rows.Next();
 			if(Render)
@@ -2253,8 +2225,6 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView, bool PrewarmOnly)
 				const int UiMode = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode);
 				if(UiMode == 0)
 					DoTClientSettingsButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInputOthers, "tclient-fast-input-others", Localize("Fast input others"), &g_Config.m_TcFastInputOthers, &Row, LineSize);
-				else if(UiMode == 3)
-					DoTClientSettingsButton_CheckBoxAutoVMarginAndSet(&g_Config.m_QmBestInputOthers, "qm-best-input-others", Localize("Best input others"), &g_Config.m_QmBestInputOthers, &Row, LineSize);
 				else
 					DoTClientSettingsButton_CheckBoxAutoVMarginAndSet(&g_Config.m_QmSaikoPlusOthers, "qm-saiko-plus-others", Localize("Saiko+ others"), &g_Config.m_QmSaikoPlusOthers, &Row, LineSize);
 			}
@@ -3784,26 +3754,18 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView, bool PrewarmOnly)
 					Changed = ProcessToggle(Rows.Next(), &g_Config.m_QmAutoMargin) || Changed;
 
 					CUIRect Button = Rows.Next();
-					CUIRect FastButton, BestButton, SaikoButton, ButtonsRest;
+					CUIRect FastButton, SaikoButton, ButtonsRest;
 					const float Spacing = MarginSmall;
-					const float ButtonWidth = (Button.w - Spacing * 2.0f) / 3.0f;
+					const float ButtonWidth = (Button.w - Spacing) / 2.0f;
 					Button.VSplitLeft(ButtonWidth, &FastButton, &ButtonsRest);
-					ButtonsRest.VSplitLeft(Spacing, nullptr, &ButtonsRest);
-					ButtonsRest.VSplitLeft(ButtonWidth, &BestButton, &ButtonsRest);
 					ButtonsRest.VSplitLeft(Spacing, nullptr, &ButtonsRest);
 					SaikoButton = ButtonsRest;
 					FastButton.HMargin(2.0f, &FastButton);
-					BestButton.HMargin(2.0f, &BestButton);
 					SaikoButton.HMargin(2.0f, &SaikoButton);
 					const int UiMode = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode);
 					if(Ui()->DoButtonLogic(&s_FastInputModeFast, UiMode == 0, &FastButton, BUTTONFLAG_LEFT))
 					{
 						g_Config.m_QmFastInputMode = 0;
-						Changed = true;
-					}
-					if(Ui()->DoButtonLogic(&s_FastInputModeBest, UiMode == 3, &BestButton, BUTTONFLAG_LEFT))
-					{
-						g_Config.m_QmFastInputMode = 3;
 						Changed = true;
 					}
 					if(Ui()->DoButtonLogic(&s_FastInputModeSaikoPlus, UiMode == 4, &SaikoButton, BUTTONFLAG_LEFT))
@@ -3813,9 +3775,9 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView, bool PrewarmOnly)
 					}
 
 					const int ActiveMode = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode);
-					for(int RowIndex = 0; RowIndex < (ActiveMode == 3 ? 4 : 1); ++RowIndex)
-						Rows.Next();
-					Changed = ProcessToggle(Rows.Next(), ActiveMode == 0 ? &g_Config.m_TcFastInputOthers : (ActiveMode == 3 ? &g_Config.m_QmBestInputOthers : &g_Config.m_QmSaikoPlusOthers)) || Changed;
+					// 模式专属滑块恒为一行，与实际渲染路径保持一致。
+					Rows.Next();
+					Changed = ProcessToggle(Rows.Next(), ActiveMode == 0 ? &g_Config.m_TcFastInputOthers : &g_Config.m_QmSaikoPlusOthers) || Changed;
 					Changed = ProcessToggle(Rows.Next(), &g_Config.m_ClSubTickAiming) || Changed;
 					return Changed;
 				};

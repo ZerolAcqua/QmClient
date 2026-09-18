@@ -22,6 +22,7 @@
 #include <game/client/animstate.h>
 #include <game/client/components/menus.h>
 #include <game/client/components/qmclient/perf_logging.h>
+#include <game/client/components/qmclient/qm_chat_avatar.h>
 #include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/components/qmclient/settings_resource_preview.h>
 #include <game/client/components/settings_runtime_cache.h>
@@ -680,6 +681,7 @@ void CSkins::CSkinContainer::SetState(EState State, ESettingsResourcePriority Pr
 {
 	const EState OldState = m_State;
 	m_State = State;
+	m_pSkins->m_UnresolvedSkinScanState.OnStateChange(OldState, State);
 	if(State != OldState)
 		m_UnresolvedNotified = false;
 
@@ -1020,6 +1022,15 @@ bool CSkins::PrepareSkinData(const char *pName, CSkinLoadData &Data)
 	return true;
 }
 
+static std::shared_ptr<const QmChatAvatar::SSource> CreateChatAvatarSource(const CImageInfo &Image)
+{
+	auto pSource = std::make_shared<QmChatAvatar::SSource>();
+	constexpr int s_aSprites[] = {SPRITE_TEE_BODY, SPRITE_TEE_BODY_OUTLINE, SPRITE_TEE_FOOT, SPRITE_TEE_FOOT_OUTLINE, SPRITE_TEE_EYE_NORMAL};
+	for(size_t Index = 0; Index < std::size(s_aSprites); ++Index)
+		pSource->m_aSprites[Index] = QmChatAvatar::CopySprite(Image, g_pData->m_aSprites[s_aSprites[Index]]);
+	return pSource;
+}
+
 void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData &Data)
 {
 	const std::chrono::nanoseconds UploadStart = time_get_nanoseconds();
@@ -1047,6 +1058,8 @@ void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData 
 		Skin.m_ColorableSkin.m_aEyes[i] = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + i]);
 	}
 
+	Skin.m_OriginalSkin.m_pChatAvatar = CreateChatAvatarSource(Data.m_Info);
+	Skin.m_ColorableSkin.m_pChatAvatar = CreateChatAvatarSource(Data.m_InfoGrayscale);
 	Skin.m_Metrics = Data.m_Metrics;
 	Skin.m_OriginalSkin.m_pBodyOutline = QmCreateSkinOutline(Data.m_Info, g_pData->m_aSprites[SPRITE_TEE_BODY], g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE], vec2(64, 64));
 	Skin.m_OriginalSkin.m_pFeetOutline = QmCreateSkinOutline(Data.m_Info, g_pData->m_aSprites[SPRITE_TEE_FOOT], g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE], vec2(64, 32));
@@ -1212,6 +1225,8 @@ void CSkins::FinishSkinPreviewUpload(CSkinContainer *pSkinContainer)
 	dbg_assert(SkinIt != m_Skins.end(), "FinishSkinPreviewUpload on skin '%s' which is not in m_Skins", pSkinContainer->Name());
 	const bool BackgroundTracked = SkinIt->second->IsBackgroundTracked();
 	pSkinContainer->m_pSkin->m_Metrics = pSkinContainer->m_SettingsPendingUploadData.m_Metrics;
+	pSkinContainer->m_pSkin->m_OriginalSkin.m_pChatAvatar = CreateChatAvatarSource(pSkinContainer->m_SettingsPendingUploadData.m_Info);
+	pSkinContainer->m_pSkin->m_ColorableSkin.m_pChatAvatar = CreateChatAvatarSource(pSkinContainer->m_SettingsPendingUploadData.m_InfoGrayscale);
 	const CImageInfo &OutlineSource = pSkinContainer->m_SettingsPendingUploadData.m_Info;
 	pSkinContainer->m_pSkin->m_OriginalSkin.m_pBodyOutline = QmCreateSkinOutline(OutlineSource, g_pData->m_aSprites[SPRITE_TEE_BODY], g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE], vec2(64, 64));
 	pSkinContainer->m_pSkin->m_OriginalSkin.m_pFeetOutline = QmCreateSkinOutline(OutlineSource, g_pData->m_aSprites[SPRITE_TEE_FOOT], g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE], vec2(64, 32));
@@ -1302,6 +1317,7 @@ void CSkins::OnShutdown()
 		}
 	}
 	m_Skins.clear();
+	m_UnresolvedSkinScanState = {};
 }
 
 void CSkins::OnUpdate()
@@ -1381,11 +1397,12 @@ void CSkins::PrepareSettingsThroughputForFrame()
 		return;
 	}
 
-	CSkinLoadingStats Stats = LoadingStats();
+	CSkinLoadingStats Stats;
 	int LoadingJobsAwaitingResult = 0;
 	int LoadingJobsReadyForMainThread = 0;
 	for(const auto &[_, pSkinContainer] : m_Skins)
 	{
+		Stats.AddState(pSkinContainer->m_State);
 		if(pSkinContainer->m_State != CSkinContainer::EState::LOADING || pSkinContainer->m_pLoadJob == nullptr)
 			continue;
 		if(!pSkinContainer->m_pLoadJob->Done())
@@ -1835,7 +1852,7 @@ void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)
 
 bool CSkins::ReclaimBackgroundSkinForPriorityRequest(const char *pRequesterName, int CountFuseLimit)
 {
-	if(CountFuseLimit <= 0)
+	if(CountFuseLimit <= 0 || m_SkinsBackgroundList.empty())
 		return false;
 
 	size_t NumPendingLoading = 0;
@@ -1844,7 +1861,8 @@ bool CSkins::ReclaimBackgroundSkinForPriorityRequest(const char *pRequesterName,
 		if(pSkinContainer->m_State == CSkinContainer::EState::PENDING ||
 			pSkinContainer->m_State == CSkinContainer::EState::LOADING)
 		{
-			++NumPendingLoading;
+			if(++NumPendingLoading >= (size_t)CountFuseLimit)
+				break;
 		}
 	}
 	if(NumPendingLoading < (size_t)CountFuseLimit)
@@ -2429,6 +2447,9 @@ void CSkins::Refresh(TSkinLoadedCallback &&SkinLoadedCallback)
 
 void CSkins::CollectUnresolvedSkins()
 {
+	// 先消费标记；本轮回调中新产生的失败仍会触发下一轮检查。
+	if(!m_UnresolvedSkinScanState.Consume())
+		return;
 	// 复制皮肤名：OnSkinUpdate 会重新解析皮肤并可能新建皮肤容器，届时不能继续引用容器自身的数据。
 	// 每个失败状态只通知一次，否则每次皮肤更新都会重复触发回调。
 	for(auto &[_, pSkinContainer] : m_Skins)
@@ -2447,30 +2468,7 @@ CSkins::CSkinLoadingStats CSkins::LoadingStats() const
 	CSkinLoadingStats Stats;
 	for(const auto &[_, pSkinContainer] : m_Skins)
 	{
-		switch(pSkinContainer->m_State)
-		{
-		case CSkinContainer::EState::UNLOADED:
-			Stats.m_NumUnloaded++;
-			break;
-		case CSkinContainer::EState::BACKGROUND_REQUESTED:
-			Stats.m_NumBackgroundRequested++;
-			break;
-		case CSkinContainer::EState::PENDING:
-			Stats.m_NumPending++;
-			break;
-		case CSkinContainer::EState::LOADING:
-			Stats.m_NumLoading++;
-			break;
-		case CSkinContainer::EState::LOADED:
-			Stats.m_NumLoaded++;
-			break;
-		case CSkinContainer::EState::ERROR:
-			Stats.m_NumError++;
-			break;
-		case CSkinContainer::EState::NOT_FOUND:
-			Stats.m_NumNotFound++;
-			break;
-		}
+		Stats.AddState(pSkinContainer->m_State);
 	}
 	return Stats;
 }

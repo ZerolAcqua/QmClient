@@ -108,6 +108,18 @@ TEST(MusicLyricsQrc, ParsesRlrcWordTiming)
 	EXPECT_EQ(Timeline.m_vLines[1].m_vWords[3].m_EndMs, 6490);
 }
 
+TEST(MusicLyricsQrc, SelectsPreviousLineDuringInterlude)
+{
+	const char *Rlrc = "[0,1000]第一(0,1000)\n[2000,1000]第二(2000,1000)\n";
+	NeteaseLyrics::STimeline Timeline;
+	std::string Error;
+	ASSERT_TRUE(ParseQrcRlrc(Rlrc, &Timeline, &Error)) << Error;
+	EXPECT_EQ(NeteaseLyrics::SelectCurrentLine(Timeline, 1500).m_Index, -1);
+	const NeteaseLyrics::SSelectedLine Selected = NeteaseLyrics::SelectLatestStartedLine(Timeline, 1500);
+	EXPECT_EQ(Selected.m_Index, 0);
+	EXPECT_FALSE(Selected.m_InTimedRange);
+}
+
 TEST(MusicLyricsQrc, RoundTripsFixedVectorThroughDataEntry)
 {
 	const std::vector<uint8_t> Data = FromHex(ENCRYPTED_RLRC_HEX);

@@ -13,9 +13,9 @@
 
 #include <game/client/component.h>
 
+#include <deque>
 #include <memory>
 #include <mutex>
-#include <deque>
 #include <string>
 #include <vector>
 
@@ -81,6 +81,7 @@ private:
 	std::shared_ptr<CHttpRequest> m_pQmDdnetPlayerTask = nullptr;
 	std::shared_ptr<IJob> m_pQmDdnetPlayerParseJob = nullptr;
 	std::shared_ptr<CHttpRequest> m_pQmNewsPublishTask = nullptr;
+	std::shared_ptr<CHttpRequest> m_pQmSponsorsPublishTask = nullptr;
 
 	char m_aQmClientMachineHash[SHA256_MAXSTRSIZE] = "";
 	char m_aQmClientLifecycleSessionId[64] = "";
@@ -102,6 +103,18 @@ private:
 	void SaveQmNewsCache();
 	void ApplyQmNewsPayload(const char *pBody, size_t BodySize);
 	void FinishQmNewsPublish();
+
+	// 赞助名单使用独立草稿与缓存；展示姓名和人数取自同一份 Markdown。
+	std::string m_QmSponsorsMarkdown;
+	std::string m_QmSponsorsDraft;
+	std::vector<std::string> m_vQmSponsorNames;
+	EQmNewsStatus m_QmSponsorsStatus = EQmNewsStatus::IDLE;
+	int m_QmSponsorsVersion = -1;
+	int m_QmSponsorsRevision = 0;
+	void InitQmSponsors();
+	void SaveQmSponsorsCache();
+	bool ApplyQmSponsorsPayload(const json_value *pPayload, bool SaveCache);
+	void FinishQmSponsorsPublish();
 
 	// 自有服务专用 WS 通道；断线只重连，不回退 HTTP。
 	std::unique_ptr<IQmWebSocketClient> m_pQmRealtime;
@@ -145,14 +158,12 @@ private:
 	int64_t m_QmClientMarkerLastFlushTick = 0;
 	int64_t m_QmDdnetPlayerLastSync = 0;
 	int64_t m_QmDdnetPlayerNextRetry = 0;
-	int m_QmClientOnlineUserCount = 0;
-	int m_QmClientOnlineDummyCount = 0;
 	int m_QmDdnetTotalFinishes = -1;
 	bool m_QmClientDistributionSuccessLatched = false;
 	bool m_QmClientShutdownReported = false;
 	bool m_QmClientAwaitingRecoveryStop = false;
 	bool m_QmClientStartupSent = false;
-	std::vector<SQmClientServerDistribution> m_vQmClientServerDistribution;
+	SQmClientDistributionSnapshot m_QmClientDistribution;
 
 	void InitQmClientLifecycle();
 	void UpdateQmClientLifecycleAndServerTime();
@@ -165,7 +176,6 @@ private:
 	void UpdateQmClientRecognition();
 	void FinishQmClientUsers();
 	bool EnsureQmClientMachineHash();
-	void ClearQmClientServerDistribution();
 	void InitQmDeveloperAuthentication();
 	void ApplyQmRealtimeDevelopers(const json_value *pPayload);
 
@@ -201,9 +211,10 @@ public:
 	int64_t QmServerSessionStartTime() const { return m_QmClientServerSessionStart; }
 	bool HasQmServerPlaytime() const { return m_QmClientServerPlaytimeSeconds >= 0; }
 	int64_t QmServerPlaytimeSeconds() const { return m_QmClientServerPlaytimeSeconds; }
-	const std::vector<SQmClientServerDistribution> &QmClientServerDistribution() const { return m_vQmClientServerDistribution; }
-	int QmClientOnlineUserCount() const { return m_QmClientOnlineUserCount; }
-	int QmClientOnlineDummyCount() const { return m_QmClientOnlineDummyCount; }
+	const std::vector<SQmClientServerDistribution> &QmClientServerDistribution() const { return m_QmClientDistribution.m_vServers; }
+	int QmClientOnlineUserCount() const { return m_QmClientDistribution.m_OnlineUserCount; }
+	int QmClientOnlineDummyCount() const { return m_QmClientDistribution.m_OnlineDummyCount; }
+	bool QmClientDistributionSyncing() const;
 	int QmDdnetTotalFinishes() const { return m_QmDdnetTotalFinishes; }
 	const char *QmDdnetFavoritePartner() const { return m_aQmDdnetFavoritePartner; }
 
@@ -218,6 +229,15 @@ public:
 	void QmNewsRefresh(bool Force);
 	void QmNewsPublishDraft();
 	void QmNewsReloadDraft();
+
+	const std::vector<std::string> &QmSponsorNames() const { return m_vQmSponsorNames; }
+	const char *QmSponsorsDraft() const { return m_QmSponsorsDraft.c_str(); }
+	EQmNewsStatus QmSponsorsStatus() const { return m_QmSponsorsStatus; }
+	int QmSponsorsRevision() const { return m_QmSponsorsRevision; }
+	bool QmSponsorsPublishing() const { return m_pQmSponsorsPublishTask != nullptr; }
+	void QmSponsorsRefresh();
+	void QmSponsorsReloadDraft();
+	void QmSponsorsPublishDraft();
 
 	// 实时通道状态（供设置界面与诊断使用）。
 	bool QmRealtimeAvailable() const { return m_pQmRealtime != nullptr && m_pQmRealtime->Available(); }

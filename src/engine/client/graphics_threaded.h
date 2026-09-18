@@ -1193,7 +1193,7 @@ public:
 
 	IGraphics::CTextureHandle FindFreeTextureIndex();
 	void BumpTextureHandleEpochAndResetSlots();
-	bool IsTextureHandleAllocated(CTextureHandle TextureId) const;
+	bool IsTextureHandleAllocated(CTextureHandle TextureId) const override;
 	void FreeTextureIndex(CTextureHandle *pIndex);
 	// 显卡设备重建会清空 m_vQuadContainers，旧索引随之失效；
 	// 所有按索引取用容器的入口都必须先过这一层校验。

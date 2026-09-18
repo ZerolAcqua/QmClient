@@ -126,7 +126,7 @@ float CUiV2AnimationRuntime::TrackProgress(const SActiveTrack &Track) const
 	const float Delay = std::max(0.0f, Track.m_Transition.m_DelaySec);
 	const float LocalElapsed = std::max(0.0f, Track.m_ElapsedSec - Delay);
 	if(Duration <= 0.0f)
-		return LocalElapsed > 0.0f ? 1.0f : 0.0f;
+		return Track.m_ElapsedSec >= Delay ? 1.0f : 0.0f;
 	return std::clamp(LocalElapsed / Duration, 0.0f, 1.0f);
 }
 
@@ -507,56 +507,68 @@ void CUiV2AnimationRuntime::AdvanceSpring(SActiveTrack &Track, float Dt) const
 
 void CUiV2AnimationRuntime::Advance(float Dt)
 {
-	if(Dt <= 0.0f)
+	if(!std::isfinite(Dt) || Dt <= 0.0f)
 		return;
-	const float ClampedDt = std::min(Dt, 1.0f / 15.0f);
-	m_TimeSec += ClampedDt;
+	m_TimeSec += Dt;
 
 	constexpr float KSpringRestHoldSec = 0.033f;
-
-	std::deque<STrackKey> vCompleted;
-	for(auto &Pair : m_ActiveTracks)
-	{
-		const STrackKey &Key = Pair.first;
-		SActiveTrack &Track = Pair.second;
-		Track.m_ElapsedSec += ClampedDt;
-
+	const auto AdvanceTrack = [&](const STrackKey &Key, SActiveTrack &Track, float Elapsed, float &Remaining) {
+		Remaining = 0.0f;
+		Track.m_ElapsedSec += Elapsed;
+		const float Delay = std::max(0.0f, Track.m_Transition.m_DelaySec);
 		if(Track.m_Transition.m_Driver == EUiAnimDriver::SPRING)
 		{
-			AdvanceSpring(Track, ClampedDt);
-			if(Track.m_RestTimerSec >= KSpringRestHoldSec)
-			{
-				Track.m_Current = Track.m_Target;
-				Track.m_Velocity = 0.0f;
-				m_Values[Key] = Track.m_Current;
-				vCompleted.push_back(Key);
-			}
-			else
-			{
-				m_Values[Key] = Track.m_Current;
-			}
-		}
-		else
-		{
-			const float Previous = Track.m_Current;
-			const float RawProgress = TrackProgress(Track);
-			const float Progress = ApplyTrackEasing(RawProgress, Track);
-			Track.m_Current = Track.m_Start + (Track.m_Target - Track.m_Start) * Progress;
-			// 有限差分速度：供打断时做 tween→弹簧接管的初速度（速度继承）。
-			if(ClampedDt > 0.0f)
-				Track.m_Velocity = (Track.m_Current - Previous) / ClampedDt;
+			// 跨过延迟边界时只积分真正开始运动后的时间，长帧也不丢弃经过时间。
+			const float ActiveDt = std::min(Elapsed, std::max(0.0f, Track.m_ElapsedSec - Delay));
+			if(ActiveDt > 0.0f)
+				AdvanceSpring(Track, ActiveDt);
 			m_Values[Key] = Track.m_Current;
-
-			if(RawProgress >= 1.0f)
-				vCompleted.push_back(Key);
+			return Track.m_RestTimerSec >= KSpringRestHoldSec;
 		}
+
+		const float Previous = Track.m_Current;
+		const float RawProgress = TrackProgress(Track);
+		const float Progress = ApplyTrackEasing(RawProgress, Track);
+		Track.m_Current = Track.m_Start + (Track.m_Target - Track.m_Start) * Progress;
+		// 有限差分速度用于被打断后的弹簧接续。
+		Track.m_Velocity = (Track.m_Current - Previous) / Elapsed;
+		m_Values[Key] = Track.m_Current;
+		if(RawProgress < 1.0f)
+			return false;
+		// 固定时长轨道可精确交接剩余时间；后续轨道仍保留自己的延迟。
+		Remaining = std::max(0.0f, Track.m_ElapsedSec - Delay - Track.m_Transition.m_DurationSec);
+		return true;
+	};
+
+	struct SCompletedTrack
+	{
+		STrackKey m_Key;
+		float m_Remaining;
+	};
+	std::deque<SCompletedTrack> vCompleted;
+	for(auto &[Key, Track] : m_ActiveTracks)
+	{
+		float Remaining;
+		if(AdvanceTrack(Key, Track, Dt, Remaining))
+			vCompleted.push_back({Key, Remaining});
 	}
 
-	for(const STrackKey &Key : vCompleted)
+	for(const SCompletedTrack &Completed : vCompleted)
 	{
-		auto ItTrack = m_ActiveTracks.find(Key);
-		if(ItTrack != m_ActiveTracks.end())
-			CompleteTrack(Key, ItTrack->second);
+		float Remaining = Completed.m_Remaining;
+		auto ItTrack = m_ActiveTracks.find(Completed.m_Key);
+		while(ItTrack != m_ActiveTracks.end())
+		{
+			CompleteTrack(Completed.m_Key, ItTrack->second);
+			if(Remaining <= 0.0f)
+				break;
+			ItTrack = m_ActiveTracks.find(Completed.m_Key);
+			if(ItTrack == m_ActiveTracks.end())
+				break;
+			const float Elapsed = Remaining;
+			if(!AdvanceTrack(Completed.m_Key, ItTrack->second, Elapsed, Remaining))
+				break;
+		}
 	}
 }
 

@@ -37,8 +37,6 @@ struct SQmClientServerDistribution
 struct SQmClientRecognitionMark
 {
 	std::string m_Name;
-	bool m_FootParticlesEnabled = false;
-	bool m_RemoteParticlesEnabled = false;
 	bool m_VoiceSupported = false;
 	EClientBrand m_ClientBrand = EClientBrand::QM;
 	std::string m_Qid;
@@ -54,6 +52,18 @@ struct SQmClientUsersParseResult
 };
 
 bool ParseQmClientUsersJson(const json_value *pRoot, const char *pServerAddress, SQmClientUsersParseResult &OutResult);
+
+// 分布列表保留最近一次有效快照；租约只决定同步提示，不删除展示数据。
+struct SQmClientDistributionSnapshot
+{
+	std::vector<SQmClientServerDistribution> m_vServers;
+	int m_OnlineUserCount = 0;
+	int m_OnlineDummyCount = 0;
+	int64_t m_ExpireTick = 0;
+
+	bool Apply(SQmClientUsersParseResult &Result, int64_t ExpireTick);
+	bool IsStale(int64_t NowTick) const { return m_ExpireTick > 0 && NowTick >= m_ExpireTick; }
+};
 
 enum class EQmDeveloperBadgeStyle
 {

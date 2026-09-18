@@ -39,6 +39,7 @@
 #include <game/client/components/qmclient/settings_resource_preview.h>
 #include <game/client/components/qmclient/tee_color_code.h>
 #include <game/client/components/qmclient/tee_hue_cycle.h>
+#include <game/client/components/qmclient/tee_skin_apply.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>
 #include <game/client/skin.h>
@@ -2616,6 +2617,33 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		int RowsIterated = 0;
 		int RowsRendered = 0;
 		const bool ShowSkinMetadata = g_Config.m_QmSkinShowMetadata != 0;
+		// 单击与双击共用同一份「应用皮肤」赋值路径：先写当前子标签的编辑对象，再按目标角色决定是否改写另一侧。
+		const auto ApplySkinListEntry = [&](const CSkins::CSkinListEntry &Entry, const ETeeSkinApplyTarget Target, const bool ScrollToSelected) {
+			if(Entry.SkinContainer() == nullptr)
+				return;
+			const bool HasColorKey = Entry.ColorKey().has_value();
+			const bool EntryUseCustomColor = HasColorKey ? Entry.ColorKey()->m_UseCustomColor : *pUseCustomColor != 0;
+			const int EntryColorBody = HasColorKey ? Entry.ColorKey()->m_ColorBody : (int)*pColorBody;
+			const int EntryColorFeet = HasColorKey ? Entry.ColorKey()->m_ColorFeet : (int)*pColorFeet;
+			// 复用单击路径：当前子标签的字段直接用指针写入。
+			str_copy(pSkinName, Entry.SkinContainer()->Name(), SkinNameSize);
+			if(HasColorKey)
+			{
+				*pUseCustomColor = EntryUseCustomColor ? 1 : 0;
+				if(EntryUseCustomColor)
+				{
+					*pColorBody = EntryColorBody;
+					*pColorFeet = EntryColorFeet;
+				}
+			}
+			// 双击指定另一侧时，用同一套语义把该皮肤写到目标角色。
+			if(QmTeeSkinApplyTargetDummy(Target) != (m_Dummy ? 1 : 0))
+				QmApplyTeeSkinToTarget(g_Config, Target, Entry.SkinContainer()->Name(), HasColorKey, EntryUseCustomColor, EntryColorBody, EntryColorFeet);
+			SkinList.ForceRefresh();
+			SetNeedSendInfo();
+			if(ScrollToSelected)
+				m_SkinListScrollToSelected = true;
+		};
 		auto DoButtonSkinQueue = [&](const void *pButtonId, const void *pParentId, bool InQueue, bool Disabled, const CUIRect *pRect) {
 			if(InQueue || (pParentId != nullptr && Ui()->HotItem() == pParentId) || Ui()->HotItem() == pButtonId)
 			{
@@ -2842,6 +2870,19 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 			}
 
 			RenderSkinStatus(Item.m_Rect, pSkinContainer, SkinListEntry.ErrorTooltipId(), PreviewCacheReady);
+			// 双击应用：DoButtonLogic 用左|右键一次拿到按键序号（1=左键，2=右键），
+			// DoDoubleClickLogic 是有状态的双击检测，必须点击门控且每帧每项只调用一次。
+			const int ItemButton = Ui()->DoButtonLogic(SkinListEntry.ListItemId(), 0, &Item.m_Rect, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
+			if(ItemButton != 0 && Ui()->DoDoubleClickLogic(SkinListEntry.ListItemId()))
+			{
+				const ETeeSkinApplyTarget Target = QmTeeSkinApplyTargetForButton(ItemButton);
+				ApplySkinListEntry(SkinListEntry, Target, QmTeeSkinApplyTargetDummy(Target) != (m_Dummy ? 1 : 0));
+			}
+			if(ItemButton != 0)
+			{
+				Ui()->RegisterPassiveHotItem(SkinListEntry.ListItemId(), &Item.m_Rect);
+				GameClient()->m_Tooltips.DoToolTip(SkinListEntry.ListItemId(), &Item.m_Rect, Localize("Double-click: left applies to main, right applies to dummy"));
+			}
 		}
 		const int TailItems = (int)vSkinList.size() - VisibleRange.m_EndItem;
 		if(TailItems > 0)
@@ -3238,21 +3279,9 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		{
 			if(NewSelected >= 0 && NewSelected < (int)vSkinList.size())
 			{
-				const CSkins::CSkinListEntry &SelectedSkinEntry = vSkinList[NewSelected];
 				gs_TeeSettingsPageState.m_SelectedIndex = NewSelected;
-				str_copy(pSkinName, SelectedSkinEntry.SkinContainer()->Name(), SkinNameSize);
-				if(SelectedSkinEntry.ColorKey().has_value())
-				{
-					const auto &SelectedColorKey = SelectedSkinEntry.ColorKey().value();
-					*pUseCustomColor = SelectedColorKey.m_UseCustomColor ? 1 : 0;
-					if(SelectedColorKey.m_UseCustomColor)
-					{
-						*pColorBody = SelectedColorKey.m_ColorBody;
-						*pColorFeet = SelectedColorKey.m_ColorFeet;
-					}
-				}
-				SkinList.ForceRefresh();
-				SetNeedSendInfo();
+				// 单击语义不变：只改当前 Player/Dummy 子标签的编辑对象。
+				ApplySkinListEntry(vSkinList[NewSelected], m_Dummy ? ETeeSkinApplyTarget::DUMMY : ETeeSkinApplyTarget::MAIN, false);
 			}
 		}
 

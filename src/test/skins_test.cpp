@@ -4,6 +4,7 @@
 #include <generated/client_data.h>
 
 #include <game/client/animstate.h>
+#include <game/client/components/qmclient/qm_chat_avatar.h>
 #include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/components/skins.h>
 #include <game/client/render.h>
@@ -272,6 +273,68 @@ TEST(Skins, UnresolvedSkinStatesAreOnlyMissingOrFailed)
 	EXPECT_FALSE(CSkins::CSkinContainer::IsUnresolved(EState::LOADED));
 }
 
+TEST(Skins, UnresolvedScanCoalescesNewFailuresAndSkipsStableStates)
+{
+	using EState = CSkins::CSkinContainer::EState;
+	CSkins::CUnresolvedSkinScanState Scan;
+	EXPECT_FALSE(Scan.Consume());
+	for(const EState State : {EState::UNLOADED, EState::BACKGROUND_REQUESTED, EState::PENDING, EState::LOADING, EState::LOADED})
+	{
+		Scan.OnStateChange(EState::ERROR, State);
+		EXPECT_FALSE(Scan.Consume());
+	}
+
+	Scan.OnStateChange(EState::LOADING, EState::ERROR);
+	Scan.OnStateChange(EState::LOADING, EState::NOT_FOUND);
+	EXPECT_TRUE(Scan.Consume());
+	EXPECT_FALSE(Scan.Consume());
+	Scan.OnStateChange(EState::ERROR, EState::ERROR);
+	Scan.OnStateChange(EState::NOT_FOUND, EState::NOT_FOUND);
+	EXPECT_FALSE(Scan.Consume());
+	Scan.OnStateChange(EState::ERROR, EState::NOT_FOUND);
+	EXPECT_TRUE(Scan.Consume());
+}
+
+TEST(Skins, UnresolvedScanPreservesPendingWorkAcrossRecoveryAndNewCallbackFailures)
+{
+	using EState = CSkins::CSkinContainer::EState;
+	CSkins::CUnresolvedSkinScanState Scan;
+	Scan.OnStateChange(EState::LOADING, EState::ERROR);
+	Scan.OnStateChange(EState::ERROR, EState::PENDING);
+	EXPECT_TRUE(Scan.Consume());
+	EXPECT_FALSE(Scan.Consume());
+
+	Scan.OnStateChange(EState::PENDING, EState::LOADING);
+	Scan.OnStateChange(EState::LOADING, EState::ERROR);
+	EXPECT_TRUE(Scan.Consume());
+	Scan.OnStateChange(EState::UNLOADED, EState::NOT_FOUND);
+	EXPECT_TRUE(Scan.Consume());
+	EXPECT_FALSE(Scan.Consume());
+
+	Scan.OnStateChange(EState::LOADING, EState::ERROR);
+	Scan = {};
+	EXPECT_FALSE(Scan.Consume());
+	Scan.OnStateChange(EState::UNLOADED, EState::NOT_FOUND);
+	EXPECT_TRUE(Scan.Consume());
+}
+
+TEST(Skins, UnresolvedScanIsConsumedBeforeCollectionAndCallbacksKeepTheirOrder)
+{
+	const std::string Source = ReadTestSourceFile("src/game/client/components/skins.cpp");
+	const std::string Collect = FunctionBody(Source, "void CSkins::CollectUnresolvedSkins()");
+	const size_t Guard = Collect.find("if(!m_UnresolvedSkinScanState.Consume())");
+	const size_t Loop = Collect.find("for(auto &[_, pSkinContainer] : m_Skins)");
+	ASSERT_NE(Guard, std::string::npos);
+	ASSERT_NE(Loop, std::string::npos);
+	EXPECT_LT(Guard, Loop);
+	const std::string Update = FunctionBody(Source, "void CSkins::OnUpdate()");
+	EXPECT_LT(Update.find("CollectUnresolvedSkins();"), Update.find("for(const std::string &SkinName : m_vSkinsUnresolvedThisFrame)"));
+	const std::string SetState = FunctionBody(Source, "void CSkins::CSkinContainer::SetState(EState State, ESettingsResourcePriority Priority)");
+	EXPECT_NE(SetState.find("m_pSkins->m_UnresolvedSkinScanState.OnStateChange(OldState, State);"), std::string::npos);
+	const std::string Shutdown = FunctionBody(Source, "void CSkins::OnShutdown()");
+	EXPECT_NE(Shutdown.find("m_UnresolvedSkinScanState = {};"), std::string::npos);
+}
+
 TEST(Skins, UnknownSkinNameFallsBackToDefaultSkinOnlyWhenUnresolvable)
 {
 	const std::string GameClientSource = ReadTestSourceFile("src/game/client/gameclient.cpp");
@@ -392,6 +455,28 @@ TEST(Skins, LoadingStatsRealInflightExcludesBackgroundRequested)
 	EXPECT_EQ(Stats.RealInflight(), 18u);
 	EXPECT_FALSE(Stats.AdmissionInvariantViolated(18));
 	EXPECT_TRUE(Stats.AdmissionInvariantViolated(17));
+}
+
+TEST(Skins, LoadingStatsAccumulateMixedStatesWithoutInflatingAdmissionPressure)
+{
+	using EState = CSkins::CSkinContainer::EState;
+	CSkins::CSkinLoadingStats Stats;
+	for(const EState State : {EState::UNLOADED, EState::BACKGROUND_REQUESTED, EState::BACKGROUND_REQUESTED,
+		    EState::PENDING, EState::LOADING, EState::LOADING, EState::LOADED, EState::ERROR, EState::NOT_FOUND})
+	{
+		Stats.AddState(State);
+	}
+
+	EXPECT_EQ(Stats.m_NumUnloaded, 1u);
+	EXPECT_EQ(Stats.m_NumBackgroundRequested, 2u);
+	EXPECT_EQ(Stats.m_NumPending, 1u);
+	EXPECT_EQ(Stats.m_NumLoading, 2u);
+	EXPECT_EQ(Stats.m_NumLoaded, 1u);
+	EXPECT_EQ(Stats.m_NumError, 1u);
+	EXPECT_EQ(Stats.m_NumNotFound, 1u);
+	EXPECT_EQ(Stats.RealInflight(), 3u);
+	EXPECT_FALSE(Stats.AdmissionInvariantViolated(3));
+	EXPECT_TRUE(Stats.AdmissionInvariantViolated(2));
 }
 
 TEST(Skins, TeeBackgroundRequestsWaitForAdmissionBeforePending)
@@ -719,6 +804,26 @@ TEST(Skins, SettingsAssetsListVirtualizationKeepsTotalListLength)
 	EXPECT_EQ(WorkshopListBody.find("for(size_t ListIndex = 0; ListIndex < CombinedCount; ++ListIndex)"), std::string::npos);
 }
 
+TEST(Skins, BackgroundReclaimSkipsEmptyQueuesAndStopsCountingAtTheFuse)
+{
+	const std::string Source = ReadTestSourceFile("src/game/client/components/skins.cpp");
+	const std::string Body = FunctionBody(Source, "bool CSkins::ReclaimBackgroundSkinForPriorityRequest");
+	const size_t EmptyGuard = Body.find("CountFuseLimit <= 0 || m_SkinsBackgroundList.empty()");
+	const size_t CountLoop = Body.find("for(const auto &[_, pSkinContainer] : m_Skins)");
+	const size_t StopCounting = Body.find("if(++NumPendingLoading >= (size_t)CountFuseLimit)");
+	const size_t StopBreak = Body.find("break;", StopCounting);
+	const size_t BelowFuse = Body.find("if(NumPendingLoading < (size_t)CountFuseLimit)");
+	ASSERT_NE(EmptyGuard, std::string::npos);
+	ASSERT_NE(CountLoop, std::string::npos);
+	ASSERT_NE(StopCounting, std::string::npos);
+	ASSERT_NE(StopBreak, std::string::npos);
+	ASSERT_NE(BelowFuse, std::string::npos);
+	EXPECT_LT(EmptyGuard, CountLoop);
+	EXPECT_LT(CountLoop, StopCounting);
+	EXPECT_LT(StopCounting, StopBreak);
+	EXPECT_LT(StopBreak, BelowFuse);
+}
+
 TEST(Skins, TeePriorityRequestsReclaimBackgroundRequestedBeforeAdmittedBackgroundWork)
 {
 	std::ifstream File(TestSourcePath("src/game/client/components/skins.cpp"));
@@ -983,6 +1088,74 @@ TEST(Skins, UnloadedSkinTexturesInvalidateDependentRenderInfos)
 	EXPECT_NE(OnUpdateBody.find("m_vSkinsTexturesUnloadedThisFrame.clear();"), std::string::npos);
 }
 
+TEST(Skins, StaleTeeHandlesAreRepairedAndNeverDrawn)
+{
+	// 昨天那轮修复只堵了「6.x 皮肤贴图被卸载」这一条通知路径；只要还有一条路径漏通知，
+	// 引用失效句柄的渲染信息就会一直把 Tee 画成没有贴图的实心白块（世界里也一样），
+	// 直到那个玩家换皮肤。这一轮补上「句柄存活查询 + 绘制期兜底 + 每帧自愈」。
+	EXPECT_FALSE(CTeeRenderInfo::IsLiveDrawableTextureState(false, false, false));
+	EXPECT_FALSE(CTeeRenderInfo::IsLiveDrawableTextureState(true, true, true));
+	EXPECT_FALSE(CTeeRenderInfo::IsLiveDrawableTextureState(true, false, false));
+	EXPECT_TRUE(CTeeRenderInfo::IsLiveDrawableTextureState(true, false, true));
+
+	const std::string GraphicsHeader = ReadTestSourceFile("src/engine/graphics.h");
+	const std::string ThreadedHeader = ReadTestSourceFile("src/engine/client/graphics_threaded.h");
+	EXPECT_NE(GraphicsHeader.find("virtual bool IsTextureHandleAllocated(CTextureHandle Handle) const = 0;"), std::string::npos);
+	EXPECT_NE(ThreadedHeader.find("bool IsTextureHandleAllocated(CTextureHandle TextureId) const override;"), std::string::npos);
+
+	const std::string RenderHeader = ReadTestSourceFile("src/game/client/render.h");
+	EXPECT_NE(RenderHeader.find("static bool IsLiveDrawableTextureState(const bool IsValid, const bool IsNullTexture, const bool IsAllocated)"), std::string::npos);
+	EXPECT_NE(RenderHeader.find("static bool IsLiveDrawableTexture(const IGraphics *pGraphics, const IGraphics::CTextureHandle &Texture)"), std::string::npos);
+	EXPECT_NE(RenderHeader.find("bool HasStaleTexture(const IGraphics *pGraphics) const;"), std::string::npos);
+
+	const std::string RenderSource = ReadTestSourceFile("src/game/client/render.cpp");
+	const std::string HasStaleBody = FunctionBody(RenderSource, "bool CTeeRenderInfo::HasStaleTexture(const IGraphics *pGraphics) const");
+	ASSERT_FALSE(HasStaleBody.empty());
+	EXPECT_NE(HasStaleBody.find("!pGraphics->IsTextureHandleAllocated(Texture)"), std::string::npos);
+	EXPECT_NE(HasStaleBody.find("HasStaleSkinTextures(m_OriginalRenderSkin) || HasStaleSkinTextures(m_ColorableRenderSkin)"), std::string::npos);
+	EXPECT_NE(HasStaleBody.find("Sixup.m_aOriginalTextures"), std::string::npos);
+	EXPECT_NE(HasStaleBody.find("Sixup.m_aColorableTextures"), std::string::npos);
+	// 绘制期不能再出现不查存活状态的 bare 判据，否则失效句柄照样会被画成实心块。
+	for(const char *pSignature : {
+		    "void CRenderTools::RenderTee(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, int Emote, vec2 Dir, vec2 Pos, float Alpha, vec2 BodyScale",
+		    "void CRenderTools::RenderTee7(",
+		    "void CRenderTools::RenderTee6("})
+	{
+		const std::string Body = FunctionBody(RenderSource, pSignature);
+		ASSERT_FALSE(Body.empty()) << pSignature;
+		EXPECT_EQ(Body.find("CTeeRenderInfo::IsDrawableTexture("), std::string::npos) << pSignature;
+		EXPECT_NE(Body.find("IsDrawableTextureAlive(Graphics()"), std::string::npos) << pSignature;
+	}
+
+	// 轮廓贴图自己按需重建，失效时当作需要重建而不是直接画。
+	const std::string OutlineHeader = ReadTestSourceFile("src/game/client/components/qmclient/qm_skin_outline.h");
+	EXPECT_NE(OutlineHeader.find("|| !pGraphics->IsTextureHandleAllocated(m_Texture))"), std::string::npos);
+	EXPECT_NE(OutlineHeader.find("m_Texture.IsNullTexture() || !pGraphics->IsTextureHandleAllocated(m_Texture)"), std::string::npos);
+
+	const std::string GameClientSource = ReadTestSourceFile("src/game/client/gameclient.cpp");
+	const std::string GameClientHeader = ReadTestSourceFile("src/game/client/gameclient.h");
+	EXPECT_NE(GameClientHeader.find("void RepairStaleTeeRenderInfos();"), std::string::npos);
+	// 复用旧渲染信息之前必须先确认里面的句柄还活着。
+	const std::string UpdateRenderInfoBody = FunctionBody(GameClientSource, "void CGameClient::CClientData::UpdateRenderInfo()");
+	ASSERT_FALSE(UpdateRenderInfoBody.empty());
+	const size_t AlivePos = UpdateRenderInfoBody.find("const bool PreviousRenderInfoAlive = !m_RenderInfo.HasStaleTexture(");
+	ASSERT_NE(AlivePos, std::string::npos);
+	const size_t ReusePos = UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousRenderInfoAlive && PreviousSixSkinResident)");
+	ASSERT_NE(ReusePos, std::string::npos);
+	EXPECT_LT(AlivePos, ReusePos);
+
+	// 每帧自愈：托管渲染信息与客户端副本都要重新解析，避免白块一直存在。
+	const std::string RepairBody = FunctionBody(GameClientSource, "void CGameClient::RepairStaleTeeRenderInfos()");
+	ASSERT_FALSE(RepairBody.empty());
+	EXPECT_NE(RepairBody.find("if(!pManagedTeeRenderInfo->TeeRenderInfo().HasStaleTexture(pGraphics))"), std::string::npos);
+	EXPECT_NE(RepairBody.find("RefreshSkin(pManagedTeeRenderInfo);"), std::string::npos);
+	EXPECT_NE(RepairBody.find("if(!ClientData.m_RenderInfo.HasStaleTexture(pGraphics))"), std::string::npos);
+	EXPECT_NE(RepairBody.find("ClientData.UpdateRenderInfo();"), std::string::npos);
+	const std::string OnUpdateBody = FunctionBody(GameClientSource, "void CGameClient::OnUpdate()");
+	ASSERT_FALSE(OnUpdateBody.empty());
+	EXPECT_NE(OnUpdateBody.find("RepairStaleTeeRenderInfos();"), std::string::npos);
+}
+
 TEST(Skins, DefaultFallbackNeverAppliesTheUntexturedPlaceholder)
 {
 	EXPECT_FALSE(CTeeRenderInfo::IsDrawableTextureState(false, false));
@@ -1011,7 +1184,7 @@ TEST(Skins, DefaultFallbackNeverAppliesTheUntexturedPlaceholder)
 	ASSERT_FALSE(RenderTeeBody.empty());
 	EXPECT_NE(RenderTeeBody.find("const bool SixupBodyValid"), std::string::npos);
 	EXPECT_NE(RenderTeeBody.find("const bool SixBodyValid"), std::string::npos);
-	EXPECT_NE(RenderTeeBody.find("CTeeRenderInfo::IsDrawableTexture"), std::string::npos);
+	EXPECT_NE(RenderTeeBody.find("CTeeRenderInfo::IsLiveDrawableTexture"), std::string::npos);
 	EXPECT_NE(RenderTeeBody.find("else if(SixBodyValid)"), std::string::npos);
 	EXPECT_EQ(RenderTeeBody.find("else\n\t\treturn;"), std::string::npos);
 	EXPECT_LT(RenderTeeBody.find("else if(SixBodyValid)"), RenderTeeBody.find("Graphics()->SetColor(1.f, 1.f, 1.f, 1.f);"));
@@ -1019,10 +1192,10 @@ TEST(Skins, DefaultFallbackNeverAppliesTheUntexturedPlaceholder)
 	EXPECT_NE(RenderHeader.find("return IsValid && !IsNullTexture;"), std::string::npos);
 	const std::string RenderTee7Body = FunctionBody(RenderSource, "void CRenderTools::RenderTee7(");
 	ASSERT_FALSE(RenderTee7Body.empty());
-	EXPECT_NE(RenderTee7Body.find("IsDrawableTexture(EyesTexture)"), std::string::npos);
+	EXPECT_NE(RenderTee7Body.find("IsDrawableTextureAlive(Graphics(), EyesTexture)"), std::string::npos);
 	const std::string RenderTee6Body = FunctionBody(RenderSource, "void CRenderTools::RenderTee6(");
 	ASSERT_FALSE(RenderTee6Body.empty());
-	EXPECT_NE(RenderTee6Body.find("if(!CTeeRenderInfo::IsDrawableTexture(*pFeetTexture))"), std::string::npos);
+	EXPECT_NE(RenderTee6Body.find("if(!IsDrawableTextureAlive(Graphics(), *pFeetTexture))"), std::string::npos);
 	EXPECT_NE(RenderTee6Body.find("m_Skins.FindOrNullptr(g_Config.m_TcWhiteFeetSkin)"), std::string::npos);
 	EXPECT_EQ(RenderTee6Body.find("m_Skins.Find(g_Config.m_TcWhiteFeetSkin)"), std::string::npos);
 }
@@ -1170,9 +1343,9 @@ TEST(Skins, HandRenderingNeverBindsNullOrIncompleteTextureSets)
 	ASSERT_NE(RenderHandPos, std::string::npos);
 	ASSERT_NE(RenderHand7Pos, std::string::npos);
 	const std::string RenderHandBody = Source.substr(RenderHandPos, RenderHand7Pos - RenderHandPos);
-	EXPECT_NE(RenderHandBody.find("CTeeRenderInfo::IsDrawableTexture(pInfo->m_aSixup"), std::string::npos);
-	EXPECT_NE(RenderHandBody.find("CTeeRenderInfo::IsDrawableTexture(SkinTextures.m_HandsOutline)"), std::string::npos);
-	EXPECT_NE(RenderHandBody.find("CTeeRenderInfo::IsDrawableTexture(SkinTextures.m_Hands)"), std::string::npos);
+	EXPECT_NE(RenderHandBody.find("CTeeRenderInfo::IsLiveDrawableTexture(Graphics(), pInfo->m_aSixup"), std::string::npos);
+	EXPECT_NE(RenderHandBody.find("CTeeRenderInfo::IsLiveDrawableTexture(Graphics(), SkinTextures.m_HandsOutline)"), std::string::npos);
+	EXPECT_NE(RenderHandBody.find("CTeeRenderInfo::IsLiveDrawableTexture(Graphics(), SkinTextures.m_Hands)"), std::string::npos);
 	EXPECT_EQ(RenderHandBody.find("PartTexture(protocol7::SKINPART_HANDS).IsValid()"), std::string::npos);
 }
 
@@ -2162,6 +2335,7 @@ TEST(Skins, SkinQueuePresetsAreSelectableEditableQueues)
 	EXPECT_NE(Menus.find("s_PresetListBox.SetScrollProfile(EQmScrollProfile::SETTINGS_INNER);"), std::string::npos);
 	EXPECT_NE(Menus.find("s_QueueListBox.SetItemColors(ui_token::color::LIST_ITEM_SELECTED"), std::string::npos);
 	EXPECT_NE(Menus.find("s_PresetListBox.SetItemColors(ui_token::color::LIST_ITEM_SELECTED"), std::string::npos);
+	EXPECT_NE(Menus.find("ActivePresetIndex != (int)CSkins::SKIN_QUEUE_SERVER_PRESET"), std::string::npos);
 	EXPECT_NE(Menus.find("QueueList.HSplitTop(TeeMetrics.m_LineHeight, &QueueListHeader"), std::string::npos);
 	EXPECT_NE(Menus.find("TeeMetrics.m_ButtonHeight), &QueueListHeaderLabel, &ClearQueueRect"), std::string::npos);
 	EXPECT_NE(Menus.find("CurrentQueueLabelProps.m_MaxWidth = QueueListHeaderLabel.w;"), std::string::npos);
@@ -2336,4 +2510,72 @@ TEST(Skins, TeePreviewLayerOutlineMasksDoNotSelectFillLayers)
 	EXPECT_FALSE(HasTeePreviewLayer(Mask, TEE_PREVIEW_LAYER_BODY));
 	EXPECT_FALSE(HasTeePreviewLayer(Mask, TEE_PREVIEW_LAYER_BACK_FEET));
 	EXPECT_FALSE(HasTeePreviewLayer(Mask, TEE_PREVIEW_LAYER_FRONT_FEET_OUTLINE));
+}
+
+TEST(QmChatAvatar, MissingSkinUsesStableCircularTee)
+{
+	const auto First = QmChatAvatar::Render(nullptr, "player one");
+	EXPECT_EQ(First, QmChatAvatar::Render(nullptr, "player one"));
+	EXPECT_NE(First, QmChatAvatar::Render(nullptr, "player two"));
+	EXPECT_EQ(First[3], 0);
+	EXPECT_EQ(First[(40 * QmChatAvatar::SIZE + 40) * 4 + 3], 255);
+}
+
+TEST(QmChatAvatar, SnapshotKeepsOriginalSkinAndCustomColorsAfterReset)
+{
+	auto pSource = std::make_shared<QmChatAvatar::SSource>();
+	auto &Body = pSource->m_aSprites[QmChatAvatar::BODY];
+	Body.m_Width = Body.m_Height = 1;
+	Body.m_vRgba = {255, 255, 255, 255};
+	CTeeRenderInfo Info;
+	Info.m_CustomColoredSkin = true;
+	Info.m_ColorBody = ColorRGBA(0.25f, 0.50f, 0.75f, 1.0f);
+	Info.m_ColorableRenderSkin.m_pChatAvatar = pSource;
+	const auto pSnapshot = QmChatAvatar::Capture(Info);
+	ASSERT_NE(pSnapshot, nullptr);
+	Info.Reset();
+	pSource.reset();
+	const auto Rgba = QmChatAvatar::Render(pSnapshot.get(), "player");
+	const size_t Pixel = (40 * QmChatAvatar::SIZE + 40) * 4;
+	EXPECT_NEAR(Rgba[Pixel], 64, 1);
+	EXPECT_NEAR(Rgba[Pixel + 1], 128, 1);
+	EXPECT_NEAR(Rgba[Pixel + 2], 191, 1);
+}
+
+TEST(QmChatAvatar, SixupSnapshotUsesSelectedDummyAndPartColor)
+{
+	auto pBody = std::make_shared<QmChatAvatar::SSource>();
+	pBody->m_aSprites[QmChatAvatar::BODY] = {1, 1, {255, 255, 255, 255}};
+	CTeeRenderInfo Info;
+	auto &Sixup = Info.m_aSixup[1];
+	Sixup.m_apChatAvatarColorable[protocol7::SKINPART_BODY] = pBody;
+	Sixup.m_aUseCustomColors[protocol7::SKINPART_BODY] = true;
+	Sixup.m_aColors[protocol7::SKINPART_BODY] = ColorRGBA(1.0f, 0.0f, 0.0f, 1.0f);
+	EXPECT_EQ(QmChatAvatar::Capture(Info, 0), nullptr);
+	const auto pSnapshot = QmChatAvatar::Capture(Info, 1);
+	ASSERT_NE(pSnapshot, nullptr);
+	Info.Reset();
+	const auto Rgba = QmChatAvatar::Render(pSnapshot.get(), "player");
+	const size_t Pixel = (40 * QmChatAvatar::SIZE + 40) * 4;
+	EXPECT_EQ(Rgba[Pixel], 255);
+	EXPECT_EQ(Rgba[Pixel + 1], 0);
+	EXPECT_EQ(Rgba[Pixel + 2], 0);
+}
+
+TEST(QmChatAvatar, SpriteCopyHasBoundedSizeAndOwnsItsPixels)
+{
+	std::vector<uint8_t> vPixels(512 * 256 * 4, 255);
+	CImageInfo Image;
+	Image.m_Width = 512;
+	Image.m_Height = 256;
+	Image.m_Format = CImageInfo::FORMAT_RGBA;
+	Image.m_pData = vPixels.data();
+	const auto Sprite = QmChatAvatar::CopySprite(Image, g_pData->m_aSprites[SPRITE_TEE_BODY]);
+	EXPECT_EQ(Sprite.m_Width, 64);
+	EXPECT_EQ(Sprite.m_Height, 64);
+	EXPECT_EQ(Sprite.m_vRgba.size(), 64u * 64u * 4u);
+	std::fill(vPixels.begin(), vPixels.end(), 0);
+	ASSERT_FALSE(Sprite.Empty());
+	EXPECT_EQ(Sprite.m_vRgba[0], 255);
+	EXPECT_EQ(Sprite.m_vRgba[3], 255);
 }

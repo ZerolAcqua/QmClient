@@ -13,6 +13,7 @@ void CSkin::CSkinTextures::Reset()
 	m_BodyOutline = IGraphics::CTextureHandle();
 	m_Feet = IGraphics::CTextureHandle();
 	m_FeetOutline = IGraphics::CTextureHandle();
+	m_pChatAvatar.reset();
 	m_pBodyOutline.reset();
 	m_pFeetOutline.reset();
 	m_Hands = IGraphics::CTextureHandle();
@@ -33,6 +34,7 @@ void CSkin::CSkinTextures::Unload(IGraphics *pGraphics)
 		m_pBodyOutline->Unload(pGraphics);
 	if(m_pFeetOutline)
 		m_pFeetOutline->Unload(pGraphics);
+	m_pChatAvatar.reset();
 	m_pBodyOutline.reset();
 	m_pFeetOutline.reset();
 	pGraphics->UnloadTexture(&m_Hands);

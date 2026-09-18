@@ -35,6 +35,7 @@
 #include <game/client/components/menus_settings_controls.h>
 #include <game/client/components/menus_start.h>
 #include <game/client/components/qmclient/demo_cut.h>
+#include <game/client/components/qmclient/qm_map_upload.h>
 #include <game/client/components/qmclient/settings_perf_windows.h>
 #include <game/client/components/section_loader.h>
 #include <game/client/components/settings_resource_jobs.h>
@@ -43,6 +44,7 @@
 #include <game/client/frame_scheduler.h>
 #include <game/client/lineinput.h>
 #include <game/client/ui.h>
+#include <game/client/ui_listbox.h>
 #include <game/voting.h>
 
 #include <algorithm>
@@ -1910,6 +1912,7 @@ protected:
 	// found in menus_demo.cpp
 	vec2 m_DemoControlsPositionOffset = vec2(0.0f, 0.0f);
 	bool m_DemoDisplayExpanded = false;
+	bool m_DemoExportDisplayExpanded = false;
 	bool m_PausedBeforeSeeking;
 	float m_PrevSeekAmount;
 	float m_LastPauseChange = -1.0f;
@@ -1921,6 +1924,8 @@ protected:
 	void FetchAllHeaders();
 	void HandleDemoSeeking(float PositionToSeek, float TimeToSeek, int TickToSeek = -1);
 	void RenderDemoPlayer(CUIRect MainView);
+	void RenderDemoCard(const CUIRect &Rect);
+	void RenderDemoExportDisplayToggle(const CUIRect &Rect);
 	void RenderDemoDisplaySettings(CUIRect View, bool Enabled = true);
 	void RenderDemoPlayerSliceSavePopup(CUIRect MainView);
 	bool m_DemoBrowserListInitialized = false;
@@ -2115,7 +2120,6 @@ protected:
 	void RenderServerbrowserInfo(CUIRect View);
 	void RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *pSelectedServer);
 	void RenderServerbrowserFriends(CUIRect View);
-	void RenderServerbrowserQm(CUIRect View);
 	void RenderServerbrowserFavoriteMaps(CUIRect View);
 	static CUi::EPopupMenuFunctionResult PopupFriendsCategory(void *pContext, CUIRect View, bool Active);
 	static CUi::EPopupMenuFunctionResult PopupFriendNote(void *pContext, CUIRect View, bool Active);
@@ -2173,6 +2177,32 @@ protected:
 		CButtonContainer m_ConfirmButton;
 		CButtonContainer m_CancelButton;
 	} m_SkinQueuePresetRenamePopupContext;
+
+	struct SQmMapUploadFile
+	{
+		char m_aFilename[IO_MAX_PATH_LENGTH] = "";
+		bool m_IsDirectory = false;
+		int m_StorageType = IStorage::TYPE_ALL;
+	};
+	class CQmMapUploadPicker : public SPopupMenuId
+	{
+	public:
+		CMenus *m_pMenus = nullptr;
+		char m_aFolder[IO_MAX_PATH_LENGTH] = "";
+		int m_StorageType = IStorage::TYPE_ALL;
+		int m_Selected = -1;
+		std::vector<SQmMapUploadFile> m_vFiles;
+		CListBox m_ListBox;
+		CButtonContainer m_CancelButton;
+	} m_QmMapUploadPicker;
+	qm_map_upload::CUpload m_QmMapUpload;
+	char m_aQmMapUploadPath[IO_MAX_PATH_LENGTH] = "";
+	char m_aQmMapUploadPlayer[MAX_NAME_LENGTH] = "";
+	int m_QmMapUploadStorageType = IStorage::TYPE_ALL;
+	void PopulateQmMapUploadPicker();
+	static int QmMapUploadScan(const CFsFileInfo *pInfo, int IsDir, int StorageType, void *pUser);
+	static CUi::EPopupMenuFunctionResult PopupQmMapUploadPicker(void *pContext, CUIRect View, bool Active);
+	const char *QmMapUploadPlayerName() const;
 
 	class CMapListItem
 	{
@@ -2341,7 +2371,6 @@ public:
 		SMALL_TAB_BROWSER_FILTER,
 		SMALL_TAB_BROWSER_INFO,
 		SMALL_TAB_BROWSER_FRIENDS,
-		SMALL_TAB_BROWSER_QM,
 
 		SMALL_TAB_LENGTH,
 	};
@@ -2920,7 +2949,6 @@ private:
 	void RenderQmVisualWeaponAnimationContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, float ContentGap, bool PrewarmOnly);
 	void RenderQmVisualChatBubbleContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	void RenderQmVisualSkinTransitionContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
-	void RenderQmVisualFocusModeContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float ColumnGap, float LabelWidth);
 	void RenderQmVisualCameraViewContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	bool RenderQmHudCheckbox(CUIRect &Content, float LineHeight, float LineSpacing, const void *pId, const char *pTextId, const char *pText, int *pValue);
 	bool HandleQmHudCheckboxInput(CUIRect &Content, float LineHeight, float LineSpacing, const void *pId, int *pValue);
@@ -2939,9 +2967,9 @@ private:
 	void RenderQmFunctionKeywordReplyContent(CUIRect &Content, float UiScale, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	void RenderQmFunctionTranslateContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	void RenderQmFunctionPieMenuContent(CUIRect &Content, float UiScale, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, float ButtonHeight, float CardPadding, float CornerRadius, bool PrewarmOnly);
+	void RenderQmFunctionMapUploadContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, bool PrewarmOnly);
 	void RenderQmFunctionFavoriteMapsContent(CUIRect &Content, float UiScale, float LineHeight, float BodySize, float LineSpacing, bool PrewarmOnly);
 	void RenderQmFunctionHJAssistContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
-	void RenderQmHudSpeedrunTimerContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	void RenderQmHudBindStatusContent(CUIRect &Content, float LineHeight, float LineSpacing);
 	void RenderQmHudDebugGraphContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	void RenderQmHudDebugModeContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);

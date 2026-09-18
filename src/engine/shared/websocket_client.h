@@ -94,6 +94,8 @@ public:
 		int m_HeartbeatMs = 0;
 		int m_BackoffBaseMs = 0;
 		int m_BackoffMaxMs = 0;
+		// 发送队列上限；实时语音使用较小值，避免慢连接积压过期音频。
+		size_t m_OutgoingQueueCapacity = 32;
 	};
 	virtual void SetTuning(const STuning &Tuning) { (void)Tuning; }
 

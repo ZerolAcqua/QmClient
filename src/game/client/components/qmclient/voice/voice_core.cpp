@@ -41,6 +41,7 @@ static constexpr int VOICE_CLIENT_SNAPSHOT_INTERVAL_MS = 10;
 static constexpr int VOICE_CONFIG_SNAPSHOT_INTERVAL_MS = 50;
 static constexpr int VOICE_OVERLAY_VISIBLE_MS = 180;
 static constexpr int VOICE_OVERLAY_MAX_SPEAKERS = 5;
+static constexpr int VOICE_MAX_CAPTURE_FRAMES_PER_UPDATE = 3;
 static constexpr const char *s_pVoiceOverlayMicIcon = "\xEF\x84\xB0";
 
 const char *GetEffectiveQmVoiceServer();
@@ -193,27 +194,6 @@ void CRClientVoice::SDLAudioCallback(void *pUserData, Uint8 *pStream, int Len)
 	pThis->MixAudio(reinterpret_cast<int16_t *>(pStream), Samples, OutputChannels);
 }
 
-static bool ParseHostPort(const char *pAddrStr, char *pHost, size_t HostSize, int &Port)
-{
-	const char *pColon = str_rchr(pAddrStr, ':');
-	if(!pColon || pColon == pAddrStr || *(pColon + 1) == '\0')
-		return false;
-
-	str_truncate(pHost, HostSize, pAddrStr, pColon - pAddrStr);
-	if(pHost[0] == '[')
-	{
-		const int Len = str_length(pHost);
-		if(Len >= 2 && pHost[Len - 1] == ']')
-		{
-			mem_move(pHost, pHost + 1, Len - 2);
-			pHost[Len - 2] = '\0';
-		}
-	}
-
-	Port = str_toint(pColon + 1);
-	return Port > 0 && Port <= 65535;
-}
-
 void CRClientVoice::Init(CGameClient *pGameClient, IClient *pClient, IConsole *pConsole)
 {
 	SetInterfaces(pGameClient, pClient, pConsole);
@@ -325,25 +305,6 @@ void CRClientVoice::CopyDiagnosticLogMessage(const char *pField, char *pBuf, siz
 {
 	const CLockScope Guard(m_DiagnosticLogMutex);
 	str_copy(pBuf, pField, BufSize);
-}
-
-bool CRClientVoice::EnsureSocket()
-{
-	if(m_Socket)
-		return true;
-
-	NETADDR BindAddr = NETADDR_ZEROED;
-	BindAddr.type = NETTYPE_IPV4 | NETTYPE_IPV6;
-	m_Socket = net_udp_create(BindAddr);
-	if(!m_Socket)
-	{
-		m_SocketReady.store(false);
-		LogDiagnosticErrorOnce(m_aSocketErrorLog, sizeof(m_aSocketErrorLog), "Failed to open UDP socket");
-		return false;
-	}
-	m_SocketReady.store(true);
-	ClearDiagnosticLogMessage(m_aSocketErrorLog);
-	return true;
 }
 
 bool CRClientVoice::EnsureAudio()
@@ -1006,7 +967,8 @@ void CRClientVoice::ExportUiStatus(VoiceUtils::SVoiceUiStatus &Out) const NO_THR
 	Out.m_NeedNetwork = std::clamp(Config.m_QmVoiceTestMode, 0, 2) != 1;
 	Out.m_AudioRefreshPending = m_AudioRefreshRequested.load();
 	Out.m_ServerAddrValid = m_ServerAddrValid.load();
-	Out.m_HaveSocket = m_SocketReady.load();
+	Out.m_HaveSocket = m_TransportReady.load();
+	Out.m_Connecting = m_TransportConnecting.load();
 	Out.m_CaptureReady = m_CaptureReady.load();
 	Out.m_CaptureUnavailable = m_CaptureUnavailable.load();
 	Out.m_OutputReady = m_OutputReady.load();
@@ -1126,16 +1088,11 @@ void CRClientVoice::Shutdown()
 		}
 	}
 	m_pPeers.reset();
-	if(m_Socket)
-	{
-		net_udp_close(m_Socket);
-		m_Socket = nullptr;
-	}
-	m_SocketReady.store(false);
+	m_pTransport.reset();
+	m_TransportReady.store(false);
+	m_TransportConnecting.store(false);
 	m_ServerAddrValid.store(false);
-	m_ServerAddrResolveRequested.store(true);
 	m_aServerAddrStr[0] = '\0';
-	m_LastServerResolveAttempt = 0;
 	m_HpfPrevIn = 0.0f;
 	m_HpfPrevOut = 0.0f;
 	m_CompEnv = 0.0f;
@@ -1170,82 +1127,45 @@ void CRClientVoice::Shutdown()
 
 void CRClientVoice::UpdateServerAddrConfig() NO_THREAD_SAFETY_ANALYSIS
 {
-	const char *pVoiceServer = GetEffectiveQmVoiceServer();
-	bool AddrChanged = false;
-	{
-		const CLockScope Guard(m_ServerAddrMutex);
-		AddrChanged = str_comp(m_aServerAddrStr, pVoiceServer) != 0;
-		if(AddrChanged)
-			str_copy(m_aServerAddrStr, pVoiceServer, sizeof(m_aServerAddrStr));
-	}
-
-	if(!AddrChanged)
-		return;
-
-	m_ServerAddrValid.store(false);
-	m_LastServerResolveAttempt = 0;
-	m_ServerAddrResolveRequested.store(true);
+	const CLockScope Guard(m_ServerAddrMutex);
+	str_copy(m_aServerAddrStr, GetEffectiveQmVoiceServer(), sizeof(m_aServerAddrStr));
 }
 
-void CRClientVoice::ResolveServerAddr() NO_THREAD_SAFETY_ANALYSIS
+void CRClientVoice::UpdateTransport() NO_THREAD_SAFETY_ANALYSIS
 {
-	const int64_t Now = time_get();
-	const bool ShouldRetry = !m_ServerAddrValid.load() && (m_LastServerResolveAttempt == 0 || Now - m_LastServerResolveAttempt > time_freq() * 5);
-	if(!m_ServerAddrResolveRequested.load() && !ShouldRetry)
-		return;
+	if(!m_pTransport)
+		m_pTransport = std::make_unique<VoiceUtils::CVoiceWebSocketTransport>();
 
-	char aServerAddrStr[sizeof(m_aServerAddrStr)];
+	char aServerUrl[sizeof(m_aServerAddrStr)];
 	{
 		const CLockScope Guard(m_ServerAddrMutex);
-		str_copy(aServerAddrStr, m_aServerAddrStr, sizeof(aServerAddrStr));
+		str_copy(aServerUrl, m_aServerAddrStr, sizeof(aServerUrl));
 	}
-
-	m_ServerAddrResolveRequested.store(false);
-	if(aServerAddrStr[0] == '\0')
+	SRClientVoiceConfigSnapshot Config;
+	GetConfigSnapshot(Config);
+	bool Online = false;
 	{
-		m_ServerAddrValid.store(false);
-		return;
+		const CLockScope Guard(m_SnapshotMutex);
+		Online = m_OnlineSnap;
 	}
+	const bool NeedNetwork = Online && std::clamp(Config.m_QmVoiceTestMode, 0, 2) != 1;
+	const bool Reset = m_pTransport->Update(aServerUrl, NeedNetwork, m_ContextHash.load(), Config.m_QmVoiceTokenHash, VoiceProtocolVersion(Config));
+	m_ServerAddrValid.store(m_pTransport->UrlValid());
+	m_TransportReady.store(m_pTransport->Connected());
+	m_TransportConnecting.store(m_pTransport->Connecting());
+	if(Reset)
+		ResetRuntimeState(VoiceUtils::VOICE_RUNTIME_RESET_CONNECTION | VoiceUtils::VOICE_RUNTIME_RESET_PEERS, Config.m_QmVoiceTokenHash);
 
-	m_LastServerResolveAttempt = Now;
-
-	NETADDR NewAddr = NETADDR_ZEROED;
-	if(net_addr_from_str(&NewAddr, aServerAddrStr) == 0)
+	const char *pError = m_pTransport->LastError();
+	if(NeedNetwork && pError[0] != '\0')
 	{
-		{
-			const CLockScope Guard(m_ServerAddrMutex);
-			m_ServerAddr = NewAddr;
-		}
-		m_ServerAddrValid.store(true);
+		char *pField = m_pTransport->UrlValid() ? m_aSocketErrorLog : m_aServerAddrErrorLog;
+		LogDiagnosticErrorOnce(pField, sizeof(m_aSocketErrorLog), pError);
+	}
+	if(m_pTransport->UrlValid())
 		ClearDiagnosticLogMessage(m_aServerAddrErrorLog);
-		return;
-	}
-
-	char aHost[128];
-	int Port = 0;
-	if(!ParseHostPort(aServerAddrStr, aHost, sizeof(aHost), Port))
-	{
-		char aError[256];
-		str_format(aError, sizeof(aError), "Invalid voice server address '%s'", aServerAddrStr);
-		LogDiagnosticErrorOnce(m_aServerAddrErrorLog, sizeof(m_aServerAddrErrorLog), aError);
-		return;
-	}
-
-	if(net_host_lookup(aHost, &NewAddr, NETTYPE_IPV4) == 0 || net_host_lookup(aHost, &NewAddr, NETTYPE_IPV6) == 0)
-	{
-		NewAddr.port = Port;
-		{
-			const CLockScope Guard(m_ServerAddrMutex);
-			m_ServerAddr = NewAddr;
-		}
-		m_ServerAddrValid.store(true);
-		ClearDiagnosticLogMessage(m_aServerAddrErrorLog);
-		return;
-	}
-
-	char aError[256];
-	str_format(aError, sizeof(aError), "Failed to resolve voice server '%s'", aServerAddrStr);
-	LogDiagnosticErrorOnce(m_aServerAddrErrorLog, sizeof(m_aServerAddrErrorLog), aError);
+	if(!NeedNetwork || m_pTransport->Connected())
+		ClearDiagnosticLogMessage(m_aSocketErrorLog);
 }
 
 bool CRClientVoice::UpdateContext()
@@ -1370,6 +1290,7 @@ void CRClientVoice::ResetRuntimeState(uint32_t Flags, uint32_t RoomTokenHash) NO
 		m_LastMediaRxPacketTime.store(0);
 		m_LastPingSentTime = 0;
 		m_LastPingSeq = 0;
+		m_LastKeepalive = 0;
 		m_LastTokenHashSent = 0;
 	}
 
@@ -1412,7 +1333,7 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 	VoiceUtils::SVoiceTransmitPreconditions Preconditions;
 	Preconditions.m_NeedNetwork = NeedNetwork;
 	Preconditions.m_ServerAddrValid = m_ServerAddrValid.load();
-	Preconditions.m_HaveSocket = m_Socket != nullptr;
+	Preconditions.m_HaveSocket = m_TransportReady.load();
 	Preconditions.m_Online = Online && LocalClientId >= 0 && LocalClientId < MAX_CLIENTS;
 	Preconditions.m_HaveCaptureDevice = HaveCaptureDevice;
 	Preconditions.m_HaveEncoder = m_pEncoder != nullptr;
@@ -1422,7 +1343,7 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 					 (VoiceUtils::VOICE_TX_BLOCK_SERVER_ADDR | VoiceUtils::VOICE_TX_BLOCK_SOCKET | VoiceUtils::VOICE_TX_BLOCK_ONLINE);
 	if(NetworkBlockers != 0)
 	{
-		ResetTransmitState(false);
+		ResetTransmitState(true);
 		return;
 	}
 
@@ -1484,11 +1405,6 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 
 	if(NeedNetwork && (TokenChanged || (!TxActiveSnapshot && NeedKeepalive)))
 	{
-		NETADDR ServerAddrLocal = NETADDR_ZEROED;
-		{
-			const CLockScope Guard(m_ServerAddrMutex);
-			ServerAddrLocal = m_ServerAddr;
-		}
 		uint8_t aPacket[VOICE_MAX_PACKET];
 		const uint16_t PingSequence = m_Sequence++;
 		VoiceUtils::SVoicePacketHeader Header;
@@ -1499,16 +1415,16 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 		Header.m_Flags = TxFlags;
 		Header.m_SenderId = (uint16_t)LocalClientId;
 		Header.m_Sequence = PingSequence;
-		if(VoiceUtils::WriteVoicePacketHeader(aPacket, sizeof(aPacket), Header))
+		if(VoiceUtils::WriteVoicePacketHeader(aPacket, sizeof(aPacket), Header) &&
+			m_pTransport && m_pTransport->SendPacket(aPacket, VOICE_PACKET_HEADER_SIZE))
 		{
-			net_udp_send(m_Socket, &ServerAddrLocal, aPacket, VOICE_PACKET_HEADER_SIZE);
 			m_LastTxPacketTime.store(Now);
+			MarkLocalRoomMemberSeen(Now);
+			m_LastPingSentTime = Now;
+			m_LastPingSeq = PingSequence;
+			m_LastKeepalive = Now;
+			m_LastTokenHashSent = Config.m_QmVoiceTokenHash;
 		}
-		MarkLocalRoomMemberSeen(Now);
-		m_LastPingSentTime = Now;
-		m_LastPingSeq = PingSequence;
-		m_LastKeepalive = Now;
-		m_LastTokenHashSent = Config.m_QmVoiceTokenHash;
 	}
 
 	if(!HaveCaptureDevice)
@@ -1528,15 +1444,20 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 		if(ShowMicLevel)
 		{
 			bool UpdatedMicLevel = false;
-			while(SDL_GetQueuedAudioSize(m_CaptureDevice) >= VOICE_FRAME_BYTES)
+			int FramesProcessed = 0;
+			while(SDL_GetQueuedAudioSize(m_CaptureDevice) >= VOICE_FRAME_BYTES && FramesProcessed < VOICE_MAX_CAPTURE_FRAMES_PER_UPDATE)
 			{
 				int16_t aPcm[VOICE_FRAME_SAMPLES];
 				SDL_DequeueAudio(m_CaptureDevice, aPcm, VOICE_FRAME_BYTES);
+				FramesProcessed++;
 				VoiceUtils::ProcessVoiceCaptureFrame(Config, aPcm, VOICE_FRAME_SAMPLES, m_AgcGain, m_NsNoiseFloor, m_NsGain, m_pNoiseSuppress, m_NoiseSuppressFallbackLogged, m_HpfPrevIn, m_HpfPrevOut, m_CompEnv);
 				const float Peak = VoiceUtils::VoiceFramePeak(aPcm, VOICE_FRAME_SAMPLES);
 				UpdateMicLevel(Peak);
 				UpdatedMicLevel = true;
 			}
+			// 音频设备积压时丢弃旧帧，避免恢复 PTT 后把过期语音送入网络。
+			if(SDL_GetQueuedAudioSize(m_CaptureDevice) >= VOICE_FRAME_BYTES)
+				SDL_ClearQueuedAudio(m_CaptureDevice);
 			if(!UpdatedMicLevel)
 				UpdateMicLevel(-1.0f);
 		}
@@ -1568,10 +1489,12 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 	uint8_t aPayload[VOICE_MAX_PAYLOAD];
 
 	bool UpdatedMicLevel = false;
-	while(SDL_GetQueuedAudioSize(m_CaptureDevice) >= VOICE_FRAME_BYTES)
+	int FramesProcessed = 0;
+	while(SDL_GetQueuedAudioSize(m_CaptureDevice) >= VOICE_FRAME_BYTES && FramesProcessed < VOICE_MAX_CAPTURE_FRAMES_PER_UPDATE)
 	{
 		int16_t aPcm[VOICE_FRAME_SAMPLES];
 		SDL_DequeueAudio(m_CaptureDevice, aPcm, VOICE_FRAME_BYTES);
+		FramesProcessed++;
 		VoiceUtils::ProcessVoiceCaptureFrame(Config, aPcm, VOICE_FRAME_SAMPLES, m_AgcGain, m_NsNoiseFloor, m_NsGain, m_pNoiseSuppress, m_NoiseSuppressFallbackLogged, m_HpfPrevIn, m_HpfPrevOut, m_CompEnv);
 
 		const float Peak = VoiceUtils::VoiceFramePeak(aPcm, VOICE_FRAME_SAMPLES);
@@ -1655,12 +1578,12 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 		mem_copy(aPacket + Offset, aPayload, EncSize);
 		Offset += EncSize;
 
-		NETADDR ServerAddrLocal = NETADDR_ZEROED;
+		if(!m_pTransport || !m_pTransport->SendPacket(aPacket, Offset))
 		{
-			const CLockScope Guard(m_ServerAddrMutex);
-			ServerAddrLocal = m_ServerAddr;
+			// 网络拥塞或重连时丢弃本批采集，避免恢复后补发旧语音。
+			ResetTransmitState(true);
+			break;
 		}
-		net_udp_send(m_Socket, &ServerAddrLocal, aPacket, (int)Offset);
 		m_LastTxPacketTime.store(Now);
 		MarkLocalVoiceActive(Now);
 		if(Config.m_QmVoiceDebug)
@@ -1674,6 +1597,8 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 			}
 		}
 	}
+	if(SDL_GetQueuedAudioSize(m_CaptureDevice) >= VOICE_FRAME_BYTES)
+		SDL_ClearQueuedAudio(m_CaptureDevice);
 
 	if(ShowMicLevel)
 	{
@@ -1688,7 +1613,7 @@ void CRClientVoice::ProcessCapture() NO_THREAD_SAFETY_ANALYSIS
 
 void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 {
-	if(!m_OutputDevice || !m_Socket)
+	if(!m_pTransport || !m_pTransport->Connected())
 		return;
 
 	SRClientVoiceConfigSnapshot Config;
@@ -1697,30 +1622,11 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 	const bool TestServer = TestMode == 2;
 	const uint8_t ProtocolVersion = VoiceProtocolVersion(Config);
 
-	while(net_socket_read_wait(m_Socket, std::chrono::nanoseconds(0)) > 0)
+	SQmWebSocketMessage Message;
+	while(m_pTransport->PollPacket(Message))
 	{
-		NETADDR Addr;
-		unsigned char *pData = nullptr;
-		int Bytes = net_udp_recv(m_Socket, &Addr, &pData);
-		if(Bytes <= 0 || !pData)
-			break;
-
-		NETADDR ServerAddrLocal = NETADDR_ZEROED;
-		{
-			const CLockScope Guard(m_ServerAddrMutex);
-			ServerAddrLocal = m_ServerAddr;
-		}
-		if(net_addr_comp(&Addr, &ServerAddrLocal) != 0)
-		{
-			m_RxDropAddr++;
-			continue;
-		}
-
-		if(Bytes < VOICE_PACKET_HEADER_SIZE)
-		{
-			m_RxDropHeader++;
-			continue;
-		}
+		const auto *pData = reinterpret_cast<const uint8_t *>(Message.m_Data.data());
+		const int Bytes = (int)Message.m_Data.size();
 
 		VoiceUtils::SVoicePacketHeader Header;
 		if(!VoiceUtils::ReadVoicePacketHeader(pData, Bytes, Header))
@@ -1749,7 +1655,6 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 
 		const uint16_t PayloadSize = Header.m_PayloadSize;
 		const uint32_t TokenHash = Header.m_TokenHash;
-		const uint8_t Flags = Header.m_Flags;
 		const uint16_t SenderId = Header.m_SenderId;
 		const uint16_t Sequence = Header.m_Sequence;
 		const float PosX = VoiceUtils::SanitizeFloat(Header.m_PosX);
@@ -1771,6 +1676,9 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 			continue;
 		case VoiceUtils::EVoiceIncomingPacketDecision::DROP_TYPE:
 			m_RxDropType++;
+			continue;
+		case VoiceUtils::EVoiceIncomingPacketDecision::DROP_FLAGS:
+			m_RxDropHeader++;
 			continue;
 		case VoiceUtils::EVoiceIncomingPacketDecision::DROP_CONTEXT:
 			m_RxDropContext++;
@@ -1812,11 +1720,13 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 			continue;
 		}
 
+		if(!m_OutputDevice)
+			continue;
+
 		int LocalId = -1;
 		vec2 LocalPos = vec2(0.0f, 0.0f);
 		bool SpecActive = false;
 		vec2 SpecPos = vec2(0.0f, 0.0f);
-		char aSenderName[MAX_NAME_LENGTH];
 		bool SenderOtherTeam = false;
 		bool SenderActive = false;
 		bool SenderSpec = false;
@@ -1830,7 +1740,6 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 			LocalPos = m_aClientPosSnap[LocalId];
 			SpecActive = m_SpecActiveSnap;
 			SpecPos = m_SpecPosSnap;
-			str_copy(aSenderName, m_aClientNameSnap[SenderId].data(), sizeof(aSenderName));
 			SenderOtherTeam = m_aClientOtherTeamSnap[SenderId] != 0;
 			SenderActive = m_aClientActiveSnap[SenderId] != 0;
 			SenderSpec = m_aClientSpecSnap[SenderId] != 0;
@@ -1840,7 +1749,6 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 
 		const bool IsSelf = SenderId == LocalId;
 		const bool IgnoreDistance = VoiceUtils::VoiceShouldIgnoreDistance(Config.m_QmVoiceIgnoreDistance != 0, Config.m_QmVoiceGroupGlobal != 0, LocalToken, TokenHash);
-		const char *pSenderName = aSenderName;
 		VoiceUtils::SVoiceReceiveAudibilityContext AudibilityContext;
 		AudibilityContext.m_IsSelf = IsSelf;
 		AudibilityContext.m_TestServer = TestServer;
@@ -1850,14 +1758,16 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 		AudibilityContext.m_SenderOtherTeam = SenderOtherTeam;
 		AudibilityContext.m_SenderActive = SenderActive;
 		AudibilityContext.m_SenderSpec = SenderSpec;
-		AudibilityContext.m_ListMode = Config.m_QmVoiceListMode;
-		AudibilityContext.m_HearVad = Config.m_QmVoiceHearVad != 0;
-		AudibilityContext.m_SenderUsesVad = (Flags & VOICE_FLAG_VAD) != 0;
-		AudibilityContext.m_pMuteList = Config.m_aQmVoiceMute;
-		AudibilityContext.m_pWhitelist = Config.m_aQmVoiceWhitelist;
-		AudibilityContext.m_pBlacklist = Config.m_aQmVoiceBlacklist;
-		AudibilityContext.m_pVadAllow = Config.m_aQmVoiceVadAllow;
-		if(VoiceUtils::EvaluateVoiceReceiveAudibility(AudibilityContext, pSenderName) != VoiceUtils::EVoiceReceiveAudibility::ALLOW)
+		// 接收端只按连接上下文、队伍/观战状态和空间距离过滤；旧的名单、按名音量
+		// 与 VAD 白名单不再参与实时路径，配置字段仅为旧配置文件保留。
+		AudibilityContext.m_ListMode = 0;
+		AudibilityContext.m_HearVad = true;
+		AudibilityContext.m_SenderUsesVad = false;
+		AudibilityContext.m_pMuteList = "";
+		AudibilityContext.m_pWhitelist = "";
+		AudibilityContext.m_pBlacklist = "";
+		AudibilityContext.m_pVadAllow = "";
+		if(VoiceUtils::EvaluateVoiceReceiveAudibility(AudibilityContext, nullptr) != VoiceUtils::EVoiceReceiveAudibility::ALLOW)
 			continue;
 		m_aLastHeard[SenderId].store(PacketNow);
 
@@ -1866,7 +1776,7 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 			m_RxDropPayload++;
 			continue;
 		}
-		if((size_t)VOICE_PACKET_HEADER_SIZE + PayloadSize > (size_t)Bytes)
+		if((size_t)VOICE_PACKET_HEADER_SIZE + PayloadSize != (size_t)Bytes)
 		{
 			m_RxDropPayload++;
 			continue;
@@ -1890,14 +1800,6 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 		float Volume = std::clamp(RadiusFactor * (Config.m_QmVoiceVolume / 100.0f), 0.0f, 4.0f);
 		if(Volume <= 0.0f)
 			continue;
-
-		int NameVolume = 100;
-		if(VoiceUtils::VoiceNameVolume(Config.m_aQmVoiceNameVolumes, pSenderName, NameVolume))
-		{
-			Volume *= (NameVolume / 100.0f);
-			if(Volume <= 0.0f)
-				continue;
-		}
 
 		const bool StereoEnabled = Config.m_QmVoiceStereo != 0;
 		const float StereoWidth = std::clamp(Config.m_QmVoiceStereoWidth / 100.0f, 0.0f, 2.0f);
@@ -1982,9 +1884,8 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 			m_RxPackets++;
 			if(Now - m_RxLastLog > time_freq())
 			{
-				log_info("voice", "rx packets=%d drop_addr=%d drop_header=%d drop_version=%d drop_type=%d drop_ctx=%d drop_group=%d drop_sender=%d drop_payload=%d drop_radius=%d",
+				log_info("voice", "rx packets=%d drop_header=%d drop_version=%d drop_type=%d drop_ctx=%d drop_group=%d drop_sender=%d drop_payload=%d drop_radius=%d",
 					m_RxPackets,
-					m_RxDropAddr,
 					m_RxDropHeader,
 					m_RxDropVersion,
 					m_RxDropType,
@@ -1995,7 +1896,6 @@ void CRClientVoice::ProcessIncoming() NO_THREAD_SAFETY_ANALYSIS
 					m_RxDropRadius);
 				m_RxLastLog = Now;
 				m_RxPackets = 0;
-				m_RxDropAddr = 0;
 				m_RxDropHeader = 0;
 				m_RxDropVersion = 0;
 				m_RxDropType = 0;
@@ -2279,7 +2179,7 @@ void CRClientVoice::WorkerLoop() NO_THREAD_SAFETY_ANALYSIS
 		if(ShouldEnsureAudio)
 			EnsureAudio();
 
-		ResolveServerAddr();
+		UpdateTransport();
 		ProcessIncoming();
 		DecodeJitter();
 		UpdateEncoderParams();
@@ -2318,7 +2218,7 @@ void CRClientVoice::WorkerLoop() NO_THREAD_SAFETY_ANALYSIS
 				VoiceUtils::SVoiceTransmitPreconditions Preconditions;
 				Preconditions.m_NeedNetwork = NeedNetwork;
 				Preconditions.m_ServerAddrValid = m_ServerAddrValid.load();
-				Preconditions.m_HaveSocket = m_Socket != nullptr;
+				Preconditions.m_HaveSocket = m_TransportReady.load();
 				Preconditions.m_Online = OnlineSnap;
 				Preconditions.m_HaveCaptureDevice = m_CaptureDevice != 0;
 				Preconditions.m_HaveEncoder = m_pEncoder != nullptr;
@@ -2330,10 +2230,10 @@ void CRClientVoice::WorkerLoop() NO_THREAD_SAFETY_ANALYSIS
 				const int TxAgeMs = m_LastTxPacketTime.load() > 0 ? (int)std::clamp((Now - m_LastTxPacketTime.load()) * 1000 / time_freq(), (int64_t)0, (int64_t)999999) : -1;
 				const int RxAgeMs = m_LastRxPacketTime.load() > 0 ? (int)std::clamp((Now - m_LastRxPacketTime.load()) * 1000 / time_freq(), (int64_t)0, (int64_t)999999) : -1;
 
-				log_info("voice", "state server_valid=%d ping=%d socket=%d online=%d out=%d cap=%d enc=%d mute=%d tx_block=0x%x tx_blockers=%s tx=%d tx_age=%d mic=%.2f rx_age=%d drop_addr=%d drop_header=%d drop_version=%d drop_type=%d drop_ctx=%d drop_group=%d drop_sender=%d drop_payload=%d drop_radius=%d peers=%d queued_packets=%d queued_frames=%d",
+				log_info("voice", "state server_valid=%d ping=%d socket=%d online=%d out=%d cap=%d enc=%d mute=%d tx_block=0x%x tx_blockers=%s tx=%d tx_age=%d mic=%.2f rx_age=%d drop_header=%d drop_version=%d drop_type=%d drop_ctx=%d drop_group=%d drop_sender=%d drop_payload=%d drop_radius=%d peers=%d queued_packets=%d queued_frames=%d",
 					m_ServerAddrValid.load() ? 1 : 0,
 					m_PingMs.load(),
-					m_Socket != nullptr ? 1 : 0,
+					m_TransportReady.load() ? 1 : 0,
 					OnlineSnap ? 1 : 0,
 					m_OutputDevice != 0 ? 1 : 0,
 					m_CaptureDevice != 0 ? 1 : 0,
@@ -2345,7 +2245,6 @@ void CRClientVoice::WorkerLoop() NO_THREAD_SAFETY_ANALYSIS
 					TxAgeMs,
 					(double)m_MicLevel.load(),
 					RxAgeMs,
-					m_RxDropAddr,
 					m_RxDropHeader,
 					m_RxDropVersion,
 					m_RxDropType,
@@ -2387,6 +2286,11 @@ void CRClientVoice::OnRender() NO_THREAD_SAFETY_ANALYSIS
 	if(g_Config.m_QmVoiceOffNonActive && m_pGraphics && !m_pGraphics->WindowActive())
 	{
 		StopWorker();
+		if(m_pTransport)
+			m_pTransport->Disconnect();
+		m_TransportReady.store(false);
+		m_TransportConnecting.store(false);
+		ResetRuntimeState(VoiceUtils::VOICE_RUNTIME_RESET_CONNECTION | VoiceUtils::VOICE_RUNTIME_RESET_PEERS, m_RoomMemberTokenHash.load());
 		if(!m_AudioPausedForInactive)
 		{
 			if(m_CaptureDevice)
@@ -2484,12 +2388,6 @@ void CRClientVoice::OnRender() NO_THREAD_SAFETY_ANALYSIS
 		if(!WorkerStopped)
 			StopWorker();
 		m_AudioRefreshRequested.store(true);
-	}
-	if(!EnsureSocket())
-	{
-		if(!WorkerStopped)
-			StopWorker();
-		return;
 	}
 	if(!m_Worker.joinable())
 		m_AudioRefreshRequested.store(true);

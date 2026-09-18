@@ -324,6 +324,8 @@ public:
 	bool IsRegistered(const NETADDR &Addr);
 
 private:
+	friend class CServerBrowserTestAccess;
+
 	CNetClient *m_pNetClient = nullptr;
 	IConfigManager *m_pConfigManager = nullptr;
 	IConsole *m_pConsole = nullptr;

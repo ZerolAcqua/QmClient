@@ -16,6 +16,8 @@
 #include <generated/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/components/qmclient/friend_enter_tracker.h>
+#include <game/client/components/qmclient/friend_online_tracker.h>
 #include <game/client/components/qmclient/local_saves.h>
 #include <game/client/components/qmclient/map_progress.h>
 #include <game/client/components/qmclient/modes.h>
@@ -377,34 +379,26 @@ class CTClient : public CComponent
 	void StartSwapCountdown(int Dummy, const char *pCounterpart, bool Outgoing);
 	void ClearSwapCountdown(int Dummy = -1);
 
-	// 好友上线提醒
-	struct SFriendOnlineState
-	{
-		float m_LastSeen = 0.0f;
-		std::string m_Name;
-		std::string m_Map;
-		int m_LastSeenScanId = 0;
-	};
-	std::unordered_map<std::string, SFriendOnlineState> m_FriendOnline;
-	float m_FriendNotifyNextCheck = 0.0f;
+	// 好友上线提醒只消费本功能发起的完整刷新结果。
+	qm_friend_notify::COnlineTracker m_FriendOnlineTracker;
 	int m_FriendNotifyPrevEnabled = -1;
 	int m_FriendNotifyPrevIgnoreClan = -1;
-	bool m_FriendNotifyScanRunning = false;
-	int m_FriendNotifyScanIndex = 0;
-	int m_FriendNotifyScanId = 0;
+	uint64_t m_FriendNotifyPrevRevision = 0;
+	bool m_FriendOnlineRefreshPending = false;
 	float m_FriendAutoRefreshNext = 0.0f;
 	int m_FriendAutoRefreshPrevEnabled = -1;
 	int m_FriendAutoRefreshPrevSeconds = -1;
 	void CheckFriendOnline();
-	// 好友进图自动打招呼
-	std::unordered_set<std::string> m_FriendEnterOnline;
-	bool m_aFriendEnterClientActive[MAX_CLIENTS] = {};
+	// 本服进服通知和自动问候共享同一份出入状态。
+	qm_friend_notify::CEnterTracker m_FriendEnterTracker;
 	int m_FriendEnterPrevEnabled = -1;
 	int m_FriendEnterPrevIgnoreClan = -1;
-	bool m_FriendEnterInitialized = false;
+	int m_FriendEnterPrevDummy = -1;
+	uint64_t m_FriendEnterPrevRevision = 0;
 	float m_FriendEnterNextCheck = 0.0f;
 	std::string m_FriendEnterPendingNames;
 	float m_FriendEnterPendingSendAt = 0.0f;
+	void ResetFriendEnter();
 	void CheckFriendEnterGreet();
 
 	bool m_QmAspectApplyPending = false;
@@ -519,25 +513,10 @@ public:
 		return m_aGoresMapProgress[Idx];
 	}
 
-	// Focus Mode (Zen Mode)
-	bool m_FocusModeStateKnown = false;
-	bool m_PrevFocusModeActive = false;
-	SQmFocusConfigOverrideState m_FocusHudOverrideState;
-	SQmFocusConfigOverrideState m_FocusNamePlatesOverrideState;
-	SQmFocusConfigOverrideState m_FocusNamePlatesOwnOverrideState;
-	SQmFocusConfigOverrideState m_FocusNameplateCoordsOverrideState;
-	SQmFocusConfigOverrideState m_FocusNameplateCoordsOwnOverrideState;
-	SQmFocusConfigOverrideState m_FocusNameplateCoordXOverrideState;
-	SQmFocusConfigOverrideState m_FocusNameplateCoordYOverrideState;
-	SQmFocusConfigOverrideState m_FocusDirectionOverrideState;
-	SQmFocusConfigOverrideState m_FocusVideoHudOverrideState;
-	SQmFocusConfigOverrideState m_FocusVideoDirectionOverrideState;
-	void ApplyFocusModeEffects();
-
 	// Gores FastInput Link
 	bool m_GoresModeStateKnown = false;
 	bool m_PrevGoresModeActive = false;
-	SQmFocusConfigOverrideState m_GoresDummyHammerOverride;
+	SQmConfigOverrideState m_GoresDummyHammerOverride;
 	void ResetGoresDummyHammerOverride();
 	bool m_GoresAutoMapKnown = false;
 	unsigned m_GoresAutoMapToken = 0;

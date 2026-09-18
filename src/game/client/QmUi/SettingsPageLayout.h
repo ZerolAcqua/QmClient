@@ -459,12 +459,6 @@ inline float ResolveQmVisualCollisionHitboxHeight(const SSettingsContentMetrics 
 	return (Enabled ? 16.0f : 1.0f) * Metrics.m_RowStep;
 }
 
-inline float ResolveQmVisualFocusModeHeight(const SSettingsContentMetrics &Metrics)
-{
-	const float Section = Metrics.m_SmallSize + Metrics.m_LineSpacing;
-	return 16.0f * Metrics.m_RowStep + 3.0f * Section + Metrics.m_LineSpacing;
-}
-
 inline float ResolveSettingsHslaRowsHeight(const SSettingsContentMetrics &Metrics, const bool Alpha)
 {
 	return ResolveSettingsRowsHeight(Alpha ? 4 : 3, Metrics.m_LineHeight, Metrics.m_LineSpacing);

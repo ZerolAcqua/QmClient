@@ -438,6 +438,8 @@ void CGraphics_Threaded::BumpTextureHandleEpochAndResetSlots()
 	m_FirstFreeTexture = 0;
 }
 
+// 句柄里的槽位代数与纪元必须和当前状态一致，才算真的还分配着纹理；
+// 设备重建或槽位复用后，旧句柄会在这里被判定为失效（绘制期据此兜底）。
 bool CGraphics_Threaded::IsTextureHandleAllocated(CTextureHandle TextureId) const
 {
 	if(!TextureId.IsValid())

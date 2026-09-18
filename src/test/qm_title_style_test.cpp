@@ -783,6 +783,50 @@ TEST(QmTitleStyle, StylePreviewUsesLocalOriginAndSingleScreenOffset)
 	EXPECT_NE(Preview.find("PreviewEffect, PreviewX, PreviewY);"), std::string::npos);
 }
 
+// 浏览风格时必须看到各自原色，不能被当前单色或彩虹配置压成白色。
+TEST(QmTitleStyle, StylePickerAlwaysShowsOriginalColors)
+{
+	const std::string Menus = ReadQmTitleStyleSource("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const size_t Start = Menus.find("static void RenderQmTitleStylePreviewEntry(");
+	const size_t End = Menus.find("static void RenderQmTitleFinishedPreview(", Start);
+	ASSERT_NE(Start, std::string::npos);
+	ASSERT_NE(End, std::string::npos);
+	const std::string Preview = Menus.substr(Start, End - Start);
+	const size_t OriginalColors = Preview.find("PreviewStyle.m_ColorOverride = false;");
+	ASSERT_NE(OriginalColors, std::string::npos);
+	EXPECT_LT(OriginalColors, Preview.find("QmTitleRenderFillCursor("));
+}
+
+// 选择风格即恢复它的配色，成品预览不能继续展示服务器上一次保存的风格。
+TEST(QmTitleStyle, PickingStyleRestoresColorsAndPreviewsDraft)
+{
+	const std::string Menus = ReadQmTitleStyleSource("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const size_t Start = Menus.find("if(!ReadOnly && Ui()->DoButtonLogic(&s_aTitleStyleItemIds[ItemIndex]");
+	const size_t End = Menus.find("s_TitleStyleExpanded = false;", Start);
+	ASSERT_NE(Start, std::string::npos);
+	ASSERT_NE(End, std::string::npos);
+	const std::string Selection = Menus.substr(Start, End - Start);
+	EXPECT_NE(Selection.find("g_Config.m_QmTitleColorMode = (int)EQmTitleColorMode::FOLLOW_SERVER;"), std::string::npos);
+	EXPECT_NE(Menus.find("const char *pPreviewStyleId = g_Config.m_QmTitleStyleEnabled ? g_Config.m_QmTitleStyle : Auth.PlayerTitleStyle(GameClient()->m_Snap.m_LocalClientId);"), std::string::npos);
+	EXPECT_NE(Menus.find("s_Title.GetString(), pPreviewStyleId,"), std::string::npos);
+}
+
+// 单色覆盖风格后，名牌与预览必须使用选定颜色；彩虹预览也必须在位移之后补回色段。
+TEST(QmTitleStyle, CustomColorsSurviveStyleInNameplateAndPreview)
+{
+	const std::string Menus = ReadQmTitleStyleSource("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string Nameplates = ReadQmTitleStyleSource("src/game/client/components/nameplates.cpp");
+	EXPECT_NE(Nameplates.find("const bool VertexColored = (DynamicStyle && !m_TitleRenderStyle.m_ColorOverride) || m_TitleColorStyle.m_Rainbow || !CustomColor;"), std::string::npos);
+	const size_t Start = Menus.find("static void RenderQmTitleFinishedPreview(");
+	const size_t End = Menus.find("static void UpdateKeywordRulesLayoutState(", Start);
+	ASSERT_NE(Start, std::string::npos);
+	ASSERT_NE(End, std::string::npos);
+	const std::string Preview = Menus.substr(Start, End - Start);
+	EXPECT_NE(Preview.find("const bool VertexColored = (DynamicStyle && !RenderStyle.m_ColorOverride) || ColorStyle.m_Rainbow || !CustomColor;"), std::string::npos);
+	EXPECT_NE(Preview.find("if(ColorStyle.m_Rainbow && (!DynamicStyle || RenderStyle.m_ColorOverride))"), std::string::npos);
+	EXPECT_EQ(Preview.find("else if(ColorStyle.m_Rainbow)"), std::string::npos);
+}
+
 // 高级模式只折叠设置；全部十个配置入口必须在父级之内，预览与保存仍在外面。
 TEST(QmTitleStyle, AdvancedSettingsContainAllOptionsWithoutResettingThem)
 {
@@ -813,10 +857,10 @@ TEST(QmTitleStyle, FinishedPreviewUsesDraftAndCompleteAppearance)
 	ASSERT_NE(Start, std::string::npos);
 	ASSERT_NE(End, std::string::npos);
 	const std::string Preview = Menus.substr(Start, End - Start);
-	EXPECT_NE(Menus.find("s_Title.GetString(), pServerStyleId, g_Config.m_QmTitleStyleEnabled != 0, pLocalStyleId"), std::string::npos);
+	EXPECT_NE(Menus.find("s_Title.GetString(), pPreviewStyleId,"), std::string::npos);
 	EXPECT_NE(Preview.find("ResolveQmTitleColorStyle(g_Config.m_QmTitleColorMode, g_Config.m_QmTitleColor, g_Config.m_QmTitleOpacity, ServerRainbow)"), std::string::npos);
-	// 预览必须与实际名牌走同一条风格解析路径：本地兜底显式传入，而不是在预览里另写一套回退。
-	EXPECT_NE(Preview.find("QmTitleResolveRenderStyle(pStyleId, LocalStyleEnabled, pLocalStyleId)"), std::string::npos);
+	// 预览使用选中的草稿风格，颜色与效果仍走名牌共用的解析路径。
+	EXPECT_NE(Preview.find("QmTitleResolveRenderStyle(pStyleId, false, \"\")"), std::string::npos);
 	EXPECT_NE(Preview.find("QmTitleShimmerFromConfig()"), std::string::npos);
 	EXPECT_NE(Preview.find("QmAddTitleRainbowSplits"), std::string::npos);
 	EXPECT_NE(Preview.find("g_Config.m_QmTitleBloom >= 2 ? 16 : 6"), std::string::npos);
@@ -863,25 +907,32 @@ TEST(QmTitleStyle, LocalColorModeOverridesStyleColors)
 	EXPECT_NE(Nameplates.find("QmAddTitleRainbowSplits(Cursor, m_aText, 1.0f);"), std::string::npos);
 }
 
-// 服务端 presence 只能在「确实拿到本服务器的有效名单」时丢弃：否则请求失败会让头衔与风格瞬间消失，
-// 表现为颜色在本地配色档与服务端风格之间来回闪。
+// 只有本服务器的有效 WS 名单可以替换旧称号；无效推送与断线不能提前清空租约。
 TEST(QmTitleStyle, TitlePresenceSurvivesFailedRefresh)
 {
 	const std::string Client = ReadQmTitleStyleSource("src/game/client/components/qmclient/qmclient.cpp");
 	ASSERT_FALSE(Client.empty());
 
-	const size_t ListStart = Client.find("if(m_pTitleList && m_pTitleList->Done())");
+	const size_t ListStart = Client.find("void CQmClient::ApplyQmRealtimeTitles(");
 	ASSERT_NE(ListStart, std::string::npos);
-	const size_t ListEnd = Client.find("if(Client()->State() != IClient::STATE_ONLINE", ListStart);
+	const size_t ListEnd = Client.find("void CQmClient::UpdateQmRealtime()", ListStart);
 	ASSERT_NE(ListEnd, std::string::npos);
 	const std::string List = Client.substr(ListStart, ListEnd - ListStart);
 
-	const size_t Success = List.find("m_pTitleList->StatusCode() == 200 && str_comp(aServer, m_aTitlePendingServer) == 0");
-	ASSERT_NE(Success, std::string::npos);
-	const size_t Clear = List.find("mem_zero(m_aTitleExpires, sizeof(m_aTitleExpires));");
-	ASSERT_NE(Clear, std::string::npos);
-	// 清空必须发生在成功分支内部、且在校验之后。
-	EXPECT_GT(Clear, Success) << "清空旧 presence 的位置必须落在拿名单成功的分支里";
+	const size_t ValidPayload = List.find("if(!Message.m_HasTitles || !Message.m_pTitlePayload)");
+	const size_t SameServer = List.find("str_comp(pAddress->u.string.ptr, aServer) != 0");
+	const size_t Apply = List.find("ApplyQmTitlePresences(Message.m_pTitlePayload.get(), aServer);");
+	ASSERT_NE(ValidPayload, std::string::npos);
+	ASSERT_NE(SameServer, std::string::npos);
+	ASSERT_NE(Apply, std::string::npos);
+	EXPECT_LT(ValidPayload, SameServer);
+	EXPECT_LT(SameServer, Apply);
+	EXPECT_EQ(List.find("mem_zero(m_aTitleExpires"), std::string::npos);
+
+	// 防止重新引入日志中会在 HTTP 超时后读取状态码的旧轮询链路。
+	EXPECT_EQ(Client.find("StartTitleRequest(\"presence\""), std::string::npos);
+	EXPECT_EQ(Client.find("m_pTitleReport"), std::string::npos);
+	EXPECT_EQ(Client.find("m_pTitleList"), std::string::npos);
 }
 
 // 相位基准：对齐服务端时间并取模。直接用 Unix 时间戳量级会让 float 相位失效（1e9 时 ULP≈64 秒）。

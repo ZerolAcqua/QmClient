@@ -1,5 +1,24 @@
 # Demo 简易剪辑工具
 
+## 2026-09-15 紧凑模糊界面
+
+- 用户确认范围：底部播放剪辑面板、显示设置、剪辑导出与视频导出弹窗。
+- 面板只模糊覆盖区域，沿用 `qm_gaussian_blur` 总开关；深色覆层不透明度从 92% 调整为 56%，关闭模糊或图形后端不支持时使用 92% 深色底。
+- 主面板最大宽度由 760 改为 640，高度由 152 改为 120；显示设置高度为 116，展开后主面板总高为 242。标题、时间轴、播放和剪辑操作分层保留，剪辑按起止标记、加入/清空列表、预览、导出排列。
+- 窄屏按可用宽度缩小播放图标；起止按钮使用 `I/O + 时间`，预览和导出使用图标并保留悬停说明。现有快捷键、右键清除、播放、寻址和导出行为保持一致。
+- 导出弹窗最大宽度为 560，按实际片段和展开状态计算高度；显示设置默认折叠，标题和确认按钮固定，空间不足时正文可滚动。主面板的显示设置在进入 Demo 时默认折叠。
+- 修复剪辑导出弹窗处于播放控件模糊抑制作用域内的问题：调用移至播放面板返回之后，先绘制弹窗模糊背景，再抑制控件模糊。
+- 先补测试代码，覆盖紧凑尺寸、200% UI 缩放下的边界、导出内容高度和弹窗模糊调用边界，再实现；按仓库要求不编译、不执行测试。
+- 完成后按补丁版本从 3.6.1 更新到 3.6.2。
+
+### 本次审查与验证
+
+- Findings：只读审查未发现尚未处理的阻断问题。核对了弹窗模糊与控件抑制顺序、滚动偏移及提前返回时的裁剪收尾、窄屏播放栏宽度、显示设置展开帧的高度一致性。
+- `python qmclient_scripts/gate/check_gate.py --mode quick --report-json-path tmp/demo_compact_quick.json`：通过，11 项通过、0 项失败；日志为 `tmp/demo_compact_quick.log`。
+- `python qmclient_scripts/fix_style.py -n src/game/client/components/menus_demo.cpp src/game/client/components/menus.cpp src/game/client/components/menus.h src/game/client/components/qmclient/demo_ui.h src/test/qm_new_ui_menu_branch_test.cpp src/game/version.h`：通过。
+- 本次涉及文件的 `git diff --check` 通过；保留 UTF-8、无 BOM、LF 换行。
+- 未编译、未运行 C++/Rust 测试、未启动客户端；新增测试没有运行时通过结论，游戏内模糊效果与交互仍待实机验证。
+
 ## 剪辑 HUD 与显示选项扩展
 
 - 用户确认：Demo 预览和视频导出使用独立显示设置，不影响正常游戏。选择保存在客户端配置，不写入 `.demo` 文件。

@@ -19,7 +19,8 @@
 #include <game/client/components/motd.h>
 #include <game/client/components/player_points.h>
 #include <game/client/components/qmclient/axiom_scores.h>
-#include <game/client/components/qmclient/modes.h>
+#include <game/client/components/qmclient/friend_heart_icon.h>
+#include <game/client/components/qmclient/scoreboard_skin.h>
 #include <game/client/components/statboard.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
@@ -1408,7 +1409,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				m_ScoreboardPopupContext.m_ClientId = ClientId;
 				m_ScoreboardPopupContext.m_IsLocal = GameClient()->m_aLocalIds[0] == ClientId ||
 								     (Client()->DummyConnected() && GameClient()->m_aLocalIds[1] == ClientId);
-				Ui()->DoPopupMenu(&m_ScoreboardPopupContext, Ui()->MouseX(), Ui()->MouseY(), 110.0f, m_ScoreboardPopupContext.m_IsLocal ? 58.5f : 87.5f, &m_ScoreboardPopupContext, PopupScoreboard);
+				Ui()->DoPopupMenu(&m_ScoreboardPopupContext, Ui()->MouseX(), Ui()->MouseY(), m_ScoreboardPopupContext.m_IsLocal ? 110.0f : 145.0f, m_ScoreboardPopupContext.m_IsLocal ? 58.5f : 87.5f, &m_ScoreboardPopupContext, PopupScoreboard);
 			}
 
 			if(Ui()->HotItem() == &ClientData ||
@@ -1719,9 +1720,6 @@ void CScoreboard::OnRender()
 		return;
 	UpdateTeamModeCache();
 	UpdateQmAxiomScoreMode();
-
-	if(ShouldHideFocusScoreboard(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideScoreboard != 0))
-		return;
 
 	// 当记分板可见时（骗你的,不可见也查），为所有活跃玩家触发查询点
 	if(HasQmAxiomScoreMode())
@@ -2240,9 +2238,9 @@ CUi::EPopupMenuFunctionResult CScoreboard::PopupScoreboard(void *pContext, CUIRe
 
 	if(!pPopupContext->m_IsLocal)
 	{
-		const int ActionsNum = 3;
+		const int ActionsNum = 4;
 		const float ActionSize = 25.0f;
-		const float ActionSpacing = minimum(17.5f, (View.w - (ActionsNum * ActionSize)) / 2);
+		const float ActionSpacing = minimum(17.5f, (View.w - (ActionsNum * ActionSize)) / (ActionsNum - 1));
 		const float ActionsWidth = ActionsNum * ActionSize + (ActionsNum - 1) * ActionSpacing;
 		int ActionCorners = IGraphics::CORNER_ALL;
 
@@ -2282,7 +2280,8 @@ CUi::EPopupMenuFunctionResult CScoreboard::PopupScoreboard(void *pContext, CUIRe
 
 		ColorRGBA FriendActionColor = Client.m_Friend ? ColorRGBA(0.95f, 0.3f, 0.3f, 0.85f * pUi->ButtonColorMul(&pPopupContext->m_FriendAction)) :
 								ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f * pUi->ButtonColorMul(&pPopupContext->m_FriendAction));
-		const char *pFriendActionIcon = pUi->HotItem() == &pPopupContext->m_FriendAction && Client.m_Friend ? FontIcons::FONT_ICON_HEART_CRACK : FontIcons::FONT_ICON_HEART;
+		// 未加好友态用默认字体的实体爱心（U+2665）；已是好友悬停仍是图标字体的空心裂心。
+		const char *pFriendActionIcon = pUi->HotItem() == &pPopupContext->m_FriendAction && Client.m_Friend ? FontIcons::FONT_ICON_HEART_CRACK : QM_FRIEND_HEART_ICON;
 		if(pUi->DoButton_FontIcon(&pPopupContext->m_FriendAction, pFriendActionIcon, Client.m_Friend, &Action, BUTTONFLAG_LEFT, ActionCorners, true, FriendActionColor))
 		{
 			if(Client.m_Friend)
@@ -2313,6 +2312,31 @@ CUi::EPopupMenuFunctionResult CScoreboard::PopupScoreboard(void *pContext, CUIRe
 			Client.m_EmoticonIgnore ^= 1;
 		}
 		pScoreboard->GameClient()->m_Tooltips.DoToolTip(&pPopupContext->m_EmoticonAction, &Action, Client.m_EmoticonIgnore ? Localize("Unmute emoticons") : Localize("Mute emoticons"));
+
+		Action = CUiV2LegacyAdapter::ToCUIRect(vActions[3].m_Box);
+		const bool Sixup = pScoreboard->Client()->IsSixup();
+		const bool CanCopySkin = !Sixup && pScoreboard->Client()->State() == IClient::STATE_ONLINE;
+		if(pUi->DoButton_FontIcon(&pPopupContext->m_CopySkinAction, FontIcons::FONT_ICON_COPY, 0, &Action, BUTTONFLAG_LEFT, ActionCorners, CanCopySkin) && CanCopySkin)
+		{
+			if(QmCopyScoreboardSkin(g_Config, Sixup, Client.m_aSkinName, Client.m_UseCustomColor, Client.m_ColorBody, Client.m_ColorFeet))
+			{
+				if(g_Config.m_ClDummy)
+					pScoreboard->GameClient()->SendDummyInfo(false);
+				else
+					pScoreboard->GameClient()->SendInfo(false);
+			}
+		}
+
+		char aSkinTooltip[256];
+		if(Sixup)
+			str_copy(aSkinTooltip, Localize("Skin copying is only available for 0.6 skins"));
+		else
+		{
+			char aSkinName[128];
+			str_format(aSkinName, sizeof(aSkinName), Localize("Skin: %s"), Client.m_aSkinName);
+			str_format(aSkinTooltip, sizeof(aSkinTooltip), "%s\n%s", Localize("Copy skin"), aSkinName);
+		}
+		pScoreboard->GameClient()->m_Tooltips.DoToolTip(&pPopupContext->m_CopySkinAction, &Action, aSkinTooltip, 240.0f);
 	}
 
 	const float ButtonSize = 17.5f;

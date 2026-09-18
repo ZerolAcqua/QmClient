@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <utility>
 
 namespace
 {
@@ -76,6 +77,17 @@ namespace
 		return EClientBrand::QM;
 	}
 } // namespace
+
+bool SQmClientDistributionSnapshot::Apply(SQmClientUsersParseResult &Result, int64_t ExpireTick)
+{
+	if(!Result.m_Parsed)
+		return false;
+	m_vServers = std::move(Result.m_vServerDistribution);
+	m_OnlineUserCount = Result.m_OnlineUserCount;
+	m_OnlineDummyCount = Result.m_OnlineDummyCount;
+	m_ExpireTick = ExpireTick;
+	return true;
+}
 
 bool ParseQmClientUsersJson(const json_value *pRoot, const char *pServerAddress, SQmClientUsersParseResult &OutResult)
 {
@@ -152,12 +164,6 @@ bool ParseQmClientUsersJson(const json_value *pRoot, const char *pServerAddress,
 		const json_value *pQidField = JsonObjectField(pEntry, "qid");
 		if(pQidField != &json_value_none && pQidField->type == json_string)
 			Mark.m_Qid = pQidField->u.string.ptr;
-
-		const json_value *pFootParticlesEnabled = JsonObjectField(pEntry, "foot_particles_enabled");
-		JsonReadBoolean(pFootParticlesEnabled, Mark.m_FootParticlesEnabled);
-
-		const json_value *pRemoteParticlesEnabled = JsonObjectField(pEntry, "remote_particles_enabled");
-		JsonReadBoolean(pRemoteParticlesEnabled, Mark.m_RemoteParticlesEnabled);
 
 		Mark.m_VoiceSupported = true;
 		const json_value *pVoiceSupported = JsonObjectField(pEntry, "voice_supported");

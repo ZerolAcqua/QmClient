@@ -1,3 +1,4 @@
+#include <game/client/components/players.h>
 #include <game/client/components/qmclient/qm_hook_coll_candidates.h>
 // 请抬头享受阳光｜日子很好 我很我---------致咩子
 #include "test.h"
@@ -130,4 +131,59 @@ TEST(QmHookCollCandidates, ReusesTargetsForEverySimulatedSegmentAndPreservesOrde
 	EXPECT_EQ(Cache.Get(3, [](int Id) { return Id == 8; }), (std::vector<int>{8}));
 	Cache.Reset();
 	EXPECT_TRUE(Cache.Get(3, [](int) { return false; }).empty());
+}
+
+TEST(QmHookCollGeometry, ReusedScratchPreservesSegmentAndCornerOrder)
+{
+	SQmHookCollLineScratch Scratch;
+	Scratch.m_vLineSegments.emplace_back(vec2(1.0f, 2.0f), vec2(5.0f, 2.0f));
+	Scratch.m_vLineSegments.emplace_back(vec2(20.0f, 3.0f), vec2(20.0f, 9.0f));
+	Scratch.AppendQuad(Scratch.m_vLineSegments[0], vec2(0.0f, 2.0f), 0.5f);
+	Scratch.AppendQuad(Scratch.m_vLineSegments[1], vec2(-2.0f, 0.0f), 0.25f);
+	ASSERT_EQ(Scratch.m_vLineQuadSegments.size(), 2u);
+	const auto &Horizontal = Scratch.m_vLineQuadSegments[0];
+	EXPECT_EQ(vec2(Horizontal.m_X0, Horizontal.m_Y0), vec2(5.0f, 1.0f));
+	EXPECT_EQ(vec2(Horizontal.m_X1, Horizontal.m_Y1), vec2(5.0f, 3.0f));
+	EXPECT_EQ(vec2(Horizontal.m_X2, Horizontal.m_Y2), vec2(1.0f, 1.0f));
+	EXPECT_EQ(vec2(Horizontal.m_X3, Horizontal.m_Y3), vec2(1.0f, 3.0f));
+	const auto &Vertical = Scratch.m_vLineQuadSegments[1];
+	EXPECT_EQ(vec2(Vertical.m_X0, Vertical.m_Y0), vec2(20.5f, 9.0f));
+	EXPECT_EQ(vec2(Vertical.m_X1, Vertical.m_Y1), vec2(19.5f, 9.0f));
+	EXPECT_EQ(vec2(Vertical.m_X2, Vertical.m_Y2), vec2(20.5f, 3.0f));
+	EXPECT_EQ(vec2(Vertical.m_X3, Vertical.m_Y3), vec2(19.5f, 3.0f));
+}
+
+TEST(QmHookCollGeometry, NewPlayerAndTipReuseCapacityWithoutStaleGeometry)
+{
+	SQmHookCollLineScratch Scratch;
+	for(int Segment = 0; Segment < 250; ++Segment)
+	{
+		Scratch.m_vLineSegments.emplace_back(vec2(Segment * 4.0f, 0.0f), vec2(Segment * 4.0f + 2.0f, 0.0f));
+		Scratch.AppendQuad(Scratch.m_vLineSegments.back(), vec2(0.0f, 1.0f), 0.5f);
+	}
+	const auto *pLines = Scratch.m_vLineSegments.data();
+	const auto *pQuads = Scratch.m_vLineQuadSegments.data();
+	const auto LineCapacity = Scratch.m_vLineSegments.capacity();
+	const auto QuadCapacity = Scratch.m_vLineQuadSegments.capacity();
+	for(int Player = 0; Player < 64; ++Player)
+	{
+		Scratch.Reset();
+		EXPECT_TRUE(Scratch.m_vLineSegments.empty());
+		EXPECT_TRUE(Scratch.m_vLineQuadSegments.empty());
+		Scratch.m_vLineSegments.emplace_back(vec2(4.0f, 0.0f), vec2(8.0f, 0.0f));
+		Scratch.m_vLineSegments.emplace_back(vec2(0.0f, 0.0f), vec2(4.0f, 0.0f));
+		for(const auto &Line : Scratch.m_vLineSegments)
+			Scratch.AppendQuad(Line, vec2(0.0f, 1.0f), 0.5f);
+		ASSERT_EQ(Scratch.m_vLineQuadSegments.size(), 2u);
+		EXPECT_FLOAT_EQ(Scratch.m_vLineQuadSegments[0].m_X0, 8.0f);
+		EXPECT_FLOAT_EQ(Scratch.m_vLineQuadSegments[1].m_X0, 4.0f);
+		Scratch.m_vLineQuadSegments.clear();
+		Scratch.AppendQuad(IGraphics::CLineItem(vec2(8.0f, 0.0f), vec2(9.0f, 0.0f)), vec2(0.0f, 1.0f), 0.5f);
+		ASSERT_EQ(Scratch.m_vLineQuadSegments.size(), 1u);
+		EXPECT_FLOAT_EQ(Scratch.m_vLineQuadSegments[0].m_X0, 9.0f);
+		EXPECT_EQ(Scratch.m_vLineSegments.data(), pLines);
+		EXPECT_EQ(Scratch.m_vLineQuadSegments.data(), pQuads);
+		EXPECT_EQ(Scratch.m_vLineSegments.capacity(), LineCapacity);
+		EXPECT_EQ(Scratch.m_vLineQuadSegments.capacity(), QuadCapacity);
+	}
 }

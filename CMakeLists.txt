@@ -240,6 +240,39 @@ if(TARGET_OS STREQUAL "windows" AND TARGET_BITS STREQUAL "64")
   target_include_directories(qm-soda-helper PRIVATE src)
   target_compile_definitions(qm-soda-helper PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
   target_link_libraries(qm-soda-helper PRIVATE bcrypt winhttp ws2_32)
+
+  # 酷狗与 QQ 音乐共用独立采集进程，网络与进程读取不进入游戏主线程。
+  add_executable(qm-music-helper
+    src/qm-music-hook/qm_music_helper.cpp
+    src/qm-music-hook/qm_music_source.h
+    src/qm-music-hook/qm_music_publication.cpp
+    src/qm-music-hook/qm_music_publication.h
+    src/qm-music-hook/qm_kugou_source.cpp
+    src/qm-music-hook/qm_kugou_source.h
+    src/qm-music-hook/qm_kugou_protocol.cpp
+    src/qm-music-hook/qm_kugou_protocol.h
+    src/qm-music-hook/qm_qqmusic_source.cpp
+    src/qm-music-hook/qm_qqmusic_source.h
+    src/qm-music-hook/qm_qqmusic_protocol.cpp
+    src/qm-music-hook/qm_qqmusic_protocol.h
+    src/qm-soda-hook/qm_soda_protocol.cpp
+    src/qm-soda-hook/qm_soda_writer.cpp
+    src/qm-nmt-hook/qm_netease_cdp_client.cpp
+    src/qm-nmt-hook/qm_netease_cdp.cpp
+    src/game/client/components/qmclient/music_lyrics/music_lyrics_krc.cpp
+    src/game/client/components/qmclient/music_lyrics/music_lyrics_qrc.cpp
+    src/game/client/components/qmclient/netease/netease_lyric_parser.cpp
+    src/engine/external/json-parser/json.c
+  )
+  set_target_properties(qm-music-helper PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  )
+  target_include_directories(qm-music-helper PRIVATE src)
+  target_compile_definitions(qm-music-helper PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_link_libraries(qm-music-helper PRIVATE bcrypt winhttp ws2_32 iphlpapi version advapi32 user32)
 endif()
 
 if(TARGET_OS STREQUAL "android")
@@ -632,15 +665,17 @@ if(TARGET_OS STREQUAL "android")
   find_package(Android)
 endif()
 find_package(ZLIB)
-# 汽水 Helper 与网易云 Helper 都在 find_package 之前定义,这里补链接 zlib。
-if(TARGET qm-soda-helper)
-  if(ZLIB_DEP)
-    target_sources(qm-soda-helper PRIVATE ${ZLIB_DEP})
-    target_include_directories(qm-soda-helper PRIVATE ${ZLIB_INCLUDE_DIRS})
-  elseif(ZLIB_LIBRARIES)
-    target_link_libraries(qm-soda-helper PRIVATE ${ZLIB_LIBRARIES})
+# 歌词 Helper 在 find_package 之前定义，这里补链接 zlib。
+foreach(qm_lyrics_helper qm-soda-helper qm-music-helper)
+  if(TARGET ${qm_lyrics_helper})
+    if(ZLIB_DEP)
+      target_sources(${qm_lyrics_helper} PRIVATE ${ZLIB_DEP})
+      target_include_directories(${qm_lyrics_helper} PRIVATE ${ZLIB_INCLUDE_DIRS})
+    elseif(ZLIB_LIBRARIES)
+      target_link_libraries(${qm_lyrics_helper} PRIVATE ${ZLIB_LIBRARIES})
+    endif()
   endif()
-endif()
+endforeach()
 find_package(Crypto)
 find_package(Curl)
 if(CLIENT AND VIDEORECORDER)
@@ -2320,34 +2355,6 @@ file(GLOB QM_ICON_ATLAS_SVG_SOURCES
   datasrc/qm_icons/phosphor_thin/*.svg
   datasrc/qm_icons/tabler/*.svg
 )
-set(QM_ICON_MORPH_SVG_SOURCES
-  datasrc/qm_icons/phosphor_bold/icon-eye-off.svg
-  datasrc/qm_icons/phosphor_bold/icon-eye.svg
-  datasrc/qm_icons/phosphor_fill/icon-eye-off.svg
-  datasrc/qm_icons/phosphor_fill/icon-eye.svg
-  datasrc/qm_icons/phosphor_regular/icon-eye-off.svg
-  datasrc/qm_icons/phosphor_regular/icon-eye.svg
-  datasrc/qm_icons/phosphor_thin/icon-eye-off.svg
-  datasrc/qm_icons/phosphor_thin/icon-eye.svg
-)
-set(QM_ICON_MORPH_GENERATED ${PROJECT_BINARY_DIR}/src/generated/qm_icon_morph_generated.inc)
-add_custom_command(OUTPUT ${QM_ICON_MORPH_GENERATED}
-  COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/src/generated
-  COMMAND ${Python3_EXECUTABLE}
-    qmclient_scripts/qm_build_icon_morph.py
-    --source-root datasrc/qm_icons
-    --output ${QM_ICON_MORPH_GENERATED}
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-  DEPENDS
-    qmclient_scripts/qm_build_icon_atlas.py
-    qmclient_scripts/qm_build_icon_morph.py
-    ${QM_ICON_MORPH_SVG_SOURCES}
-  COMMENT "Building QmClient eye path morph data"
-)
-add_custom_target(qm-icon-morph DEPENDS ${QM_ICON_MORPH_GENERATED})
-if(TARGET sync_runtime_data)
-  add_dependencies(sync_runtime_data qm-icon-morph)
-endif()
 add_custom_target(qm-icon-atlas
   COMMAND ${Python3_EXECUTABLE}
     qmclient_scripts/qm_build_icon_atlas.py
@@ -3262,8 +3269,6 @@ if(CLIENT)
     projectile_data.h
     qm_icon_manager.cpp
     qm_icon_manager.h
-    qm_icon_morph.cpp
-    qm_icon_morph.h
     qm_ime_candidate_popup.cpp
     qm_ime_candidate_popup.h
     qm_ime_manager.cpp
@@ -3534,7 +3539,6 @@ if(CLIENT)
     )
   endif()
   add_dependencies(game-client generate_content_types)
-  add_dependencies(game-client qm-icon-morph)
   if(TARGET qm-nmt-hook64)
     add_dependencies(game-client qm-nmt-hook64 qm-nmt-helper qm-nmt-bootstrap)
     add_custom_command(TARGET game-client POST_BUILD
@@ -3548,6 +3552,12 @@ if(CLIENT)
     add_custom_command(TARGET game-client POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:qm-soda-helper>" "$<TARGET_FILE_DIR:game-client>/qm-soda-helper.exe"
       COMMENT "Copying SodaMusic hook helper")
+  endif()
+  if(TARGET qm-music-helper)
+    add_dependencies(game-client qm-music-helper)
+    add_custom_command(TARGET game-client POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:qm-music-helper>" "$<TARGET_FILE_DIR:game-client>/qm-music-helper.exe"
+      COMMENT "Copying Kugou and QQ Music helper")
   endif()
   if(VULKAN)
     add_dependencies(game-client build_vulkan_shaders)
@@ -3988,6 +3998,11 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     qm_netease_hook_protocol_test.cpp
     music_lyrics_krc_test.cpp
     music_lyrics_qrc_test.cpp
+    qm_music_registry_test.cpp
+    qm_music_transport_test.cpp
+    qm_kugou_protocol_test.cpp
+    qm_kugou_patch_test.cpp
+    qm_qqmusic_protocol_test.cpp
     qm_spotify_crypto_test.cpp
     qm_spotify_token_test.cpp
     qm_spotify_parser_test.cpp
@@ -4081,6 +4096,11 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/game/client/components/qmclient/monitoring/monitoring_device_perf.cpp
     src/game/client/components/qmclient/music_lyrics/music_lyrics_krc.cpp
     src/game/client/components/qmclient/music_lyrics/music_lyrics_qrc.cpp
+    src/game/client/components/qmclient/music_lyrics/qm_soda_lyric_file.cpp
+    src/qm-soda-hook/qm_soda_protocol.cpp
+    src/qm-music-hook/qm_music_publication.cpp
+    src/qm-music-hook/qm_kugou_protocol.cpp
+    src/qm-music-hook/qm_qqmusic_protocol.cpp
     src/game/client/components/qmclient/music_lyrics/qm_spotify_crypto.cpp
     src/game/client/components/qmclient/music_lyrics/qm_spotify_token.cpp
     src/game/client/components/qmclient/music_lyrics/qm_spotify_parser.cpp
@@ -4162,6 +4182,10 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
       src/test/music_lyrics_krc_test.cpp
       src/test/music_lyrics_qrc_test.cpp
       src/test/qm_soda_lyric_file_test.cpp
+      src/test/qm_music_transport_test.cpp
+      src/test/qm_kugou_protocol_test.cpp
+      src/test/qm_kugou_patch_test.cpp
+      src/test/qm_qqmusic_protocol_test.cpp
       src/test/qm_soda_probe_test.cpp
       src/test/qm_soda_protocol_test.cpp
       src/test/netease_lyric_parser_test.cpp
@@ -4173,6 +4197,9 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
       src/test/qm_spotify_crypto_test.cpp
       src/test/qm_spotify_token_test.cpp
       src/test/qm_spotify_parser_test.cpp
+      src/qm-music-hook/qm_music_publication.cpp
+      src/qm-music-hook/qm_kugou_protocol.cpp
+      src/qm-music-hook/qm_qqmusic_protocol.cpp
       src/qm-soda-hook/qm_soda_probe.cpp
       src/qm-soda-hook/qm_soda_protocol.cpp
       src/game/client/components/qmclient/music_lyrics/qm_soda_lyric_file.cpp
@@ -4455,10 +4482,12 @@ if(TARGET game-client)
       list(APPEND CPACK_TARGETS ${qm_nmt_runtime_target})
     endif()
   endforeach()
-  # 汽水音乐 Hook Helper 与客户端同级发布。
-  if(TARGET qm-soda-helper)
-    list(APPEND CPACK_TARGETS qm-soda-helper)
-  endif()
+  # 音乐采集 Helper 与客户端同级发布。
+  foreach(qm_lyrics_helper qm-soda-helper qm-music-helper)
+    if(TARGET ${qm_lyrics_helper})
+      list(APPEND CPACK_TARGETS ${qm_lyrics_helper})
+    endif()
+  endforeach()
 endif()
 if(TARGET qm-client-updater)
   list(APPEND CPACK_TARGETS qm-client-updater)

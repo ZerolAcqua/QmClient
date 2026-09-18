@@ -7,10 +7,12 @@
 #include <game/client/QmUi/QmCardRegistry.h>
 #include <game/client/QmUi/QmUiPerf.h>
 #include <game/client/components/player_points.h>
+#include <game/client/components/qmclient/friend_online_tracker.h>
 #include <game/client/components/qmclient/monitoring/monitoring.h>
 #include <game/client/components/qmclient/music_app_watcher.h>
 #include <game/client/components/qmclient/perf_diagnostics.h>
 #include <game/client/components/qmclient/perf_logging.h>
+#include <game/client/components/qmclient/qm_map_upload.h>
 #include <game/client/components/qmclient/qm_music_hook_registry.h>
 #include <game/client/components/qmclient/settings_perf_windows.h>
 #include <game/client/components/qmclient/settings_resource_preview.h>
@@ -913,7 +915,17 @@ TEST(QmMonitoringHelpers, QmUiRuntimeTelemetryExposesSettingsContext)
 	EXPECT_EQ(Source.find("layout_ms=%.3f"), std::string::npos);
 	EXPECT_NE(Source.find("QmPerfLogPayload(\"perf/ui_runtime\""), std::string::npos);
 	EXPECT_NE(Source.find("QmPerfLogStage(\"perf/ui_runtime\", pStage, DurationMs, Force, pClient, pPage, nullptr, pExtra);"), std::string::npos);
-	EXPECT_NE(Source.find("LogPerfStage(m_pGameClient->Client(), m_aPerfPage[0] != '\\0' ? m_aPerfPage : nullptr, \"ui_runtime_total\", RenderTimer.ElapsedMs(), false, aExtra);"), std::string::npos);
+	EXPECT_NE(Source.find("LogPerfStage(m_pGameClient->Client(), m_aPerfPage[0] != '\\0' ? m_aPerfPage : nullptr, \"ui_runtime_total\", DurationMs, false, aExtra);"), std::string::npos);
+	// 调度需要的活动计数仍逐帧更新，诊断关闭后不再准备日志正文。
+	const size_t ActiveCount = Source.find("m_LastStats.m_ActiveAnimCount = m_AnimRuntime.ActiveTrackCount();");
+	const size_t DisabledLogGuard = Source.find("if(!PerfEnabled)", ActiveCount);
+	const size_t Payload = Source.find("char aPayload[256];", DisabledLogGuard);
+	ASSERT_NE(ActiveCount, std::string::npos);
+	ASSERT_NE(DisabledLogGuard, std::string::npos);
+	ASSERT_NE(Payload, std::string::npos);
+	EXPECT_LT(ActiveCount, DisabledLogGuard);
+	EXPECT_LT(DisabledLogGuard, Payload);
+	EXPECT_NE(Source.find("TimingEnabled = PerfEnabled || g_Config.m_QmUiRuntimeV2Debug != 0"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, QmClientPerfTelemetryUsesLiveClientContext)
@@ -2073,25 +2085,6 @@ TEST(QmMonitoringHelpers, TClientSettingsCardDeckCoversEveryBoxedSection)
 		EXPECT_NE(Source.find(pStableId), std::string::npos) << pStableId;
 	}
 	EXPECT_EQ(Source.find("if(SectionMeta.m_pStableCardId == nullptr || SectionMeta.m_pStableCardId[0] == '\\0')\n\t\t\t\tcontinue;"), std::string::npos);
-}
-
-TEST(QmMonitoringHelpers, QmClientFocusModeSectionLabelsUseDisplayTextNotTranslationKeys)
-{
-	const std::string Source = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
-	const std::string Body = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmVisualFocusModeContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float ColumnGap, float LabelWidth)");
-	ASSERT_FALSE(Body.empty());
-	const std::string &FocusModeBody = Body;
-
-	EXPECT_NE(FocusModeBody.find("auto RenderSection = [&](CUIRect &Target, const char *pTextId, const char *pLabel)"), std::string::npos);
-	EXPECT_EQ(FocusModeBody.find("Localize(pTextId)"), std::string::npos);
-	EXPECT_NE(FocusModeBody.find("RenderQmVisualLabel(pTextId, &Row, Localize(pLabel), SmallSize);"), std::string::npos);
-	EXPECT_NE(FocusModeBody.find("RenderSection(LeftColumn, \"qmclient-focus-section-interface\", \"Interface\");"), std::string::npos);
-	EXPECT_NE(FocusModeBody.find("RenderSection(LeftColumn, \"qmclient-focus-section-players\", \"Players\");"), std::string::npos);
-	EXPECT_NE(FocusModeBody.find("RenderSection(LeftColumn, \"qmclient-focus-section-visuals\", \"Visuals\");"), std::string::npos);
-	EXPECT_NE(FocusModeBody.find("RenderSection(RightColumn, \"qmclient-focus-section-audio\", \"Audio\");"), std::string::npos);
-	EXPECT_NE(FocusModeBody.find("RenderSection(RightColumn, \"qmclient-focus-section-chat\", \"Chat\");"), std::string::npos);
-	EXPECT_NE(Source.find("RenderQmVisualFocusModeContent(Content, LineHeight, BodySize, LineSpacing, LineSpacing, LabelWidth);"), std::string::npos);
-	EXPECT_EQ(Source.find("RenderQmVisualFocusModeContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, LabelWidth);"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, SettingsTextColdStartAvoidsGlobalLanguageCacheAndCachesCheckboxLabels)
@@ -5484,6 +5477,64 @@ TEST(QmMonitoringHelpers, ClientRenderLoopUsesGameClientIdleThrottleWithOneFrame
 	EXPECT_EQ(ClientSource.find("time_freq() / (int64_t)g_Config.m_GfxRefreshRate"), std::string::npos);
 }
 
+TEST(QmMonitoringHelpers, RenderGateWaitReplacesBusyWaitWithoutChangingGate)
+{
+	const std::string ClientSource = ReadRepoFile("src/engine/client/client.cpp");
+	const std::string ConfigSource = ReadRepoFile("src/engine/shared/config_variables_qmclient.h");
+
+	// 门控速率只在确实渲染时生效；窗口失活、录制等情形保持原有循环行为。
+	EXPECT_NE(ClientSource.find("int RenderGateRate = 0;"), std::string::npos);
+	EXPECT_NE(ClientSource.find("if(IsRenderActive && GfxRefreshRate > 0)"), std::string::npos);
+	EXPECT_NE(ClientSource.find("RenderGateRate = GfxRefreshRate;"), std::string::npos);
+
+	// 新等待分支必须排在空闲节流分支之后，并复用同一套等待与时间补偿语义。
+	const size_t IdleBranch = ClientSource.find("else if(IdleRenderThrottleRate > 0)");
+	const size_t GateBranch = ClientSource.find("else if(RenderGateRate > 0)");
+	ASSERT_NE(IdleBranch, std::string::npos);
+	ASSERT_NE(GateBranch, std::string::npos);
+	EXPECT_LT(IdleBranch, GateBranch);
+	const size_t GateSlept = ClientSource.find("Slept = true;", GateBranch);
+	ASSERT_NE(GateSlept, std::string::npos);
+	const std::string GateBody = ClientSource.substr(GateBranch, GateSlept - GateBranch);
+	EXPECT_NE(GateBody.find("SleepTimeInNanoSeconds = (std::chrono::nanoseconds(1s) / (int64_t)RenderGateRate) - (Now - LastTime);"), std::string::npos);
+	EXPECT_NE(GateBody.find("WaitWithNetwork(SleepTimeInNanoSeconds);"), std::string::npos);
+
+	// 门控判据本身不得被改动：渲染时机、丢帧补偿与帧率判定保持原样。
+	EXPECT_NE(ClientSource.find("(!GfxRefreshRate || RenderFrameTicks <= Now - LastRenderTime)"), std::string::npos);
+	EXPECT_NE(ClientSource.find("int64_t AdditionalTime = GfxRefreshRate ? ((Now - LastRenderTime) - RenderFrameTicks) : 0;"), std::string::npos);
+
+	// 呈现对齐：默认开启、可关闭，且只在"关垂直同步 + 未设上限"时接入。
+	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmPresentAlign, qm_present_align, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE,"), std::string::npos);
+	const size_t AlignGuard = ClientSource.find("else if(g_Config.m_QmPresentAlign != 0 && g_Config.m_GfxScreenRefreshRate > 0)");
+	ASSERT_NE(AlignGuard, std::string::npos);
+	const size_t AlignRate = ClientSource.find("GfxRefreshRate = std::clamp(g_Config.m_GfxScreenRefreshRate, 10, 10000);", AlignGuard);
+	ASSERT_NE(AlignRate, std::string::npos);
+	// 对齐分支必须位于空闲节流判定之内，且不得覆盖显式上限或录制路径。
+	const size_t ThrottleGuard = ClientSource.find("if(g_Config.m_GfxVsync == 0 && GfxRefreshRate == 0)");
+	ASSERT_NE(ThrottleGuard, std::string::npos);
+	EXPECT_LT(ThrottleGuard, AlignGuard);
+	EXPECT_LT(AlignRate, ClientSource.find("if(IVideo::Current())"));
+}
+
+TEST(QmMonitoringHelpers, TextRuntimePerfSamplingRunsOnlyWhenDiagnosticsAreEnabled)
+{
+	const std::string TextSource = ReadRepoFile("src/engine/client/text.cpp");
+
+	// 关闭诊断时不再读取高精度时钟；开启时采样字段与口径保持原样。
+	EXPECT_NE(TextSource.find("const auto UploadStart = QmPerfEnabled() ? time_get_nanoseconds() : std::chrono::nanoseconds(0);"), std::string::npos);
+	EXPECT_NE(TextSource.find("const auto RasterizeStart = QmPerfEnabled() ? time_get_nanoseconds() : std::chrono::nanoseconds(0);"), std::string::npos);
+	EXPECT_NE(TextSource.find("const auto CreateStart = PerfEnabled ? time_get_nanoseconds() : std::chrono::nanoseconds(0);"), std::string::npos);
+	EXPECT_NE(TextSource.find("const bool PerfEnabled = QmPerfEnabled();"), std::string::npos);
+	EXPECT_NE(TextSource.find("m_QmPerfGlyphUploadMs += std::chrono::duration<double, std::milli>(time_get_nanoseconds() - UploadStart).count();"), std::string::npos);
+	EXPECT_NE(TextSource.find("m_QmPerfGlyphRasterizeMs += std::chrono::duration<double, std::milli>(time_get_nanoseconds() - RasterizeStart).count();"), std::string::npos);
+	EXPECT_NE(TextSource.find("m_QmPerfTextContainerCreateMs += std::chrono::duration<double, std::milli>(time_get_nanoseconds() - CreateStart).count();"), std::string::npos);
+	EXPECT_NE(TextSource.find("m_QmPerfTextContainerUploadMs += std::chrono::duration<double, std::milli>(time_get_nanoseconds() - UploadStart).count();"), std::string::npos);
+	// 采样字段仍然只在开启时累加，且上传统计的递增点未被移除。
+	EXPECT_NE(TextSource.find("++m_QmPerfGlyphUploads;"), std::string::npos);
+	EXPECT_NE(TextSource.find("++m_QmPerfTextContainerUploads;"), std::string::npos);
+	EXPECT_NE(TextSource.find("event=text_runtime_budget glyph_new=%d glyph_uploads=%d glyph_rasterize_ms=%.3f glyph_upload_ms=%.3f"), std::string::npos);
+}
+
 TEST(QmMonitoringHelpers, ConsoleQueuedResultCopyPreservesExternalArguments)
 {
 	const std::string ConsoleSource = ReadRepoFile("src/engine/shared/console.cpp");
@@ -7167,8 +7218,8 @@ TEST(QmMonitoringHelpers, QmClientVoiceTextInputsUseSharedQmTextField)
 	EXPECT_LT(TokenHiddenPos, TokenTextFieldPos);
 
 	const size_t ServerInputPos = Body.find("static CLineInput s_VoiceServer(g_Config.m_QmVoiceServer, sizeof(g_Config.m_QmVoiceServer));");
-	const size_t ServerEmptyTextPos = Body.find("s_VoiceServer.SetEmptyText(\"42.194.185.210:9987\");", ServerInputPos);
-	const size_t ServerTextFieldPos = Body.find("ui_widget::InputField(QmClientVoiceTextInputCtx, &s_VoiceServer, ControlCol, \"42.194.185.210:9987\", BodySize);", ServerEmptyTextPos);
+	const size_t ServerEmptyTextPos = Body.find("s_VoiceServer.SetEmptyText(\"wss://qmclient.icu/ws/voice\");", ServerInputPos);
+	const size_t ServerTextFieldPos = Body.find("ui_widget::InputField(QmClientVoiceTextInputCtx, &s_VoiceServer, ControlCol, \"wss://qmclient.icu/ws/voice\", BodySize);", ServerEmptyTextPos);
 	EXPECT_NE(ServerInputPos, std::string::npos);
 	EXPECT_NE(ServerEmptyTextPos, std::string::npos);
 	EXPECT_NE(ServerTextFieldPos, std::string::npos);
@@ -7324,7 +7375,7 @@ TEST(QmMonitoringHelpers, SettingsRenderOnlyTraversalDoesNotConsumeDeckAnimation
 	EXPECT_NE(RenderPassOrderModel.find("m_SettingsCardRenderOnlyOrderSource != g_Config.m_QmGlobalCardOrder"), std::string::npos);
 }
 
-TEST(QmMonitoringHelpers, LaserPreviewDrawsWeaponBodiesBeforePreviewLaser)
+TEST(QmMonitoringHelpers, LaserPreviewDrawsWeaponBodiesAfterPreviewLaser)
 {
 	const std::string Source = ReadRepoFile("src/game/client/components/menus.cpp");
 	const std::string Body = ExtractSourceFunctionBody(Source, "void CMenus::DoLaserPreview(const CUIRect *pRect, const ColorHSLA LaserOutlineColor, const ColorHSLA LaserInnerColor, const int LaserType)");
@@ -7337,8 +7388,8 @@ TEST(QmMonitoringHelpers, LaserPreviewDrawsWeaponBodiesBeforePreviewLaser)
 	ASSERT_NE(PreviewLaserPos, std::string::npos);
 	ASSERT_NE(RifleBodyPos, std::string::npos);
 	ASSERT_NE(ShotgunBodyPos, std::string::npos);
-	EXPECT_LT(RifleBodyPos, PreviewLaserPos);
-	EXPECT_LT(ShotgunBodyPos, PreviewLaserPos);
+	EXPECT_LT(PreviewLaserPos, RifleBodyPos);
+	EXPECT_LT(PreviewLaserPos, ShotgunBodyPos);
 }
 
 TEST(QmMonitoringHelpers, LaserRoundCapsRenderedInBothEnhancedAndPlainPaths)
@@ -7676,7 +7727,6 @@ TEST(QmMonitoringHelpers, P6VisualContentOwnersRemainShellFree)
 	const std::string WeaponAnimationBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualWeaponAnimationContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, float ContentGap, bool PrewarmOnly)");
 	const std::string ChatBubbleBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualChatBubbleContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
 	const std::string SkinTransitionBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualSkinTransitionContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
-	const std::string FocusModeBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualFocusModeContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float ColumnGap, float LabelWidth)");
 	const std::string CameraViewBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualCameraViewContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
 	ASSERT_FALSE(StreamerBody.empty());
 	ASSERT_FALSE(TranslateUiBody.empty());
@@ -7685,7 +7735,6 @@ TEST(QmMonitoringHelpers, P6VisualContentOwnersRemainShellFree)
 	ASSERT_FALSE(WeaponAnimationBody.empty());
 	ASSERT_FALSE(ChatBubbleBody.empty());
 	ASSERT_FALSE(SkinTransitionBody.empty());
-	ASSERT_FALSE(FocusModeBody.empty());
 	ASSERT_FALSE(CameraViewBody.empty());
 
 	EXPECT_NE(Header.find("RenderQmVisualStreamerContent"), std::string::npos);
@@ -7695,7 +7744,6 @@ TEST(QmMonitoringHelpers, P6VisualContentOwnersRemainShellFree)
 	EXPECT_NE(Header.find("RenderQmVisualWeaponAnimationContent"), std::string::npos);
 	EXPECT_NE(Header.find("RenderQmVisualChatBubbleContent"), std::string::npos);
 	EXPECT_NE(Header.find("RenderQmVisualSkinTransitionContent"), std::string::npos);
-	EXPECT_NE(Header.find("RenderQmVisualFocusModeContent"), std::string::npos);
 	EXPECT_NE(Header.find("RenderQmVisualCameraViewContent"), std::string::npos);
 	EXPECT_NE(Header.find("RenderQmNewFeaturesPopup"), std::string::npos);
 	EXPECT_NE(StreamerBody.find("RenderQmVisualCheckbox"), std::string::npos);
@@ -7706,8 +7754,6 @@ TEST(QmMonitoringHelpers, P6VisualContentOwnersRemainShellFree)
 	EXPECT_NE(ChatBubbleBody.find("DoLine_ColorPicker"), std::string::npos);
 	EXPECT_NE(SkinTransitionBody.find("Skin transition animation"), std::string::npos);
 	EXPECT_NE(SkinTransitionBody.find("RenderQmSettingsSliderWithValueInput"), std::string::npos);
-	EXPECT_NE(FocusModeBody.find("toggle qm_focus_mode 0 1"), std::string::npos);
-	EXPECT_NE(FocusModeBody.find("g_CommandBindCache"), std::string::npos);
 	EXPECT_NE(CameraViewBody.find("QueueAspectApply"), std::string::npos);
 	EXPECT_NE(CameraViewBody.find("RenderQmSettingsSliderWithValueInput"), std::string::npos);
 	EXPECT_EQ(StreamerBody.find("RegisterModuleCard"), std::string::npos);
@@ -7719,7 +7765,6 @@ TEST(QmMonitoringHelpers, P6VisualContentOwnersRemainShellFree)
 	EXPECT_EQ(WeaponAnimationBody.find("RegisterModuleCard"), std::string::npos);
 	EXPECT_EQ(ChatBubbleBody.find("RegisterModuleCard"), std::string::npos);
 	EXPECT_EQ(SkinTransitionBody.find("RegisterModuleCard"), std::string::npos);
-	EXPECT_EQ(FocusModeBody.find("RegisterModuleCard"), std::string::npos);
 	EXPECT_EQ(CameraViewBody.find("RegisterModuleCard"), std::string::npos);
 }
 
@@ -7920,7 +7965,7 @@ TEST(QmMonitoringHelpers, QmClientDeckMeasureRevisionsDoNotPreMeasureContent)
 	}
 	EXPECT_EQ(FunctionDeck.find("QmKeywordReplyRules::DecodeFromConfig", FunctionDeckMeasure + 1), std::string::npos);
 
-	for(const char *pState : {"DummyMiniViewExpanded", "g_Config.m_QmPlayerStatsMapProgress", "g_Config.m_QmSpeedrunTimer", "g_Config.m_QmInputOverlay", "g_Config.m_QmHudNotificationsShowAdvanced", "g_Config.m_QmHudNotificationsUseCategoryFilters", "g_Config.m_QmVoiceEnable", "g_Config.m_QmVoiceShowAdvanced", "DynamicIslandOriginalStyle", "g_Config.m_QmSmtcEnable", "g_Config.m_QmNeteaseHookEnable", "g_Config.m_Qm3DParticles"})
+	for(const char *pState : {"DummyMiniViewExpanded", "g_Config.m_QmPlayerStatsMapProgress", "g_Config.m_QmInputOverlay", "g_Config.m_QmHudNotificationsShowAdvanced", "g_Config.m_QmHudNotificationsUseCategoryFilters", "g_Config.m_QmVoiceEnable", "g_Config.m_QmVoiceShowAdvanced", "DynamicIslandOriginalStyle", "g_Config.m_QmSmtcEnable", "g_Config.m_QmNeteaseHookEnable", "g_Config.m_Qm3DParticles"})
 		EXPECT_NE(HudDeck.find(pState), std::string::npos) << pState;
 	for(const char *pState : {"g_Config.m_TcFreezeChatEnabled", "g_Config.m_TcFreezeChatEmoticon", "g_Config.m_QmAxiomAutoLogin", "g_Config.m_QmGores", "g_Config.m_QmGoresAutoEnable", "g_Config.m_QmWeaponTrajectory", "g_Config.m_QmFriendOnlineAutoRefresh", "g_Config.m_QmFriendEnterBroadcast", "g_Config.m_QmFriendEnterAutoGreet", "s_BlockWordsLayoutRevision", "g_Config.m_QmTranslateBackend", "g_Config.m_QmTranslateLlmEnableThinking", "g_Config.m_QmTranslateLlmProvider", "s_KeywordRulesLayoutRevision", "g_Config.m_QmPieMenuEnabled", "s_FavoriteMapsLayoutRevision", "g_Config.m_QmAutoTeamLock"})
 		EXPECT_NE(FunctionDeck.find(pState), std::string::npos) << pState;
@@ -9267,11 +9312,9 @@ TEST(QmMonitoringHelpers, ServerBrowserScrollRegionsUseSharedQmScrollPresets)
 	const std::string FilterBody = ExtractSourceFunctionBody(Source, "void CMenus::RenderServerbrowserDDNetFilter(CUIRect View,\n\tIFilterList &Filter,\n\tfloat ItemHeight, int MaxItems, int ItemsPerRow,\n\tCScrollRegion &ScrollRegion, std::vector<unsigned char> &vItemIds,\n\tbool UpdateCommunityCacheOnChange,\n\tconst std::function<const char *(int ItemIndex)> &GetItemName,\n\tconst std::function<void(int ItemIndex, CUIRect Item, const void *pItemId, bool Active)> &RenderItem)");
 	const std::string FriendsBody = ExtractSourceFunctionBody(Source, "void CMenus::RenderServerbrowserFriends(CUIRect View)");
 	const std::string InfoScoreboardBody = ExtractSourceFunctionBody(Source, "void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *pSelectedServer)");
-	const std::string QmBody = ExtractSourceFunctionBody(Source, "void CMenus::RenderServerbrowserQm(CUIRect View)");
 	ASSERT_FALSE(FilterBody.empty());
 	ASSERT_FALSE(FriendsBody.empty());
 	ASSERT_FALSE(InfoScoreboardBody.empty());
-	ASSERT_FALSE(QmBody.empty());
 
 	EXPECT_NE(Source.find("#include <game/client/ui_scrollregion.h>"), std::string::npos);
 	EXPECT_NE(FilterBody.find("ScrollRequest.m_Profile = EQmScrollProfile::FILTER_GRID;"), std::string::npos);
@@ -9297,12 +9340,6 @@ TEST(QmMonitoringHelpers, ServerBrowserScrollRegionsUseSharedQmScrollPresets)
 	EXPECT_EQ(InfoScoreboardBody.find("SetScrollbarMargin"), std::string::npos);
 	EXPECT_EQ(InfoScoreboardBody.find("s_ListBox.SetScrollbarWidth(16.0f);"), std::string::npos);
 	EXPECT_EQ(InfoScoreboardBody.find("s_ListBox.SetScrollbarMargin(5.0f);"), std::string::npos);
-
-	EXPECT_EQ(QmBody.find("QmScrollRegionParamsForSize"), std::string::npos);
-	EXPECT_EQ(QmBody.find("SetScrollbarWidth"), std::string::npos);
-	EXPECT_EQ(QmBody.find("SetScrollbarMargin"), std::string::npos);
-	EXPECT_EQ(QmBody.find("s_QmServerListBox.SetScrollbarWidth(16.0f);"), std::string::npos);
-	EXPECT_EQ(QmBody.find("s_QmServerListBox.SetScrollbarMargin(5.0f);"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, CountryFilterUsesHiddenRailScrollPolicy)
@@ -10820,6 +10857,46 @@ namespace
 	}
 }
 
+TEST(QmTeeTrailCurve, PreparedSegmentsMatchOriginalCurveAtEverySubdivision)
+{
+	// 保留优化前的公式作为几何对照：端点、退化方向和浮点运算顺序均不变。
+	const auto OriginalCurve = [](vec2 P0, vec2 P1, vec2 P2, vec2 P3, float T) {
+		const auto Unit = [](vec2 V, vec2 Fallback = vec2(1, 0)) {
+			const float Len = length(V);
+			return Len > 0.0001f ? V / Len : Fallback;
+		};
+		const float D = distance(P1, P2);
+		const vec2 Segment = Unit(P2 - P1);
+		const vec2 Before = Unit(P1 - P0, Segment);
+		const vec2 After = Unit(P3 - P2, Segment);
+		const vec2 M1 = Unit(Before + Segment, Segment) * D * std::max(0.0f, dot(Before, Segment));
+		const vec2 M2 = Unit(Segment + After, Segment) * D * std::max(0.0f, dot(Segment, After));
+		return P1 * (2 * T * T * T - 3 * T * T + 1) + M1 * (T * T * T - 2 * T * T + T) + P2 * (-2 * T * T * T + 3 * T * T) + M2 * (T * T * T - T * T);
+	};
+	const std::array<vec2, 4> aaPoints[] = {
+		{vec2(-6, 0), vec2(0, 0), vec2(6, 0), vec2(12, 0)},
+		{vec2(-4, -2), vec2(0, 0), vec2(7, 9), vec2(9, 15)},
+		{vec2(6, 0), vec2(0, 0), vec2(6, 0), vec2(0, 0)},
+		{vec2(3, 4), vec2(3, 4), vec2(3, 4), vec2(3, 4)},
+		{vec2(0, 0), vec2(0, 0), vec2(0.00001f, 0), vec2(0.00001f, 0)},
+		{vec2(-192, 7), vec2(0, 7), vec2(192, 7), vec2(384, 7)},
+	};
+	for(const auto &aPoints : aaPoints)
+	{
+		const auto Prepared = qm_tee_trail::PrepareCurve(aPoints[0], aPoints[1], aPoints[2], aPoints[3]);
+		EXPECT_EQ(Prepared.Evaluate(0.0f), aPoints[1]);
+		EXPECT_EQ(Prepared.Evaluate(1.0f), aPoints[2]);
+		for(int Divisions : {1, 2, 7, 31, 383})
+		{
+			for(int Sample = 0; Sample <= Divisions; ++Sample)
+			{
+				const float T = float(Sample) / Divisions;
+				EXPECT_EQ(Prepared.Evaluate(T), OriginalCurve(aPoints[0], aPoints[1], aPoints[2], aPoints[3], T));
+			}
+		}
+	}
+}
+
 TEST(QmTeeTrailStyles, FiveEffectsHaveDifferentGeometryEvenWithTheSameColor)
 {
 	const auto vTrail = MakeStyleTestTrail();
@@ -11356,4 +11433,394 @@ TEST(QmBackgroundParsing, SpotifySpDcNormalizationIsConfigChangeDriven)
 	ASSERT_NE(RawCache, std::string::npos);
 	ASSERT_NE(Normalize, std::string::npos);
 	EXPECT_LT(RawCache, Normalize);
+}
+
+// 4xx 是可解释的业务响应；请求配置必须在交给 HTTP 线程前保留这些状态码。
+TEST(QmHttpResults, NewsPublishPreservesErrorResponsesBeforeDispatch)
+{
+	const std::string Client = ReadRepoFile("src/game/client/components/qmclient/qmclient.cpp");
+	const std::string Publish = ExtractSourceFunctionBody(Client, "void CQmClient::QmNewsPublishDraft()");
+	ASSERT_FALSE(Publish.empty());
+	const size_t PreserveErrors = Publish.find("m_pQmNewsPublishTask->FailOnErrorStatus(false);");
+	const size_t Dispatch = Publish.find("Http()->Run(m_pQmNewsPublishTask);");
+	ASSERT_NE(PreserveErrors, std::string::npos);
+	ASSERT_NE(Dispatch, std::string::npos);
+	EXPECT_LT(PreserveErrors, Dispatch);
+}
+
+// Done() 包括超时和取消：失败分支必须在读取响应之前退出，并释放请求以允许重试。
+TEST(QmHttpResults, TitleFailureReturnsBeforeReadingResponse)
+{
+	const std::string Client = ReadRepoFile("src/game/client/components/qmclient/qmclient.cpp");
+	const std::string Update = ExtractSourceFunctionBody(Client, "void CQmClient::UpdateTitleAuthentication()");
+	const std::string Failure = ExtractSourceFunctionBody(Update, "if(m_pTitleOperation->State() != EHttpState::DONE)");
+	ASSERT_FALSE(Update.empty());
+	ASSERT_FALSE(Failure.empty());
+	EXPECT_NE(Failure.find("m_pTitleOperation.reset();"), std::string::npos);
+	EXPECT_NE(Failure.find("return;"), std::string::npos);
+	EXPECT_EQ(Failure.find("StatusCode()"), std::string::npos);
+	EXPECT_EQ(Failure.find("ResultJson()"), std::string::npos);
+	const size_t EndFailure = Update.find(Failure) + Failure.size();
+	const size_t ReadJson = Update.find("m_pTitleOperation->ResultJson()");
+	const size_t ReadStatus = Update.find("m_pTitleOperation->StatusCode()");
+	ASSERT_NE(ReadJson, std::string::npos);
+	ASSERT_NE(ReadStatus, std::string::npos);
+	EXPECT_LT(EndFailure, ReadJson);
+	EXPECT_LT(EndFailure, ReadStatus);
+}
+
+TEST(QmMapUpload, AcceptsMapExtensionAndServerCompatibleNames)
+{
+	for(const char *pFilename : {"test.map", "Test.MAP", "测试 地图-1_2.map"})
+	{
+		EXPECT_TRUE(qm_map_upload::IsMapFilename(pFilename)) << pFilename;
+		EXPECT_TRUE(qm_map_upload::ValidateFilename(pFilename)) << pFilename;
+	}
+	for(const char *pFilename : {"", "map", "test.map.bak", "test.txt", "test.map "})
+		EXPECT_FALSE(qm_map_upload::IsMapFilename(pFilename)) << pFilename;
+}
+
+TEST(QmMapUpload, RejectsPathsEmptyStemsMultipleDotsAndForbiddenCharacters)
+{
+	for(const char *pFilename : {".map", "a.b.map", "../test.map", "maps/test.map", "maps\\test.map", "test .map", "test.map "})
+		EXPECT_FALSE(qm_map_upload::ValidateFilename(pFilename)) << pFilename;
+	for(const char Character : std::string("!@#$%^&*()+|\\/[]{};:'\",<>=\t\r\n\x01"))
+	{
+		const std::string Filename = std::string("test") + Character + ".map";
+		EXPECT_FALSE(qm_map_upload::ValidateFilename(Filename.c_str())) << Filename;
+	}
+}
+
+TEST(QmMapUpload, MultipartPreservesBinaryMapAndUtf8PlayerName)
+{
+	const unsigned char aMap[] = {'D', 'A', 'T', 'A', 0, '\r', '\n', 0xff};
+	const char *pBoundary = "QmUploadBoundary123";
+	std::string Body;
+	ASSERT_TRUE(qm_map_upload::BuildMultipart("测试地图.map", "玩家 甲", aMap, sizeof(aMap), pBoundary, Body));
+	EXPECT_EQ(Body.find("--QmUploadBoundary123\r\n"), size_t(0));
+	EXPECT_NE(Body.find("Content-Disposition: form-data; name=\"file\"; filename=\"测试地图.map\"\r\n"), std::string::npos);
+	EXPECT_NE(Body.find(std::string(reinterpret_cast<const char *>(aMap), sizeof(aMap))), std::string::npos);
+	EXPECT_NE(Body.find("Content-Disposition: form-data; name=\"player_id\"\r\n\r\n玩家 甲\r\n"), std::string::npos);
+	const std::string Closing = "--QmUploadBoundary123--\r\n";
+	ASSERT_GE(Body.size(), Closing.size());
+	EXPECT_EQ(Body.compare(Body.size() - Closing.size(), Closing.size(), Closing), 0);
+}
+
+TEST(QmMapUpload, MultipartRejectsMissingFieldsAndOversizedFilesBeforeReadingData)
+{
+	const unsigned char aMap[] = {'D'};
+	std::string Body;
+	EXPECT_FALSE(qm_map_upload::BuildMultipart("../test.map", "Player", aMap, sizeof(aMap), "Boundary", Body));
+	EXPECT_FALSE(qm_map_upload::BuildMultipart("test.map", "", aMap, sizeof(aMap), "Boundary", Body));
+	EXPECT_FALSE(qm_map_upload::BuildMultipart("test.map", "Player", aMap, 0, "Boundary", Body));
+	// 大小检查必须先于读取文件内容，避免为超限文件分配请求正文。
+	EXPECT_EQ(qm_map_upload::MAX_MAP_SIZE, size_t(64) * 1024 * 1024);
+	EXPECT_FALSE(qm_map_upload::BuildMultipart("test.map", "Player", aMap, qm_map_upload::MAX_MAP_SIZE + 1, "Boundary", Body));
+}
+
+TEST(QmMapUpload, MultipartRejectsInvalidOrConflictingBoundaries)
+{
+	const unsigned char aMap[] = {'D'};
+	std::string Body;
+	for(const char *pBoundary : {"", "bad\r\nboundary", "bad\"boundary"})
+		EXPECT_FALSE(qm_map_upload::BuildMultipart("test.map", "Player", aMap, sizeof(aMap), pBoundary, Body));
+	const unsigned char aCollision[] = {'\r', '\n', '-', '-', 'b', 'o', 'u', 'n', 'd', 'a', 'r', 'y', '\r', '\n'};
+	EXPECT_FALSE(qm_map_upload::BuildMultipart("test.map", "Player", aCollision, sizeof(aCollision), "boundary", Body));
+	EXPECT_FALSE(qm_map_upload::BuildMultipart("test.map", "Player\r\n--boundary", aMap, sizeof(aMap), "boundary", Body));
+}
+
+TEST(QmMapUpload, ResponseRequiresBothHttpAndBusinessSuccess)
+{
+	const std::string Success = R"({"success":true,"message":"上传成功"})";
+	for(const int StatusCode : {200, 201, 299})
+	{
+		const auto Result = qm_map_upload::ParseResponse(StatusCode, Success.data(), Success.size());
+		EXPECT_TRUE(Result.m_Valid);
+		EXPECT_TRUE(Result.m_Success);
+		EXPECT_EQ(Result.m_Message, "上传成功");
+	}
+	for(const int StatusCode : {0, 199, 300, 401, 500})
+	{
+		const auto Result = qm_map_upload::ParseResponse(StatusCode, Success.data(), Success.size());
+		EXPECT_TRUE(Result.m_Valid);
+		EXPECT_FALSE(Result.m_Success);
+	}
+	const std::string Failure = R"({"success":false,"message":"地图格式错误"})";
+	for(const int StatusCode : {200, 400, 500})
+	{
+		const auto Result = qm_map_upload::ParseResponse(StatusCode, Failure.data(), Failure.size());
+		EXPECT_TRUE(Result.m_Valid);
+		EXPECT_FALSE(Result.m_Success);
+		EXPECT_EQ(Result.m_Message, "地图格式错误");
+	}
+}
+
+TEST(QmMapUpload, ResponseRejectsMalformedJsonAndMissingBooleanSuccess)
+{
+	for(const std::string_view Json : {"", "<html>error</html>", "{", "[]", "null", "true", "{}", "{\"success\":1}", "{\"success\":\"true\"}"})
+	{
+		const auto Result = qm_map_upload::ParseResponse(200, Json.data(), Json.size());
+		EXPECT_FALSE(Result.m_Valid) << Json;
+		EXPECT_FALSE(Result.m_Success) << Json;
+	}
+}
+
+TEST(QmMapUpload, ResponseUsesExplicitLengthAndOnlyStringMessages)
+{
+	// 输入可以不是以零结尾的字符串，后续缓冲区内容不能参与解析。
+	const std::string Json = R"({"success":true})";
+	const std::string Buffer = Json + "trailing bytes";
+	const auto Bounded = qm_map_upload::ParseResponse(200, Buffer.data(), Json.size());
+	EXPECT_TRUE(Bounded.m_Valid);
+	EXPECT_TRUE(Bounded.m_Success);
+	EXPECT_TRUE(Bounded.m_Message.empty());
+	const std::string NonStringMessage = R"({"success":false,"message":123})";
+	const auto Failure = qm_map_upload::ParseResponse(400, NonStringMessage.data(), NonStringMessage.size());
+	EXPECT_TRUE(Failure.m_Valid);
+	EXPECT_FALSE(Failure.m_Success);
+	EXPECT_TRUE(Failure.m_Message.empty());
+}
+
+TEST(QmMapUpload, CancelBeforePreparingDoesNotCreateAnUploadRequest)
+{
+	CJobPool Pool;
+	Pool.Init(1);
+	auto pJob = std::make_shared<qm_map_upload::CPrepareJob>("missing-qm-map-upload-test.map", "test.map", "Player");
+	pJob->Cancel();
+	Pool.Add(pJob);
+	Pool.Shutdown();
+	ASSERT_EQ(pJob->State(), IJob::STATE_DONE);
+	EXPECT_EQ(pJob->Status(), qm_map_upload::EStatus::CANCELLED);
+	EXPECT_EQ(pJob->Request(), nullptr);
+}
+
+TEST(QmMapUpload, MissingMapFileFailsBeforeCreatingAnUploadRequest)
+{
+	CJobPool Pool;
+	Pool.Init(1);
+	// 空路径不能指向文件，测试不依赖工作目录中恰好不存在某个名称。
+	auto pJob = std::make_shared<qm_map_upload::CPrepareJob>("", "test.map", "Player");
+	Pool.Add(pJob);
+	Pool.Shutdown();
+	ASSERT_EQ(pJob->State(), IJob::STATE_DONE);
+	EXPECT_EQ(pJob->Status(), qm_map_upload::EStatus::READ_FAILED);
+	EXPECT_EQ(pJob->Request(), nullptr);
+}
+
+TEST(QmFriendsCategoryOrder, RestoreCommandMovesExistingCategoryByName)
+{
+	const std::string Source = ReadRepoFile("src/engine/client/friends.cpp");
+	const std::string Init = ExtractSourceFunctionBody(Source, "void CFriends::Init(bool Foes)");
+	const std::string Restore = ExtractSourceFunctionBody(Source, "void CFriends::ConMoveFriendCategory(IConsole::IResult *pResult, void *pUserData)");
+	const std::string Move = ExtractSourceFunctionBody(Source, "bool CFriends::MoveCategory(int FromIndex, int ToIndex)");
+	ASSERT_FALSE(Init.empty());
+	ASSERT_FALSE(Restore.empty());
+	ASSERT_FALSE(Move.empty());
+	EXPECT_NE(Init.find("pConsole->Register(\"qm_friend_category_move\", \"s[category] i[position]\", CFGFLAG_CLIENT, ConMoveFriendCategory, this,"), std::string::npos);
+	EXPECT_NE(Restore.find("pSelf->FindCategory(pResult->GetString(0))"), std::string::npos);
+	EXPECT_NE(Restore.find("pSelf->MoveCategory("), std::string::npos);
+	EXPECT_NE(Restore.find("pResult->GetInteger(1)"), std::string::npos);
+	EXPECT_EQ(Restore.find("AddCategory("), std::string::npos);
+	EXPECT_EQ(Restore.find("IsProtectedCategory("), std::string::npos);
+	EXPECT_EQ(Move.find("IsProtectedCategory("), std::string::npos);
+	EXPECT_NE(Move.find("FromIndex < 0 || ToIndex < 0 || FromIndex >= m_NumCategories || ToIndex >= m_NumCategories"), std::string::npos);
+}
+
+TEST(QmFriendsCategoryOrder, SaveIncludesBuiltinsAfterCreatingAllCustomCategories)
+{
+	const std::string Source = ReadRepoFile("src/engine/client/friends.cpp");
+	const std::string Save = ExtractSourceFunctionBody(Source, "void CFriends::ConfigSaveCallback(IConfigManager *pConfigManager, void *pUserData)");
+	const std::string Categories = ExtractSourceFunctionBody(Save, "if(!pSelf->m_Foes)");
+	ASSERT_FALSE(Categories.empty());
+	const size_t AddCommand = Categories.find("friend_category_add");
+	const size_t MoveCommand = Categories.find("qm_friend_category_move");
+	ASSERT_NE(AddCommand, std::string::npos);
+	ASSERT_NE(MoveCommand, std::string::npos);
+	EXPECT_LT(AddCommand, MoveCommand);
+
+	const size_t MoveLoopStart = Categories.rfind("for(int CategoryIndex = 0; CategoryIndex < pSelf->m_NumCategories; ++CategoryIndex)", MoveCommand);
+	ASSERT_NE(MoveLoopStart, std::string::npos);
+	EXPECT_LT(AddCommand, MoveLoopStart);
+	const std::string MoveLoop = ExtractSourceFunctionBody(Categories.substr(MoveLoopStart), "for(int CategoryIndex");
+	ASSERT_FALSE(MoveLoop.empty());
+	// 内置分组同样保存，转义后的分组名与目标位置必须在同一条配置命令内。
+	EXPECT_EQ(MoveLoop.find("IsProtectedCategory("), std::string::npos);
+	EXPECT_NE(MoveLoop.find("str_copy(aBuf, \"qm_friend_category_move \\\"\");"), std::string::npos);
+	const size_t EscapeName = MoveLoop.find("str_escape(&pDst, pSelf->m_aaCategories[CategoryIndex], pEnd);");
+	const size_t Position = MoveLoop.find("str_format(aPosition, sizeof(aPosition), \"\\\" %d\", CategoryIndex);");
+	const size_t AppendPosition = MoveLoop.find("str_append(aBuf, aPosition);");
+	const size_t Write = MoveLoop.find("pConfigManager->WriteLine(aBuf);");
+	ASSERT_NE(EscapeName, std::string::npos);
+	ASSERT_NE(Position, std::string::npos);
+	ASSERT_NE(AppendPosition, std::string::npos);
+	ASSERT_NE(Write, std::string::npos);
+	EXPECT_LT(EscapeName, Position);
+	EXPECT_LT(Position, AppendPosition);
+	EXPECT_LT(AppendPosition, Write);
+}
+
+TEST(QmFriendOnlineTracker, FirstSnapshotAndStableFriendsStaySilent)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Friend{"Alice\tClan", "Alice", "Map", "server"};
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, NewFriendNotifiesOnceAfterBaseline)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	EXPECT_TRUE(Tracker.Update({}, {"server"}).empty());
+	const qm_friend_notify::CFriend Friend{"Alice\tClan", "Alice", "Map", "server"};
+	const auto vNotifications = Tracker.Update({Friend, Friend}, {"server"});
+	ASSERT_EQ(vNotifications.size(), 1u);
+	EXPECT_EQ(vNotifications[0].m_Name, "Alice");
+	EXPECT_EQ(vNotifications[0].m_Map, "Map");
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, OneMissingSnapshotDoesNotReannounceFriend)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Friend{"Alice\tClan", "Alice", "Map", "server"};
+	Tracker.Update({Friend}, {"server"});
+	EXPECT_TRUE(Tracker.Update({}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, TwoMissingSnapshotsAllowReturnNotification)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Friend{"Alice\tClan", "Alice", "Map", "server"};
+	Tracker.Update({Friend}, {"server"});
+	EXPECT_TRUE(Tracker.Update({}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({}, {"server"}).empty());
+	const auto vNotifications = Tracker.Update({Friend}, {"server"});
+	ASSERT_EQ(vNotifications.size(), 1u);
+	EXPECT_EQ(vNotifications[0].m_Key, Friend.m_Key);
+}
+
+TEST(QmFriendOnlineTracker, MissingOrIncompleteServerDoesNotConfirmOffline)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Friend{"Alice\tClan", "Alice", "Map", "server"};
+	Tracker.Update({Friend}, {"server", "other"});
+	EXPECT_TRUE(Tracker.Update({}, {"other"}).empty());
+	EXPECT_TRUE(Tracker.Update({}, {"other"}).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server", "other"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, UnavailableServerBreaksConsecutiveMissingEvidence)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Friend{"Alice\tClan", "Alice", "Map", "server"};
+	Tracker.Update({Friend}, {"server"});
+	Tracker.Update({}, {"server"});
+	Tracker.Update({}, {"other"});
+	Tracker.Update({}, {"server"});
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, EmptyListsNeitherCreateBaselineNorExpireFriends)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Friend{"Alice\tClan", "Alice", "Map", "server"};
+	EXPECT_TRUE(Tracker.Update({}, {}).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({}, {}).empty());
+	EXPECT_TRUE(Tracker.Update({}, {}).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, ClanChangeOnSameServerStaysSilent)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Original{"Alice\tOld", "Alice", "Map", "server"};
+	const qm_friend_notify::CFriend Changed{"Alice\tNew", "Alice", "Map", "server"};
+	Tracker.Update({Original}, {"server"});
+	EXPECT_TRUE(Tracker.Update({Changed}, {"server"}).empty());
+	Tracker.Update({}, {"server"});
+	EXPECT_TRUE(Tracker.Update({Changed}, {"server"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, MapAndServerChangesKeepFriendOnline)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Original{"Alice\tClan", "Alice", "OldMap", "old"};
+	const qm_friend_notify::CFriend Moved{"Alice\tClan", "Alice", "NewMap", "new"};
+	Tracker.Update({Original}, {"old", "new"});
+	EXPECT_TRUE(Tracker.Update({Moved}, {"old", "new"}).empty());
+	Tracker.Update({}, {"old"});
+	Tracker.Update({}, {"old"});
+	EXPECT_TRUE(Tracker.Update({Moved}, {"new"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, ResetSilentlyRebuildsBaseline)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Friend{"Alice\tClan", "Alice", "Map", "server"};
+	Tracker.Update({}, {"server"});
+	Tracker.Reset();
+	EXPECT_TRUE(Tracker.Update({Friend}, {"server"}).empty());
+	const qm_friend_notify::CFriend NewFriend{"Bob\tClan", "Bob", "Map", "server"};
+	const auto vNotifications = Tracker.Update({Friend, NewFriend}, {"server"});
+	ASSERT_EQ(vNotifications.size(), 1u);
+	EXPECT_EQ(vNotifications[0].m_Name, "Bob");
+}
+
+TEST(QmFriendOnlineTracker, FirstCompleteObservationOfMissingServerStaysSilent)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Existing{"Alice\tClan", "Alice", "Map", "first"};
+	const qm_friend_notify::CFriend InitiallyMissing{"Bob\tClan", "Bob", "Map", "second"};
+	Tracker.Update({Existing}, {"first"});
+	EXPECT_TRUE(Tracker.Update({Existing, InitiallyMissing}, {"first", "second"}).empty());
+	const qm_friend_notify::CFriend NewFriend{"Carol\tClan", "Carol", "Map", "second"};
+	const auto vNotifications = Tracker.Update({Existing, InitiallyMissing, NewFriend}, {"first", "second"});
+	ASSERT_EQ(vNotifications.size(), 1u);
+	EXPECT_EQ(vNotifications[0].m_Name, "Carol");
+}
+
+TEST(QmFriendOnlineTracker, IncompleteServerDoesNotCreateNotificationBaseline)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend PartiallyVisible{"Alice\tClan", "Alice", "Map", "partial"};
+	const qm_friend_notify::CFriend InitiallyMissing{"Bob\tClan", "Bob", "Map", "partial"};
+	EXPECT_TRUE(Tracker.Update({PartiallyVisible}, {"other"}).empty());
+	EXPECT_TRUE(Tracker.Update({PartiallyVisible, InitiallyMissing}, {"other", "partial"}).empty());
+	const qm_friend_notify::CFriend NewFriend{"Carol\tClan", "Carol", "Map", "partial"};
+	const auto vNotifications = Tracker.Update({PartiallyVisible, InitiallyMissing, NewFriend}, {"other", "partial"});
+	ASSERT_EQ(vNotifications.size(), 1u);
+	EXPECT_EQ(vNotifications[0].m_Name, "Carol");
+}
+
+TEST(QmFriendOnlineTracker, ExistingSameNameBecomingFriendByClanStaysSilent)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Unmatched{"Alice\tOther", "Alice", "Map", "server", false};
+	const qm_friend_notify::CFriend Matched{"Alice\tClan", "Alice", "Map", "server"};
+	Tracker.Update({Unmatched}, {"server"});
+	EXPECT_TRUE(Tracker.Update({Matched}, {"server"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, TemporaryUnmatchedClanKeepsPresenceUntilClanReturns)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Matched{"Alice\tClan", "Alice", "Map", "server"};
+	const qm_friend_notify::CFriend Unmatched{"Alice\tOther", "Alice", "Map", "server", false};
+	Tracker.Update({Matched}, {"server"});
+	EXPECT_TRUE(Tracker.Update({Unmatched}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({Unmatched}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({Unmatched}, {"server"}).empty());
+	EXPECT_TRUE(Tracker.Update({Matched}, {"server"}).empty());
+}
+
+TEST(QmFriendOnlineTracker, NewSameNameWithUnmatchedClanDoesNotNotify)
+{
+	qm_friend_notify::COnlineTracker Tracker;
+	const qm_friend_notify::CFriend Unmatched{"Alice\tOther", "Alice", "Map", "server", false};
+	Tracker.Update({}, {"server"});
+	EXPECT_TRUE(Tracker.Update({Unmatched}, {"server"}).empty());
 }

@@ -69,7 +69,7 @@ namespace
 
 	// 以固定帧步推进分离弹簧；FrameSeconds 可用来验证帧率无关性。
 	// 步数向上取整，保证请求的时长一定被走完（否则会差一帧、落在窗口之前）；
-	// Seconds == 0 时一步都不走——那是"只切目标、不推进时间"的用法。
+	// Seconds == 0 时只切换目标，不推进时间。
 	const int StepCount(float Seconds, float FrameSeconds)
 	{
 		if(Seconds <= 0.0f)
@@ -81,6 +81,8 @@ namespace
 	{
 		const float Period = QmHudMediaIslandBlobSpringWindowSeconds();
 		const int Steps = StepCount(Seconds, FrameSeconds);
+		if(Steps == 0)
+			QmHudMediaIslandBlobSpringAdvance(Spring, 0.0f, Period, TargetVisible);
 		for(int i = 0; i < Steps; ++i)
 			QmHudMediaIslandBlobSpringAdvance(Spring, FrameSeconds, Period, TargetVisible);
 		return QmHudMediaIslandBlobProgress(Spring);
@@ -236,13 +238,14 @@ TEST(QmHudDummyMiniViewSource, VulkanUsesOffscreenTargetForEveryVendor)
 	EXPECT_NE(VulkanSource.find("LoadAttachments ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : InitialLayout"), std::string::npos);
 }
 
-TEST(QmHudMediaIslandLayout, ScalesTheCompleteDesignToEightyPercent)
+TEST(QmHudMediaIslandLayout, CompactHeightIsAboutFortyPixelsAt1080p)
 {
-	EXPECT_FLOAT_EQ(QmHudMediaIslandDesignScale, 0.8f);
-	EXPECT_FLOAT_EQ(QmHudMediaIslandScaled(16.0f), 12.8f);
-	EXPECT_FLOAT_EQ(QmHudMediaIslandScaled(12.0f), 9.6f);
-	EXPECT_FLOAT_EQ(QmHudMediaIslandScaled(5.8f), 4.64f);
-	EXPECT_FLOAT_EQ(QmHudMediaIslandScaled(3.0f), 2.4f);
+	EXPECT_FLOAT_EQ(QmHudMediaIslandDesignScale, 0.7f);
+	EXPECT_FLOAT_EQ(QmHudMediaIslandScaled(16.0f), 11.2f);
+	EXPECT_FLOAT_EQ(QmHudMediaIslandScaled(12.0f), 8.4f);
+	EXPECT_FLOAT_EQ(QmHudMediaIslandScaled(5.8f), 4.06f);
+	EXPECT_FLOAT_EQ(QmHudMediaIslandScaled(3.0f), 2.1f);
+	EXPECT_NEAR(QmHudMediaIslandScaled(16.0f) * 1080.0f / 300.0f, 40.32f, 0.001f);
 }
 
 // 意图：无媒体、无队伍内容、无左侧倒计时副岛时不得为不存在的主内容保留空胶囊，
@@ -452,12 +455,12 @@ TEST(QmHudMediaIslandEntrance, StartsAsOpaqueBlackCircleAtTargetCenter)
 
 	const SHudMediaIslandEntrancePose Pose = QmHudMediaIslandEntrancePose(Target, 8.0f, TargetColor, 0.0f);
 
-	EXPECT_FLOAT_EQ(Pose.m_Rect.x, 133.6f);
-	EXPECT_FLOAT_EQ(Pose.m_Rect.y, 10.6f);
-	EXPECT_FLOAT_EQ(Pose.m_Rect.w, 12.8f);
-	EXPECT_FLOAT_EQ(Pose.m_Rect.h, 12.8f);
-	EXPECT_FLOAT_EQ(Pose.m_Radius, 6.4f);
-	EXPECT_FLOAT_EQ(Pose.m_DisabledCornerRadius, 6.4f);
+	EXPECT_FLOAT_EQ(Pose.m_Rect.x, 134.4f);
+	EXPECT_FLOAT_EQ(Pose.m_Rect.y, 11.4f);
+	EXPECT_FLOAT_EQ(Pose.m_Rect.w, 11.2f);
+	EXPECT_FLOAT_EQ(Pose.m_Rect.h, 11.2f);
+	EXPECT_FLOAT_EQ(Pose.m_Radius, 5.6f);
+	EXPECT_FLOAT_EQ(Pose.m_DisabledCornerRadius, 5.6f);
 	EXPECT_FLOAT_EQ(Pose.m_BackgroundColor.r, 0.0f);
 	EXPECT_FLOAT_EQ(Pose.m_BackgroundColor.g, 0.0f);
 	EXPECT_FLOAT_EQ(Pose.m_BackgroundColor.b, 0.0f);
@@ -603,9 +606,9 @@ TEST(QmHudMediaIslandEntrance, DropStartsFullyAboveScreenAndEndsAtExpansionOrigi
 
 	EXPECT_LT(Hidden.m_Rect.y + Hidden.m_Rect.h, ScreenTop);
 	EXPECT_FLOAT_EQ(Hidden.m_Rect.x + Hidden.m_Rect.w * 0.5f, Target.x + Target.w * 0.5f);
-	EXPECT_FLOAT_EQ(Arrived.m_Rect.y, Target.y + Target.h * 0.5f - 6.4f);
-	EXPECT_FLOAT_EQ(Arrived.m_Rect.w, 12.8f);
-	EXPECT_FLOAT_EQ(Arrived.m_Rect.h, 12.8f);
+	EXPECT_FLOAT_EQ(Arrived.m_Rect.y, Target.y + Target.h * 0.5f - 5.6f);
+	EXPECT_FLOAT_EQ(Arrived.m_Rect.w, 11.2f);
+	EXPECT_FLOAT_EQ(Arrived.m_Rect.h, 11.2f);
 	EXPECT_FLOAT_EQ(Arrived.m_ContentAlpha, 0.0f);
 }
 
@@ -633,9 +636,9 @@ TEST(QmHudMediaIslandEntrance, IntermediatePoseMorphsGeometryAndConfiguredBackgr
 
 	const SHudMediaIslandEntrancePose Pose = QmHudMediaIslandEntrancePose(Target, 8.0f, TargetColor, 0.5f);
 
-	EXPECT_GT(Pose.m_Rect.w, 12.8f);
+	EXPECT_GT(Pose.m_Rect.w, 11.2f);
 	EXPECT_LT(Pose.m_Rect.w, Target.w);
-	EXPECT_GT(Pose.m_Rect.h, 12.8f);
+	EXPECT_GT(Pose.m_Rect.h, 11.2f);
 	EXPECT_LT(Pose.m_Rect.h, Target.h);
 	EXPECT_GT(Pose.m_BackgroundColor.b, 0.0f);
 	EXPECT_LT(Pose.m_BackgroundColor.b, TargetColor.b);
@@ -1024,8 +1027,8 @@ TEST(QmHudMediaIslandBlob, UnderdampedTravelOvershootsThenPullsBackToRest)
 	const float Peak = PeakBlobTravel(Spring, true, SettleSeconds);
 	EXPECT_GT(Peak, 1.05f) << "过冲必须明显可见";
 	EXPECT_LT(Peak, 1.15f) << "过冲仍需克制";
-	// zeta=0.60 的理论过冲 +9.48%；数值积分实测 +9.28%。
-	EXPECT_NEAR(Peak, 1.0928f, 0.005f);
+	// zeta=0.60 的理论过冲为 +9.48%，连续求值保留这份轻回弹。
+	EXPECT_NEAR(Peak, 1.0948f, 0.001f);
 
 	// 峰值之后要回落并稳定在 1.0（精确落位）。
 	StepBlobSpring(Spring, true, SettleSeconds);
@@ -1088,16 +1091,76 @@ TEST(QmHudMediaIslandBlob, OvershootPeaksAfterTheRushAndNotDuringTheBridgePhase)
 
 TEST(QmHudMediaIslandBlob, TravelIsFrameRateIndependent)
 {
-	// 解析式求值：串行小步与一次性大步必须给出相同结果。
-	SHudMediaIslandBlobSpring Sixty;
-	SHudMediaIslandBlobSpring TwoForty;
-	float SixtyTravel = 0.0f;
-	float TwoFortyTravel = 0.0f;
-	for(int i = 0; i < 30; ++i)
-		SixtyTravel = StepBlobSpring(Sixty, true, 1.0f / 60.0f, 1.0f / 60.0f);
-	for(int i = 0; i < 120; ++i)
-		TwoFortyTravel = StepBlobSpring(TwoForty, true, 1.0f / 240.0f, 1.0f / 240.0f);
-	EXPECT_FLOAT_EQ(SixtyTravel, TwoFortyTravel);
+	// 不同刷新率的每一帧都应落在同一条连续轨迹上。
+	const float Period = QmHudMediaIslandBlobSpringWindowSeconds();
+	for(const int FrameRate : {60, 144, 165, 240, 1000})
+	{
+		SHudMediaIslandBlobSpring Spring;
+		const float FrameSeconds = 1.0f / FrameRate;
+		for(int Frame = 1; Frame <= FrameRate / 2; ++Frame)
+		{
+			QmHudMediaIslandBlobSpringAdvance(Spring, FrameSeconds, Period, true);
+			SHudMediaIslandBlobSpring SingleStep;
+			QmHudMediaIslandBlobSpringAdvance(SingleStep, Frame * FrameSeconds, Period, true);
+			EXPECT_NEAR(Spring.m_Value, SingleStep.m_Value, 0.00001f) << FrameRate << " Hz, frame " << Frame;
+			EXPECT_NEAR(Spring.m_Velocity, SingleStep.m_Velocity, 0.00002f) << FrameRate << " Hz, frame " << Frame;
+		}
+	}
+}
+
+TEST(QmHudMediaIslandBlob, EveryHighRefreshFrameAdvancesWithoutRepeatedPoses)
+{
+	SHudMediaIslandBlobSpring Spring;
+	const float Period = QmHudMediaIslandBlobSpringWindowSeconds();
+	for(int Frame = 0; Frame < 120; ++Frame)
+	{
+		const float Previous = Spring.m_Value;
+		QmHudMediaIslandBlobSpringAdvance(Spring, 0.001f, Period, true);
+		EXPECT_GT(Spring.m_Value, Previous) << "1000 Hz frame " << Frame;
+	}
+}
+
+TEST(QmHudMediaIslandBlob, IrregularFramePartitionsPreservePositionAndVelocity)
+{
+	const float Period = QmHudMediaIslandBlobSpringWindowSeconds();
+	const std::array<float, 8> aFrameSeconds = {0.001f, 0.0035f, 0.011f, 0.0075f, 0.043f, 0.029f, 0.092f, 0.187f};
+	SHudMediaIslandBlobSpring Partitioned;
+	float ElapsedSeconds = 0.0f;
+	for(const float DeltaSeconds : aFrameSeconds)
+	{
+		ElapsedSeconds += DeltaSeconds;
+		QmHudMediaIslandBlobSpringAdvance(Partitioned, DeltaSeconds, Period, true);
+	}
+	SHudMediaIslandBlobSpring SingleStep;
+	QmHudMediaIslandBlobSpringAdvance(SingleStep, ElapsedSeconds, Period, true);
+	EXPECT_NEAR(Partitioned.m_Value, SingleStep.m_Value, 0.00001f);
+	EXPECT_NEAR(Partitioned.m_Velocity, SingleStep.m_Velocity, 0.00002f);
+
+	// 连续反向后仍按同一真实时长推进，不能丢掉原有速度。
+	QmHudMediaIslandBlobSpringAdvance(Partitioned, 0.0f, Period, false);
+	QmHudMediaIslandBlobSpringAdvance(SingleStep, 0.0f, Period, false);
+	for(const float DeltaSeconds : aFrameSeconds)
+		QmHudMediaIslandBlobSpringAdvance(Partitioned, DeltaSeconds, Period, false);
+	QmHudMediaIslandBlobSpringAdvance(SingleStep, ElapsedSeconds, Period, false);
+	EXPECT_NEAR(Partitioned.m_Value, SingleStep.m_Value, 0.00001f);
+	EXPECT_NEAR(Partitioned.m_Velocity, SingleStep.m_Velocity, 0.00002f);
+}
+
+TEST(QmHudMediaIslandBlob, LongFrameCompletesExpiredMotionAndStaysAtRest)
+{
+	SHudMediaIslandBlobSpring Spring;
+	const float Period = QmHudMediaIslandBlobSpringWindowSeconds();
+	QmHudMediaIslandBlobSpringAdvance(Spring, 0.1f, Period, true);
+	QmHudMediaIslandBlobSpringAdvance(Spring, 5.0f, Period, true);
+	EXPECT_FLOAT_EQ(Spring.m_Value, 1.0f);
+	EXPECT_FLOAT_EQ(Spring.m_Velocity, 0.0f);
+	QmHudMediaIslandBlobSpringAdvance(Spring, 0.001f, Period, true);
+	EXPECT_FLOAT_EQ(Spring.m_Value, 1.0f);
+	EXPECT_FLOAT_EQ(Spring.m_Velocity, 0.0f);
+	QmHudMediaIslandBlobSpringAdvance(Spring, 5.0f, Period, false);
+	EXPECT_FLOAT_EQ(Spring.m_Value, 0.0f);
+	EXPECT_FLOAT_EQ(Spring.m_Velocity, 0.0f);
+	EXPECT_FLOAT_EQ(QmHudMediaIslandBlobProgress(Spring), 0.0f);
 }
 
 TEST(QmHudMediaIslandBlob, ReverseKeepsVelocityContinuousAndPoseHasNoJump)
@@ -1112,6 +1175,7 @@ TEST(QmHudMediaIslandBlob, ReverseKeepsVelocityContinuousAndPoseHasNoJump)
 	const float ValueBefore = Spring.m_Value;
 	const float VelocityBefore = Spring.m_Velocity;
 	StepBlobSpring(Spring, false, 0.0f);
+	EXPECT_FALSE(Spring.m_TargetVisible);
 	EXPECT_FLOAT_EQ(Spring.m_Value, ValueBefore);
 	EXPECT_FLOAT_EQ(Spring.m_Velocity, VelocityBefore);
 	EXPECT_FLOAT_EQ(QmHudMediaIslandBlobPose(Spring).m_Travel, BeforeReverse.m_Travel);
@@ -1124,6 +1188,7 @@ TEST(QmHudMediaIslandBlob, ReverseKeepsVelocityContinuousAndPoseHasNoJump)
 
 	// 反向途中再切回，位姿仍然连续（不允许折角/跳变）。
 	StepBlobSpring(Spring, true, 0.0f);
+	EXPECT_TRUE(Spring.m_TargetVisible);
 	const SHudMediaIslandBlobPose AfterReverse = QmHudMediaIslandBlobPose(Spring);
 	EXPECT_FLOAT_EQ(AfterReverse.m_Travel, MidReverse.m_Travel);
 	EXPECT_FLOAT_EQ(AfterReverse.m_Velocity, MidReverse.m_Velocity);
@@ -1223,6 +1288,40 @@ TEST(QmHudMediaIslandSatellite, AdvanceIsIdempotentWithinTheSameTick)
 	EXPECT_EQ(LastTick, 100);
 }
 
+TEST(QmHudMediaIslandSatellite, ClockAdvanceConsumesTheWholeElapsedInterval)
+{
+	SHudMediaIslandBlobSpring Spring;
+	int64_t LastTick = 0;
+	const int64_t StartTick = time_freq();
+	QmHudAdvanceMediaIslandLiquidProgress(Spring, LastTick, StartTick, true, true);
+	const int64_t HalfSecondTicks = time_freq() / 2;
+	QmHudAdvanceMediaIslandLiquidProgress(Spring, LastTick, StartTick + HalfSecondTicks, true, true);
+	SHudMediaIslandBlobSpring Expected;
+	QmHudMediaIslandBlobSpringAdvance(Expected, HalfSecondTicks / static_cast<float>(time_freq()), QmHudMediaIslandBlobSpringWindowSeconds(), true);
+	EXPECT_NEAR(Spring.m_Value, Expected.m_Value, 0.00001f);
+	EXPECT_NEAR(Spring.m_Velocity, Expected.m_Velocity, 0.00002f);
+
+	QmHudAdvanceMediaIslandLiquidProgress(Spring, LastTick, StartTick + 5 * time_freq(), true, true);
+	EXPECT_FLOAT_EQ(Spring.m_Value, 1.0f);
+	EXPECT_FLOAT_EQ(Spring.m_Velocity, 0.0f);
+	QmHudAdvanceMediaIslandLiquidProgress(Spring, LastTick, StartTick + 10 * time_freq(), false, true);
+	EXPECT_FLOAT_EQ(Spring.m_Value, 0.0f);
+	EXPECT_FLOAT_EQ(Spring.m_Velocity, 0.0f);
+}
+
+TEST(QmHudMediaIslandSatellite, DisablingMotionDuringTravelSnapsToTheRequestedTarget)
+{
+	SHudMediaIslandBlobSpring Spring;
+	int64_t LastTick = time_freq();
+	QmHudMediaIslandBlobSpringAdvance(Spring, 0.1f, QmHudMediaIslandBlobSpringWindowSeconds(), true);
+	QmHudAdvanceMediaIslandLiquidProgress(Spring, LastTick, LastTick + 1, false, false);
+	EXPECT_FLOAT_EQ(Spring.m_Value, 0.0f);
+	EXPECT_FLOAT_EQ(Spring.m_Velocity, 0.0f);
+	QmHudAdvanceMediaIslandLiquidProgress(Spring, LastTick, LastTick + 1, true, false);
+	EXPECT_FLOAT_EQ(Spring.m_Value, 1.0f);
+	EXPECT_FLOAT_EQ(Spring.m_Velocity, 0.0f);
+}
+
 TEST(QmHudMediaIslandSpectatorEye, OpeningTransitionHonorsMotionLevel)
 {
 	EXPECT_LT(QmHudAdvanceMediaIslandSpectatorIconProgress(0.0f, 0.179f, 2), 1.0f);
@@ -1241,7 +1340,7 @@ TEST(QmHudMediaIslandSpectatorEye, ApprovedOpeningPoseCrossfadesAndOpensVertical
 	EXPECT_FLOAT_EQ(Closed.m_OpenScaleX, 0.88f);
 	EXPECT_FLOAT_EQ(Closed.m_OpenScaleY, 0.44f);
 	EXPECT_FLOAT_EQ(Closed.m_CountAlpha, 0.0f);
-	EXPECT_FLOAT_EQ(Closed.m_CountOffsetX, -2.4f);
+	EXPECT_FLOAT_EQ(Closed.m_CountOffsetX, -2.1f);
 
 	const SHudMediaIslandSpectatorIconPose Mid = QmHudMediaIslandSpectatorIconPose(0.5f);
 	EXPECT_FLOAT_EQ(Mid.m_ClosedAlpha, 0.5f);
@@ -1470,15 +1569,17 @@ TEST(QmHudMediaIslandBackdrop, TransparentOpacityIncludesPureBlurAndSkipsOpaqueB
 	EXPECT_FALSE(QmHudMediaIslandShouldPrepareBackdropBlur(99, false));
 }
 
-TEST(QmHudMediaIslandBackdrop, RefreshesBlurOnlyAfterTheShortFrameAttemptInterval)
+TEST(QmHudMediaIslandBackdrop, RefreshesEveryNewFrameAndReusesTheSameFrameAttempt)
 {
 	EXPECT_TRUE(QmHudMediaIslandShouldRefreshBackdropBlur(10, 0, false));
-	// 失败尝试也要进入短暂冷却，避免后端持续失败时每帧重试。
-	EXPECT_FALSE(QmHudMediaIslandShouldRefreshBackdropBlur(11, 10, true));
+	// 同一次主循环里的重复绘制复用结果，下一次绘制不受循环限速方式影响。
 	EXPECT_FALSE(QmHudMediaIslandShouldRefreshBackdropBlur(10, 10, true));
-	EXPECT_FALSE(QmHudMediaIslandShouldRefreshBackdropBlur(12, 10, true));
+	EXPECT_TRUE(QmHudMediaIslandShouldRefreshBackdropBlur(11, 10, true));
+	EXPECT_TRUE(QmHudMediaIslandShouldRefreshBackdropBlur(12, 11, true));
 	EXPECT_TRUE(QmHudMediaIslandShouldRefreshBackdropBlur(13, 10, true));
 	EXPECT_TRUE(QmHudMediaIslandShouldRefreshBackdropBlur(9, 10, true));
+	EXPECT_TRUE(QmHudMediaIslandShouldRefreshBackdropBlur(0, UINT64_MAX, true));
+	EXPECT_FALSE(QmHudMediaIslandShouldRefreshBackdropBlur(0, 0, true));
 }
 
 TEST(QmHudMediaIslandBackdrop, MapsTheAnimatedOuterRectToTheCapturedScreenTexture)
@@ -2049,7 +2150,7 @@ TEST(QmHudMediaIslandSource, SharedScaleCoversLayoutTimerAndEntranceWithoutMovin
 	const std::string IslandBody = FunctionBody(Source, "void CHud::RenderMediaIsland()");
 	const std::string TimerBody = FunctionBody(Source, "SHudTopTimerCapsuleInfo BuildHudTopTimerCapsuleInfo(const SHudGameTimerInfo &TimerInfo)");
 
-	EXPECT_NE(Logic.find("QmHudMediaIslandDesignScale = 0.8f"), std::string::npos);
+	EXPECT_NE(Logic.find("QmHudMediaIslandDesignScale = 0.7f"), std::string::npos);
 	EXPECT_NE(Logic.find("QmHudMediaIslandScaled(16.0f)"), std::string::npos);
 	EXPECT_NE(AvoidanceBody.find("QmHudMediaIslandScaled(16.0f)"), std::string::npos);
 	EXPECT_NE(AvoidanceBody.find("QmHudMediaIslandScaled(5.8f)"), std::string::npos);

@@ -47,6 +47,7 @@
 #include <engine/shared/protocol7.h>
 #include <engine/shared/protocol_ex.h>
 #include <engine/shared/protocolglue.h>
+#include <engine/shared/qm_removed_config.h>
 #include <engine/shared/rust_version.h>
 #include <engine/shared/snapshot.h>
 #include <engine/shared/uuid_manager.h>
@@ -4522,6 +4523,9 @@ void CClient::Run()
 		}
 
 		int IdleRenderThrottleRate = 0;
+		// 本帧生效的刷新率门控速率（0 = 不门控）。仅用于把被门控掉的迭代从
+		// 忙等换成等待，不参与任何渲染时机判断。
+		int RenderGateRate = 0;
 
 		// render
 		{
@@ -4566,6 +4570,14 @@ void CClient::Run()
 					GfxRefreshRate = std::clamp(RequestedRenderThrottleRate, 10, 10000);
 					IdleRenderThrottleRate = GfxRefreshRate;
 				}
+				else if(g_Config.m_QmPresentAlign != 0 && g_Config.m_GfxScreenRefreshRate > 0)
+				{
+					// 关垂直同步且未设上限时，呈现模式是 IMMEDIATE：客户端既不等显示器也不被
+					// 节流，会以数倍于刷新率的速率持续投递。把渲染对齐到显示器刷新率，
+					// 把时间片还给合成/扫描输出；画面内容与玩法不变，只降低投递速率。
+					GfxRefreshRate = std::clamp(g_Config.m_GfxScreenRefreshRate, 10, 10000);
+					RequestedRenderThrottleRate = GfxRefreshRate;
+				}
 			}
 
 #if defined(CONF_VIDEORECORDER)
@@ -4578,6 +4590,9 @@ void CClient::Run()
 				IdleRenderThrottleRate = 0;
 			}
 #endif
+			// 只在确实要渲染时把被门控掉的迭代交给等待；窗口失活、录制等情形保持原行为。
+			if(IsRenderActive && GfxRefreshRate > 0)
+				RenderGateRate = GfxRefreshRate;
 			if(QmPerfEnabled() && (IdleRenderThrottleRate != LastIdleRenderThrottleRate || RequestedRenderThrottleRate != LastRequestedRenderThrottleRate))
 			{
 				char aPayload[192];
@@ -4698,6 +4713,15 @@ void CClient::Run()
 		else if(IdleRenderThrottleRate > 0)
 		{
 			SleepTimeInNanoSeconds = (std::chrono::nanoseconds(1s) / (int64_t)IdleRenderThrottleRate) - (Now - LastTime);
+			WaitWithNetwork(SleepTimeInNanoSeconds);
+			Slept = true;
+		}
+		else if(RenderGateRate > 0)
+		{
+			// 仅由刷新率门控限速时，被门控掉的迭代原本是忙等（gfx_refresh_rate 非零会
+			// 关掉空闲节流分支）。这里等待到同一个时间片：门控判据、渲染时机与结果不变，
+			// 只去掉空转占用的 CPU 时间片。
+			SleepTimeInNanoSeconds = (std::chrono::nanoseconds(1s) / (int64_t)RenderGateRate) - (Now - LastTime);
 			WaitWithNetwork(SleepTimeInNanoSeconds);
 			Slept = true;
 		}
@@ -6309,7 +6333,9 @@ struct SSaveUnknownCommandContext
 static bool SaveUnknownDomainCommandCallback(const char *pCommand, void *pUser)
 {
 	SSaveUnknownCommandContext *pContext = static_cast<SSaveUnknownCommandContext *>(pUser);
-	pContext->m_pClient->ConfigManager()->StoreUnknownCommand(pCommand, pContext->m_ConfigDomain);
+	// 回调原文还包含分号后的命令，只消费当前旧配置，后续命令由控制台继续执行。
+	if(!QmRemovedConfig::IsFocusCommand(pCommand))
+		pContext->m_pClient->ConfigManager()->StoreUnknownCommand(pCommand, pContext->m_ConfigDomain);
 	return true;
 }
 
@@ -7077,9 +7103,6 @@ void CClient::UpdatePredictionMargin()
 	Settings.m_Enabled = g_Config.m_TcFastInput != 0;
 	Settings.m_Mode = g_Config.m_QmFastInputMode;
 	Settings.m_FastAmountMs = g_Config.m_TcFastInputAmount;
-	Settings.m_BestOffset = g_Config.m_QmBestInputOffset;
-	Settings.m_BestSmoothing = g_Config.m_QmBestInputSmoothing;
-	Settings.m_BestLatencyComp = g_Config.m_QmBestInputLatencyComp;
 	Settings.m_SaikoPlusAmount = g_Config.m_QmSaikoPlusAmount;
 	Settings.m_BasePredictionMarginMs = g_Config.m_ClPredictionMargin;
 	const int BaseMargin = QmFastInputBasePredictionMarginMs(Settings);

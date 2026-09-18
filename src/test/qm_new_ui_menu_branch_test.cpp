@@ -14,7 +14,11 @@
 #include <game/client/components/qmclient/axiom_auto_login.h>
 #include <game/client/components/qmclient/demo_cut.h>
 #include <game/client/components/qmclient/demo_display.h>
+#include <game/client/components/qmclient/demo_ui.h>
+#include <game/client/components/qmclient/friend_heart_icon.h>
+#include <game/client/components/qmclient/friends_category_drag.h>
 #include <game/client/components/qmclient/nameplate_layout.h>
+#include <game/client/components/qmclient/spectator_friend_priority.h>
 #include <game/client/components/qmclient/spectator_tele_search.h>
 #include <game/client/components/tclient/statusbar.h>
 #include <game/client/components/tooltips.h>
@@ -298,6 +302,14 @@ namespace
 		return Count;
 	}
 
+	size_t CountOccurrences(const std::string &Text, const char *pNeedle)
+	{
+		size_t Count = 0;
+		for(size_t Position = Text.find(pNeedle); Position != std::string::npos; Position = Text.find(pNeedle, Position + 1))
+			++Count;
+		return Count;
+	}
+
 } // namespace
 
 TEST(QmTooltips, OwnsCallerTextAndBoundsFriendNotes)
@@ -393,6 +405,57 @@ TEST(QmNewUiMenuBranches, P6QmClientContributorsUsesCanonicalDeck)
 	EXPECT_NE(Body.find("BuildSponsorLines"), std::string::npos);
 	EXPECT_NE(Body.find("!ReadOnly && g_QmClientEnsureSponsorQrTexture"), std::string::npos);
 	EXPECT_NE(Body.find("CardDeck.RenderCached("), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, SponsorsUseLiveNamesAndInvalidateCardCaches)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string Body = FunctionBody(Source, "void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOnly)");
+	const std::string Lines = BlockBodyAfter(Body, "const auto BuildSponsorLines");
+	EXPECT_NE(Lines.find("GameClient()->m_QmClient.QmSponsorNames()"), std::string::npos);
+	EXPECT_NE(Lines.find("s_CachedSponsorsRevision == SponsorsRevision"), std::string::npos);
+	EXPECT_NE(Lines.find("s_CachedSponsorsRevision = SponsorsRevision;"), std::string::npos);
+	EXPECT_NE(Body.find("CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ (uint64_t)SponsorsRevision;"), std::string::npos);
+	EXPECT_NE(Body.find("Sponsors.m_MeasureRevision = (uint64_t)SponsorsRevision"), std::string::npos);
+	EXPECT_NE(Body.find("ColorRGBA(0.95f, 0.8f, 0.2f, 1.0f)"), std::string::npos);
+	EXPECT_NE(Lines.find("const char *pSeparator = \", \";"), std::string::npos);
+	const std::string LongName = BlockBodyAfter(Lines, "if(NameWidth > MaxLineWidth)");
+	EXPECT_NE(LongName.find("qm_md::SplitUtf8(Name)"), std::string::npos);
+	EXPECT_NE(LongName.find("LineWidth + GlyphWidth > MaxLineWidth"), std::string::npos);
+	EXPECT_NE(LongName.find("Lines.back().append(Glyph);"), std::string::npos);
+	EXPECT_EQ(Source.find("QM_SPONSOR_NAMES"), std::string::npos);
+	EXPECT_EQ(Source.find("qmclient/player_title.h"), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, SponsorPublishingControlsRespectReadOnlyAndBusyState)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string Body = FunctionBody(Source, "void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOnly)");
+	const std::string Render = BlockBodyAfter(Body, "Sponsors.m_Render =");
+	const std::string Developer = BlockBodyAfter(Render, "if(HasSponsorDeveloper)");
+	EXPECT_NE(Body.find("const bool HasSponsorDeveloper = GameClient()->m_QmClient.HasDeveloperCredential();"), std::string::npos);
+	EXPECT_NE(Body.find("CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ (HasSponsorDeveloper ? 1u : 0u);"), std::string::npos);
+	EXPECT_NE(Render.find("if(!ReadOnly && ui_widget::SecondaryButton(Ctx, &s_RefreshSponsorsButton"), std::string::npos);
+	EXPECT_NE(Render.find("QmClient.QmSponsorsRefresh();"), std::string::npos);
+	EXPECT_NE(Developer.find("if(!ReadOnly && ui_widget::SecondaryButton(Ctx, &s_ReloadSponsorsDraftButton, Localize(\"Reload\"), ReloadDraftRect, Publishing))"), std::string::npos);
+	EXPECT_NE(Developer.find("QmClient.QmSponsorsReloadDraft();"), std::string::npos);
+	EXPECT_NE(Developer.find("if(!ReadOnly && ui_widget::PrimaryButton(Ctx, &s_PublishSponsorsButton"), std::string::npos);
+	EXPECT_NE(Developer.find("Publishing || QmClient.QmSponsorsDraft()[0] == '\\0'"), std::string::npos);
+	EXPECT_NE(Developer.find("QmClient.QmSponsorsPublishDraft();"), std::string::npos);
+	EXPECT_NE(Developer.find("if(!ReadOnly && ui_widget::SecondaryButton(Ctx, &s_OpenSponsorsFolderButton"), std::string::npos);
+	EXPECT_NE(Developer.find("Storage()->GetCompletePath(IStorage::TYPE_SAVE, \"qmclient\""), std::string::npos);
+	EXPECT_NE(Render.find("QmClient.QmSponsorNames().empty()"), std::string::npos);
+	EXPECT_NE(Render.find("Localize(\"Loading\")"), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, SponsorNudgeUsesLiveCountAndFallsBackBeforeNamesArrive)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string Body = FunctionBody(Source, "void CMenus::RenderSponsorNudge(CUIRect Screen)");
+	EXPECT_NE(Body.find("else if(!pGameClient->m_QmClient.QmSponsorNames().empty())"), std::string::npos);
+	EXPECT_NE(Body.find("(int)pGameClient->m_QmClient.QmSponsorNames().size()"), std::string::npos);
+	EXPECT_NE(Body.find("str_copy(aText, Localize(\"Thanks for supporting QmClient\"), sizeof(aText));"), std::string::npos);
+	EXPECT_EQ(Body.find("QM_SPONSOR_NAMES"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, MenubarUsesExplicitQmNewUiColorBranch)
@@ -955,7 +1018,7 @@ TEST(QmNewUiMenuBranches, SettingsSubTabRowsUseCapsuleTabBar)
 
 TEST(QmNewUiMenuBranches, ServerBrowserToolboxUsesCapsuleTabBar)
 {
-	// 意图：服务器浏览器工具箱页签（过滤器 / 信息 / 好友 / Qm）在新 UI 下同样是胶囊，
+	// 意图：服务器浏览器工具箱页签（过滤器 / 信息 / 好友）在新 UI 下同样是胶囊，
 	// 旧 UI 保留原来的分段底色。
 	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
 	const std::string Body = FunctionBody(Source, "void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)");
@@ -1281,6 +1344,55 @@ TEST(QmDemoCutRender, UsesExportedCutAsRenderSource)
 
 	EXPECT_NE(SlicePopup.find("str_format(m_aPendingDemoRenderSelectionName, sizeof(m_aPendingDemoRenderSelectionName), \"%s.demo\", m_DemoSliceInput.GetString());"), std::string::npos);
 	EXPECT_EQ(SlicePopup.find("str_copy(m_aPendingDemoRenderSelectionName, m_aCurrentDemoSelectionName"), std::string::npos);
+}
+
+TEST(QmDemoUi, CompactPlayerFitsScaledScreensAndKeepsControlsInside)
+{
+	for(const CUIRect Screen : {CUIRect{0.0f, 0.0f, 1066.0f, 600.0f}, CUIRect{20.0f, 30.0f, 375.0f, 300.0f}})
+	{
+		for(bool Expanded : {false, true})
+		{
+			const CUIRect Panel = qm_demo_ui::PlayerRect(Screen, Expanded);
+			EXPECT_GE(Panel.x, Screen.x);
+			EXPECT_GE(Panel.y, Screen.y);
+			EXPECT_LE(Panel.x + Panel.w, Screen.x + Screen.w);
+			EXPECT_LE(Panel.y + Panel.h, Screen.y + Screen.h);
+			EXPECT_LE(Panel.w, 640.0f);
+			EXPECT_LE(qm_demo_ui::TransportWidth(qm_demo_ui::TransportButtonSize(Panel.w)), Panel.w - 16.0f);
+			if(!Expanded)
+				EXPECT_LE(Panel.h, 120.0f);
+		}
+	}
+}
+
+TEST(QmDemoUi, ExportContentGrowsOnlyForVisibleOptionsAndSegments)
+{
+	const float Base = qm_demo_ui::SliceContentHeight(0, false);
+	EXPECT_GT(qm_demo_ui::SliceContentHeight(0, true), Base);
+	EXPECT_GT(qm_demo_ui::SliceContentHeight(1, false), Base);
+	EXPECT_FLOAT_EQ(qm_demo_ui::SliceContentHeight(4, false), qm_demo_ui::SliceContentHeight(100, false));
+	const CUIRect Screen{20.0f, 30.0f, 375.0f, 300.0f};
+	const CUIRect Popup = qm_demo_ui::PopupRect(Screen, qm_demo_ui::SliceContentHeight(4, true) + 86.0f);
+	EXPECT_GE(Popup.x, Screen.x);
+	EXPECT_GE(Popup.y, Screen.y);
+	EXPECT_LE(Popup.x + Popup.w, Screen.x + Screen.w);
+	EXPECT_LE(Popup.y + Popup.h, Screen.y + Screen.h);
+	EXPECT_GT(qm_demo_ui::SliceContentHeight(4, true), Popup.h - 86.0f);
+}
+
+TEST(QmDemoUi, ExportBackdropIsOutsidePlayerBlurSuppression)
+{
+	const std::string DemoSource = ReadTextFile("src/game/client/components/menus_demo.cpp");
+	const std::string MenusSource = ReadTextFile("src/game/client/components/menus.cpp");
+	const std::string Player = FunctionBody(DemoSource, "void CMenus::RenderDemoPlayer(");
+	EXPECT_EQ(Player.find("RenderDemoPlayerSliceSavePopup("), std::string::npos);
+	EXPECT_NE(MenusSource.find("RenderDemoPlayerSliceSavePopup(Screen);"), std::string::npos);
+	const std::string Popup = FunctionBody(DemoSource, "void CMenus::RenderDemoPlayerSliceSavePopup(");
+	const size_t Backdrop = Popup.find("RenderDemoCard(Box);");
+	const size_t Suppression = Popup.find("CUiScopedGaussianBlurSuppression");
+	ASSERT_NE(Backdrop, std::string::npos);
+	ASSERT_NE(Suppression, std::string::npos);
+	EXPECT_LT(Backdrop, Suppression);
 }
 
 TEST(QmDemoDisplay, PreviewAndVideoUseTheSameProfile)
@@ -1644,7 +1756,7 @@ TEST(QmNewUiMenuBranches, QmClientUpdateFlowUsesQmClientNamingAndComparisonHelpe
 	EXPECT_NE(TClientSource.find("Force && m_UpdateShutdownRequested"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmAutoUpdate, qm_auto_update, 0"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("QmShowOutdatedVersionWarning"), std::string::npos);
-	EXPECT_NE(QmMenusSource.find("RenderCheckbox(&g_Config.m_QmAutoUpdate, \"Automatic updates\", &g_Config.m_QmAutoUpdate);"), std::string::npos);
+	EXPECT_NE(QmMenusSource.find("{&g_Config.m_QmAutoUpdate, \"Automatic updates\", &g_Config.m_QmAutoUpdate},"), std::string::npos);
 	EXPECT_NE(QmMenusSource.find("Show outdated version warning"), std::string::npos);
 
 	EXPECT_NE(TClientHeader.find("m_pQmClientUpdateInfoTask"), std::string::npos);
@@ -1784,16 +1896,35 @@ TEST(QmNewUiMenuBranches, GaussianBlurSettingReplacesBetterScoreboardAndIsVersio
 	const std::string VersionSource = ReadTextFile("src/game/version.h");
 
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmBetterScoreboard, qm_better_scoreboard, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE"), std::string::npos);
-	EXPECT_NE(MiniFeaturesContent.find("RenderCheckbox(&g_Config.m_QmBetterScoreboard, \"Better scoreboard\", &g_Config.m_QmBetterScoreboard);"), std::string::npos);
-	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(pId, pText, Localize(pText), pValue, &Row, PrewarmOnly);"), std::string::npos);
-	EXPECT_NE(MenusSource.find("case EQmModuleId::MiniFeatures: return Rows(21.0f);"), std::string::npos);
-	// Realtime channel 与 Sponsor reminder 是卡片末尾的常驻行，测量行数必须跟着内容一起涨，
-	// 否则最后一个开关会贴到卡片底边。
-	EXPECT_NE(MiniFeaturesContent.find("RenderCheckbox(&g_Config.m_QmWebSocket, \"Realtime channel\", &g_Config.m_QmWebSocket);"), std::string::npos);
+	EXPECT_NE(MiniFeaturesContent.find("{&g_Config.m_QmBetterScoreboard, \"Better scoreboard\", &g_Config.m_QmBetterScoreboard},"), std::string::npos);
+	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(Feature.m_pId, Feature.m_pTextId, Localize(Feature.m_pTextId), Feature.m_pValue, &Row, PrewarmOnly);"), std::string::npos);
+	// 卡片高度必须等于真实渲染行数，否则会在卡片末尾留下空白行。
+	// 普通行来自 s_aQmMiniFeatureRows，另加「新版 IME」与「赞助提醒」两个特殊行。
+	const size_t MiniFeatureTableRows = CountOccurrences(MenusSource, "{&g_Config.m_Qm");
+	const size_t MiniFeatureRenderedRows =
+		CountOccurrences(MiniFeaturesContent, "RenderQmFunctionCheckbox(&g_Config.m_Qm") +
+		CountOccurrences(MiniFeaturesContent, "RenderQmFunctionCheckbox(Feature.m_pId");
+	EXPECT_EQ(MiniFeatureTableRows, 16u);
+	EXPECT_EQ(MiniFeatureRenderedRows, 18u);
+	EXPECT_NE(MenusSource.find("case EQmModuleId::MiniFeatures: return Rows(static_cast<float>(s_aQmMiniFeatureRows.size() + QmMiniFeatureSpecialRowCount));"), std::string::npos);
+
+	// 删除实时通道开关后，卡片高度仍须容纳末尾的赞助提醒。
 	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(&g_Config.m_QmSponsorNudge, \"Sponsor reminder\""), std::string::npos);
 	EXPECT_NE(MenusToml.find("key = \"Better scoreboard\""), std::string::npos);
 	EXPECT_NE(MenusToml.find("simplified_chinese = \"更好的计分板\""), std::string::npos);
 	EXPECT_NE(VersionSource.find("#define QMCLIENT_VERSION \""), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, RealtimeServiceHasNoDisableSetting)
+{
+	const std::string ConfigSource = ReadTextFile("src/engine/shared/config_variables_qmclient.h");
+	const std::string MenusSource = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string ClientSource = ReadTextFile("src/game/client/components/qmclient/qmclient.cpp");
+
+	// 设置界面与旧配置均不能再关闭自有服务，保留地址、日志等独立配置。
+	EXPECT_EQ(ConfigSource.find("QmWebSocket, qm_websocket,"), std::string::npos);
+	EXPECT_EQ(MenusSource.find("\"Realtime channel\""), std::string::npos);
+	EXPECT_FALSE(std::regex_search(ClientSource, std::regex(R"(\bg_Config\.m_QmWebSocket\b)")));
 }
 
 TEST(QmNewUiMenuBranches, NewSettingsUseToggleAndExposeAccentAndBlurControls)
@@ -2417,8 +2548,9 @@ TEST(QmNewUiMenuBranches, ProcessPriorityAndImeHaveVisibleSettings)
 	EXPECT_NE(ClientSource.find("m_pConsole->Chain(\"qm_process_high_priority\", ConchainProcessHighPriority, this);"), std::string::npos);
 	const std::string MiniFeaturesBody = FunctionBody(MenusSource, "void CMenus::RenderQmFunctionMiniFeaturesContent(");
 	ASSERT_FALSE(MiniFeaturesBody.empty());
-	EXPECT_NE(MiniFeaturesBody.find("&g_Config.m_QmProcessHighPriority"), std::string::npos);
-	EXPECT_NE(MiniFeaturesBody.find("&g_Config.m_QmImeAutoManage"), std::string::npos);
+	// 普通开关行集中在 s_aQmMiniFeatureRows，渲染函数只负责遍历与两个特殊行。
+	EXPECT_NE(MenusSource.find("{&g_Config.m_QmProcessHighPriority, \"High process priority\", &g_Config.m_QmProcessHighPriority},"), std::string::npos);
+	EXPECT_NE(MenusSource.find("{&g_Config.m_QmImeAutoManage, \"Auto manage IME while typing\", &g_Config.m_QmImeAutoManage},"), std::string::npos);
 	EXPECT_NE(MiniFeaturesBody.find("&g_Config.m_QmNewIme"), std::string::npos);
 }
 
@@ -2466,7 +2598,7 @@ TEST(QmNewUiMenuBranches, EmoticonShadowHasConfigRenderPassAndVisualToggle)
 	EXPECT_EQ(CountOccurrences(RenderPlayerBody, "if(g_Config.m_QmEmoticonShadow)"), 3);
 	EXPECT_EQ(CountOccurrences(RenderPlayerBody, "Graphics()->SetColor(0.0f, 0.0f, 0.0f"), 3);
 	EXPECT_NE(RenderPlayerBody.find("EmoticonShadowOffsetX * h"), std::string::npos);
-	EXPECT_NE(RenderPlayerBody.find("EmoticonShadowOffsetY * h, h, h"), std::string::npos);
+	EXPECT_NE(RenderPlayerBody.find("EmoticonShadowOffsetY * h, h * EmoticonScale, h * EmoticonScale"), std::string::npos);
 	EXPECT_NE(RenderPlayerBody.find("Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);\n\t\tGraphics()->RenderQuadContainerAsSprite"), std::string::npos);
 	EXPECT_NE(RenderPlayerBody.find("Graphics()->SetColor(1.0f, 1.0f, 1.0f, a * Alpha);\n\t\t\tGraphics()->RenderQuadContainerAsSprite"), std::string::npos);
 	EXPECT_NE(EmoticonRenderBody.find("EmoticonSelectorShadowOpacity"), std::string::npos);
@@ -3302,19 +3434,161 @@ TEST(QmNewUiMenuBranches, FriendCategoryHeadersExposeManagement)
 
 	EXPECT_NE(Source.find("FONT_ICON_GEAR"), std::string::npos);
 	EXPECT_NE(Source.find("Localize(\"Manage categories\")"), std::string::npos);
-	EXPECT_NE(Source.find("Localize(\"Right-click or use the gear to manage categories\")"), std::string::npos);
+	EXPECT_NE(Source.find("Localize(\"Drag to reorder; click to expand or collapse. Right-click or use the gear to manage categories\")"), std::string::npos);
 }
 
-TEST(QmNewUiMenuBranches, FriendCategorySortingRequiresCtrlDrag)
+TEST(QmFriendCategoryDrag, ClickAndSmallMovementDoNotStartSorting)
+{
+	SFriendsCategoryDragState Drag;
+	const CUIRect Header{10.0f, 20.0f, 180.0f, 24.0f};
+	Drag.Begin(2, Header, vec2(30.0f, 30.0f));
+	EXPECT_FALSE(Drag.Update(vec2(30.0f, 30.0f), true));
+	EXPECT_FALSE(Drag.Update(vec2(32.0f, 33.0f), true));
+	EXPECT_FALSE(Drag.Update(vec2(32.0f, 33.0f), false));
+	EXPECT_EQ(Drag.m_DraggingIndex, -1);
+}
+
+TEST(QmFriendCategoryDrag, MovingBeyondHeaderStartsSortingWithoutModifier)
+{
+	SFriendsCategoryDragState Drag;
+	const CUIRect Header{10.0f, 20.0f, 180.0f, 24.0f};
+	Drag.Begin(3, Header, vec2(30.0f, 30.0f));
+	EXPECT_TRUE(Drag.Update(vec2(30.0f, 90.0f), true));
+	EXPECT_EQ(Drag.m_DraggingIndex, 3);
+	EXPECT_FLOAT_EQ(Drag.m_GrabOffset.x, 20.0f);
+	EXPECT_FLOAT_EQ(Drag.m_GrabOffset.y, 10.0f);
+	EXPECT_FLOAT_EQ(Drag.m_DraggedWidth, 180.0f);
+	EXPECT_FLOAT_EQ(Drag.m_DraggedHeight, 24.0f);
+	// 回到起点或释放鼠标仍属于同一次拖动，不能变成展开/收起点击。
+	EXPECT_FALSE(Drag.Update(vec2(30.0f, 30.0f), true));
+	EXPECT_FALSE(Drag.Update(vec2(30.0f, 30.0f), false));
+	EXPECT_EQ(Drag.m_DraggingIndex, 3);
+}
+
+TEST(QmFriendCategoryDrag, PressIsRequiredAndEveryCategoryCanBeDragged)
+{
+	SFriendsCategoryDragState Drag;
+	EXPECT_FALSE(Drag.Update(vec2(100.0f, 100.0f), true));
+	const CUIRect Header{10.0f, 20.0f, 180.0f, 24.0f};
+	for(int CategoryIndex = 0; CategoryIndex < 4; ++CategoryIndex)
+	{
+		Drag.Begin(CategoryIndex, Header, vec2(30.0f, 30.0f));
+		EXPECT_FALSE(Drag.Update(vec2(30.0f, 100.0f), false));
+		EXPECT_TRUE(Drag.Update(vec2(30.0f, 35.0f), true));
+		EXPECT_EQ(Drag.m_DraggingIndex, CategoryIndex);
+	}
+}
+
+TEST(QmFriendPlayerDrag, RequiresPressAndFiveUnitsOfHeldMovement)
+{
+	SFriendsPlayerDragState Drag;
+	EXPECT_FALSE(Drag.Update(vec2(100.0f, 100.0f), true));
+	int ItemId = 0;
+	const CUIRect Row{10.0f, 20.0f, 180.0f, 24.0f};
+	Drag.Begin(&ItemId, IFriends::FRIEND_PLAYER, "Alice", "Clan", "Friends", Row, vec2(30.0f, 30.0f));
+	EXPECT_FALSE(Drag.Update(vec2(32.0f, 33.0f), true));
+	EXPECT_FALSE(Drag.Update(vec2(33.0f, 34.0f), false));
+	EXPECT_FALSE(Drag.m_Dragging);
+	EXPECT_TRUE(Drag.Update(vec2(33.0f, 34.0f), true));
+	EXPECT_TRUE(Drag.m_Dragging);
+	EXPECT_FALSE(Drag.Update(vec2(30.0f, 30.0f), true));
+	EXPECT_FALSE(Drag.Update(vec2(30.0f, 30.0f), false));
+	EXPECT_TRUE(Drag.m_Dragging);
+}
+
+TEST(QmFriendPlayerDrag, OwnsIdentityAndPreservesGrabGeometry)
+{
+	SFriendsPlayerDragState Drag;
+	int ItemId = 0;
+	char aName[] = "Alice";
+	char aClan[] = "Clan";
+	char aCategory[] = "Practice";
+	const CUIRect Row{10.0f, 20.0f, 180.0f, 24.0f};
+	Drag.Begin(&ItemId, IFriends::FRIEND_PLAYER, aName, aClan, aCategory, Row, vec2(30.0f, 30.0f));
+	aName[0] = 'X';
+	aClan[0] = 'X';
+	aCategory[0] = 'X';
+	EXPECT_EQ(Drag.m_pPressedItem, &ItemId);
+	EXPECT_STREQ(Drag.m_aName, "Alice");
+	EXPECT_STREQ(Drag.m_aClan, "Clan");
+	EXPECT_STREQ(Drag.m_aCategory, "Practice");
+	EXPECT_FLOAT_EQ(Drag.m_PressMouse.x, 30.0f);
+	EXPECT_FLOAT_EQ(Drag.m_PressMouse.y, 30.0f);
+	EXPECT_FLOAT_EQ(Drag.m_GrabOffset.x, 20.0f);
+	EXPECT_FLOAT_EQ(Drag.m_GrabOffset.y, 10.0f);
+	EXPECT_FLOAT_EQ(Drag.m_DraggedWidth, 180.0f);
+	EXPECT_FLOAT_EQ(Drag.m_DraggedHeight, 24.0f);
+}
+
+TEST(QmFriendPlayerDrag, RejectsClanMembersAndClearsPreviousDrag)
+{
+	SFriendsPlayerDragState Drag;
+	int ItemId = 0;
+	const CUIRect Row{10.0f, 20.0f, 180.0f, 24.0f};
+	for(int FriendState : {IFriends::FRIEND_NO, IFriends::FRIEND_CLAN})
+	{
+		Drag.Begin(&ItemId, IFriends::FRIEND_PLAYER, "Alice", "Clan", "Friends", Row, vec2(30.0f, 30.0f));
+		ASSERT_TRUE(Drag.Update(vec2(30.0f, 35.0f), true));
+		Drag.Begin(&ItemId, FriendState, "Alice", "Clan", "Friends", Row, vec2(30.0f, 30.0f));
+		EXPECT_EQ(Drag.m_pPressedItem, nullptr);
+		EXPECT_FALSE(Drag.m_Dragging);
+		EXPECT_STREQ(Drag.m_aName, "");
+		EXPECT_STREQ(Drag.m_aClan, "");
+		EXPECT_STREQ(Drag.m_aCategory, "");
+		EXPECT_FALSE(Drag.Update(vec2(30.0f, 35.0f), true));
+	}
+	Drag.Begin(&ItemId, IFriends::FRIEND_PLAYER, "", "Clan", "Friends", Row, vec2(30.0f, 30.0f));
+	EXPECT_EQ(Drag.m_pPressedItem, nullptr);
+	Drag.Begin(nullptr, IFriends::FRIEND_PLAYER, "Alice", "Clan", "Friends", Row, vec2(30.0f, 30.0f));
+	EXPECT_EQ(Drag.m_pPressedItem, nullptr);
+}
+
+TEST(QmFriendPlayerDrag, RejectsAutomaticGroupsAndUnchangedMembership)
+{
+	SFriendsPlayerDragState Drag;
+	int ItemId = 0;
+	const CUIRect Row{10.0f, 20.0f, 180.0f, 24.0f};
+	Drag.Begin(&ItemId, IFriends::FRIEND_PLAYER, "Alice", "Clan", "Practice", Row, vec2(30.0f, 30.0f));
+	EXPECT_FALSE(Drag.CanDropTo("Friends"));
+	ASSERT_TRUE(Drag.Update(vec2(30.0f, 35.0f), true));
+	EXPECT_FALSE(Drag.CanDropTo(nullptr));
+	EXPECT_FALSE(Drag.CanDropTo(""));
+	EXPECT_FALSE(Drag.CanDropTo("clan members"));
+	EXPECT_FALSE(Drag.CanDropTo("OFFLINE"));
+	EXPECT_FALSE(Drag.CanDropTo("PRACTICE"));
+	EXPECT_TRUE(Drag.CanDropTo("Friends"));
+	EXPECT_TRUE(Drag.CanDropTo("Race"));
+}
+
+TEST(QmFriendPlayerDrag, OfflineSourceCanMoveToOrdinaryGroups)
+{
+	SFriendsPlayerDragState Drag;
+	int ItemId = 0;
+	const CUIRect Row{10.0f, 20.0f, 180.0f, 24.0f};
+	Drag.Begin(&ItemId, IFriends::FRIEND_PLAYER, "Alice", "Clan", IFriends::OFFLINE_CATEGORY, Row, vec2(30.0f, 30.0f));
+	ASSERT_TRUE(Drag.Update(vec2(30.0f, 35.0f), true));
+	EXPECT_TRUE(Drag.CanDropTo(IFriends::DEFAULT_CATEGORY));
+	EXPECT_TRUE(Drag.CanDropTo("Practice"));
+	EXPECT_FALSE(Drag.CanDropTo(IFriends::OFFLINE_CATEGORY));
+}
+
+TEST(QmNewUiMenuBranches, FriendCategorySortingPreservesClickAndExpandedState)
 {
 	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
-	const size_t DragState = Source.find("s_CategoryDragState.m_PressedIndex = CategoryIndex;");
-	ASSERT_NE(DragState, std::string::npos);
-	const size_t PressGate = Source.rfind("Input()->ModifierIsPressed() && Ui()->MouseButtonClicked(0)", DragState);
-	ASSERT_NE(PressGate, std::string::npos);
-	EXPECT_NE(Source.find("Ui()->MouseButton(0) && Input()->ModifierIsPressed() && s_CategoryDragState.m_DraggingIndex < 0", DragState), std::string::npos);
-	EXPECT_NE(Source.find("!Input()->ModifierIsPressed() && s_CategoryDragState.m_DraggingIndex < 0", DragState), std::string::npos);
-	EXPECT_EQ(Source.find("CategoryDragHoldSeconds"), std::string::npos);
+	const size_t Start = Source.find("void CMenus::RenderServerbrowserFriends(CUIRect View)");
+	const size_t End = Source.find("CUi::EPopupMenuFunctionResult CMenus::PopupFriendsCategory", Start);
+	ASSERT_NE(Start, std::string::npos);
+	ASSERT_NE(End, std::string::npos);
+	const std::string Body = Source.substr(Start, End - Start);
+	EXPECT_EQ(Body.find("ModifierIsPressed"), std::string::npos);
+	EXPECT_NE(Body.find("s_CategoryDragState.Update"), std::string::npos);
+	EXPECT_NE(Body.find("s_CategoryDragState.Begin(CategoryIndex, Header"), std::string::npos);
+	EXPECT_NE(Body.find("!DraggingAnyHeader && HeaderResult == 1"), std::string::npos);
+	EXPECT_NE(Body.find("m_vFriendsCategoryExpanded[CategoryIndex] && !DraggingAnyHeader"), std::string::npos);
+	EXPECT_EQ(Body.find("m_vFriendsCategoryExpanded[CollapseIndex] = false"), std::string::npos);
+	EXPECT_NE(Body.find("MoveCategoryExpandedState(FromIndex, ToIndex);"), std::string::npos);
+	EXPECT_NE(Body.find("SaveFriendsCategoryExpandedState();"), std::string::npos);
+	EXPECT_NE(Body.find("if(!Ui()->MouseHovered(&ListViewport))"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, ProtectedFriendCategoriesCannotBeRenamedOrDeleted)
@@ -3826,6 +4100,100 @@ TEST(QmNewUiMenuBranches, NameplateTextEffectsReserveTheirRenderedExtent)
 	EXPECT_NE(AppearanceSettings.find("Localize(\"Glow range\"), 1, 12"), std::string::npos);
 }
 
+TEST(QmNewUiMenuBranches, NameplateTextEffectAutoLodCutsOuterLayersWhenCrowded)
+{
+	// 满档特效绘制次数：辉光每圈 4 次方向绘制（最多 6 圈），描边每圈 8 次（最多 4 圈），本体不计入预算。
+	EXPECT_EQ(QmNameplateEffectFullDraws(0, 4, 12), 0);
+	EXPECT_EQ(QmNameplateEffectFullDraws(QM_TEXT_EFFECT_GRADIENT | QM_TEXT_EFFECT_RAINBOW, 4, 12), 0);
+	EXPECT_EQ(QmNameplateEffectFullDraws(QM_TEXT_EFFECT_BORDER, 1, 12), 0);
+	EXPECT_EQ(QmNameplateEffectFullDraws(QM_TEXT_EFFECT_BORDER, 4, 0), 32);
+	EXPECT_EQ(QmNameplateEffectFullDraws(QM_TEXT_EFFECT_GLOW, 4, 3), 12);
+	EXPECT_EQ(QmNameplateEffectFullDraws(QM_TEXT_EFFECT_BORDER | QM_TEXT_EFFECT_GLOW, 1, 1), 4);
+	EXPECT_EQ(QmNameplateEffectFullDraws(QM_TEXT_EFFECT_BORDER | QM_TEXT_EFFECT_GLOW, 4, 12), 56);
+
+	// 名牌数不超过满档阈值时一个绘制都不少；超过后按人数比例缩减每行允许的绘制次数。
+	EXPECT_EQ(QmNameplateEffectLodIdealDraws(0, 56, 20), 56);
+	EXPECT_EQ(QmNameplateEffectLodIdealDraws(20, 56, 20), 56);
+	EXPECT_EQ(QmNameplateEffectLodIdealDraws(30, 56, 20), 38);
+	EXPECT_EQ(QmNameplateEffectLodIdealDraws(90, 56, 20), 13);
+	EXPECT_EQ(QmNameplateEffectLodIdealDraws(128, 56, 20), 9);
+	// 极端人数下也至少留下最内圈一层特效（向上取整）。
+	EXPECT_EQ(QmNameplateEffectLodIdealDraws(600, 16, 20), 1);
+	// 没有特效可降时不进入降级状态。
+	EXPECT_EQ(QmNameplateEffectLodIdealDraws(90, 0, 20), QM_TEXT_EFFECT_DRAWS_UNLIMITED);
+
+	// 分配顺序：先砍外层辉光，再砍外层描边，本体永远保留。
+	SQmNameplateEffectPasses Passes = QmNameplateEffectResolvePasses(QM_TEXT_EFFECT_DRAWS_UNLIMITED, 4, 6);
+	EXPECT_EQ(Passes.m_BorderPasses, 4);
+	EXPECT_EQ(Passes.m_GlowPasses, 6);
+	Passes = QmNameplateEffectResolvePasses(56, 4, 6);
+	EXPECT_EQ(Passes.m_BorderPasses, 4);
+	EXPECT_EQ(Passes.m_GlowPasses, 6);
+	Passes = QmNameplateEffectResolvePasses(40, 4, 6);
+	EXPECT_EQ(Passes.m_BorderPasses, 4);
+	EXPECT_EQ(Passes.m_GlowPasses, 2);
+	Passes = QmNameplateEffectResolvePasses(13, 4, 6);
+	EXPECT_EQ(Passes.m_BorderPasses, 1);
+	EXPECT_EQ(Passes.m_GlowPasses, 1);
+	Passes = QmNameplateEffectResolvePasses(13, 0, 6);
+	EXPECT_EQ(Passes.m_BorderPasses, 0);
+	EXPECT_EQ(Passes.m_GlowPasses, 3);
+	Passes = QmNameplateEffectResolvePasses(3, 0, 6);
+	EXPECT_EQ(Passes.m_BorderPasses, 0);
+	EXPECT_EQ(Passes.m_GlowPasses, 0);
+	Passes = QmNameplateEffectResolvePasses(0, 4, 6);
+	EXPECT_EQ(Passes.m_BorderPasses, 0);
+	EXPECT_EQ(Passes.m_GlowPasses, 0);
+
+	// 平滑：死区内不动（屏幕边缘单个玩家进出不该改变档位），真实变化按步长跟上。
+	EXPECT_EQ(QmNameplateEffectLodSmoothCount(20, 21, 2, 8, 2), 20);
+	EXPECT_EQ(QmNameplateEffectLodSmoothCount(20, 18, 2, 8, 2), 20);
+	EXPECT_EQ(QmNameplateEffectLodSmoothCount(20, 22, 2, 8, 2), 20);
+	EXPECT_EQ(QmNameplateEffectLodSmoothCount(20, 23, 2, 8, 2), 23);
+	EXPECT_EQ(QmNameplateEffectLodSmoothCount(20, 90, 2, 8, 2), 28);
+	EXPECT_EQ(QmNameplateEffectLodSmoothCount(90, 20, 2, 8, 2), 88);
+	EXPECT_EQ(QmNameplateEffectLodSmoothCount(0, 3, 2, 8, 2), 3);
+	EXPECT_EQ(QmNameplateEffectLodSmoothCount(5, 5, 2, 8, 2), 5);
+
+	// 阈值附近 19/21 交替 60 帧：档位必须一直是满档，不能出现特效闪烁。
+	int Smoothed = 20;
+	for(int Frame = 0; Frame < 60; ++Frame)
+	{
+		const int Visible = (Frame % 2 == 0) ? 19 : 21;
+		Smoothed = QmNameplateEffectLodSmoothCount(
+			Smoothed, Visible,
+			QM_NAMEPLATE_EFFECT_LOD_DEAD_ZONE_NAMEPLATES,
+			QM_NAMEPLATE_EFFECT_LOD_STEP_UP_NAMEPLATES,
+			QM_NAMEPLATE_EFFECT_LOD_STEP_DOWN_NAMEPLATES);
+		EXPECT_EQ(QmNameplateEffectLodIdealDraws(Smoothed, 56, 20), 56);
+	}
+
+	// 渲染侧接线：pass 数由档位决定，但半径与淡化的分母仍取满档值，
+	// 这样降级时消失的只有最外圈，留下的内圈与改动前逐层一致。
+	const std::string RenderSource = ReadTextFile("src/game/client/render.cpp");
+	EXPECT_NE(RenderSource.find("Style.m_MaxEffectDraws"), std::string::npos);
+	EXPECT_NE(RenderSource.find("QmNameplateEffectResolvePasses("), std::string::npos);
+	EXPECT_NE(RenderSource.find("const int GlowPasses = EffectPasses.m_GlowPasses;"), std::string::npos);
+	EXPECT_NE(RenderSource.find("const int BorderPasses = EffectPasses.m_BorderPasses;"), std::string::npos);
+	EXPECT_NE(RenderSource.find("Style.m_GlowRange * (float)(Pass + 1) / (float)MaxGlowPasses"), std::string::npos);
+	EXPECT_NE(RenderSource.find("Style.m_GlowColor.a * Alpha * (1.0f - (float)Pass / (float)(MaxGlowPasses + 1))"), std::string::npos);
+	EXPECT_NE(RenderSource.find("OutlineColor.a * (1.0f - (float)Pass / (float)(MaxBorderPasses + 1))"), std::string::npos);
+	EXPECT_NE(RenderSource.find("for(int Pass = 0; Pass < GlowPasses; ++Pass)"), std::string::npos);
+	EXPECT_NE(RenderSource.find("TextRender()->RenderTextContainer(TextContainerIndex, TextColor, OutlineColor, X, Y);"), std::string::npos);
+
+	const std::string NameplatesSource = ReadTextFile("src/game/client/components/nameplates.cpp");
+	EXPECT_NE(NameplatesSource.find("Style.m_MaxEffectDraws = "), std::string::npos);
+	EXPECT_NE(NameplatesSource.find("QmNameplateEffectLodSmoothCount("), std::string::npos);
+	EXPECT_NE(NameplatesSource.find("QmNameplateEffectLodIdealDraws("), std::string::npos);
+	EXPECT_NE(NameplatesSource.find("QmNameplateEffectFullDraws("), std::string::npos);
+	EXPECT_NE(NameplatesSource.find("g_Config.m_QmNameplateEffectAutoLod"), std::string::npos);
+	EXPECT_NE(NameplatesSource.find("g_Config.m_QmNameplateEffectLodThreshold"), std::string::npos);
+
+	const std::string QmConfigHeader = ReadTestSourceFile("src/engine/shared/config_variables_qmclient.h");
+	EXPECT_NE(QmConfigHeader.find("QmNameplateEffectAutoLod, qm_nameplate_effect_auto_lod, 1, 0, 1"), std::string::npos);
+	EXPECT_NE(QmConfigHeader.find("QmNameplateEffectLodThreshold, qm_nameplate_effect_lod_threshold, 20, 4, 64"), std::string::npos);
+}
+
 TEST(QmNewUiMenuBranches, QmLaserSettingsMovedToAppearanceLaserTab)
 {
 	const std::string QmSource = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
@@ -3909,7 +4277,7 @@ TEST(QmNewUiMenuBranches, QmSettingsCardsUseSharedStyleHelpers)
 	EXPECT_NE(HudDeck.find("BuildHudPreLayoutInput"), std::string::npos);
 	EXPECT_NE(HudDeck.find("Definition.m_PreLayoutInput = BuildHudPreLayoutInput(Id);"), std::string::npos);
 	EXPECT_NE(HudDeck.find("HandleQmHudCheckboxInput(Content"), std::string::npos);
-	EXPECT_NE(HudDeck.find("case EQmModuleId::SpeedrunTimer:"), std::string::npos);
+	EXPECT_NE(HudDeck.find("case EQmModuleId::DebugGraph:"), std::string::npos);
 	EXPECT_NE(HudDeck.find("case EQmModuleId::SystemMediaControls:"), std::string::npos);
 	EXPECT_NE(VisualDeck.find("BuildVisualPreLayoutInput"), std::string::npos);
 	EXPECT_NE(VisualDeck.find("Definition.m_PreLayoutInput = BuildVisualPreLayoutInput(Id);"), std::string::npos);
@@ -4382,8 +4750,7 @@ TEST(QmNewUiMenuBranches, TClientConditionalCardsKeepMeasureRenderAndPreLayoutRo
 	EXPECT_NE(NameplatePreLayout.find("return ProcessToggle(Rows.Next(), &g_Config.m_TcWhiteFeet);"), std::string::npos);
 
 	EXPECT_NE(InputLayout.find("if(UiMode == 0)"), std::string::npos);
-	EXPECT_NE(InputLayout.find("else if(UiMode == 3)"), std::string::npos);
-	EXPECT_NE(InputPreLayout.find("for(int RowIndex = 0; RowIndex < (ActiveMode == 3 ? 4 : 1); ++RowIndex)"), std::string::npos);
+	EXPECT_EQ(InputLayout.find("else if(UiMode == 3)"), std::string::npos);
 	EXPECT_NE(InputPreLayout.find("ActiveMode == 0 ? &g_Config.m_TcFastInputOthers"), std::string::npos);
 
 	EXPECT_NE(PlayerIndicatorLayout.find("const int DistanceRowCount = 3 + (g_Config.m_TcIndicatorVariableDistance ? 3 : 1);"), std::string::npos);
@@ -4406,8 +4773,9 @@ TEST(QmNewUiMenuBranches, TClientConditionalCardsKeepMeasureRenderAndPreLayoutRo
 	EXPECT_NE(Source.find("static CButtonContainer s_FastInputModeFast;"), std::string::npos);
 	EXPECT_NE(Source.find("DoButton_Menu(&s_FastInputModeFast"), std::string::npos);
 	EXPECT_NE(InputPreLayout.find("DoButtonLogic(&s_FastInputModeFast"), std::string::npos);
-	EXPECT_NE(InputPreLayout.find("DoButtonLogic(&s_FastInputModeBest"), std::string::npos);
 	EXPECT_NE(InputPreLayout.find("DoButtonLogic(&s_FastInputModeSaikoPlus"), std::string::npos);
+	// Best input 已整体删除，两个布局分支都不允许再出现对应按钮。
+	EXPECT_EQ(Source.find("s_FastInputModeBest"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, DeckPreLayoutPressClearsStaleActiveInput)
@@ -5358,6 +5726,27 @@ TEST(QmNewUiMenuBranches, GraphicsCurrentModeLabelSanitizesScaleAndAspectRatio)
 	EXPECT_NE(Source.find("g_Config.m_GfxScreenHeight / AspectGcd"), std::string::npos);
 }
 
+TEST(QmMovingTiles, RestoresIncomingScreenMappingAfterRendering)
+{
+	const std::string Body = FunctionBody(ReadTextFile("src/game/client/components/tclient/moving_tiles.cpp"), "void CMovingTiles::OnRender()");
+	const size_t GroupStatePos = Body.find("auto ApplyGroupState =");
+	ASSERT_NE(GroupStatePos, std::string::npos);
+	const std::string BeforeGroupState = Body.substr(0, GroupStatePos);
+
+	// 从入口保存操作提取四个坐标，要求绘制结束后按原顺序恢复，而不是重设默认相机。
+	const std::regex SaveScreenPattern(R"(Graphics\(\)->GetScreen\(&([A-Za-z0-9_]+), &([A-Za-z0-9_]+), &([A-Za-z0-9_]+), &([A-Za-z0-9_]+)\);)");
+	std::smatch SavedScreen;
+	ASSERT_TRUE(std::regex_search(BeforeGroupState, SavedScreen, SaveScreenPattern));
+	const std::string RestoreScreen = "Graphics()->MapScreen(" + SavedScreen[1].str() + ", " + SavedScreen[2].str() + ", " + SavedScreen[3].str() + ", " + SavedScreen[4].str() + ");";
+
+	const size_t RenderPos = Body.rfind("RenderPass();");
+	ASSERT_NE(RenderPos, std::string::npos);
+	const size_t RestorePos = Body.find(RestoreScreen, RenderPos);
+	ASSERT_NE(RestorePos, std::string::npos);
+	EXPECT_EQ(Body.find("return", RenderPos), std::string::npos);
+	EXPECT_EQ(Body.find("MapScreen", RestorePos + RestoreScreen.size()), std::string::npos);
+}
+
 TEST(QmCameraAspectRatio, KeepsUiAspectPhysicalAndOverridesOnlyGameWorld)
 {
 	const std::string GraphicsHeader = ReadTextFile("src/engine/graphics.h");
@@ -5826,6 +6215,58 @@ TEST(QmNewUiMenuBranches, TeeStandardPageUsesUnifiedSettingsStack)
 	const std::string Ui = ReadTextFile("src/game/client/ui.cpp");
 	EXPECT_NE(FunctionBody(Ui, "bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners, const std::vector<STextColorSplit> &vColorSplits, int Align, const SEditBoxRenderOptions &RenderOptions)").find("DrawRoundedSurface(this, *pRect"), std::string::npos);
 	EXPECT_EQ(Tee.find("Ui()->DoScrollbarH("), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, TeeRestoresCardContentsAndKeepsDoubleClickActions)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/menus_settings.cpp");
+	const std::string Tee = FunctionBody(Source, "void CMenus::RenderSettingsTee(CUIRect MainView)");
+	ASSERT_FALSE(Tee.empty());
+	const size_t Options = Tee.find("const auto RenderOptions =");
+	const size_t Identity = Tee.find("const auto RenderIdentity =");
+	const size_t List = Tee.find("const auto RenderList =");
+	ASSERT_NE(Options, std::string::npos);
+	ASSERT_NE(Identity, std::string::npos);
+	ASSERT_NE(List, std::string::npos);
+	const size_t Colors = Tee.find("ResolveSettingsTeeCustomColorsLayout(MainView,");
+	EXPECT_GT(Colors, Options);
+	EXPECT_LT(Colors, Identity);
+	const size_t Queue = Tee.find("CUIRect QueuePanel;");
+	EXPECT_GT(Queue, List);
+	EXPECT_LT(Queue, Tee.find("// Layout bottom controls", List));
+	EXPECT_EQ(Tee.find("const SSettingsTeeCustomColorsLayout TeeCustomColors"), std::string::npos);
+	// 双击功能保留，布局恢复不能移除本体与分身的快捷应用入口。
+	EXPECT_EQ(Tee.find("MouseDoubleClick"), std::string::npos);
+	const size_t ItemButton = Tee.find("const int ItemButton = Ui()->DoButtonLogic(SkinListEntry.ListItemId(), 0, &Item.m_Rect, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);");
+	ASSERT_NE(ItemButton, std::string::npos);
+	EXPECT_NE(Tee.find("if(ItemButton != 0 && Ui()->DoDoubleClickLogic(SkinListEntry.ListItemId()))", ItemButton), std::string::npos);
+	EXPECT_NE(Tee.find("QmTeeSkinApplyTargetForButton(ItemButton)"), std::string::npos);
+	EXPECT_NE(Tee.find("ApplySkinListEntry(SkinListEntry, Target, QmTeeSkinApplyTargetDummy(Target) != (m_Dummy ? 1 : 0));"), std::string::npos);
+	const size_t DoubleClick = Tee.find("Ui()->DoDoubleClickLogic(", ItemButton);
+	ASSERT_NE(DoubleClick, std::string::npos);
+	EXPECT_EQ(Tee.find("Ui()->DoDoubleClickLogic(", DoubleClick + 1), std::string::npos);
+	// 单击与双击共用同一份赋值路径。
+	EXPECT_NE(Tee.find("ApplySkinListEntry(vSkinList[NewSelected], m_Dummy ? ETeeSkinApplyTarget::DUMMY : ETeeSkinApplyTarget::MAIN, false);"), std::string::npos);
+	EXPECT_NE(Tee.find("QmApplyTeeSkinToTarget(g_Config, Target, Entry.SkinContainer()->Name(), HasColorKey, EntryUseCustomColor, EntryColorBody, EntryColorFeet);"), std::string::npos);
+	EXPECT_NE(Source.find("#include <game/client/components/qmclient/tee_skin_apply.h>"), std::string::npos);
+	EXPECT_NE(Tee.find("Localize(\"Double-click: left applies to main, right applies to dummy\")"), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, TeeOriginalLayoutRestoresSavedVersionEightPositions)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/menus.cpp");
+	const size_t Start = Source.find("if(g_Config.m_QmCardLayoutVersion < 9)");
+	ASSERT_NE(Start, std::string::npos);
+	const size_t End = Source.find("g_Config.m_QmCardLayoutVersion = 9;", Start);
+	ASSERT_NE(End, std::string::npos);
+	const std::string Migration = Source.substr(Start, End - Start);
+	EXPECT_EQ(Source.find("if(g_Config.m_QmCardLayoutVersion < 8)"), std::string::npos);
+	EXPECT_NE(Migration.find("Candidate.MoveToTab(\"deck:tee-identity\", \"tee\", 1, 0);"), std::string::npos);
+	EXPECT_NE(Migration.find("Candidate.MoveToTab(\"deck:tee-skin-options\", \"tee\", 2, 0);"), std::string::npos);
+	EXPECT_NE(Migration.find("Candidate.MoveToTab(\"deck:tee-skin-list\", \"tee\", 0, 0);"), std::string::npos);
+	EXPECT_NE(Migration.find("if(!PersistCandidate(Candidate, true))"), std::string::npos);
+	const std::string Config = ReadTextFile("src/engine/shared/config_variables_qmclient.h");
+	EXPECT_NE(Config.find("MACRO_CONFIG_INT(QmCardLayoutVersion, qm_card_layout_version, 0, 0, 9,"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, Tee7NestedGridsOwnWheelAndCacheRefreshes)
@@ -6635,4 +7076,136 @@ TEST(QmNewUiMenuBranches, NameplateTextRasterizesAtStandardZoom)
 	EXPECT_EQ(Header.find("QmNameplateTextRasterizationDensity"), std::string::npos);
 	// HiDPI 物理像素对齐开关属于官方行为，保留。
 	EXPECT_NE(Header.find("QmNameplateUsesPhysicalPixelAlignment"), std::string::npos);
+}
+
+TEST(QmSpectatorFriendPriority, StablePartitionPutsFriendsFirst)
+{
+	const bool aIsFriend[] = {false, true, false, true, false};
+	int aOrder[5] = {};
+	const int FriendCount = qm_spectator_friends::BuildFriendFirstOrder(aIsFriend, 5, aOrder);
+	ASSERT_EQ(FriendCount, 2);
+	// 好友保持原有相对顺序（原下标 1 在 3 之前），其余玩家同理（0、2、4）。
+	EXPECT_EQ(aOrder[0], 1);
+	EXPECT_EQ(aOrder[1], 3);
+	EXPECT_EQ(aOrder[2], 0);
+	EXPECT_EQ(aOrder[3], 2);
+	EXPECT_EQ(aOrder[4], 4);
+}
+
+TEST(QmSpectatorFriendPriority, HandlesAllFriendsNoFriendsAndEmptyList)
+{
+	const bool aAllFriends[] = {true, true, true};
+	int aOrder[3] = {};
+	EXPECT_EQ(qm_spectator_friends::BuildFriendFirstOrder(aAllFriends, 3, aOrder), 3);
+	for(int i = 0; i < 3; ++i)
+		EXPECT_EQ(aOrder[i], i);
+
+	const bool aNoFriends[] = {false, false, false};
+	EXPECT_EQ(qm_spectator_friends::BuildFriendFirstOrder(aNoFriends, 3, aOrder), 0);
+	for(int i = 0; i < 3; ++i)
+		EXPECT_EQ(aOrder[i], i);
+
+	// 空列表不写出任何下标。
+	int Dummy = -1;
+	EXPECT_EQ(qm_spectator_friends::BuildFriendFirstOrder(aNoFriends, 0, &Dummy), 0);
+	EXPECT_EQ(Dummy, -1);
+	EXPECT_EQ(qm_spectator_friends::BuildFriendFirstOrder(aNoFriends, -1, &Dummy), 0);
+	EXPECT_EQ(Dummy, -1);
+}
+
+TEST(QmSpectatorFriendPriority, FullServerOrderIsAPermutationWithSingleBoundary)
+{
+	bool aIsFriend[MAX_CLIENTS] = {};
+	// 每隔三个玩家取一个好友，覆盖满员（64 人）时的下标边界。
+	for(int i = 0; i < MAX_CLIENTS; i += 3)
+		aIsFriend[i] = true;
+
+	int aOrder[MAX_CLIENTS] = {};
+	const int FriendCount = qm_spectator_friends::BuildFriendFirstOrder(aIsFriend, MAX_CLIENTS, aOrder);
+	int ExpectedFriends = 0;
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+		ExpectedFriends += aIsFriend[i] ? 1 : 0;
+	EXPECT_EQ(FriendCount, ExpectedFriends);
+
+	bool aSeen[MAX_CLIENTS] = {};
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+	{
+		ASSERT_GE(aOrder[i], 0);
+		ASSERT_LT(aOrder[i], MAX_CLIENTS);
+		EXPECT_FALSE(aSeen[aOrder[i]]);
+		aSeen[aOrder[i]] = true;
+		// 分区边界之前必须全是好友，之后必须全不是好友。
+		EXPECT_EQ(aIsFriend[aOrder[i]], i < FriendCount);
+	}
+}
+
+TEST(QmSpectatorFriendPriority, SpectatorHudRendersFriendsFirstWithOwnGroupTitles)
+{
+	const std::string Spectator = ReadTextFile("src/game/client/components/spectator.cpp");
+	const std::string Body = FunctionBody(Spectator, "void CSpectator::OnRender()");
+
+	// 显示顺序由纯函数算出，绘制循环按该顺序取玩家，先排序后绘制。
+	const size_t BuildOrder = Body.find("qm_spectator_friends::BuildFriendFirstOrder(");
+	const size_t DrawLoop = Body.find("apDisplayPlayers[aDisplayOrder[");
+	ASSERT_NE(BuildOrder, std::string::npos);
+	ASSERT_NE(DrawLoop, std::string::npos);
+	EXPECT_LT(BuildOrder, DrawLoop);
+
+	// 好友组与其余玩家各自带分组标题，边界只出现一次。
+	EXPECT_NE(Body.find("Localize(\"Friends\")"), std::string::npos);
+	EXPECT_NE(Body.find("Localize(\"Others\")"), std::string::npos);
+	EXPECT_NE(Body.find("i == FriendCount"), std::string::npos);
+	// 分组标题不占用网格槽位，避免满员时多出一列把玩家挤出面板：换行判定只保留玩家行那一处。
+	const size_t FirstWrap = Body.find("if(Count == PerLine + 1");
+	ASSERT_NE(FirstWrap, std::string::npos);
+	EXPECT_EQ(Body.find("if(Count == PerLine + 1", FirstWrap + 1), std::string::npos);
+
+	// 好友判定沿用快照里的 m_Friend 缓存（与爱心图标同源），渲染路径不查好友表。
+	EXPECT_NE(Body.find(".m_Friend;"), std::string::npos);
+	EXPECT_EQ(Body.find("Friends()->IsFriend("), std::string::npos);
+	EXPECT_EQ(Body.find("Foes()->IsFriend("), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, FriendHeartsUseSolidHeartGlyph)
+{
+	// 意图：图标字体 Phosphor 只有中空心形（U+E2A8 为 2 轮廓），好友界面的爱心改用默认字体
+	// DejaVu Sans 的实体心形 U+2665；调用点必须走共享常量，并把字体预设切回默认字体。
+	EXPECT_STREQ(QM_FRIEND_HEART_ICON, "\xE2\x99\xA5");
+
+	const std::string Header = ReadTextFile("src/game/client/components/qmclient/friend_heart_icon.h");
+	EXPECT_NE(Header.find("QM_FRIEND_HEART_ICON"), std::string::npos);
+	// 常量用 U+2665 的 UTF-8 字节，且不再引用图标字体的中空心形码位。
+	EXPECT_NE(Header.find("\xE2\x99\xA5"), std::string::npos);
+	EXPECT_EQ(Header.find("\xEE\x8A\xA8"), std::string::npos);
+
+	const std::string Browser = ReadTextFile("src/game/client/components/menus_browser.cpp");
+	EXPECT_NE(Browser.find("#include <game/client/components/qmclient/friend_heart_icon.h>"), std::string::npos);
+	// 好友列表表头：默认字体的实体爱心。
+	EXPECT_NE(Browser.find("Ui()->DoLabel(&Col.m_Rect, QM_FRIEND_HEART_ICON, 14.0f, TEXTALIGN_MC);"), std::string::npos);
+	EXPECT_EQ(Browser.find("Ui()->DoLabel(&Col.m_Rect, FONT_ICON_HEART, 14.0f, TEXTALIGN_MC);"), std::string::npos);
+	// 服务器列表好友图标：绘制辅助函数支持逐次指定字体预设，心形以外的图标继续用图标字体。
+	EXPECT_NE(Browser.find("const char *pText, int TextAlign, bool SmallFont = false, EFontPreset FontPreset = EFontPreset::ICON_FONT)"), std::string::npos);
+	EXPECT_NE(Browser.find("QM_FRIEND_HEART_ICON, TEXTALIGN_MC, false, EFontPreset::DEFAULT_FONT);"), std::string::npos);
+	EXPECT_NE(Browser.find("FONT_ICON_STAR, TEXTALIGN_MC);"), std::string::npos);
+
+	// 工具箱好友页签：两套 UI 分支都在画好友页签前切到默认字体，切换后不再切回图标字体。
+	const std::string TabBar = FunctionBody(Browser, "void CMenus::RenderServerbrowserTabBar(CUIRect TabBar)");
+	ASSERT_FALSE(TabBar.empty());
+	size_t FriendsTabCount = 0;
+	for(size_t Pos = TabBar.find("DoButton_MenuTab(&s_FriendsTabButton, QM_FRIEND_HEART_ICON"); Pos != std::string::npos;
+		Pos = TabBar.find("DoButton_MenuTab(&s_FriendsTabButton, QM_FRIEND_HEART_ICON", Pos + 1))
+	{
+		const size_t SwitchPos = TabBar.rfind("TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);", Pos);
+		ASSERT_NE(SwitchPos, std::string::npos);
+		EXPECT_EQ(TabBar.substr(SwitchPos, Pos - SwitchPos).find("SetFontPreset(EFontPreset::ICON_FONT"), std::string::npos);
+		++FriendsTabCount;
+	}
+	EXPECT_EQ(FriendsTabCount, 2);
+	EXPECT_EQ(TabBar.find("DoButton_MenuTab(&s_FriendsTabButton, FONT_ICON_HEART"), std::string::npos);
+
+	const std::string Scoreboard = ReadTextFile("src/game/client/components/scoreboard.cpp");
+	EXPECT_NE(Scoreboard.find("#include <game/client/components/qmclient/friend_heart_icon.h>"), std::string::npos);
+	// 未加好友态用实体爱心；已是好友悬停保留图标字体的中空裂心（图标字体没有实心裂心）。
+	EXPECT_NE(Scoreboard.find("? FontIcons::FONT_ICON_HEART_CRACK : QM_FRIEND_HEART_ICON;"), std::string::npos);
+	EXPECT_EQ(Scoreboard.find(": FontIcons::FONT_ICON_HEART;"), std::string::npos);
 }

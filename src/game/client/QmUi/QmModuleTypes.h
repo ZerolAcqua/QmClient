@@ -15,7 +15,6 @@ namespace qm_module
 		ChatBubble,
 		GoresActor,
 		Gores,
-		FocusMode,
 		KeyBinds,
 		MiniFeatures,
 		JumpHint,
@@ -36,7 +35,6 @@ namespace qm_module
 		CollisionHitbox,
 		FavoriteMaps,
 		HJAssist,
-		SpeedrunTimer,
 		DebugGraph,
 		InputOverlay,
 		HudNotifications,
@@ -50,6 +48,7 @@ namespace qm_module
 		DebugMode,
 		BindStatusHud,
 		Emoticons,
+		MapUpload,
 	};
 
 	enum class EQmModuleColumn
@@ -67,7 +66,7 @@ namespace qm_module
 		const char *m_pKey;
 	};
 
-	constexpr size_t QmModuleCount = 39;
+	constexpr size_t QmModuleCount = 38;
 } // namespace qm_module
 
 #endif // GAME_CLIENT_QMUI_QMMODULETYPES_H

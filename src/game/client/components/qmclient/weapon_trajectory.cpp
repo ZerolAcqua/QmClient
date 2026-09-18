@@ -11,7 +11,6 @@
 
 #include <game/client/components/controls.h>
 #include <game/client/components/players.h>
-#include <game/client/components/qmclient/modes.h>
 #include <game/client/gameclient.h>
 #include <game/client/prediction/entities/character.h>
 #include <game/collision.h>
@@ -24,9 +23,6 @@
 
 bool CQmWeaponTrajectory::IsVisible() const
 {
-	if(ShouldHideFocusGuideLines(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideGuideLines != 0))
-		return false;
-
 	const int TrajectoryMode = std::clamp(g_Config.m_QmWeaponTrajectory, 0, 2);
 	const bool ManualTrajectoryVisible = GameClient()->m_Controls.m_aShowWeaponTrajectory[g_Config.m_ClDummy] != 0;
 	const bool TrajectoryVisible = TrajectoryMode == 2 || (TrajectoryMode == 1 && ManualTrajectoryVisible);

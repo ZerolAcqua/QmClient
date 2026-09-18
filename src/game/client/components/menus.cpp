@@ -50,6 +50,7 @@
 #include <game/client/components/console.h>
 #include <game/client/components/key_binder.h>
 #include <game/client/components/menu_background.h>
+#include <game/client/components/qmclient/demo_ui.h>
 #include <game/client/components/qmclient/perf_logging.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>
@@ -693,6 +694,8 @@ void CMenus::LoadSettingsCardOrderModel()
 	if(m_SettingsCardOrderLoaded)
 		return;
 
+	qm_module::RemoveLegacyZenModeLayoutConfig();
+
 	const std::vector<qm_card_order::SEntry> Defaults = qm_card_registry::BuildDefaultEntries();
 	m_SettingsCardOrderModel.LoadMerged(g_Config.m_QmGlobalCardOrder, Defaults);
 	const auto CopyModelEntries = [](const qm_card_order::CModel &Source) {
@@ -943,6 +946,21 @@ void CMenus::LoadSettingsCardOrderModel()
 			m_SettingsCardOrderLoaded = true;
 			return;
 		}
+	}
+	if(g_Config.m_QmCardLayoutVersion < 9)
+	{
+		// 撤回 Tee 重排：同时修复已经保存为 v8 的列位，只重置这三张卡。
+		qm_card_order::CModel Candidate;
+		MakeCandidate(Candidate);
+		Candidate.MoveToTab("deck:tee-identity", "tee", 1, 0);
+		Candidate.MoveToTab("deck:tee-skin-options", "tee", 2, 0);
+		Candidate.MoveToTab("deck:tee-skin-list", "tee", 0, 0);
+		if(!PersistCandidate(Candidate, true))
+		{
+			m_SettingsCardOrderLoaded = true;
+			return;
+		}
+		g_Config.m_QmCardLayoutVersion = 9;
 	}
 	m_SettingsCardOrderLoaded = true;
 }
@@ -1795,6 +1813,8 @@ void CMenus::DoLaserPreview(const CUIRect *pRect, const ColorHSLA LaserOutlineCo
 	// TicksBody = 4.0 for less laser width for weapon alignment
 	if(LaserType == LASERTYPE_RIFLE || LaserType == LASERTYPE_SHOTGUN)
 	{
+		// 先绘制光束，再由武器贴图遮住发射端的重叠部分。
+		GameClient()->m_Items.RenderLaser(From, Pos, OuterColor, InnerColor, 4.0f, TicksHead, LaserType, g_Config.m_QmLaserGlowIntensity);
 		switch(LaserType)
 		{
 		case LASERTYPE_RIFLE:
@@ -1814,7 +1834,6 @@ void CMenus::DoLaserPreview(const CUIRect *pRect, const ColorHSLA LaserOutlineCo
 			Graphics()->QuadsEnd();
 			break;
 		}
-		GameClient()->m_Items.RenderLaser(From, Pos, OuterColor, InnerColor, 4.0f, TicksHead, LaserType, g_Config.m_QmLaserGlowIntensity);
 	}
 	else
 	{
@@ -3709,6 +3728,9 @@ void CMenus::Render()
 		{
 			CPerfTimer StageTimer;
 			RenderDemoPlayer(Screen);
+			// 播放控件的模糊抑制已退出，导出卡片可以独立采样背景。
+			if(m_MenuActive && m_DemoPlayerState == DEMOPLAYER_SLICE_SAVE)
+				RenderDemoPlayerSliceSavePopup(Screen);
 			LogPerfStage(Client(), "demo_player", StageTimer.ElapsedMs());
 		}
 		break;
@@ -3749,6 +3771,11 @@ void CMenus::Render()
 
 void CMenus::RenderPopupFullscreen(CUIRect Screen)
 {
+	const bool DemoRenderPopup = m_Popup == POPUP_RENDER_DEMO;
+#if defined(CONF_VIDEORECORDER)
+	const bool DemoDisplayExpanded = m_DemoExportDisplayExpanded;
+	const float DemoRenderContentHeight = 86.0f + (DemoDisplayExpanded ? qm_demo_ui::DISPLAY_HEIGHT + 4.0f : 0.0f) + (Client()->State() == IClient::STATE_ONLINE ? 30.0f : 0.0f);
+#endif
 	// QmClient 新功能弹窗自带完整布局(标题/滚动条目/按钮)，不复用通用弹窗骨架。
 	if(m_Popup == POPUP_QM_NEW_FEATURES)
 	{
@@ -3866,9 +3893,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 #if defined(CONF_VIDEORECORDER)
 	if(m_Popup == POPUP_RENDER_DEMO)
 	{
-		const float Width = std::min(680.0f, Screen.w - 32.0f);
-		const float Height = std::min(496.0f, Screen.h - 32.0f);
-		Box = {Screen.x + (Screen.w - Width) * 0.5f, Screen.y + (Screen.h - Height) * 0.5f, Width, Height};
+		Box = qm_demo_ui::PopupRect(Screen, DemoRenderContentHeight + 86.0f);
 	}
 #endif
 
@@ -3880,25 +3905,32 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		const SUiPresenceResult Presence = GameClient()->UiRuntimeV2()->Tree().ResolvePresence(AnimRuntime, NodeKey, true, ui_token::motion::MODAL_IN);
 		BgColor.a *= 0.85f + 0.15f * std::clamp(Presence.m_Alpha, 0.0f, 1.0f);
 	}
-	Box.Draw(BgColor, IGraphics::CORNER_ALL, ui_token::radius::CARD);
+	if(DemoRenderPopup)
+	{
+		RenderDemoCard(Box);
+		Box.Margin(12.0f, &Box);
+	}
+	else
+		Box.Draw(BgColor, IGraphics::CORNER_ALL, ui_token::radius::CARD);
+	CUiScopedGaussianBlurSuppression DemoPopupBlurSuppression(Ui(), DemoRenderPopup);
 
 	// Title
 	{
 		CUIRect Title;
-		Box.HSplitTop(20.0f, nullptr, &Box);
-		Box.HSplitTop(24.0f, &Title, &Box);
-		Box.HSplitTop(20.0f, nullptr, &Box);
-		Title.VMargin(20.0f, &Title);
+		Box.HSplitTop(DemoRenderPopup ? 0.0f : 20.0f, nullptr, &Box);
+		Box.HSplitTop(DemoRenderPopup ? 22.0f : 24.0f, &Title, &Box);
+		Box.HSplitTop(DemoRenderPopup ? 6.0f : 20.0f, nullptr, &Box);
+		Title.VMargin(DemoRenderPopup ? 0.0f : 20.0f, &Title);
 
-		const float TitleFontSize = 24.0f;
+		const float TitleFontSize = DemoRenderPopup ? 16.0f : 24.0f;
 		if(TextRender()->TextWidth(TitleFontSize, pTitle) > Title.w)
 			Ui()->DoLabel(&Title, pTitle, TitleFontSize, TEXTALIGN_ML, {.m_MaxWidth = Title.w});
 		else
-			Ui()->DoLabel(&Title, pTitle, TitleFontSize, TEXTALIGN_MC);
+			Ui()->DoLabel(&Title, pTitle, TitleFontSize, DemoRenderPopup ? TEXTALIGN_ML : TEXTALIGN_MC);
 	}
 
 	// Extra text (optional)
-	if(m_Popup != POPUP_JOIN_TUTORIAL)
+	if(m_Popup != POPUP_JOIN_TUTORIAL && !DemoRenderPopup)
 	{
 		CUIRect ExtraText;
 		Box.HSplitTop(24.0f, &ExtraText, &Box);
@@ -4189,15 +4221,14 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		DemoRenderTextInputCtx.m_ScopeHash = MakeUiScopeHash("demo_render_text_input");
 		DemoRenderTextInputCtx.m_FrameDt = GameClient()->UiRuntimeV2()->FrameDt();
 
-		Box.VMargin(24.0f, &Box);
-		Box.HMargin(20.0f, &Box);
-		Box.HSplitBottom(24.0f, &Box, &Row);
-		Box.HSplitBottom(40.0f, &Box, nullptr);
-		Row.VMargin(40.0f, &Row);
-		Row.VSplitMid(&Abort, &Ok, 40.0f);
+		Box.HSplitBottom(26.0f, &Box, &Row);
+		Box.HSplitBottom(8.0f, &Box, nullptr);
+		Row.VSplitRight(96.0f, &Row, &Ok);
+		Row.VSplitRight(8.0f, &Row, nullptr);
+		Row.VSplitRight(96.0f, &Row, &Abort);
 
 		static CButtonContainer s_ButtonAbort;
-		if(DoButton_Menu(&s_ButtonAbort, Localize("Abort"), 0, &Abort) || Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
+		if(DoButton_Menu(&s_ButtonAbort, Localize("Abort"), 0, &Abort, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), nullptr, 12.0f) || Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
 		{
 			m_DemoRenderInput.Clear();
 			m_HasPendingDemoRenderSource = false;
@@ -4205,7 +4236,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		}
 
 		static CButtonContainer s_ButtonOk;
-		if(DoButton_Menu(&s_ButtonOk, Localize("Ok"), 0, &Ok) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER))
+		if(DoButton_Menu(&s_ButtonOk, Localize("Export"), 0, &Ok, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f, 0.0f, ColorRGBA(0.04f, 0.48f, 1.0f, 0.95f), nullptr, 12.0f) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER))
 		{
 			m_Popup = POPUP_NONE;
 			// render video
@@ -4234,9 +4265,22 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			}
 		}
 
+		static CScrollRegion s_DemoRenderScroll;
+		vec2 ScrollOffset;
+		s_DemoRenderScroll.Begin(&Box, &ScrollOffset);
+		Box.y += ScrollOffset.y;
+		Box.h = DemoRenderContentHeight;
+		s_DemoRenderScroll.AddRect(Box);
 		CUIRect DisplayOptions;
-		Box.HSplitTop(144.0f, &DisplayOptions, &Box);
-		RenderDemoDisplaySettings(DisplayOptions, !Ui()->IsPopupOpen());
+		Box.HSplitTop(22.0f, &DisplayOptions, &Box);
+		RenderDemoExportDisplayToggle(DisplayOptions);
+		if(DemoDisplayExpanded)
+		{
+			Box.HSplitTop(4.0f, nullptr, &Box);
+			Box.HSplitTop(qm_demo_ui::DISPLAY_HEIGHT, &DisplayOptions, &Box);
+			RenderDemoDisplaySettings(DisplayOptions, !Ui()->IsPopupOpen());
+		}
+		Box.HSplitTop(8.0f, nullptr, &Box);
 
 		CUIRect UseSoundsCheckbox;
 		Box.HSplitBottom(24.0f, &Box, &Row);
@@ -4273,7 +4317,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		const char *pPaused = m_StartPaused ? Localize("(paused)") : "";
 		str_format(aBuffer, sizeof(aBuffer), "%s: ×%g %s", Localize("Speed"), DEMO_SPEEDS[m_Speed], pPaused);
 		Ui()->DoLabel(&Row, aBuffer, 12.8f, TEXTALIGN_ML);
-		Box.HSplitBottom(16.0f, &Box, nullptr);
+		Box.HSplitBottom(8.0f, &Box, nullptr);
 		Box.HSplitBottom(24.0f, &Box, &Row);
 
 		CUIRect Label, TextBox;
@@ -4294,6 +4338,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			LabelProperties.SetColor(ColorRGBA(1.0f, 0.0f, 0.0f));
 			Ui()->DoLabel(&Row, Localize("You will be disconnected from the server."), 12.8f, TEXTALIGN_MC, LabelProperties);
 		}
+		s_DemoRenderScroll.End();
 	}
 	else if(m_Popup == POPUP_RENDER_DONE)
 	{
@@ -5456,6 +5501,7 @@ void CMenus::OnReset()
 
 void CMenus::OnShutdown()
 {
+	m_QmMapUpload.Cancel();
 	if(m_SettingsPerfWindowTracker.HasActiveWindow())
 	{
 		const SQmSettingsPerfWindowSummary Summary = m_SettingsPerfWindowTracker.FinishActiveWindow();
@@ -7004,6 +7050,8 @@ void CMenus::OnStateChange(int NewState, int OldState)
 		g_Config.m_ClDemoSliceBegin = -1;
 		g_Config.m_ClDemoSliceEnd = -1;
 		m_DemoPlayerState = DEMOPLAYER_NONE;
+		m_DemoDisplayExpanded = false;
+		m_DemoExportDisplayExpanded = false;
 	}
 
 	// reset active item
@@ -7082,6 +7130,7 @@ void CMenus::OnWindowResize()
 void CMenus::OnRender()
 {
 	CPerfTimer FrameTimer;
+	m_QmMapUpload.Poll();
 
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		SetActive(true);

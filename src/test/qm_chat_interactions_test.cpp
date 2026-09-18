@@ -4,6 +4,7 @@
 #include <game/client/components/chat.h>
 #include <game/client/components/console.h>
 #include <game/client/components/qmclient/local_saves.h>
+#include <game/client/components/qmclient/qm_chat_export.h>
 #include <game/client/components/qmclient/red_packet_auto_claim.h>
 #include <game/client/components/tclient/fast_practice.h>
 #include <game/client/components/tclient/warlist.h>
@@ -12,8 +13,10 @@
 #include <test/test.h>
 
 #include <array>
+#include <atomic>
 #include <iterator>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -160,7 +163,7 @@ TEST(QmChatMessageMerge, SettingIsDefaultOnLocalizedInDreamFeaturesAndVersioned)
 
 	ASSERT_NE(MiniFeatures, std::string::npos);
 	EXPECT_NE(Config.find("MACRO_CONFIG_INT(QmMessageMerge, qm_message_merge, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE"), std::string::npos);
-	EXPECT_NE(Menus.find("RenderCheckbox(&g_Config.m_QmMessageMerge, \"Message merging\", &g_Config.m_QmMessageMerge);", MiniFeatures), std::string::npos);
+	EXPECT_NE(Menus.find("{&g_Config.m_QmMessageMerge, \"Message merging\", &g_Config.m_QmMessageMerge},", MiniFeatures), std::string::npos);
 	EXPECT_NE(Translations.find("key = \"Message merging\""), std::string::npos);
 	EXPECT_NE(Translations.find("simplified_chinese = \"消息合并\""), std::string::npos);
 	EXPECT_NE(Version.find("#define QMCLIENT_VERSION \""), std::string::npos);
@@ -185,7 +188,7 @@ TEST(QmWarListEnemyChat, FilteringKeepsChatLogPersistenceIndependent)
 	EXPECT_NE(WarListSettings.find("\"tclient-warlist-block-enemy-chat\""), std::string::npos);
 	EXPECT_NE(WarListSettings.find("\"Block enemy chat\""), std::string::npos);
 
-	const size_t AddLineCall = OnMessage.find("AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage)");
+	const size_t AddLineCall = OnMessage.find("AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage, false, std::nullopt, SourceConnection)");
 	const size_t SaveLogCall = OnMessage.find("SaveChatLogLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage)");
 	ASSERT_NE(AddLineCall, std::string::npos);
 	ASSERT_NE(SaveLogCall, std::string::npos);
@@ -347,16 +350,13 @@ TEST(QmLocalSaveJoinHint, UsesExpiringEchoMessages)
 	EXPECT_EQ(Body.find("GameClient()->Echo(CodesLine.c_str(), true);"), std::string::npos);
 }
 
-TEST(QmModeStatus, UsesExpiringEchoMessages)
+TEST(QmGoresModeStatus, UsesExpiringEchoMessages)
 {
 	const std::string Source = ReadTestSourceFile("src/game/client/components/tclient/tclient.cpp");
 	const std::string Chat = ReadTestSourceFile("src/game/client/components/chat.cpp");
-	const std::string FocusBody = SourceFunctionBody(Source, "void CTClient::ApplyFocusModeEffects()");
 	const std::string GoresBody = SourceFunctionBody(Source, "void CTClient::ApplyGoresFastInputLink(bool AutoMapCheck)");
 	const std::string EchoBody = SourceFunctionBody(Chat, "void CChat::Echo(const char *pString)");
 
-	EXPECT_NE(FocusBody.find("GameClient()->Echo(aFocusMsg);"), std::string::npos);
-	EXPECT_EQ(FocusBody.find("GameClient()->Echo(aFocusMsg, true);"), std::string::npos);
 	EXPECT_NE(GoresBody.find("GameClient()->Echo(aGoresMsg);"), std::string::npos);
 	EXPECT_EQ(GoresBody.find("GameClient()->Echo(aGoresMsg, true);"), std::string::npos);
 	EXPECT_NE(EchoBody.find("GameClient()->m_QmHudNotifications.QueueEcho"), std::string::npos);
@@ -719,7 +719,7 @@ TEST(QmChatBlockWords, MatchedMessageKeepsRawConsoleAndChatLogPaths)
 	EXPECT_NE(Menus.find("BlockWordsAction == 1"), std::string::npos);
 	EXPECT_NE(Menus.find("g_Config.m_QmBlockWordsAction = 1;"), std::string::npos);
 	EXPECT_NE(Menus.find("qmclient-word-filter-match-mode\", &LabelColumn, Localize(\"Mode\")"), std::string::npos);
-	const size_t RawConsoleCall = AddLine.find("PrintBlockedMessageToConsole(ClientId, Team, pLine);");
+	const size_t RawConsoleCall = AddLine.find("PrintBlockedMessageToConsole(ClientId, Team, pLine, SourceConnection);");
 	const size_t HideBranch = AddLine.find("if(CanHideBlockWordsMessage)");
 	ASSERT_NE(RawConsoleCall, std::string::npos);
 	ASSERT_NE(HideBranch, std::string::npos);
@@ -1217,4 +1217,171 @@ TEST(QmChatLogWrites, KeepsMessageOrderWhileDiskWriteIsBlocked)
 	Pool.Shutdown();
 	EXPECT_EQ(Written, (std::vector<int>{1, 2, 3}));
 	EXPECT_NE(Queue.Enqueue([] {}), nullptr);
+}
+
+namespace
+{
+	QmChatExport::TGlyphs TestGlyphs()
+	{
+		QmChatExport::TGlyphs Glyphs;
+		for(const int Font : {QmChatExport::FONT_MESSAGE, QmChatExport::FONT_NAME, QmChatExport::FONT_TIME})
+		{
+			for(const int Codepoint : std::array<int, 9>{'a', 'b', 'c', 'x', ' ', 0x4f60, 0x597d, 0x4e16, 0x754c})
+				Glyphs[{Font, Codepoint}] = {8, 12, 10, std::vector<uint8_t>(8 * 12, 255)};
+		}
+		return Glyphs;
+	}
+}
+
+TEST(QmChatExport, WrapPreservesUtf8CharactersAndExplicitNewlines)
+{
+	const auto Lines = QmChatExport::Wrap("你好世界\nabc", TestGlyphs(), QmChatExport::FONT_MESSAGE, 20);
+	ASSERT_EQ(Lines.size(), 4u);
+	EXPECT_EQ(Lines[0], "你好");
+	EXPECT_EQ(Lines[1], "世界");
+	EXPECT_EQ(Lines[2], "ab");
+	EXPECT_EQ(Lines[3], "c");
+	EXPECT_EQ(QmChatExport::Wrap("a\n\nb", TestGlyphs(), QmChatExport::FONT_MESSAGE, 20), (std::vector<std::string>{"a", "", "b"}));
+}
+
+TEST(QmChatExport, WrapKeepsGlyphWiderThanOneLine)
+{
+	EXPECT_EQ(QmChatExport::Wrap("你好", TestGlyphs(), QmChatExport::FONT_MESSAGE, 1), (std::vector<std::string>{"你", "好"}));
+}
+
+TEST(QmChatExport, LongSingleMessageContinuesWithoutLosingText)
+{
+	QmChatExport::SLine Line;
+	Line.m_Sender = "sender";
+	Line.m_Message.assign(60000, 'x');
+	const auto Pages = QmChatExport::BuildPages({Line}, TestGlyphs());
+	ASSERT_GT(Pages.size(), 1u);
+	std::string Reassembled;
+	for(const auto &Page : Pages)
+	{
+		EXPECT_LE(Page.m_Height, QmChatExport::MAX_IMAGE_HEIGHT);
+		for(const auto &Record : Page.m_vRecords)
+		{
+			EXPECT_EQ(Record.m_LineIndex, 0u);
+			for(const auto &Text : Record.m_vMessageLines)
+				Reassembled += Text;
+		}
+	}
+	EXPECT_EQ(Reassembled, Line.m_Message);
+}
+
+TEST(QmChatExport, BodyDoesNotRepeatSender)
+{
+	QmChatExport::SLine Line;
+	Line.m_Sender = "separate nickname";
+	Line.m_Message = "abc";
+	const auto Pages = QmChatExport::BuildPages({Line}, TestGlyphs());
+	ASSERT_EQ(Pages.size(), 1u);
+	ASSERT_EQ(Pages[0].m_vRecords.size(), 1u);
+	EXPECT_EQ(Pages[0].m_vRecords[0].m_vMessageLines, (std::vector<std::string>{"abc"}));
+}
+
+TEST(QmChatExport, LongSenderWrapsAboveBodyAndSurvivesMessagePagination)
+{
+	QmChatExport::SLine Line;
+	Line.m_Sender.assign(180, 'x');
+	Line.m_Message.assign(60000, 'x');
+	const auto Glyphs = TestGlyphs();
+	const auto Pages = QmChatExport::BuildPages({Line}, Glyphs);
+	ASSERT_GT(Pages.size(), 1u);
+	std::string Message;
+	for(const auto &Page : Pages)
+	{
+		EXPECT_LE(Page.m_Height, QmChatExport::MAX_IMAGE_HEIGHT);
+		for(const auto &Record : Page.m_vRecords)
+		{
+			ASSERT_GT(Record.m_vNameLines.size(), 1u);
+			std::string Name;
+			for(const auto &NameLine : Record.m_vNameLines)
+				Name += NameLine;
+			EXPECT_EQ(Name, Line.m_Sender);
+			for(const auto &MessageLine : Record.m_vMessageLines)
+				Message += MessageLine;
+		}
+	}
+	EXPECT_EQ(Message, Line.m_Message);
+	Line.m_Message = "abc";
+	const auto SmallPage = QmChatExport::BuildPages({Line}, Glyphs).front();
+	std::atomic<bool> Cancelled{false};
+	const auto Pixels = QmChatExport::RenderPage(SmallPage, {Line}, Glyphs, Cancelled);
+	// 第三行昵称仍有实际文字像素，不能只保留布局高度。
+	EXPECT_EQ(Pixels[(98 * QmChatExport::IMAGE_WIDTH + 140) * 4], 172);
+}
+
+TEST(QmChatExport, HtmlEscapesContentAndKeepsNicknameOutsideBubble)
+{
+	QmChatExport::SLine Line;
+	Line.m_Sender = "<name>";
+	Line.m_Message = "<script>&\"'";
+	Line.m_Time = "12:34";
+	std::string Html;
+	ASSERT_TRUE(QmChatExport::BuildHtml({Line}, {"<title>", "total", "messages"}, Html));
+	EXPECT_NE(Html.find("&lt;title&gt;"), std::string::npos);
+	EXPECT_NE(Html.find("class=\"name\">&lt;name&gt;</div>"), std::string::npos);
+	EXPECT_NE(Html.find("class=\"bubble\">&lt;script&gt;&amp;&quot;&#39;</div>"), std::string::npos);
+	EXPECT_NE(Html.find("class=\"time\">12:34</div>"), std::string::npos);
+	EXPECT_EQ(Html.find("<script>"), std::string::npos);
+	EXPECT_NE(Html.find("data:image/png;base64,"), std::string::npos);
+}
+
+TEST(QmChatExport, HtmlAndPngPutLocalMessagesOnRight)
+{
+	QmChatExport::SLine Other;
+	Other.m_Sender = "other";
+	Other.m_Message = "abc";
+	QmChatExport::SLine Local = Other;
+	Local.m_Local = true;
+	std::string Html;
+	ASSERT_TRUE(QmChatExport::BuildHtml({Other, Local}, {"chat", "total", "messages"}, Html));
+	EXPECT_NE(Html.find("class=\"msg\""), std::string::npos);
+	EXPECT_NE(Html.find("class=\"msg local\""), std::string::npos);
+	const auto Glyphs = TestGlyphs();
+	const auto LeftPage = QmChatExport::BuildPages({Other}, Glyphs).front();
+	const auto RightPage = QmChatExport::BuildPages({Local}, Glyphs).front();
+	std::atomic<bool> Cancelled{false};
+	const auto Left = QmChatExport::RenderPage(LeftPage, {Other}, Glyphs, Cancelled);
+	const auto Right = QmChatExport::RenderPage(RightPage, {Local}, Glyphs, Cancelled);
+	ASSERT_FALSE(Left.empty());
+	ASSERT_EQ(Left.size(), Right.size());
+	// 气泡正文区域只出现在对应发送者的一侧。
+	const size_t LeftPixel = (100 * QmChatExport::IMAGE_WIDTH + 150) * 4;
+	const size_t RightPixel = (100 * QmChatExport::IMAGE_WIDTH + 920) * 4;
+	EXPECT_NE(Left[LeftPixel], Right[LeftPixel]);
+	EXPECT_NE(Left[RightPixel], Right[RightPixel]);
+}
+
+TEST(QmChatExport, CancelledExportDoesNotTouchStorage)
+{
+	std::atomic<bool> Cancelled{true};
+	std::atomic<int> CompletedPages{7};
+	QmChatExport::SLine Line;
+	Line.m_Message = "abc";
+	EXPECT_FALSE(QmChatExport::Export(nullptr, "unused", {Line}, TestGlyphs(), {}, Cancelled, CompletedPages));
+	EXPECT_EQ(CompletedPages.load(), 0);
+	EXPECT_TRUE(QmChatExport::BuildPages({Line}, TestGlyphs(), &Cancelled).empty());
+	std::string Html;
+	EXPECT_FALSE(QmChatExport::BuildHtml({Line}, {}, Html, &Cancelled));
+}
+
+TEST(QmChatExport, OutgoingWhisperKeepsTheSendingConnectionIdentity)
+{
+	const int aLocalIds[] = {4, 18};
+	// 当前控制角色为4时，后台分身发出的私聊仍由18发送。
+	EXPECT_EQ(QmChatExport::ResolveSenderId(62, true, 1, aLocalIds, std::size(aLocalIds), 4, false), 18);
+	// 切换控制角色后，主连接发出的私聊仍由4发送。
+	EXPECT_EQ(QmChatExport::ResolveSenderId(62, true, 0, aLocalIds, std::size(aLocalIds), 18, false), 4);
+	// 收到私聊与普通聊天使用消息中的发言人。
+	EXPECT_EQ(QmChatExport::ResolveSenderId(62, false, 1, aLocalIds, std::size(aLocalIds), 4, false), 62);
+}
+
+TEST(QmChatExport, DemoWhisperUsesRecordedLocalIdentity)
+{
+	const int aLocalIds[] = {-1, -1};
+	EXPECT_EQ(QmChatExport::ResolveSenderId(62, true, 0, aLocalIds, std::size(aLocalIds), 31, true), 31);
+	EXPECT_EQ(QmChatExport::ResolveSenderId(62, true, 1, aLocalIds, std::size(aLocalIds), 31, false), -1);
 }

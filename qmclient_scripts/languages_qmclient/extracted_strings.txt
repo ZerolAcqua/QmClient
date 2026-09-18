@@ -5,19 +5,13 @@
 %.2f KiB
 %.2f MiB
 %c Team %d
-%d dummies
-%d dummy
 %d items selected
 %d of %d server
 %d of %d servers
 %d player
 %d players
 %d selected items were deleted, but %d items could not be deleted. The first failing item was '%s'.
-%d servers, %d users
-%d servers, %d users, %d dummies
 %d teams
-%d user
-%d users
 %d. %s | main: %s | dummy: %s
 %d/%d KiB (%.1f KiB/s)
 %ds left
@@ -85,6 +79,7 @@ _ or ' ' = blank spacer
 a = View angle
 A demo with this name already exists
 A folder with this name already exists
+A player name is required.
 A save is already being restored. Please wait.
 A screenshot with this name already exists
 A Tee
@@ -183,6 +178,7 @@ Advanced options
 AFR
 After hammer fly, whether dummy switches back to previous weapon
 After Load
+After uploading again, use: reload or hot_reload
 Afterimage pop
 Agree
 Aim
@@ -258,7 +254,6 @@ Apply
 Apply a preset first
 Apply a saved profile by 1-based index to the current tee
 Apply a writable preset and edit first
-Apply Best input to other Tees
 Apply Changes
 Apply input early before next tick for prediction
 Apply quick input to other Tees as well
@@ -320,7 +315,6 @@ Auto agree vote
 Auto chat in water
 Auto chat when dying in water
 Auto concurrency: %d (smart default)
-Auto disable when time expires
 Auto enable in Gores mode
 Auto enable/disable IME on text focus
 Auto execute
@@ -354,7 +348,6 @@ Auto vote on map change after min duration (0=Off, 1=Oppose, 2=Agree)
 Auto weapon switch
 Auto-close chat after unfreeze
 Auto-create CSV on game end
-Auto-disable speedrun timer when time runs out
 Auto-fetch all players' skins for dummy rotation queue
 Auto-fetch all players' skins for rotation queue
 Auto-follow delay
@@ -453,12 +446,6 @@ Behavior
 Behavior type
 Benchmark frame times for number of seconds to file, then quit
 Best
-Best input
-Best input delay compensation percentage
-Best input interpolation mode (1=linear 2=cubic 3=smooth)
-Best input others
-Best input prediction offset (0.01 tick)
-Best input smooth percentage
 Better scoreboard
 Bind address for client/server
 Bind chat, team chat, and history actions
@@ -573,6 +560,7 @@ Chat bubble text color
 Chat bubble transparency (0-100)
 Chat command
 Chat command (e.g. showall 1)
+Chat export cancelled
 Chat export failed
 Chat fade smooth time (milliseconds)
 Chat font size
@@ -728,7 +716,7 @@ Configure player identity and country
 Configure QmClient gameplay helpers
 Configure QmClient HUD elements
 Configure remaining DDNet client preferences
-Configure skin colors, eyes, and filters
+Configure skin downloads, prefix, and default eyes
 Configure sound and audio packs
 Configure TClient tools and profiles
 Configure Tee appearance and skins
@@ -751,6 +739,7 @@ Connected, no one is speaking
 Connected, waiting for first ping
 Connecting dummy
 Connecting to
+Connecting to voice server
 Connection disconnected
 Connection elevated
 Connection normal
@@ -800,6 +789,7 @@ Could not load sponsor QR code. Check the Base64 data
 Could not load touch controls from clipboard. See local console for details.
 Could not load touch controls from file. See local console for details.
 Could not preview this image
+Could not read the map file.
 Could not resolve connect address '%s'. See local console for details.
 Could not save downloaded map. Try manually deleting this file: %s
 Could not save title credential
@@ -1036,6 +1026,7 @@ Door Laser Inner Color
 Door laser inner color
 Door Laser Outline Color
 Door laser outline color
+Double-click: left applies to main, right applies to dummy
 Download community skins
 Download failed
 Download skins
@@ -1047,6 +1038,8 @@ Downloading update...
 Downscaled (0.78)
 Draft file is empty
 Drag HUD modules with the left mouse button
+Drag to another category to move this friend.
+Drag to reorder; click to expand or collapse. Right-click or use the gear to manage categories
 Dragger Inner Color
 Dragger laser inner color
 Dragger laser outline color
@@ -1207,6 +1200,8 @@ Enable Jelly Tee
 Enable KCP/legacy transport statistics query and sample output
 Enable keyboard shortcuts in replay player
 Enable keyword reply
+Enable Kugou Music hook integration
+Enable Kugou Music lyrics
 Enable left swipe offset on chat fade
 Enable LLM thinking mode (may increase response time)
 Enable lyrics
@@ -1227,6 +1222,8 @@ Enable player statistics panel
 Enable practice commands by default. Requires sv_test_cmds 1
 Enable practice mode for teams. Allows /rescue but scores not recorded
 Enable QmClient style background 3D particles
+Enable QQ Music hook integration
+Enable QQ Music lyrics
 Enable rainbow rendering for hook
 Enable rainbow rendering for other players' Tees
 Enable rainbow rendering for Tee
@@ -1247,7 +1244,6 @@ Enable SodaMusic hook integration
 Enable sound
 Enable sound when rendering video
 Enable spectator cursor (if available)
-Enable speedrun timer
 Enable Spotify lyric integration
 Enable Spotify lyrics
 Enable squishy Tee deformation
@@ -1260,7 +1256,6 @@ Enable team chat message sound
 Enable team chat sound
 Enable Tee trail
 Enable tee trails
-Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
 Enable thinking mode (slower)
 Enable tile outlines
 Enable UDP KCP transport negotiation (old clients keep legacy UDP, hot-switch fallback)
@@ -1273,8 +1268,6 @@ Enable voice chat
 Enable voice filtering (highpass/compressor/limiter)
 Enable warlist
 Enable word filter list
-Enable Zen Mode
-Enable Zen mode
 Enable/disable infinite hook.
 Enable/disable quad alignment. When enabled, red lines show how moving quads/points align and snap to others
 Enable/disable replays
@@ -1335,6 +1328,7 @@ Export selected file
 Export to clipboard
 Exported %d chat messages
 Exported to %s
+Exporting chat images: %d
 Expose playback controls to the operating system
 External console password. Must be set to enable economy.
 Extras
@@ -1383,6 +1377,7 @@ File already exists, do you want to overwrite it?
 File executed on map change/reload to set default server settings
 File for storing ranks if sv_use_sql is disabled or as backup SQL server.
 File with announcements, one per line.
+File: %s
 Fill
 Filter chat messages by regular expression
 Filter connecting players
@@ -1410,11 +1405,9 @@ Finished maps
 Fire
 First page in console
 Flip:
-Focus mode
 Folder
 Folder Link
 Follow
-Follow server
 Follow Tee
 Following
 Font cursor
@@ -1579,59 +1572,24 @@ Hello from ui_widget::Modal
 Help: %s
 Helpful for Gores: allow negative internal certainty for more conservative prediction
 Hi!
-Hide basic system info (join, version, rules) in Zen mode
 Hide chat messages from players marked as enemies
-Hide death/respawn effects
-Hide death/respawn effects in Zen Mode
-Hide direction in Zen mode
-Hide direction indicators
-Hide Echo messages
-Hide Echo messages in Zen mode
-Hide explosion effects
-Hide freeze effects
-Hide freeze effects in Zen Mode
 Hide ghosts of frozen players
 Hide guide lines
-Hide hammer effects
-Hide hammer effects in Zen Mode
 Hide helper lines in Gores mode
-Hide helper lines in Zen mode
-Hide HUD
-Hide HUD in Zen mode
 Hide indicator for tees on your screen
 Hide input emoticon
-Hide join/version prompts
-Hide jump effects
-Hide jump effects in Zen Mode
-Hide kill and finish messages in Zen mode
-Hide kill/finish messages
-Hide map progress
-Hide map progress bar in Zen mode
-Hide nameplates
-Hide names
 Hide non-friend names/clans and show client ID
 Hide other players' ghosts when frozen
 Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
-Hide player messages in Zen mode
-Hide player name plates in Zen Mode
-Hide player names in Zen Mode
-Hide projectile effects in Zen Mode
-Hide scoreboard
-Hide scoreboard in Zen mode
 Hide sensitive info like /save password
 Hide server information on join
-Hide server prompt notifications
-Hide server tip notifications (including notification bar) in Zen mode
 Hide Settings Tabs
 Hide sponsor QR code
 Hide system message prefix
 Hide the *** prefix before server chat messages
 Hide toast
 Hide typing emoji during input
-Hide UI for focused gameplay
-Hide weapon fire effects in Zen Mode
-Hide weapon muzzle flashes
 High Detail
 High process priority
 High to low
@@ -1670,7 +1628,6 @@ Hookable/unhookable tile outline width
 Hooking L/R: %.0f%%/%.0f%%
 Horizontal position
 Hostname of DNSBL provider for IP verification
-Hours
 Hover for tooltip
 How far the plasma gun tracks a tee
 How far the tractor tracks a tee
@@ -1761,11 +1718,9 @@ Input overlay mouse scale (percent)
 Input overlay opacity (percent)
 Input overlay X position (percent)
 Input overlay Y position (percent)
-Input smoothing
 Input switch
 Insane
 Installing update. Please wait...
-Interface
 Interface accent color
 Interface animations
 Interface page
@@ -1776,13 +1731,13 @@ Interface transparency
 Intermediate
 Internet
 Internet (From online source)
-Interpolation
 Interval for auto-saving current editor map copy to "auto" folder (0=off)
 Invalid bound name
 Invalid client id to kick
 Invalid client id to move to spectators
 Invalid Demo
 Invalid ID
+Invalid map file or filename.
 Invalid option
 Invalid save number. Use a number from the save list.
 Invalid spectator id used
@@ -1814,6 +1769,7 @@ Joining Tutorial server
 Jump
 Jump hint
 Jump hint color
+Jump hint defaults migration completed flag
 Jump hint font size
 Jump hint horizontal position (% of screen width)
 Jump hint text
@@ -1851,6 +1807,8 @@ Kill yourself when kill-protected during a long game (use f1, kill for regular k
 killed themselves
 Kills a player and announces the kill
 Kills team and disables practice mode
+Kugou hook heartbeat timeout (milliseconds)
+Kugou hook helper path (empty=beside QmClient)
 l = Local time
 L select  R swap  M select only
 Label
@@ -1858,6 +1816,8 @@ Label type
 LAN
 Language
 Language file to use
+Large emoticons and launch mode
+Large emoticons and launched emoticons
 Large text announcement for friend joining
 Large text content
 Large text for friend join (use %s for friend name)
@@ -1874,7 +1834,6 @@ Laser Size/Thickness (percentage, 100=default)
 Last entered
 Last page in console
 Latency
-Latency compensation
 Latency Jitter
 Launch count threshold for the next sponsor reminder
 Layout
@@ -1955,8 +1914,6 @@ Local
 Local + Dummy
 Local console log category filter mask (bit flags)
 Local only
-Local particle effects
-Local particles: show particles behind own Tee (e.g. freeze snow)
 Local saves
 Local test mode
 Local test mode, no server needed
@@ -2002,6 +1959,8 @@ Map browser surface color
 Map browser transparency
 Map danger border
 Map download send window
+Map exceeds the client limit of 64 MiB.
+Map folders
 Map play history
 Map Preview TODO
 Map progress bar
@@ -2017,6 +1976,11 @@ Map size
 Map sound volume
 Map to use on server
 Map type:
+Map upload
+Map upload cancelled.
+Map upload in progress...
+Map upload network error.
+Map uploaded successfully.
 Margin when notification is docked
 Mark demo
 Mark the beginning of a demo cut
@@ -2085,7 +2049,6 @@ Microphone
 Microphone permission denied by system
 Microphone volume
 Microphone volume (percent)
-Milliseconds
 Milliseconds to apply quick input early
 Min size
 Mini features
@@ -2106,7 +2069,6 @@ Minimum time between kick votes (in seconds)
 Minimum time between kills (in seconds)
 Minimum time between map votes (in seconds)
 Minimum width for name column in server browser
-Minutes
 Minutes on server before a player can call a map change vote (0 = disabled)
 Minutes to save replay on ESC menu
 Misc
@@ -2127,6 +2089,7 @@ Mouse
 Mouse sensitivity
 Mouse sensitivity in menu/editor
 Mouse size
+Move a friend category to a position
 Move left
 Move player to spectators
 Move right
@@ -2136,15 +2099,9 @@ Moves to the point with x/y-coordinates ii
 Moves to the tile with x/y-number ii
 Multi-View
 Mute
-Mute death/respawn sound in Zen Mode
-Mute death/respawn sounds
 Mute emoticons
 Mute flag sounds
-Mute hammer sound in Zen mode
-Mute hammer sounds
 Mute hook sound
-Mute jump sound in Zen Mode
-Mute jump sounds
 Mute map sounds
 Mute microphone
 Mute movement sound
@@ -2184,6 +2141,7 @@ Name plates size
 Name to change to near finish (when tc_change_name_near_finish enabled)
 Name:
 Name: %s
+Nameplate count that still keeps full text effect quality; beyond it effect layers scale down by count (higher=keep more)
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 Nameplate nickname scope (0=None 1=Current character 2=Own characters 3=Other players 4=Other players and own non-current characters 5=All)
 Nameplate position X
@@ -2193,6 +2151,7 @@ Nameplate strong hook icon color
 Nameplate text
 Nameplate text border color
 Nameplate text border range
+Nameplate text effect auto LOD (0=Off 1=On: trim outer effect layers when crowded)
 Nameplate text effects (1=Border 2=Gradient 4=Rainbow 8=Glow)
 Nameplate text effects demo manual target client ID (-1=None)
 Nameplate text effects demo mode (0=Off 1=Smart 2=Manual target 3=Manual scope)
@@ -2235,7 +2194,6 @@ Next page in console
 Next weapon
 Nickname
 No
-No active QmClient reports yet
 No animation
 No answer from server yet.
 No assets
@@ -2265,6 +2223,7 @@ No local saves file found (ddnet-saves.txt)
 No local servers found (ports %d-%d)
 No login required
 No map play history yet
+No map selected
 No matching assets.
 No matching features found. Try other keywords
 No new features yet
@@ -2279,6 +2238,7 @@ No presets yet
 No preview
 No results
 No safe position found
+No saved maps found
 No saved profiles available yet. Save one first.
 No screenshot selected
 No server selected
@@ -2302,7 +2262,6 @@ Not connected to a game server
 Not connected to server
 Not downloaded
 Not enabled
-Not in the current browser list
 Not open, check input device or mic permission
 Not open, check output device
 Note
@@ -2529,6 +2488,7 @@ Player skin marking
 Player skin used for volleyball appearance
 Player stats
 Player stats and info display
+Player: %s
 Players
 Players are not allowed to chat from VPNs at this time
 Players can collide on this server
@@ -2582,7 +2542,7 @@ Prediction lead
 Prediction lead is high, check prediction settings and server timing
 Prediction margin
 Prediction margin when frozen
-Prediction offset
+Preparing chat export: %d%%
 Preparing demo playback
 Presentation animations
 Preset %d
@@ -2591,6 +2551,7 @@ Preset when encoding video with libx264, default 5 (medium), 0 is ultrafast, 9 i
 Press a key…
 Press ESC to close. Watch the scale-in spring on open.
 Press Esc to exit the HUD editor
+Press F2, log in, then use: change_map map_name
 Prev. weapon
 Preview
 Preview 'Hook collisions' being pressed
@@ -2601,7 +2562,7 @@ Preview dummy nameplate
 Preview hook collision colors and line styles
 Preview import file
 Preview laser bodies, outlines, and impacts
-Preview player and dummy appearance
+Preview player and dummy appearance and colors
 Preview player and dummy nameplates
 Preview player nameplate
 Preview selected file
@@ -2655,7 +2616,6 @@ Puts you out of live freeze
 Puts you out of solo part
 Pyramid
 q = Connection quality
-Qm
 Qm UI custom icon color
 Qm UI icon color: 1=White, 2=Black, 3=Custom, 4=Rainbow
 Qm UI icon weight: 0=Regular, 1=Bold, 2=Thin, 3=Fill
@@ -2668,18 +2628,19 @@ QmClient chat log
 QmClient Community
 QmClient community and project information
 QmClient information and project links
-QmClient online distribution
 QmClient Settings
 QmClient sidebar module collapse state
 QmClient sidebar module order
 QmUi animation intensity: 0=Off, 1=Reduced, 2=Full
 QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
 QQ group: 1076765929 (click to copy)
+QQ Music hook heartbeat timeout (milliseconds)
+QQ Music hook helper path (empty=beside QmClient)
 Quads are used for background decoration
 Queue is empty
 Queue preset: %s
 Quick action menu for players
-Quick input mode (0=Fast 3=Best 4=Saiko+; 1/2 legacy mapped to Best)
+Quick input mode (0=Fast 4=Saiko+; legacy values fall back to Fast)
 Quit
 Quit the client
 Quitting. Please wait…
@@ -2706,7 +2667,6 @@ Randomize player color (0 = all, 1 = body, 2 = feet, 3 = skin, 4 = flag) example
 Ratio
 Ratio threshold for local target language detection
 Really? Not even a little?
-Realtime channel
 Realtime channel heartbeat interval (seconds, 0 uses default)
 Realtime channel reconnect backoff base (ms)
 Realtime channel reconnect backoff cap (ms)
@@ -2757,8 +2717,6 @@ Remote console
 Remote console password (full access)
 Remote console password for helper (limited access)
 Remote console password for moderator (limited access)
-Remote particle effects
-Remote particles: sync and render other players via central server (requires both local+remote enabled)
 Remove
 Remove [group] [clan]:
 Remove [group] [name]:
@@ -2880,6 +2838,7 @@ Restart in x seconds (0 = abort)
 Restart the client
 Restarting. Please wait…
 Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
+Restore Kugou files
 Restore old single-segment hook collision line behavior
 Restoring save %d: main '%s', dummy '%s'.
 Retrying…
@@ -2890,7 +2849,6 @@ Rifle laser inner color
 Rifle Laser Outline Color
 Rifle laser outline color
 Right jump
-Right-click or use the gear to manage categories
 Right-click to disable auto-translate
 Right-click to enable auto-translate
 Ring
@@ -2996,21 +2954,22 @@ Screenshots
 Screenshots directory
 Search
 Search and navigate settings
+Search and pick skins and manage the skin queue
 Search donor asset
 Search main asset
 Search settings by title, feature, or keyword
-Search skins and manage the skin queue
 Searching
 Sec-WebSocket-Protocol sent during the realtime handshake
 Secondary
-Seconds
 Seconds to wait before reconnecting (0=off, when server is full)
 Seconds to wait before reconnecting (after timeout, 0 to disable).
 SecretId
 SecretKey
+Select a saved .map file (client limit: 64 MiB).
 Select all chat
 Select button by touch
 Select export
+Select map
 Select the country flag for each player
 Select which player fields a profile stores
 Selected %d
@@ -3019,7 +2978,6 @@ Selected candidate
 Selected candidate %d/%d under cursor.
 Selected item color
 Selected part: %d
-Selected server
 Selected timertype is not supported by your client
 Selection
 Self
@@ -3061,7 +3019,6 @@ Server executable not found, can't run server
 Server filter
 Server hostname (0.7 only)
 Server info
-Server IP
 Server kick/spec votes are no longer actively moderated.
 Server kick/spec votes will now be actively moderated.
 Server name
@@ -3072,7 +3029,8 @@ Server preset
 Server region. Used for region bans
 Server stress (debug builds only).
 Server type (novice, moderate, etc.)
-Set a voice server to enable QmClient distribution
+Server URL
+Server-assigned style
 Set all to Rifle
 Set camera position relative to current view in the map
 Set camera position to x and y in the map
@@ -3091,6 +3049,7 @@ Set server to singleplayer mode (no player interaction, must be set before loadi
 Set team for a player (spectators = -1, game = 0)
 Set team for all players (spectators = -1, game = 0)
 Set timeout protection code s
+Set up Kugou lyrics
 Set voice input device
 Set voice output device
 Set your checkpoints based on another player
@@ -3293,6 +3252,8 @@ Show other players' coordinates
 Show other players' hook collision lines
 Show other players' hook collision lines (2 always shown)
 Show other players' hook collision lines when rendering video
+Show other players' large emoticons
+Show other players' launched emoticons
 Show other team players (2=own team only)
 Show other team players (alpha, 0=invisible, 100=visible)
 Show other tees' trails
@@ -3423,6 +3384,7 @@ Size of hook strength icon and number indicator
 Size of key press icons
 Size of strength/weakness icon and number
 Skin
+Skin copying is only available for 0.6 skins
 Skin could not be found.
 Skin could not be loaded due to an error. Check the local console for details.
 Skin Database
@@ -3530,14 +3492,6 @@ Speed
 Speed of camera moving to desired position (higher = faster)
 Speed up the demo
 Speed:
-Speedrun countdown timer
-Speedrun Timer
-Speedrun timer
-Speedrun timer hours
-Speedrun timer milliseconds
-Speedrun timer minutes
-Speedrun timer seconds
-Speedrun timer time (MM:SS, legacy)
 Sphere
 Spin pop
 Spirit
@@ -3752,6 +3706,7 @@ The selected button is not visible. Do you want to deselect it or edit its visib
 The selected button is overlapping with other buttons.
 The selected part stays highlighted while you adjust its color.
 The server is running a non-standard tuning on a pure game type.
+The server rejected the map upload.
 The update is ready and will be installed when you exit.
 The width of texture %s is not divisible by %d, or the height is not divisible by %d, which might cause visual bugs.
 Theme
@@ -3803,7 +3758,6 @@ Time between info changes (name/skin/color) (in seconds), set very high to avoid
 Time between team changes (in seconds) (spectator/in-game)
 Time client is banned if economy authentication fails. 0 just closes connection.
 Time client is banned if remote console auth fails. 0 to only use kick
-TIME EXPIRED!
 Time in seconds before economy authentication timeout.
 Time interval (seconds) between chat messages.
 Time limit
@@ -3841,6 +3795,7 @@ Toggle custom color
 Toggle Do Not Disturb (no chat and server messages)
 Toggle dummy
 Toggle dyncam
+Toggle emote launcher
 Toggle fast practice mode
 Toggle ghost
 Toggle ghost key
@@ -3930,7 +3885,6 @@ Types
 u = Snapshot latency
 UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or network accelerators.
 UDP seems to be filtered.
-UDP socket not open
 UI color
 UI controller sens.
 UI icon color
@@ -3961,6 +3915,7 @@ Unbind all keys
 Unbind key
 Uncertainty duration
 Unclassified audio issue
+Unexpected map upload response.
 Unfinished
 Unfinished map
 Unfinished map count: %d
@@ -4003,6 +3958,9 @@ Update notice
 Update or add a specific war group
 Update Rate
 Update rate for mapping 64 player IDs to vanilla IDs
+Upload .map files. Server and admin passwords: s.
+Upload a saved map to the public test server
+Upload map
 Uploading map data to GPU
 URL for downloading community skins
 URL for downloading maps (must start with https://)
@@ -4031,6 +3989,7 @@ Use enemy color instead of frozen color
 Use enemy list to drive player indicators
 Use high bandwidth mode (doubles server bandwidth, LAN only)
 Use k key to kill (restart), q to pause and watch other players. See settings for other key binds.
+Use large emote
 Use mouse sensitivity when dynamic camera is on
 Use multi-char replacement based on word length
 Use native UI for IME (may break IME in fullscreen mode, requires restart)
@@ -4109,7 +4068,7 @@ Voice output device (empty=default)
 Voice playback volume (percent)
 Voice protocol version
 Voice room token (optional)
-Voice server address host:port
+Voice server URL (ws:// or wss://)
 Voice stereo output
 Voice stereo width (percent)
 Voice test mode (0=Off 1=Local 2=Server Loopback)
@@ -4331,8 +4290,6 @@ Your team was killed because it couldn't finish anymore and hasn't entered /prac
 Your team was unlocked by an unlock team tile
 Your timeout code has been set. 0.7 clients can not reclaim their tees on timeout; however, a 0.6 client can claim your tee
 z = Zoom
-Zen Mode
-Zen mode key
 Zhipu AI
 Zhipu API key
 ZhipuAI API Key
@@ -4349,6 +4306,9 @@ Zoom to current mouse target
 ⚠️ LibreTranslate API Key not set
 ⚠️ LLM API Key not configured
 ⚠️ Tencent Cloud API not configured
+发射表情按键
+显示他人发射表情
+显示他人大表情
 [Assets editor blend mode]	Color
 [Assets editor blend mode]	Color Burn
 [Assets editor blend mode]	Color Dodge
@@ -5418,6 +5378,7 @@ Zoom to current mouse target
 [Team status]	forbidden
 [Team status]	required
 [Team status]	solo
+[Title color mode]	Use style colors
 [Touch button behavior]	Bind
 [Touch button behavior]	Bind Toggle
 [Touch button behavior]	Predefined

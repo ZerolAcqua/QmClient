@@ -53,6 +53,8 @@ inline const SQmMusicHookEntry *QmMusicHookRegistry(size_t *pCount)
 		{&g_Config.m_QmNeteaseHookEnable, "Enable Netease music Hook", "Enable Netease music Hook", L"cloudmusic.exe"},
 		{&g_Config.m_QmSodaHookEnable, "Enable SodaMusic Hook", "Enable SodaMusic Hook", L"SodaMusic.exe"},
 		{&g_Config.m_QmSpotifyEnable, "Enable Spotify lyrics", "Enable Spotify lyrics", L"Spotify.exe"},
+		{&g_Config.m_QmKugouHookEnable, "Enable Kugou Music lyrics", "Enable Kugou Music lyrics", L"KuGou.exe"},
+		{&g_Config.m_QmQQMusicHookEnable, "Enable QQ Music lyrics", "Enable QQ Music lyrics", L"QQMusic.exe"},
 	};
 	if(pCount != nullptr)
 		*pCount = sizeof(aEntries) / sizeof(aEntries[0]);

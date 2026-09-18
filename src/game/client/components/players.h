@@ -2,11 +2,39 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #ifndef GAME_CLIENT_COMPONENTS_PLAYERS_H
 #define GAME_CLIENT_COMPONENTS_PLAYERS_H
+#include <engine/graphics.h>
+
 #include <generated/protocol.h>
 
 #include <game/client/component.h>
 #include <game/client/components/qmclient/weapon_animation.h>
 #include <game/client/render.h>
+
+#include <vector>
+
+// 每次钩子提示线绘制独占使用，跨玩家与小窗调用只保留容量，不保留几何。
+struct SQmHookCollLineScratch
+{
+	std::vector<IGraphics::CLineItem> m_vLineSegments;
+	std::vector<IGraphics::CFreeformItem> m_vLineQuadSegments;
+
+	void Reset()
+	{
+		m_vLineSegments.clear();
+		m_vLineQuadSegments.clear();
+	}
+
+	void AppendQuad(const IGraphics::CLineItem &LineSegment, const vec2 &PerpToAngle, float LineWidth)
+	{
+		vec2 DrawInitPos(LineSegment.m_X0, LineSegment.m_Y0);
+		vec2 DrawFinishPos(LineSegment.m_X1, LineSegment.m_Y1);
+		vec2 Pos0 = DrawFinishPos + PerpToAngle * -LineWidth;
+		vec2 Pos1 = DrawFinishPos + PerpToAngle * LineWidth;
+		vec2 Pos2 = DrawInitPos + PerpToAngle * -LineWidth;
+		vec2 Pos3 = DrawInitPos + PerpToAngle * LineWidth;
+		m_vLineQuadSegments.emplace_back(Pos0.x, Pos0.y, Pos1.x, Pos1.y, Pos2.x, Pos2.y, Pos3.x, Pos3.y);
+	}
+};
 
 class CPlayers : public CComponent
 {
@@ -46,6 +74,7 @@ class CPlayers : public CComponent
 	bool IsPlayerInfoAvailable(int ClientId) const;
 	bool ShouldRenderWeaponAnimation(int ClientId) const;
 
+	SQmHookCollLineScratch m_HookCollLineScratch;
 	int m_WeaponEmoteQuadContainerIndex;
 	int m_aWeaponSpriteMuzzleQuadContainerIndex[NUM_WEAPONS];
 	int m_aWeaponSwitchLastWeapons[MAX_CLIENTS];

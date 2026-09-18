@@ -22,7 +22,6 @@
 #include <game/client/components/flow.h>
 #include <game/client/components/qmclient/afk_presentation.h>
 #include <game/client/components/qmclient/jelly_tee.h>
-#include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/components/qmclient/tee_hue_cycle.h>
 #include <game/client/components/skins.h>
@@ -170,14 +169,15 @@ void CPlayers::RenderHand(const CTeeRenderInfo *pInfo, vec2 CenterPos, vec2 Dir,
 {
 	const vec2 HandPos = CalculateHandPosition(CenterPos, Dir, PostRotOffset);
 	const float HandAngle = CalculateHandAngle(Dir, AngleOffset);
-	if(CTeeRenderInfo::IsDrawableTexture(pInfo->m_aSixup[g_Config.m_ClDummy].PartTexture(protocol7::SKINPART_HANDS)))
+	// 句柄失效（设备重建、槽位复用）时当成不可绘制，否则手也会画成没有贴图的实心块。
+	if(CTeeRenderInfo::IsLiveDrawableTexture(Graphics(), pInfo->m_aSixup[g_Config.m_ClDummy].PartTexture(protocol7::SKINPART_HANDS)))
 	{
 		RenderHand7(pInfo, HandPos, HandAngle, Alpha);
 	}
 	else
 	{
 		const CSkin::CSkinTextures &SkinTextures = pInfo->m_CustomColoredSkin ? pInfo->m_ColorableRenderSkin : pInfo->m_OriginalRenderSkin;
-		if(CTeeRenderInfo::IsDrawableTexture(SkinTextures.m_HandsOutline) && CTeeRenderInfo::IsDrawableTexture(SkinTextures.m_Hands))
+		if(CTeeRenderInfo::IsLiveDrawableTexture(Graphics(), SkinTextures.m_HandsOutline) && CTeeRenderInfo::IsLiveDrawableTexture(Graphics(), SkinTextures.m_Hands))
 			RenderHand6(pInfo, HandPos, HandAngle, Alpha);
 	}
 }
@@ -287,9 +287,6 @@ void CPlayers::RenderHookCollLine(
 	const CNetObj_Character *pPlayerChar,
 	int ClientId)
 {
-	if(ShouldHideFocusGuideLines(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideGuideLines != 0))
-		return;
-
 	const bool ManualHookCollVisible = GameClient()->m_Controls.m_aShowHookColl[g_Config.m_ClDummy] != 0;
 	if(GameClient()->m_TClient.ShouldHideGoresGuides(ManualHookCollVisible))
 		return;
@@ -389,7 +386,8 @@ void CPlayers::RenderHookCollLine(
 	vec2 SegmentStartPos = LineStartPos;
 
 	ColorRGBA HookCollColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClHookCollColorNoColl));
-	std::vector<IGraphics::CLineItem> vLineSegments;
+	m_HookCollLineScratch.Reset();
+	auto &vLineSegments = m_HookCollLineScratch.m_vLineSegments;
 
 	const int MaxHookTicks = 5 * Client()->GameTickSpeed(); // calculating above 5 seconds is very expensive and unlikely to happen
 
@@ -557,25 +555,15 @@ void CPlayers::RenderHookCollLine(
 	Graphics()->TextureClear();
 	if(HookCollSize > 0)
 	{
-		std::vector<IGraphics::CFreeformItem> vLineQuadSegments;
+		auto &vLineQuadSegments = m_HookCollLineScratch.m_vLineQuadSegments;
 		vLineQuadSegments.reserve(vLineSegments.size());
 
 		float LineWidth = 0.5f + (float)(HookCollSize - 1) * 0.25f;
 		const vec2 PerpToAngle = normalize(vec2(Direction.y, -Direction.x)) * GameClient()->m_Camera.m_Zoom;
 
-		auto ConvertLineSegments = [&](const IGraphics::CLineItem &LineSegment) {
-			vec2 DrawInitPos(LineSegment.m_X0, LineSegment.m_Y0);
-			vec2 DrawFinishPos(LineSegment.m_X1, LineSegment.m_Y1);
-			vec2 Pos0 = DrawFinishPos + PerpToAngle * -LineWidth;
-			vec2 Pos1 = DrawFinishPos + PerpToAngle * LineWidth;
-			vec2 Pos2 = DrawInitPos + PerpToAngle * -LineWidth;
-			vec2 Pos3 = DrawInitPos + PerpToAngle * LineWidth;
-			vLineQuadSegments.emplace_back(Pos0.x, Pos0.y, Pos1.x, Pos1.y, Pos2.x, Pos2.y, Pos3.x, Pos3.y);
-		};
-
 		for(const auto &LineSegment : vLineSegments)
 		{
-			ConvertLineSegments(LineSegment);
+			m_HookCollLineScratch.AppendQuad(LineSegment, PerpToAngle, LineWidth);
 		}
 
 		vLineSegments.clear();
@@ -586,7 +574,7 @@ void CPlayers::RenderHookCollLine(
 		if(HookTipLineSegment.has_value() && HookCollTipColor.a > 0.0f && !g_Config.m_TcRevertHookLine)
 		{
 			vLineQuadSegments.clear();
-			ConvertLineSegments(HookTipLineSegment.value());
+			m_HookCollLineScratch.AppendQuad(HookTipLineSegment.value(), PerpToAngle, LineWidth);
 			Graphics()->SetColor(HookCollTipColor.WithMultipliedAlpha(Alpha));
 			Graphics()->QuadsDrawFreeform(vLineQuadSegments.data(), vLineQuadSegments.size());
 		}
@@ -1109,8 +1097,7 @@ void CPlayers::RenderPlayer(
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
 
 				// HADOKEN
-				if(!ShouldHideFocusMuzzleEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMuzzleEffects != 0) &&
-					AttackTime <= 1.0f / 6.0f &&
+				if(AttackTime <= 1.0f / 6.0f &&
 					g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
 				{
 					int IteX = rand() % g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles;
@@ -1176,8 +1163,7 @@ void CPlayers::RenderPlayer(
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
 			}
 
-			if(!ShouldHideFocusMuzzleEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMuzzleEffects != 0) &&
-				(Player.m_Weapon == WEAPON_GUN || Player.m_Weapon == WEAPON_SHOTGUN) &&
+			if((Player.m_Weapon == WEAPON_GUN || Player.m_Weapon == WEAPON_SHOTGUN) &&
 				g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
 			{
 				float AlphaMuzzle = 0.0f;
@@ -1702,8 +1688,7 @@ void CPlayers::RenderPlayerGhost(
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
 
 				// HADOKEN
-				if(!ShouldHideFocusMuzzleEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMuzzleEffects != 0) &&
-					AttackTime <= 1.0f / 6.0f &&
+				if(AttackTime <= 1.0f / 6.0f &&
 					g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
 				{
 					int IteX = rand() % g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles;
@@ -1768,8 +1753,7 @@ void CPlayers::RenderPlayerGhost(
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
 			}
 
-			if(!ShouldHideFocusMuzzleEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMuzzleEffects != 0) &&
-				(Player.m_Weapon == WEAPON_GUN || Player.m_Weapon == WEAPON_SHOTGUN) &&
+			if((Player.m_Weapon == WEAPON_GUN || Player.m_Weapon == WEAPON_SHOTGUN) &&
 				g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
 			{
 				float AlphaMuzzle = 0.0f;

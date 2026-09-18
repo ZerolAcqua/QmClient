@@ -196,7 +196,7 @@ TEST(QmHudNotifications, RoutesServerSystemMessagesWhenEnabled)
 	EXPECT_EQ(QmHudNotifications::ServerMessageRoute(nullptr, QmHudNotifications::ESoloPrompt::None, true), QmHudNotifications::EServerMessageRoute::None);
 }
 
-TEST(QmHudNotifications, ClassifiesServerSystemMessagesForFocusMode)
+TEST(QmHudNotifications, ClassifiesServerSystemMessages)
 {
 	EXPECT_EQ(QmHudNotifications::ServerMessageClass("DDraceNetwork 版本: 18.9", QmHudNotifications::ESoloPrompt::None), QmHudNotifications::EServerMessageClass::BasicInfo);
 	EXPECT_EQ(QmHudNotifications::ServerMessageClass("请访问 DDNet.org，或输入 /info，并确保阅读 /rules", QmHudNotifications::ESoloPrompt::None), QmHudNotifications::EServerMessageClass::BasicInfo);
@@ -790,40 +790,10 @@ TEST(QmHudNotificationRules, FallsBackForUnknownMessage)
 	EXPECT_TRUE(Analysis.m_UseFallbackLocalization);
 }
 
-TEST(QmHudNotificationRules, ConsumesHiddenBasicInfoWhenConfigured)
-{
-	const auto Analysis = QmHudNotifications::AnalyzeServerMessage("DDraceNetwork Version: 18.9", QmHudNotifications::ESoloPrompt::None);
-	const auto Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, true, true, false);
-	EXPECT_TRUE(Decision.m_ConsumeHiddenMessage);
-	EXPECT_FALSE(Decision.m_QueueNotification);
-	EXPECT_FALSE(Decision.m_ClearPendingCompatPrompt);
-	EXPECT_FALSE(Decision.m_UseFallbackNotification);
-}
-
-TEST(QmHudNotificationRules, ConsumesHiddenPromptWhenConfigured)
-{
-	const auto Analysis = QmHudNotifications::AnalyzeServerMessage("Team save already in progress", QmHudNotifications::ESoloPrompt::None);
-	const auto Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, true, false, true);
-	EXPECT_TRUE(Decision.m_ConsumeHiddenMessage);
-	EXPECT_FALSE(Decision.m_QueueNotification);
-	EXPECT_FALSE(Decision.m_ClearPendingCompatPrompt);
-	EXPECT_FALSE(Decision.m_UseFallbackNotification);
-}
-
-TEST(QmHudNotificationRules, ClearsPendingCompatWhenSoloPromptIsHidden)
-{
-	const auto Analysis = QmHudNotifications::AnalyzeServerMessage("You are now in a solo part", QmHudNotifications::ESoloPrompt::Enter);
-	const auto Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, true, false, true);
-	EXPECT_TRUE(Decision.m_ConsumeHiddenMessage);
-	EXPECT_FALSE(Decision.m_QueueNotification);
-	EXPECT_TRUE(Decision.m_ClearPendingCompatPrompt);
-}
-
 TEST(QmHudNotificationRules, DoesNotQueueWhenSystemRouteIsDisabled)
 {
 	const auto Analysis = QmHudNotifications::AnalyzeServerMessage("Team save already in progress", QmHudNotifications::ESoloPrompt::None);
-	const auto Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, false, false, false);
-	EXPECT_FALSE(Decision.m_ConsumeHiddenMessage);
+	const auto Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, false);
 	EXPECT_FALSE(Decision.m_QueueNotification);
 	EXPECT_FALSE(Decision.m_ClearPendingCompatPrompt);
 	EXPECT_FALSE(Decision.m_UseFallbackNotification);
@@ -832,8 +802,7 @@ TEST(QmHudNotificationRules, DoesNotQueueWhenSystemRouteIsDisabled)
 TEST(QmHudNotificationRules, KeepsUnknownFallbackNotificationWhenSystemRouteIsEnabled)
 {
 	const auto Analysis = QmHudNotifications::AnalyzeServerMessage("regular server message", QmHudNotifications::ESoloPrompt::None);
-	const auto Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, true, false, false);
-	EXPECT_FALSE(Decision.m_ConsumeHiddenMessage);
+	const auto Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, true);
 	EXPECT_TRUE(Decision.m_QueueNotification);
 	EXPECT_FALSE(Decision.m_ClearPendingCompatPrompt);
 	EXPECT_TRUE(Decision.m_UseFallbackNotification);
@@ -917,45 +886,23 @@ TEST(QmHudNotificationRules, DisabledCategoryFiltersRouteNonEmptySystemMessages)
 	EXPECT_TRUE(Decision.m_UseFallbackNotification);
 }
 
-TEST(QmHudNotificationRules, FocusModeHiddenMessagesOverrideCategoryFilters)
-{
-	QmHudNotifications::SServerMessageRouteConfig Config;
-	Config.m_RouteSystemMessages = true;
-	Config.m_ShowBasicInfo = true;
-	Config.m_ShowPrompts = true;
-	Config.m_HideBasicInfo = true;
-	Config.m_HidePrompt = true;
-
-	auto Analysis = QmHudNotifications::AnalyzeServerMessage("DDraceNetwork Version: 18.9", QmHudNotifications::ESoloPrompt::None);
-	auto Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, Config);
-	EXPECT_TRUE(Decision.m_ConsumeHiddenMessage);
-	EXPECT_FALSE(Decision.m_QueueNotification);
-
-	Analysis = QmHudNotifications::AnalyzeServerMessage("Team save already in progress", QmHudNotifications::ESoloPrompt::None);
-	Decision = QmHudNotifications::DecideServerMessageEntry(Analysis, Config);
-	EXPECT_TRUE(Decision.m_ConsumeHiddenMessage);
-	EXPECT_FALSE(Decision.m_QueueNotification);
-}
-
 TEST(QmHudNotificationRules, QueuedSystemNotificationsRemainVisibleInChat)
 {
 	const auto Prompt = QmHudNotifications::AnalyzeServerMessage("Welcome to DDraceNetwork!", QmHudNotifications::ESoloPrompt::None);
-	EXPECT_FALSE(QmHudNotifications::ShouldSuppressServerMessageChat(Prompt, false, false));
-	EXPECT_TRUE(QmHudNotifications::ShouldSuppressServerMessageChat(Prompt, false, true));
+	EXPECT_FALSE(QmHudNotifications::ShouldSuppressServerMessageChat(Prompt));
 
 	const auto BasicInfo = QmHudNotifications::AnalyzeServerMessage("DDraceNetwork Version: 20.0", QmHudNotifications::ESoloPrompt::None);
-	EXPECT_FALSE(QmHudNotifications::ShouldSuppressServerMessageChat(BasicInfo, false, false));
-	EXPECT_TRUE(QmHudNotifications::ShouldSuppressServerMessageChat(BasicInfo, true, false));
+	EXPECT_FALSE(QmHudNotifications::ShouldSuppressServerMessageChat(BasicInfo));
 
 	const auto Solo = QmHudNotifications::AnalyzeServerMessage("You are now in a solo part", QmHudNotifications::ESoloPrompt::Enter);
-	EXPECT_TRUE(QmHudNotifications::ShouldSuppressServerMessageChat(Solo, false, false));
+	EXPECT_TRUE(QmHudNotifications::ShouldSuppressServerMessageChat(Solo));
 }
 
 TEST(QmHudNotifications, HandleServerChatUsesFallbackNotificationForUnknownMessage)
 {
 	CTestHudNotifications Notifications;
 	QmHudNotifications::SServerMessageAnalysis Analysis;
-	EXPECT_TRUE(Notifications.HandleServerChat("regular server message", true, false, false, &Analysis));
+	EXPECT_TRUE(Notifications.HandleServerChat("regular server message", true, &Analysis));
 	EXPECT_TRUE(Analysis.m_UseFallbackLocalization);
 	EXPECT_EQ(Notifications.NotificationCountForTests(), 1);
 	EXPECT_STREQ(Notifications.LastNotificationTextForTests(), "regular server message");
@@ -966,9 +913,9 @@ TEST(QmHudNotifications, ConsecutiveIdenticalSystemNotificationsCollapseIntoRepe
 	CTestHudNotifications Notifications;
 	QmHudNotifications::SServerMessageAnalysis Analysis;
 
-	EXPECT_TRUE(Notifications.HandleServerChat("Team save already in progress", true, false, false, &Analysis));
-	EXPECT_TRUE(Notifications.HandleServerChat("Team save already in progress", true, false, false, &Analysis));
-	EXPECT_TRUE(Notifications.HandleServerChat("Team save already in progress", true, false, false, &Analysis));
+	EXPECT_TRUE(Notifications.HandleServerChat("Team save already in progress", true, &Analysis));
+	EXPECT_TRUE(Notifications.HandleServerChat("Team save already in progress", true, &Analysis));
+	EXPECT_TRUE(Notifications.HandleServerChat("Team save already in progress", true, &Analysis));
 
 	EXPECT_EQ(Notifications.NotificationCountForTests(), 1);
 	EXPECT_STREQ(Notifications.LastNotificationTextForTests(), "Team save already in progress");
@@ -980,35 +927,35 @@ TEST(QmHudNotifications, HandleServerChatRespectsDisabledSystemRoute)
 {
 	CTestHudNotifications Notifications;
 	QmHudNotifications::SServerMessageAnalysis Analysis;
-	EXPECT_FALSE(Notifications.HandleServerChat("Team save already in progress", false, false, false, &Analysis));
+	EXPECT_FALSE(Notifications.HandleServerChat("Team save already in progress", false, &Analysis));
 	EXPECT_EQ(Analysis.m_Class, QmHudNotifications::EServerMessageClass::Prompt);
 	EXPECT_EQ(Notifications.NotificationCountForTests(), 0);
 }
 
-TEST(QmHudNotifications, HandleServerChatConsumesHiddenBasicInfo)
+TEST(QmHudNotifications, HandleServerChatLeavesBasicInfoInChat)
 {
 	CTestHudNotifications Notifications;
 	QmHudNotifications::SServerMessageAnalysis Analysis;
-	EXPECT_TRUE(Notifications.HandleServerChat("DDraceNetwork Version: 18.9", true, true, false, &Analysis));
+	EXPECT_FALSE(Notifications.HandleServerChat("DDraceNetwork Version: 18.9", true, &Analysis));
 	EXPECT_EQ(Analysis.m_Class, QmHudNotifications::EServerMessageClass::BasicInfo);
 	EXPECT_EQ(Notifications.NotificationCountForTests(), 0);
 }
 
-TEST(QmHudNotifications, HandleServerChatClearsPendingCompatAfterHiddenSoloPrompt)
+TEST(QmHudNotifications, HandleServerChatClearsPendingCompatAfterQueuedSoloPrompt)
 {
 	CTestHudNotifications Notifications;
 	Notifications.SetPendingCompatPromptForTests(QmHudNotifications::ESoloPrompt::Enter, time_get() + time_freq());
 
-	QmHudNotifications::SServerMessageAnalysis HiddenAnalysis;
-	EXPECT_TRUE(Notifications.HandleServerChat("You are now in a solo part", true, false, true, &HiddenAnalysis));
-	EXPECT_EQ(HiddenAnalysis.m_Route, QmHudNotifications::EServerMessageRoute::Solo);
+	QmHudNotifications::SServerMessageAnalysis EnterAnalysis;
+	EXPECT_TRUE(Notifications.HandleServerChat("You are now in a solo part", true, &EnterAnalysis));
+	EXPECT_EQ(EnterAnalysis.m_Route, QmHudNotifications::EServerMessageRoute::Solo);
 	EXPECT_EQ(Notifications.PendingCompatPromptForTests(), QmHudNotifications::ESoloPrompt::None);
-	EXPECT_EQ(Notifications.NotificationCountForTests(), 0);
+	EXPECT_EQ(Notifications.NotificationCountForTests(), 1);
 
 	QmHudNotifications::SServerMessageAnalysis FollowupAnalysis;
-	EXPECT_TRUE(Notifications.HandleServerChat("You are now out of the solo part", true, false, false, &FollowupAnalysis));
+	EXPECT_TRUE(Notifications.HandleServerChat("You are now out of the solo part", true, &FollowupAnalysis));
 	EXPECT_EQ(FollowupAnalysis.m_Route, QmHudNotifications::EServerMessageRoute::Solo);
-	EXPECT_EQ(Notifications.NotificationCountForTests(), 1);
+	EXPECT_EQ(Notifications.NotificationCountForTests(), 2);
 	EXPECT_STREQ(Notifications.LastNotificationTextForTests(), "You are now out of the solo part");
 }
 
@@ -1019,9 +966,9 @@ TEST(QmHudNotifications, BuildsEchoPresentationFromQueuedMessage)
 	EXPECT_STREQ(PlainEcho.m_aText, "Regular echo");
 	EXPECT_EQ(PlainEcho.m_Color, FallbackEchoColor);
 
-	const auto ColoredEcho = QmHudNotifications::BuildEchoNotificationPayload("[[$FF7F7F]]禅模式: 开启", FallbackEchoColor);
+	const auto ColoredEcho = QmHudNotifications::BuildEchoNotificationPayload("[[$FF7F7F]]Gores: 开启", FallbackEchoColor);
 	const unsigned ExpectedColor = color_cast<ColorHSLA>(ColorRGBA(1.0f, 127.0f / 255.0f, 127.0f / 255.0f, 1.0f)).Pack(false);
-	EXPECT_STREQ(ColoredEcho.m_aText, "禅模式: 开启");
+	EXPECT_STREQ(ColoredEcho.m_aText, "Gores: 开启");
 	EXPECT_EQ(ColoredEcho.m_Color, ExpectedColor);
 
 	const auto EmptyEcho = QmHudNotifications::BuildEchoNotificationPayload(nullptr, FallbackEchoColor);

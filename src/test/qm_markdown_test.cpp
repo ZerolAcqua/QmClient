@@ -1,6 +1,7 @@
 #include "test.h"
 
 #include <game/client/components/qmclient/qm_markdown.h>
+#include <game/client/components/qmclient/qm_sponsors.h>
 
 #include <gtest/gtest.h>
 
@@ -175,4 +176,78 @@ TEST(QmMarkdown, SplitsUtf8ByCodepoint)
 	for(const std::string &Glyph : vGlyphs)
 		Rebuilt += Glyph;
 	EXPECT_EQ(Rebuilt, "a中🙂");
+}
+
+TEST(QmSponsors, ReadsOnlyNonemptyListEntries)
+{
+	const std::vector<std::string> vNames = qm_sponsors::ParseNames(
+		"# 赞助名单\n"
+		"感谢所有赞助者。\n"
+		"\n"
+		"- 喵不一\n"
+		"* 久桃\n"
+		"+ 芽芽\n"
+		"1. 碳烤綿芽\n"
+		"12. 骨头\n"
+		"- \t\n"
+		"2.   \n"
+		"---\n"
+		"-没有分隔空格\n"
+		"3.没有分隔空格\n");
+	const std::vector<std::string> vExpected = {"喵不一", "久桃", "芽芽", "碳烤綿芽", "骨头"};
+	EXPECT_EQ(vNames, vExpected);
+}
+
+TEST(QmSponsors, PreservesLiteralNamesAndOrder)
+{
+	const std::vector<std::string> vNames = qm_sponsors::ParseNames(
+		"- 少女`\n"
+		"- **星星🌙**\n"
+		"- [名字](https://example.com)\n"
+		"- [[settings:qm:lyrics]]\n"
+		"- 间隔  姓名\n"
+		"- 少女`\n");
+	const std::vector<std::string> vExpected = {
+		"少女`", "**星星🌙**", "[名字](https://example.com)", "[[settings:qm:lyrics]]", "间隔  姓名", "少女`"};
+	EXPECT_EQ(vNames, vExpected);
+}
+
+TEST(QmSponsors, HandlesBomWhitespaceAndLineEndings)
+{
+	const std::vector<std::string> vNames = qm_sponsors::ParseNames(
+		"\xEF\xBB\xBF- 喵不一\r\n"
+		" \t*\t星星🌙 \t\r"
+		"2. Blue°F\n"
+		"+ 軽い猫");
+	const std::vector<std::string> vExpected = {"喵不一", "星星🌙", "Blue°F", "軽い猫"};
+	EXPECT_EQ(vNames, vExpected);
+	EXPECT_TRUE(qm_sponsors::ParseNames(nullptr).empty());
+	EXPECT_TRUE(qm_sponsors::ParseNames("").empty());
+	EXPECT_TRUE(qm_sponsors::ParseNames("\xEF\xBB\xBF\n# 标题\n说明\n-\n- \n").empty());
+}
+
+TEST(QmSponsors, LimitsSponsorCount)
+{
+	std::string Markdown;
+	for(int i = 0; i < 405; ++i)
+		Markdown += "- 赞助者" + std::to_string(i) + "\n";
+	const std::vector<std::string> vNames = qm_sponsors::ParseNames(Markdown.c_str());
+	ASSERT_EQ(vNames.size(), 400u);
+	EXPECT_EQ(vNames.front(), "赞助者0");
+	EXPECT_EQ(vNames.back(), "赞助者399");
+}
+
+TEST(QmSponsors, DropsNamesCrossingByteLimit)
+{
+	std::string Markdown = "- 完整姓名\n";
+	Markdown += std::string(64 * 1024 - Markdown.size() - 3, ' ');
+	Markdown += "- 星星🌙\n- 超出限制\n";
+	const std::vector<std::string> vExpected = {"完整姓名"};
+	EXPECT_EQ(qm_sponsors::ParseNames(Markdown.c_str()), vExpected);
+
+	// 恰好占满字节上限且没有结尾换行的完整姓名仍然保留。
+	const std::string Exact = "- " + std::string(64 * 1024 - 2, 'a');
+	const std::vector<std::string> vExact = qm_sponsors::ParseNames(Exact.c_str());
+	ASSERT_EQ(vExact.size(), 1u);
+	EXPECT_EQ(vExact[0], Exact.substr(2));
 }

@@ -2544,22 +2544,6 @@ turkish = "Konsolda ilk sayfa"
 polish = "Pierwsza strona w konsoli"
 
 [[message]]
-key = "Focus mode"
-[message.translations]
-simplified_chinese = "专注模式"
-traditional_chinese = "專注模式"
-japanese = "フォーカスモード"
-korean = "집중 모드"
-russian = "Режим фокуса"
-german = "Fokusmodus"
-spanish = "Modo enfoque"
-french = "Mode focus"
-brazilian_portuguese = "Modo foco"
-portuguese = "Modo foco"
-turkish = "Odak modu"
-polish = "Tryb skupienia"
-
-[[message]]
 key = "Follow"
 [message.translations]
 simplified_chinese = "跟随"
@@ -4638,6 +4622,22 @@ brazilian_portuguese = "Mouse"
 portuguese = "Rato"
 turkish = "Fare"
 polish = "Mysz"
+
+[[message]]
+key = "Move a friend category to a position"
+[message.translations]
+simplified_chinese = "将好友分类移动到指定位置"
+traditional_chinese = "將好友分類移動到指定位置"
+japanese = "フレンドカテゴリを指定した位置に移動"
+korean = "친구 카테고리를 지정한 위치로 이동"
+russian = "Переместить категорию друзей на указанную позицию"
+german = "Freundeskategorie an eine bestimmte Position verschieben"
+spanish = "Mover una categoría de amigos a una posición"
+french = "Déplacer une catégorie d'amis vers une position"
+brazilian_portuguese = "Mover uma categoria de amigos para uma posição"
+portuguese = "Mover uma categoria de amigos para uma posição"
+turkish = "Bir arkadaş kategorisini belirli bir konuma taşı"
+polish = "Przenieś kategorię znajomych na wskazaną pozycję"
 
 [[message]]
 key = "Move dummy left"
@@ -8080,22 +8080,6 @@ turkish = "Hız:"
 polish = "Prędkość:"
 
 [[message]]
-key = "Speedrun timer"
-[message.translations]
-simplified_chinese = "速通计时器"
-traditional_chinese = "速通計時器"
-japanese = "スピードラインタイマー"
-korean = "스피드런 타이머"
-russian = "Таймер спидранa"
-german = "Speedrun-Timer"
-spanish = "Temporizador de speedrun"
-french = "Chronomètre de speedrun"
-brazilian_portuguese = "Temporizador de speedrun"
-portuguese = "Temporizador de speedrun"
-turkish = "Hızlı koşu zamanlayıcısı"
-polish = "Stoper speedrun"
-
-[[message]]
 key = "Spree"
 [message.translations]
 simplified_chinese = "连杀"
@@ -9086,22 +9070,6 @@ brazilian_portuguese = "Contornos de tiles"
 portuguese = "Contornos de tiles"
 turkish = "Karo ana hatları"
 polish = "Kontury kafelków"
-
-[[message]]
-key = "TIME EXPIRED!"
-[message.translations]
-simplified_chinese = "时间耗尽！"
-traditional_chinese = "時間耗盡！"
-japanese = "時間切れ！"
-korean = "시간 초과!"
-russian = "ВРЕМЯ ИСТЕКЛО!"
-german = "ZEIT ABGELAUFEN!"
-spanish = "¡TIEMPO AGOTADO!"
-french = "TEMPS ÉCOULÉ !"
-brazilian_portuguese = "TEMPO ESGOTADO!"
-portuguese = "TEMPO EXPIRADO!"
-turkish = "SÜRE DOLDU!"
-polish = "CZAS MINĄŁ!"
 
 [[message]]
 key = "Time limit: %d min"

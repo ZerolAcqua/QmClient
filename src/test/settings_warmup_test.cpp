@@ -2424,7 +2424,8 @@ TEST(SettingsWarmup, TClientCardMeasurementCachesUntilRelevantConfigChanges)
 	EXPECT_NE(TClient.find("HashValueFnv1a64(Hash, QmFastInputNormalizedMode(g_Config.m_QmFastInputMode))"), std::string::npos);
 	EXPECT_NE(TClient.find("HashValueFnv1a64(Hash, g_Config.m_TcWarListIndicator)"), std::string::npos);
 	EXPECT_NE(TClient.find("HashValueFnv1a64(Hash, g_Config.m_TcWarListIndicatorColors)"), std::string::npos);
-	EXPECT_NE(TClient.find("for(int RowIndex = 0; RowIndex < (UiMode == 3 ? 4 : 1); ++RowIndex)"), std::string::npos);
+	// 输入卡片的模式滑块恒为一行，量算路径不再按模式分支。
+	EXPECT_EQ(TClient.find("RowIndex < (UiMode == 3 ? 4 : 1)"), std::string::npos);
 	EXPECT_NE(TClient.find("Rows.Next();"), std::string::npos);
 	const size_t LayoutHashStart = TClient.find("uint64_t HashTClientSettingsCardLayout(");
 	const size_t RuntimeKeyStart = TClient.find("SSettingsSectionCacheRuntimeKey MakeSettingsSectionRuntimeKey(", LayoutHashStart);
@@ -2491,7 +2492,8 @@ TEST(SettingsWarmup, TClientSettingsRowsSeparateControlHeightFromSpacing)
 
 	const std::string Input = Section("auto LayoutInputSection", "auto LayoutAntiLatencyToolsSection");
 	EXPECT_NE(Input.find("CTClientSettingsRowAllocator Rows(CurrentColumn);"), std::string::npos);
-	EXPECT_NE(Input.find("for(int RowIndex = 0; RowIndex < (UiMode == 3 ? 4 : 1); ++RowIndex)"), std::string::npos);
+	EXPECT_NE(Input.find("if(UiMode == 0)"), std::string::npos);
+	EXPECT_EQ(Input.find("else if(UiMode == 3)"), std::string::npos);
 	EXPECT_NE(Input.find("DoTClientSettingsButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSubTickAiming"), std::string::npos);
 	EXPECT_EQ(Input.find("&CurrentColumn, LineSize"), std::string::npos);
 

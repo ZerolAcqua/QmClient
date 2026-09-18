@@ -12,7 +12,6 @@
 #include <game/client/animstate.h>
 #include <game/client/components/binds.h>
 #include <game/client/components/particles.h>
-#include <game/client/components/qmclient/modes.h>
 #include <game/client/gameclient.h>
 #include <game/client/prediction/entities/character.h>
 #include <game/client/prediction/entities/laser.h>
@@ -73,9 +72,6 @@ namespace
 		Settings.m_Enabled = pGameClient->TClientComponent().IsFastInputActive();
 		Settings.m_Mode = g_Config.m_QmFastInputMode;
 		Settings.m_FastAmountMs = g_Config.m_TcFastInputAmount;
-		Settings.m_BestOffset = g_Config.m_QmBestInputOffset;
-		Settings.m_BestSmoothing = g_Config.m_QmBestInputSmoothing;
-		Settings.m_BestLatencyComp = g_Config.m_QmBestInputLatencyComp;
 		Settings.m_SaikoPlusAmount = g_Config.m_QmSaikoPlusAmount;
 		return QmEffectiveFastInputOffsetTicks(Settings);
 	}
@@ -87,7 +83,7 @@ namespace
 
 	bool EffectiveFastInputOthers(const CGameClient *pGameClient)
 	{
-		return QmEffectiveFastInputOthers(pGameClient->TClientComponent().IsFastInputActive(), g_Config.m_QmFastInputMode, g_Config.m_TcFastInputOthers != 0, g_Config.m_QmBestInputOthers != 0, g_Config.m_QmSaikoPlusOthers != 0);
+		return QmEffectiveFastInputOthers(pGameClient->TClientComponent().IsFastInputActive(), g_Config.m_QmFastInputMode, g_Config.m_TcFastInputOthers != 0, g_Config.m_QmSaikoPlusOthers != 0);
 	}
 
 	bool IsFrozenState(const CCharacter *pChar)
@@ -1310,7 +1306,7 @@ void CFastPractice::TrackPracticeTileFeedback(int ClientId, CCharacter *pChar, c
 	if(FeedbackDecision.m_PlayDeathFeedback && !GameClient()->m_SuppressEvents)
 		GameClient()->m_Effects.PlayerDeath(AfterPos, ClientId, 1.0f);
 	if(FeedbackDecision.m_PlayDeathFeedback && g_Config.m_SndGame && !GameClient()->m_SuppressEvents)
-		if(ShouldPlayFocusDeathOrSpawnSound(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeMuteDeathSounds != 0, g_Config.m_SndGame))
+		if(g_Config.m_SndGame)
 			GameClient()->m_Sounds.PlayAndRecord(CSounds::CHN_WORLD, SOUND_PLAYER_DIE, 1.0f, AfterPos);
 }
 
@@ -1708,7 +1704,7 @@ bool CFastPractice::OverridePredict()
 			if(g_Config.m_SndGame && !GameClient()->m_SuppressEvents)
 			{
 				if(Events & COREEVENT_GROUND_JUMP)
-					if(ShouldPlayFocusJumpSound(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeMuteJumpSounds != 0, g_Config.m_SndGame))
+					if(g_Config.m_SndGame)
 						GameClient()->m_Sounds.PlayAndRecord(CSounds::CHN_WORLD, SOUND_PLAYER_JUMP, 1.0f, Pos);
 				if(Events & COREEVENT_HOOK_ATTACH_PLAYER)
 					GameClient()->m_Sounds.PlayAndRecord(CSounds::CHN_WORLD, SOUND_HOOK_ATTACH_PLAYER, 1.0f, Pos);
@@ -1733,7 +1729,7 @@ bool CFastPractice::OverridePredict()
 			if(g_Config.m_SndGame && !GameClient()->m_SuppressEvents)
 			{
 				if(Events & COREEVENT_GROUND_JUMP)
-					if(ShouldPlayFocusJumpSound(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeMuteJumpSounds != 0, g_Config.m_SndGame))
+					if(g_Config.m_SndGame)
 						GameClient()->m_Sounds.PlayAndRecord(CSounds::CHN_WORLD, SOUND_PLAYER_JUMP, 1.0f, Pos);
 				if(Events & COREEVENT_HOOK_ATTACH_PLAYER)
 					GameClient()->m_Sounds.PlayAndRecord(CSounds::CHN_WORLD, SOUND_HOOK_ATTACH_PLAYER, 1.0f, Pos);

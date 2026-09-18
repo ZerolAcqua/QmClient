@@ -10,6 +10,7 @@
 
 #include <game/client/component.h>
 #include <game/client/components/qm_console_log_filter.h>
+#include <game/client/components/qmclient/qm_chat_export_metadata.h>
 #include <game/client/lineinput.h>
 #include <game/client/ui.h>
 
@@ -25,6 +26,7 @@ enum
 };
 
 class CConsoleLogger;
+class CQmChatExportJob;
 
 class CGameConsole : public CComponent
 {
@@ -64,6 +66,8 @@ private:
 		CStaticRingBuffer<CBacklogEntry, 1024 * 1024, CRingBufferBase::FLAG_RECYCLE> m_BacklogPending GUARDED_BY(m_BacklogPendingLock);
 		std::unordered_map<int, std::vector<SColorSpan>> m_ColorSpansByExportId;
 		std::unordered_map<int, std::vector<SColorSpan>> m_PendingColorSpansByExportId GUARDED_BY(m_BacklogPendingLock);
+		std::unordered_map<int, std::shared_ptr<const QmChatExport::SMetadata>> m_ChatMetadataByExportId;
+		std::unordered_map<int, std::shared_ptr<const QmChatExport::SMetadata>> m_PendingChatMetadataByExportId GUARDED_BY(m_BacklogPendingLock);
 		CStaticRingBuffer<char, 64 * 1024, CRingBufferBase::FLAG_RECYCLE> m_History;
 		char *m_pHistoryEntry;
 
@@ -79,6 +83,7 @@ private:
 		int m_NextExportId = 1;
 		int m_ChatExportAnchorId = -1;
 		bool m_ChatExportMode = false;
+		std::shared_ptr<CQmChatExportJob> m_pChatExportJob;
 
 		STextBoundingBox m_BoundingBox = {0.0f, 0.0f, 0.0f, 0.0f};
 		float m_LastInputHeight = 0.0f;
@@ -149,7 +154,7 @@ private:
 		void ExecuteLine(const char *pLine);
 
 		bool OnInput(const IInput::CEvent &Event);
-		void PrintLine(const char *pLine, int Len, ColorRGBA PrintColor, const SColorSpan *pColorSpans = nullptr, size_t NumColorSpans = 0) REQUIRES(!m_BacklogPendingLock);
+		void PrintLine(const char *pLine, int Len, ColorRGBA PrintColor, const SColorSpan *pColorSpans = nullptr, size_t NumColorSpans = 0, std::shared_ptr<const QmChatExport::SMetadata> pChatMetadata = nullptr) REQUIRES(!m_BacklogPendingLock);
 		int GetLinesToScroll(int Direction, int LinesToScroll);
 		void ScrollToCenter(int StartLine, int EndLine);
 		void Dump() REQUIRES(!m_BacklogPendingLock);
@@ -160,6 +165,8 @@ private:
 		bool IsChatExportableEntry(const CBacklogEntry *pEntry) const;
 		void ToggleChatExportEntry(CBacklogEntry *pEntry, bool RangeSelect);
 		bool ExportSelectedChat() REQUIRES(!m_BacklogPendingLock);
+		void UpdateChatExport();
+		void CancelChatExport();
 
 		const char *GetString() const { return m_Input.GetString(); }
 		/**
@@ -252,7 +259,7 @@ public:
 	int Sizeof() const override { return sizeof(*this); }
 
 	void PrintLine(int Type, const char *pLine);
-	void PrintLineWithColorSpans(int Level, const char *pFrom, const char *pLine, ColorRGBA PrintColor, const SColorSpan *pColorSpans, size_t NumColorSpans);
+	void PrintLineWithColorSpans(int Level, const char *pFrom, const char *pLine, ColorRGBA PrintColor, const SColorSpan *pColorSpans, size_t NumColorSpans, std::shared_ptr<const QmChatExport::SMetadata> pChatMetadata = nullptr);
 	void RequireUsername(bool UsernameReq);
 
 	void OnStateChange(int NewState, int OldState) override;

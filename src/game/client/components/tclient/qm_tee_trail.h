@@ -71,6 +71,14 @@ namespace qm_tee_trail
 		bool m_Additive = false;
 	};
 
+	// 一段轨迹的切线只准备一次，细分采样保留原三次公式与浮点运算顺序。
+	struct SPreparedCurve
+	{
+		vec2 m_Start, m_End, m_StartTangent, m_EndTangent;
+		vec2 Evaluate(float T) const;
+	};
+	SPreparedCurve PrepareCurve(vec2 P0, vec2 P1, vec2 P2, vec2 P3);
+
 	int ResolveStyle(int Style);
 	float Lifetime(int Style, int Length, float Speed);
 

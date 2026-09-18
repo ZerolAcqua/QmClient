@@ -25,7 +25,6 @@
 #include <game/client/QmUi/UiTokens.h>
 #include <game/client/animstate.h>
 #include <game/client/components/qmclient/demo_display.h>
-#include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_bind_status_hud.h>
 #include <game/client/components/scoreboard.h>
 #include <game/client/gameclient.h>
@@ -955,18 +954,6 @@ namespace
 
 		return Count;
 	}
-
-	void FormatSpeedrunTime(int64_t RemainingMilliseconds, char *pBuf, size_t BufSize)
-	{
-		const int RemainingHours = (int)(RemainingMilliseconds / (60 * 60 * 1000));
-		const int RemainingMinutes = (int)((RemainingMilliseconds / (60 * 1000)) % 60);
-		const int RemainingSeconds = (int)((RemainingMilliseconds / 1000) % 60);
-		const int Milliseconds = (int)(RemainingMilliseconds % 1000);
-		if(RemainingHours > 0)
-			str_format(pBuf, BufSize, "%02d:%02d:%02d.%03d", RemainingHours, RemainingMinutes, RemainingSeconds, Milliseconds);
-		else
-			str_format(pBuf, BufSize, "%02d:%02d.%03d", RemainingMinutes, RemainingSeconds, Milliseconds);
-	}
 }
 
 CHud::CHud()
@@ -1233,96 +1220,6 @@ void CHud::OnRelease()
 	DestroyMediaIslandBlurTargets();
 	DestroyDummyMiniViewRenderTarget();
 	m_MediaIslandFrameCache.Reset();
-}
-
-void CHud::RenderSpeedrunTimer()
-{
-	if(!g_Config.m_QmSpeedrunTimer && m_SpeedrunTimerExpiredTick <= 0)
-		return;
-
-	if(!GameClient()->m_Snap.m_pLocalCharacter)
-		return;
-
-	constexpr float SpeedrunTimerY = 20.0f;
-	constexpr float SpeedrunTimerExpiredY = 25.0f;
-
-	const int TotalConfiguredMilliseconds =
-		g_Config.m_QmSpeedrunTimerHours * 60 * 60 * 1000 +
-		g_Config.m_QmSpeedrunTimerMinutes * 60 * 1000 +
-		g_Config.m_QmSpeedrunTimerSeconds * 1000 +
-		g_Config.m_QmSpeedrunTimerMilliseconds;
-
-	int TotalSpeedrunTimerMilliseconds = TotalConfiguredMilliseconds;
-	if(TotalSpeedrunTimerMilliseconds <= 0 && g_Config.m_QmSpeedrunTimerTime > 0)
-	{
-		const int LegacyMinutes = g_Config.m_QmSpeedrunTimerTime / 100;
-		const int LegacySeconds = g_Config.m_QmSpeedrunTimerTime % 100;
-		if(LegacySeconds < 60)
-			TotalSpeedrunTimerMilliseconds = (LegacyMinutes * 60 + LegacySeconds) * 1000;
-	}
-
-	if(TotalSpeedrunTimerMilliseconds <= 0)
-		return;
-
-	const bool RaceStarted = (GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_RACETIME) &&
-				 GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer < 0;
-
-	if(RaceStarted && m_SpeedrunTimerExpiredTick > 0)
-		m_SpeedrunTimerExpiredTick = 0;
-
-	if(m_SpeedrunTimerExpiredTick > 0)
-	{
-		const int CurrentTick = Client()->GameTick(g_Config.m_ClDummy);
-		if(CurrentTick < m_SpeedrunTimerExpiredTick + Client()->GameTickSpeed() * 5)
-		{
-			char aBuf[64];
-			str_copy(aBuf, Localize("TIME EXPIRED!"), sizeof(aBuf));
-			const float Half = m_Width / 2.0f;
-			const float FontSize = 12.0f;
-			const float w = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f);
-			TextRender()->TextColor(1.0f, 0.25f, 0.25f, 1.0f);
-			TextRender()->Text(Half - w / 2, SpeedrunTimerExpiredY, FontSize, aBuf, -1.0f);
-			TextRender()->TextColor(TextRender()->DefaultTextColor());
-		}
-		else
-		{
-			m_SpeedrunTimerExpiredTick = 0;
-		}
-		return;
-	}
-
-	if(!RaceStarted)
-		return;
-
-	const int CurrentTick = Client()->GameTick(g_Config.m_ClDummy);
-	const int StartTick = -GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer;
-	const int ElapsedTicks = CurrentTick - StartTick;
-
-	const int64_t DeadlineTicks = (int64_t)TotalSpeedrunTimerMilliseconds * Client()->GameTickSpeed() / 1000;
-	const int64_t RemainingTicks = DeadlineTicks - ElapsedTicks;
-
-	if(RemainingTicks <= 0)
-	{
-		m_SpeedrunTimerExpiredTick = CurrentTick;
-		GameClient()->SendKill();
-		if(g_Config.m_QmSpeedrunTimerAutoDisable)
-			g_Config.m_QmSpeedrunTimer = 0;
-		return;
-	}
-
-	const int64_t RemainingMilliseconds = RemainingTicks * 1000 / Client()->GameTickSpeed();
-	char aBuf[32];
-	FormatSpeedrunTime(RemainingMilliseconds, aBuf, sizeof(aBuf));
-
-	const float Half = m_Width / 2.0f;
-	const float FontSize = 8.0f;
-	const float w = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f);
-
-	if(RemainingMilliseconds <= 60 * 1000)
-		TextRender()->TextColor(1.0f, 0.25f, 0.25f, 1.0f);
-
-	TextRender()->Text(Half - w / 2, SpeedrunTimerY, FontSize, aBuf, -1.0f);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
 
 void CHud::RenderGameTimer()
@@ -3344,7 +3241,7 @@ void CHud::RenderFollowSwitchCountdowns()
 	// Preserve the previous ring's outer footprint while adopting the satellite proportions.
 	constexpr float SatelliteRadius = 9.0f + 2.5f * 0.5f;
 	constexpr float RingRadius = SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_RADIUS_SCALE;
-	const float RingThickness = std::max(QmHudMediaIslandScaled(1.25f), SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_THICKNESS_SCALE);
+	const float RingThickness = std::max(1.0f, SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_THICKNESS_SCALE);
 	const float ScreenPixelSize = std::max(
 		(ScreenX1 - ScreenX0) / std::max(1, Graphics()->ScreenWidth()),
 		(ScreenY1 - ScreenY0) / std::max(1, Graphics()->ScreenHeight()));
@@ -3510,7 +3407,7 @@ void CHud::RenderFollowHookCountdown()
 	// 卫星半径/环宽与开关环保持一致，只有颜色不同（见 QmHudHookCountdownColor）。
 	constexpr float SatelliteRadius = 9.0f + 2.5f * 0.5f;
 	constexpr float RingRadius = SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_RADIUS_SCALE;
-	const float RingThickness = std::max(QmHudMediaIslandScaled(1.25f), SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_THICKNESS_SCALE);
+	const float RingThickness = std::max(1.0f, SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_THICKNESS_SCALE);
 	const float ScreenPixelSize = std::max(
 		(ScreenX1 - ScreenX0) / std::max(1, Graphics()->ScreenWidth()),
 		(ScreenY1 - ScreenY0) / std::max(1, Graphics()->ScreenHeight()));
@@ -3843,7 +3740,7 @@ void CHud::EnsureMediaIslandFrameCache() const
 	Cache.Reset();
 	Cache.m_Frame = CurrentFrame;
 	Cache.m_Valid = true;
-	const bool MediaHudEnabled = g_Config.m_QmSmtcShowHud && SystemMediaControls::AnyMediaSourceEnabled(g_Config.m_QmSmtcEnable != 0, g_Config.m_QmNeteaseHookEnable != 0 || g_Config.m_QmSodaHookEnable != 0 || g_Config.m_QmSpotifyEnable != 0);
+	const bool MediaHudEnabled = g_Config.m_QmSmtcShowHud && SystemMediaControls::AnyMediaSourceEnabled(g_Config.m_QmSmtcEnable != 0, g_Config.m_QmNeteaseHookEnable != 0 || g_Config.m_QmSodaHookEnable != 0 || g_Config.m_QmSpotifyEnable != 0 || g_Config.m_QmKugouHookEnable != 0 || g_Config.m_QmQQMusicHookEnable != 0);
 	Cache.m_HasMediaState = MediaHudEnabled && GameClient()->m_SystemMediaControls.GetStateSnapshot(Cache.m_MediaState);
 	if(g_Config.m_QmHudIslandUseOriginalStyle)
 		return;
@@ -3855,9 +3752,9 @@ void CHud::EnsureMediaIslandFrameCache() const
 		Cache.m_LyricsActive = GameClient()->m_NeteaseIntegration.HasActiveLyrics();
 		Cache.m_ShowLyrics = GameClient()->m_NeteaseIntegration.GetCurrentLyric(Cache.m_aLyrics, sizeof(Cache.m_aLyrics), &Cache.m_LyricsColor);
 	}
-	if(!Cache.m_ShowLyrics && g_Config.m_QmSodaHookEnable != 0)
+	if(!Cache.m_ShowLyrics && (g_Config.m_QmSodaHookEnable != 0 || g_Config.m_QmKugouHookEnable != 0 || g_Config.m_QmQQMusicHookEnable != 0))
 	{
-		// 汽水音乐歌词作为网易云无歌词时的备选来源。
+		// 汽水、酷狗和 QQ 音乐由统一歌词组件提供当前句。
 		Cache.m_LyricsActive = GameClient()->m_MusicLyricsIntegration.HasActiveLyrics();
 		Cache.m_ShowLyrics = GameClient()->m_MusicLyricsIntegration.GetCurrentLyric(Cache.m_aLyrics, sizeof(Cache.m_aLyrics));
 	}
@@ -6819,8 +6716,6 @@ void CHud::RenderJumpHint()
 void CHud::RenderMapProgressBar()
 {
 	const bool Preview = GameClient()->m_HudEditor.IsActive();
-	if(ShouldHideFocusMapProgress(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMapProgress != 0) && !Preview)
-		return;
 	if(!g_Config.m_QmPlayerStatsMapProgress && !Preview)
 		return;
 	if(!GameClient()->m_TClient.IsGoresMapProgressEnabled() && !Preview)
@@ -7336,12 +7231,6 @@ void CHud::OnRender()
 	const bool VideoRendering = false;
 #endif
 	const bool MainHudVisible = qm_demo_display::Resolve(g_Config, Client()->State() == IClient::STATE_DEMOPLAYBACK, VideoRendering).m_Hud;
-	const bool FocusSpectatorHudVisible = ShouldRenderFocusSpectatorHud(
-		GameClient()->m_Snap.m_SpecInfo.m_Active,
-		g_Config.m_ClShowhudSpectator != 0,
-		MainHudVisible,
-		g_Config.m_QmFocusMode != 0,
-		g_Config.m_QmFocusModeHideHud != 0);
 	const bool LocalCharacterHudVisible = GameClient()->m_Snap.m_pLocalCharacter &&
 					      !GameClient()->m_Snap.m_SpecInfo.m_Active &&
 					      !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER);
@@ -7411,7 +7300,6 @@ void CHud::OnRender()
 		RenderMapProgressBar();
 		if(g_Config.m_ClShowhudTimer && !ShowMediaIsland)
 			RenderGameTimer();
-		RenderSpeedrunTimer();
 		RenderPauseNotification();
 		RenderSuddenDeath();
 		if(g_Config.m_ClShowhudScore)
@@ -7438,10 +7326,6 @@ void CHud::OnRender()
 		GameClient()->m_Voting.Render();
 		if(g_Config.m_ClShowRecord)
 			RenderRecord();
-	}
-	else if(FocusSpectatorHudVisible)
-	{
-		RenderSpectatorHud();
 	}
 	GameClient()->m_Voice.RenderOverlay();
 	RenderCursor();

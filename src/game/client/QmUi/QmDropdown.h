@@ -5,6 +5,7 @@
 
 #include "QmScroll.h"
 #include "UiTheme.h"
+#include "UiTokens.h"
 
 #include <game/client/ui_rect.h>
 
@@ -17,16 +18,18 @@ struct SQmDropdownVisualStyle
 	ColorRGBA m_PopupBorderColor = ColorRGBA(0.7f, 0.7f, 0.7f, 0.9f);
 	ColorRGBA m_ActiveEntryColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.22f);
 	bool m_TransparentEntries = true;
+	bool m_AnimatePopupAlpha = true;
 };
 
 inline SQmDropdownVisualStyle QmSettingsDropdownVisualStyle(const SUiTheme &Theme)
 {
 	SQmDropdownVisualStyle Style;
-	// 设置卡片中的触发器与弹出层使用同一层级的 surface，悬浮反馈只由条目自身叠加。
 	Style.m_TriggerColor = Theme.m_InputSurface;
-	Style.m_PopupBackgroundColor = Theme.m_Surface;
-	Style.m_PopupBorderColor = Theme.m_Border;
-	Style.m_ActiveEntryColor = Theme.m_SurfaceHovered;
+	// 弹层必须遮住底层内容，背景与高亮边框不随卡片透明度或入场动画变淡。
+	Style.m_PopupBackgroundColor = ui_token::color::SURFACE_ELEVATED.WithAlpha(1.0f);
+	Style.m_PopupBorderColor = Theme.m_Accent.WithAlpha(1.0f);
+	Style.m_ActiveEntryColor = Theme.m_Selected;
+	Style.m_AnimatePopupAlpha = false;
 	return Style;
 }
 

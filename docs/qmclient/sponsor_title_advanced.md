@@ -1,5 +1,26 @@
 # 赞助头衔高级模式与成品预览
 
+## 2026-09-17 颜色与风格选择修复（3.6.4）
+
+本轮确认：风格列表始终展示各风格原色；选择风格时自动切换为「使用风格颜色」，成品预览立即展示当前草稿。用户之后仍可手动选择单色或彩虹。保留现有布局和仅展示「[赞助者]」的列表，配色入口仍在高级模式中。
+
+- 原因：列表调用通用风格解析后仍继承全局单色/彩虹覆盖标志，且没有传入替代色，最终取默认白色。列表现在显式使用风格自身颜色。
+- 名牌与成品预览原先只要存在风格就使用白色渲染基色，导致单色未参与。现在仅在实际使用风格颜色或彩虹色段时采用顶点配色。
+- 成品预览补回覆盖模式的彩虹色段，按 UTF-8 字节偏移跳过左括号；风格解析优先使用当前选择的草稿，服务器旧风格不再覆盖草稿预览。
+- 区分「服务器分配风格」与「使用风格颜色」两项，补齐十二种语言。头衔资料和风格仍通过原有保存按钮提交；实际玩家风格仍保留服务端优先的规则。
+- 先补充 `src/test/qm_title_style_test.cpp` 的源码接线回归用例，再修改实现，覆盖列表原色、选择时恢复配色、草稿风格优先和名牌/预览的自定义颜色分支。按要求不编译、不运行测试。
+
+本轮只读审查：未发现阻断问题。已核对风格原色绕过覆盖、草稿与已保存风格的优先级、单色渲染基色、彩虹字节偏移和保存路径。
+
+验证记录：
+
+- `python qmclient_scripts/fix_style.py -n src/game/client/components/qmclient/menus_qmclient.cpp src/game/client/components/nameplates.cpp src/test/qm_title_style_test.cpp src/game/version.h`：退出码 0。
+- 本轮涉及文件的 `git diff --check`：退出码 0。
+- `python qmclient_scripts/gate/check_gate.py --mode quick --report-json-path tmp/title-color-fix-gate.json`：10 项通过、1 项失败；唯一失败为本轮未修改的 `src/test/qm_realtime_test.cpp:188` 格式问题。设置页合同通过。
+- i18n 提取、十二种语言生成与 `review_duplicate_entries.py --show-groups 0 --show-unused 0`：退出码 0；无重复 key、空译文或未使用条目候选。生成器另提示既有的 `DDRace HUD Pro` 简中占位文案未翻译。
+- `python qmclient_scripts/languages_qmclient/validate.py --incremental`：退出码 0，十二种语言覆盖及 TOML 完整性通过，保留三条其他菜单文案长度告警。新文案使用 `Title color mode` 上下文，避免与其他模块的同名 key 产生译文冲突。日志：`tmp/title-color-validate.log`。
+- 未编译、未执行 C++/Rust 测试、未启动客户端，实际画面尚未验收。
+
 日期：2026-09-13
 
 ## 已确认行为

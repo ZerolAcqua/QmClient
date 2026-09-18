@@ -14,6 +14,7 @@
 #include <game/client/component.h>
 #include <game/client/components/qmclient/chat_emoji.h>
 #include <game/client/components/qmclient/hud_notifications/hud_notifications.h>
+#include <game/client/components/qmclient/qm_chat_export_metadata.h>
 #include <game/client/components/qmclient/qm_chat_log_jobs.h>
 #include <game/client/components/qmclient/qm_title_render.h>
 #include <game/client/lineinput.h>
@@ -140,6 +141,7 @@ private:
 		std::vector<CQmTitleTextMetrics> m_vTitleTextMetrics;
 
 		std::shared_ptr<CManagedTeeRenderInfo> m_pManagedTeeRenderInfo;
+		std::shared_ptr<const QmChatExport::SMetadata> m_pExportMetadata;
 
 		float m_TextYOffset;
 		// 记录用于当前高度缓存的头衔浮动留白，配置变化后重新测量。
@@ -274,7 +276,7 @@ private:
 	bool LineShouldHighlight(const char *pLine, const char *pName);
 	void StoreSave(const char *pText);
 	void SaveChatLogLine(int ClientId, int Team, const char *pLine);
-	void PrintBlockedMessageToConsole(int ClientId, int Team, const char *pLine);
+	void PrintBlockedMessageToConsole(int ClientId, int Team, const char *pLine, int SourceConnection);
 	void SendChatQueued(int Team, const char *pLine, bool AllowOutgoingTranslation);
 	int CountInitializedLines() const;
 	int CountVisibleLinesFrom(int BacklogLine) const;
@@ -495,7 +497,7 @@ public:
 	bool IsActive() const { return m_Mode != MODE_NONE; }
 	const char *GetInputText() const { return m_Input.GetString(); }
 	void AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible = false);
-	void AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible, std::optional<QmHudNotifications::EServerMessageClass> KnownServerMessageClass);
+	void AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible, std::optional<QmHudNotifications::EServerMessageClass> KnownServerMessageClass, int SourceConnection = -1);
 	void EnableMode(int Team);
 	void DisableMode();
 	void SaveDraft();
@@ -512,6 +514,7 @@ public:
 	void Reset();
 	void OnRelease() override;
 	void OnMessage(int MsgType, void *pRawMsg) override;
+	void OnMessage(int MsgType, void *pRawMsg, int SourceConnection);
 	bool OnCursorMove(float x, float y, IInput::ECursorType CursorType) override;
 	bool OnInput(const IInput::CEvent &Event) override;
 	void OnInit() override;

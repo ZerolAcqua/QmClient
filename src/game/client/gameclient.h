@@ -1199,7 +1199,6 @@ public:
 	bool m_ParticlesSkinLoaded = false;
 	int m_SpawnEventsProcessed = 0;
 	int m_SpawnEffectsDispatched = 0;
-	int m_SpawnEffectsFiltered = 0;
 	int m_SpawnParticleAddFailures = 0;
 
 	struct SClientEmoticonsSkin
@@ -1280,10 +1279,9 @@ public:
 
 	// Q1menG Client Recognition
 	void ClearQ1menGSyncMarks();
-	void MarkQ1menGSyncClient(int ClientId, int64_t ExpireTick, bool FootParticlesEnabled, bool RemoteParticlesEnabled, const char *pQid = nullptr, EClientBrand ClientBrand = EClientBrand::QM);
+	void MarkQ1menGSyncClient(int ClientId, int64_t ExpireTick, const char *pQid = nullptr, EClientBrand ClientBrand = EClientBrand::QM);
 	bool IsQ1menGClientRecognized(int ClientId) const;
 	const char *GetQ1menGClientQid(int ClientId) const;
-	bool ShouldRenderQ1menGRemoteFootParticles(int ClientId) const;
 	void ClearQmVoiceSyncMarks();
 	void MarkQmVoiceSupportedClient(int ClientId, int64_t ExpireTick);
 	bool IsQmVoiceSupportedClient(int ClientId) const;
@@ -1307,6 +1305,8 @@ private:
 
 	std::vector<std::shared_ptr<CManagedTeeRenderInfo>> m_vpManagedTeeRenderInfos;
 	void UpdateManagedTeeRenderInfos();
+	// 每帧校验托管/客户端渲染信息里的皮肤句柄是否还存活，失效就重新解析（绘制期兜底之外的兜底）。
+	void RepairStaleTeeRenderInfos();
 
 	void UpdateAutoTeamLock();
 	void UpdateLocalTuning();
@@ -1337,8 +1337,6 @@ private:
 	int64_t m_aAutoTeamLockDeadlineTick[NUM_DUMMIES] = {0, 0};
 	bool m_aAutoTeamLockPending[NUM_DUMMIES] = {false, false};
 	int64_t m_aQ1menGSyncMarkUntil[MAX_CLIENTS] = {0};
-	bool m_aQ1menGSyncFootParticlesEnabled[MAX_CLIENTS] = {false};
-	bool m_aQ1menGSyncRemoteParticlesEnabled[MAX_CLIENTS] = {false};
 	EClientBrand m_aQ1menGSyncClientBrands[MAX_CLIENTS] = {};
 	char m_aaQ1menGSyncQid[MAX_CLIENTS][33] = {{0}};
 	int64_t m_aQmVoiceSyncMarkUntil[MAX_CLIENTS] = {0};

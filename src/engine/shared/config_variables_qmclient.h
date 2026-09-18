@@ -16,6 +16,7 @@ MACRO_CONFIG_INT(QmPerfDebug, qm_perf_debug, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_S
 MACRO_CONFIG_INT(QmMacosGraphicsDiagnostics, qm_macos_graphics_diagnostics, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable macOS graphics diagnostics and Instruments signposts")
 MACRO_CONFIG_INT(QmVulkanApiVersion, qm_vulkan_api_version, 11, 11, 14, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Vulkan API version: 11=1.1 compatibility, 14=1.4 strict")
 MACRO_CONFIG_INT(QmProcessHighPriority, qm_process_high_priority, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Toggle client process normal/high priority on Windows")
+MACRO_CONFIG_INT(QmPresentAlign, qm_present_align, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Align render rate to the display refresh rate when vsync is off and no frame limit is set")
 MACRO_CONFIG_INT(QmNetQos, qm_net_qos, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Prioritize outgoing game traffic on Windows (best effort)")
 MACRO_CONFIG_INT(QmAssetsPreviewBudgetMbOverride, qm_assets_preview_budget_mb_override, 0, 0, 16384, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Resource preview VRAM budget override (MB, 0=auto)")
 MACRO_CONFIG_INT(QmAssetsPreviewBudgetPercent, qm_assets_preview_budget_percent, 8, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Resource preview VRAM budget percentage (based on device local VRAM budget)")
@@ -38,7 +39,7 @@ MACRO_CONFIG_INT(QmUiColorInterpolation, qm_ui_color_interpolation, 0, 0, 1, CFG
 MACRO_CONFIG_INT(QmRectCornerSegments, qm_rect_corner_segments, 16, 8, 48, CFGFLAG_CLIENT | CFGFLAG_SAVE, "UI rounded corner segments (even numbers recommended)")
 MACRO_CONFIG_STR(QmGlobalCardOrder, qm_global_card_order, 8000, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Global card ordering (format: stableId|tab|col|order; semicolon-separated)")
 MACRO_CONFIG_INT(QmCardOrderMigrated, qm_card_order_migrated, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Global card ordering old config migration completed flag")
-MACRO_CONFIG_INT(QmCardLayoutVersion, qm_card_layout_version, 0, 0, 7, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Settings card default layout migration version")
+MACRO_CONFIG_INT(QmCardLayoutVersion, qm_card_layout_version, 0, 0, 9, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Settings card default layout migration version")
 MACRO_CONFIG_STR(QmSettingsCardOrder, qm_settings_card_order, 2048, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Tclient settings card ordering (format: id:col:order; semicolon-separated)")
 MACRO_CONFIG_INT(DbgQmUiDogfood, dbg_qm_ui_dogfood, 0, 0, 1, CFGFLAG_CLIENT, "Show feat-003 shared UI primitives dogfood page (takes over QmClient settings page, for visual verification of 11 primitives + spring/easing animations)")
 MACRO_CONFIG_INT(QmNewUi, qm_new_ui, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable new settings page UI")
@@ -138,7 +139,6 @@ MACRO_CONFIG_INT(QmEntityOverlayTeleCheckpointAlpha, qm_entity_overlay_tele_chec
 MACRO_CONFIG_INT(QmEntityOverlaySwitchAlpha, qm_entity_overlay_switch_alpha, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Switch tile overlay alpha (0-100)")
 
 // Q1menG Client Recognition / Q1menG客户端识别
-MACRO_CONFIG_INT(QmClientMarkTrail, qm_client_mark_trail, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Remote particles: sync and render other players via central server (requires both local+remote enabled)")
 MACRO_CONFIG_INT(QmClientShowBadge, qm_client_show_badge, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show Qm badge: identify via central server and mark QmClient users on nameplate/scoreboard")
 
 // Sponsor title appearance / 赞助头衔外观
@@ -159,13 +159,8 @@ MACRO_CONFIG_INT(QmTitleBobPixelSnap, qm_title_bob_pixel_snap, 0, 0, 1, CFGFLAG_
 
 // Fast Input / 快速输入
 MACRO_CONFIG_INT(QmAutoMargin, qm_auto_margin, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto adjust prediction margin (fixed base margin when off)")
-MACRO_CONFIG_INT(QmFastInputMode, qm_fast_input_mode, 0, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Quick input mode (0=Fast 3=Best 4=Saiko+; 1/2 legacy mapped to Best)")
-MACRO_CONFIG_INT(QmBestInputOffset, qm_best_input_offset, 0, 0, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input prediction offset (0.01 tick)")
-MACRO_CONFIG_INT(QmBestInputSmoothing, qm_best_input_smoothing, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input smooth percentage")
-MACRO_CONFIG_INT(QmBestInputLatencyComp, qm_best_input_latency_comp, 0, 0, 50, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input delay compensation percentage")
-MACRO_CONFIG_INT(QmBestInputInterpolation, qm_best_input_interpolation, 1, 1, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input interpolation mode (1=linear 2=cubic 3=smooth)")
+MACRO_CONFIG_INT(QmFastInputMode, qm_fast_input_mode, 0, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Quick input mode (0=Fast 4=Saiko+; legacy values fall back to Fast)")
 MACRO_CONFIG_INT(QmSaikoPlusAmount, qm_saiko_plus_amount, 0, 0, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Saiko+ input amount (0.01 tick)")
-MACRO_CONFIG_INT(QmBestInputOthers, qm_best_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply Best input to other Tees")
 MACRO_CONFIG_INT(QmSaikoPlusOthers, qm_saiko_plus_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply Saiko+ to other Tees")
 
 // Keyword Reply / 关键词回复
@@ -271,7 +266,7 @@ MACRO_CONFIG_INT(QmMonitoringHudOpacity, qm_monitoring_hud_opacity, 66, 0, 100, 
 MACRO_CONFIG_INT(QmVoiceEnable, qm_voice_enable, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable voice chat")
 MACRO_CONFIG_INT(QmVoiceAgcEnable, qm_voice_agc_enable, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatic gain control (0=off 1=on)")
 MACRO_CONFIG_INT(QmVoiceProtocolVersion, qm_voice_protocol_version, 3, 1, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice protocol version")
-MACRO_CONFIG_STR(QmVoiceServer, qm_voice_server, 128, "42.194.185.210:9987", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice server address host:port")
+MACRO_CONFIG_STR(QmVoiceServer, qm_voice_server, 256, "wss://qmclient.icu/ws/voice", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice server URL (ws:// or wss://)")
 MACRO_CONFIG_STR(QmVoiceAudioBackend, qm_voice_audio_backend, 64, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice audio backend (SDL driver name, empty=auto)")
 MACRO_CONFIG_STR(QmVoiceInputDevice, qm_voice_input_device, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice input device (empty=default)")
 MACRO_CONFIG_STR(QmVoiceOutputDevice, qm_voice_output_device, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice output device (empty=default)")
@@ -362,6 +357,10 @@ MACRO_CONFIG_INT(QmNameplateTextBorderRange, qm_nameplate_text_border_range, 1, 
 MACRO_CONFIG_COL(QmNameplateTextGradientColor, qm_nameplate_text_gradient_color, 0xFFFFFFFF, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Nameplate text gradient color")
 MACRO_CONFIG_COL(QmNameplateTextGlowColor, qm_nameplate_text_glow_color, 0x664CC6FF, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Nameplate text glow color")
 MACRO_CONFIG_INT(QmNameplateTextGlowRange, qm_nameplate_text_glow_range, 4, 1, 12, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text glow range")
+// 同屏名牌很多时自动削掉最外层的文字特效（先辉光后描边，本体永远保留）：
+// 阈值以内的画质与关闭该选项时逐层一致，超过阈值后按人数比例缩减。
+MACRO_CONFIG_INT(QmNameplateEffectAutoLod, qm_nameplate_effect_auto_lod, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text effect auto LOD (0=Off 1=On: trim outer effect layers when crowded)")
+MACRO_CONFIG_INT(QmNameplateEffectLodThreshold, qm_nameplate_effect_lod_threshold, 20, 4, 64, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate count that still keeps full text effect quality; beyond it effect layers scale down by count (higher=keep more)")
 MACRO_CONFIG_INT(QmNameplateTextPlayingScope, qm_nameplate_text_playing_scope, 5, 0, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text effects playing scope (0=Off 1=Own 2=Others 3=Friends 4=Own and friends 5=All players)")
 MACRO_CONFIG_INT(QmNameplateTextSpectateScope, qm_nameplate_text_spectate_scope, 1, 0, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Nameplate text effects spectate scope (0=Off 1=Spectated player 2=Others 3=Friends 4=Spectated player and friends 5=All players)")
 // Demo 预览与视频导出共用的独立显示选项。
@@ -389,30 +388,6 @@ MACRO_CONFIG_INT(QmGoresDisableDummyHammer, qm_gores_disable_dummy_hammer, 0, 0,
 MACRO_CONFIG_INT(QmAxiomAutoLogin, qm_axiom_auto_login, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto-login after entering Axiom community server")
 MACRO_CONFIG_STR(QmAxiomLoginPassword, qm_axiom_login_password, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Password for Axiom main account auto-login")
 MACRO_CONFIG_STR(QmAxiomDummyLoginPassword, qm_axiom_dummy_login_password, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Password for Axiom alt account auto-login")
-
-// Zen Mode - 禅模式
-MACRO_CONFIG_INT(QmFocusMode, qm_focus_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeHideNames, qm_focus_mode_hide_names, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide player names in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeHideNameplates, qm_focus_mode_hide_nameplates, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide player name plates in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeHideJumpEffects, qm_focus_mode_hide_jump_effects, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide jump effects in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeHideKillEffects, qm_focus_mode_hide_kill_effects, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide death/respawn effects in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeHideExplosionEffects, qm_focus_mode_hide_explosion_effects, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide projectile effects in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeHideFreezeEffects, qm_focus_mode_hide_freeze_effects, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide freeze effects in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeHideHammerEffects, qm_focus_mode_hide_hammer_effects, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide hammer effects in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeHideMuzzleEffects, qm_focus_mode_hide_muzzle_effects, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide weapon fire effects in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeMuteJumpSounds, qm_focus_mode_mute_jump_sounds, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mute jump sound in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeMuteDeathSounds, qm_focus_mode_mute_death_sounds, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mute death/respawn sound in Zen Mode")
-MACRO_CONFIG_INT(QmFocusModeMuteHammerSounds, qm_focus_mode_mute_hammer_sounds, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mute hammer sound in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideHud, qm_focus_mode_hide_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide HUD in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideChat, qm_focus_mode_hide_chat, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide player messages in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideSystemInfoMessages, qm_focus_mode_hide_system_info_messages, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide basic system info (join, version, rules) in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideSystemMessages, qm_focus_mode_hide_system_messages, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide server tip notifications (including notification bar) in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideEcho, qm_focus_mode_hide_echo, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide Echo messages in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideMapProgress, qm_focus_mode_hide_map_progress, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide map progress bar in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideInfoMessages, qm_focus_mode_hide_info_messages, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide kill and finish messages in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideScoreboard, qm_focus_mode_hide_scoreboard, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide scoreboard in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideDirectionIndicators, qm_focus_mode_hide_direction_indicators, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide direction in Zen mode")
-MACRO_CONFIG_INT(QmFocusModeHideGuideLines, qm_focus_mode_hide_guide_lines, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide helper lines in Zen mode")
 
 // Player Stats HUD - 玩家统计面板
 MACRO_CONFIG_INT(QmPlayerStatsHud, qm_player_stats_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable player statistics panel")
@@ -497,9 +472,6 @@ MACRO_CONFIG_INT(QmDummySkinQueueLength, qm_dummy_skin_queue_length, 20, 0, 1024
 MACRO_CONFIG_INT(QmDummySkinQueueIndex, qm_dummy_skin_queue_index, 0, 0, 1024, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Dummy skin queue current position")
 MACRO_CONFIG_INT(QmDummySkinQueueRotateMap, qm_dummy_skin_queue_rotate_map, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto-fetch all players' skins for dummy rotation queue")
 
-// Foot Particles - 粒子效果
-MACRO_CONFIG_INT(QmFootParticles, qm_foot_particles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Local particles: show particles behind own Tee (e.g. freeze snow)")
-
 // Settings performance - 性能
 MACRO_CONFIG_INT(QmSettingsPrewarm, qm_settings_prewarm, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Pre-warm settings page on startup and menu idle")
 
@@ -543,19 +515,18 @@ MACRO_CONFIG_INT(QmSodaHookEnable, qm_soda_hook_enable, 0, 0, 1, CFGFLAG_CLIENT 
 MACRO_CONFIG_INT(QmSodaHookTimeoutMs, qm_soda_hook_timeout_ms, 1500, 250, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "SodaMusic hook heartbeat timeout (milliseconds)")
 MACRO_CONFIG_STR(QmSodaHookHelperPath, qm_soda_hook_helper_path, 512, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "SodaMusic hook helper path (empty=beside QmClient)")
 
+// 酷狗和 QQ 音乐共用独立采集 helper，来源开关沿用互斥与启动跟随规则。
+MACRO_CONFIG_INT(QmKugouHookEnable, qm_kugou_hook_enable, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Kugou Music hook integration")
+MACRO_CONFIG_INT(QmKugouHookTimeoutMs, qm_kugou_hook_timeout_ms, 1500, 250, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Kugou hook heartbeat timeout (milliseconds)")
+MACRO_CONFIG_STR(QmKugouHookHelperPath, qm_kugou_hook_helper_path, 512, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Kugou hook helper path (empty=beside QmClient)")
+MACRO_CONFIG_INT(QmQQMusicHookEnable, qm_qqmusic_hook_enable, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable QQ Music hook integration")
+MACRO_CONFIG_INT(QmQQMusicHookTimeoutMs, qm_qqmusic_hook_timeout_ms, 1500, 250, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "QQ Music hook heartbeat timeout (milliseconds)")
+MACRO_CONFIG_STR(QmQQMusicHookHelperPath, qm_qqmusic_hook_helper_path, 512, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "QQ Music hook helper path (empty=beside QmClient)")
+
 // Spotify 歌词链路(纯网络:sp_dc → TOTP token → color-lyrics,LRCLIB 兜底)。
 // 共享同一套歌词展示开关(qm_lyrics / qm_lyrics_in_media_island)。
 MACRO_CONFIG_INT(QmSpotifyEnable, qm_spotify_enable, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Spotify lyric integration")
 MACRO_CONFIG_STR(QmSpotifySpDc, qm_spotify_sp_dc, 1024, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Spotify sp_dc cookie (from browser DevTools, long-lived)")
-
-// Speedrun Timer - 速通倒计时器
-MACRO_CONFIG_INT(QmSpeedrunTimer, qm_speedrun_timer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speedrun countdown timer")
-MACRO_CONFIG_INT(QmSpeedrunTimerTime, qm_speedrun_timer_time, 0, 0, 9999, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speedrun timer time (MM:SS, legacy)")
-MACRO_CONFIG_INT(QmSpeedrunTimerHours, qm_speedrun_timer_hours, 0, 0, 99, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speedrun timer hours")
-MACRO_CONFIG_INT(QmSpeedrunTimerMinutes, qm_speedrun_timer_minutes, 0, 0, 59, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speedrun timer minutes")
-MACRO_CONFIG_INT(QmSpeedrunTimerSeconds, qm_speedrun_timer_seconds, 0, 0, 59, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speedrun timer seconds")
-MACRO_CONFIG_INT(QmSpeedrunTimerMilliseconds, qm_speedrun_timer_milliseconds, 0, 0, 999, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speedrun timer milliseconds")
-MACRO_CONFIG_INT(QmSpeedrunTimerAutoDisable, qm_speedrun_timer_auto_disable, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto-disable speedrun timer when time runs out")
 
 // Translate - 翻译模块
 MACRO_CONFIG_STR(QmTranslateBackend, qm_translate_backend, 32, "llm", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Translation backend (llm/tencentcloud/libretranslate/ftapi)")
@@ -621,7 +592,8 @@ MACRO_CONFIG_COL(QmTranslateMenuOptionNormal, qm_translate_menu_option_normal, 0
 
 // Jump Hint / 跳跃提示 - 根据位置小数部分显示跳跃速查表（由 tc_jump_hint 迁移而来）
 MACRO_CONFIG_INT(QmJumpHint, qm_jump_hint, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show jump hint based on fractional part of position")
-MACRO_CONFIG_STR(QmJumpHintText, qm_jump_hint_text, 512, "3 Tiles Edge Jump:\\nLeft Jump: .34|.31|.16\\nLeft Double Jump: .41|.28|.25|.13\\nRight Jump: .63|.66|.81\\nRight Double Jump: .56|.69|.72|.84", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Jump hint text (use \\n for newline)")
+MACRO_CONFIG_INT(QmJumpHintDefaultsMigrated, qm_jump_hint_defaults_migrated, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Jump hint defaults migration completed flag")
+MACRO_CONFIG_STR(QmJumpHintText, qm_jump_hint_text, 512, "三格边缘跳:\\n左起跳: .34|.31|.16\\n左二段跳: .41|.28|.25|.13\\n右起跳: .63|.66|.81\\n右二段跳: .56|.69|.72|.84", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Jump hint text (use \\n for newline)")
 MACRO_CONFIG_COL(QmJumpHintColor, qm_jump_hint_color, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Jump hint color")
 MACRO_CONFIG_INT(QmJumpHintX, qm_jump_hint_x, 20, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Jump hint horizontal position (% of screen width)")
 MACRO_CONFIG_INT(QmJumpHintY, qm_jump_hint_y, 5, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Jump hint vertical position (% of screen height)")
@@ -630,10 +602,8 @@ MACRO_CONFIG_INT(QmJumpHintSize, qm_jump_hint_size, 10, 0, 50, CFGFLAG_CLIENT | 
 // Friends - 好友
 MACRO_CONFIG_INT(QmFriendAutoFollowDelay, qm_friend_auto_follow_delay, 3, 0, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto-follow friend server switch delay (seconds)")
 
-// Realtime WebSocket channel - 实时通道（WebSocket）
-// 进服后连接中心服实时通道，用服务端推送替代高频 HTTP 轮询（头衔名单等）。
-// 通道不可用时相关数据仍走原有 HTTP 轮询，功能不会因为通道断开而停摆。
-MACRO_CONFIG_INT(QmWebSocket, qm_websocket, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)")
+// 自有服务实时通道（WebSocket）始终启用，使用服务端推送同步状态。
+// 断线后自动重连，不回退 HTTP 轮询。
 MACRO_CONFIG_STR(QmWebSocketUrl, qm_websocket_url, 256, "wss://qmclient.icu/ws", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Dedicated WebSocket endpoint (empty uses wss://qmclient.icu/ws)")
 MACRO_CONFIG_STR(QmWebSocketProtocol, qm_websocket_protocol, 64, "qmclient-json", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Sec-WebSocket-Protocol sent during the realtime handshake")
 MACRO_CONFIG_INT(QmWebSocketHeartbeat, qm_websocket_heartbeat, 15, 0, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Realtime channel heartbeat interval (seconds, 0 uses default)")

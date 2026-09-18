@@ -72,6 +72,29 @@ TEST(QmRealtime, ParsesBroadcastMarkdown)
 	EXPECT_FALSE(Message.m_HasBroadcast);
 }
 
+TEST(QmRealtime, SponsorsAreIndependentFromNews)
+{
+	SQmRealtimeMessage Message;
+	ASSERT_TRUE(Parse("{\"type\":\"sponsors\",\"data\":{\"markdown\":\"# 赞助名单\\n- 喵不一\\n- 少女`\",\"version\":4}}", Message));
+	EXPECT_EQ(Message.m_Event, EQmRealtimeEvent::SPONSORS);
+	ASSERT_TRUE(Message.m_HasRealtimeData);
+	ASSERT_NE(Message.m_pPayload, nullptr);
+	EXPECT_STREQ(json_string_get(json_object_get(Message.m_pPayload.get(), "markdown")), "# 赞助名单\n- 喵不一\n- 少女`");
+	EXPECT_EQ(json_int_get(json_object_get(Message.m_pPayload.get(), "version")), 4);
+	EXPECT_FALSE(Message.m_HasBroadcast);
+
+	// 赞助频道数据不完整时，不能冒充空名单，也不能改写新闻内容。
+	ASSERT_TRUE(Parse("{\"type\":\"sponsors\",\"data\":null}", Message));
+	EXPECT_EQ(Message.m_Event, EQmRealtimeEvent::SPONSORS);
+	EXPECT_FALSE(Message.m_HasRealtimeData);
+	EXPECT_FALSE(Message.m_HasBroadcast);
+
+	ASSERT_TRUE(Parse("{\"type\":\"broadcast\",\"data\":{\"markdown\":\"更新内容\",\"version\":8}}", Message));
+	EXPECT_EQ(Message.m_Event, EQmRealtimeEvent::BROADCAST);
+	EXPECT_TRUE(Message.m_HasBroadcast);
+	EXPECT_EQ(Message.m_BroadcastMarkdown, "更新内容");
+}
+
 TEST(QmRealtime, UnknownEventsAreIgnoredNotFatal)
 {
 	SQmRealtimeMessage Message;
@@ -157,4 +180,129 @@ TEST(QmRealtime, TitlesPayloadOwnershipSurvivesInputAndMessageReuse)
 	ASSERT_TRUE(Parse("{\"type\":\"titles\",\"data\":{}}", Message));
 	EXPECT_FALSE(Parse("bad json", Message));
 	EXPECT_EQ(Message.m_pTitlePayload, nullptr);
+}
+
+TEST(QmRealtime, InvalidTitleSnapshotsCannotReplaceLivePresences)
+{
+	// 外层仍是可识别事件，但没有完整名单时不能授权调用方清空已有称号。
+	for(const char *pPayload : {
+		    R"({})",
+		    R"({"server_time":123})",
+		    R"({"server_time":123,"presences":null})",
+		    R"({"server_time":123,"presences":{}})",
+		    R"({"presences":[]})",
+		    R"({"server_time":0,"presences":[]})",
+		    R"({"server_time":-1,"presences":[]})",
+		    R"({"server_time":"123","presences":[]})"})
+	{
+		for(const bool Nested : {false, true})
+		{
+			const std::string Payload = pPayload;
+			const std::string Input = Nested ? "{\"type\":\"titles\",\"data\":" + Payload + "}" : (Payload == "{}" ? "{\"type\":\"titles\"}" : "{\"type\":\"titles\"," + Payload.substr(1));
+			SCOPED_TRACE(Input);
+			SQmRealtimeMessage Message;
+			ASSERT_TRUE(Parse(R"({"type":"titles","data":{"server_time":123,"presences":[]}})", Message));
+			ASSERT_TRUE(Message.m_HasTitles);
+			ASSERT_TRUE(Parse(Input.c_str(), Message));
+			EXPECT_EQ(Message.m_Event, EQmRealtimeEvent::TITLES);
+			EXPECT_FALSE(Message.m_HasTitles);
+		}
+	}
+}
+
+TEST(QmRealtime, ValidTitleSnapshotKeepsLeaseAndStyleForBothWireLayouts)
+{
+	const std::string Payload = R"({"server_address":"example:8303","server_time":100,"presences":[{"server_address":"example:8303","player_id":2,"player_name":"tester","title":"Sponsor","style":"rainbow","issued_at":95,"expires_at":110}]})";
+	for(const std::string &Input : {
+		    "{\"type\":\"titles\",\"data\":" + Payload + "}",
+		    "{\"type\":\"titles\"," + Payload.substr(1)})
+	{
+		SQmRealtimeMessage Message;
+		ASSERT_TRUE(Parse(Input.c_str(), Message));
+		ASSERT_TRUE(Message.m_HasTitles);
+		ASSERT_NE(Message.m_pTitlePayload, nullptr);
+		int64_t ServerTime = 0;
+		const auto vPresences = ParseQmTitlePresences(Message.m_pTitlePayload.get(), "example:8303", &ServerTime);
+		ASSERT_EQ(vPresences.size(), 1u);
+		EXPECT_EQ(ServerTime, 100);
+		EXPECT_EQ(vPresences[0].m_PlayerId, 2);
+		EXPECT_EQ(vPresences[0].m_PlayerName, "tester");
+		EXPECT_EQ(vPresences[0].m_Title, "Sponsor");
+		EXPECT_EQ(vPresences[0].m_Style, "rainbow");
+		EXPECT_EQ(vPresences[0].m_RemainingSeconds, 10);
+	}
+}
+
+TEST(QmRealtime, DistributionKeepsLastSnapshotAfterLeaseExpires)
+{
+	SQmClientDistributionSnapshot Snapshot;
+	EXPECT_TRUE(Snapshot.m_vServers.empty());
+	EXPECT_FALSE(Snapshot.IsStale(100));
+	SQmClientUsersParseResult Result;
+	Result.m_Parsed = true;
+	Result.m_vServerDistribution = {{"one:8303", 2, 1}};
+	Result.m_OnlineUserCount = 2;
+	Result.m_OnlineDummyCount = 1;
+	Result.m_vLocalServerMarks.emplace_back().m_Name = "player";
+	ASSERT_TRUE(Snapshot.Apply(Result, 120));
+	EXPECT_FALSE(Snapshot.IsStale(119));
+	EXPECT_TRUE(Snapshot.IsStale(120));
+	EXPECT_TRUE(Snapshot.IsStale(3600));
+	ASSERT_EQ(Snapshot.m_vServers.size(), 1u);
+	EXPECT_EQ(Snapshot.m_vServers[0].m_ServerAddress, "one:8303");
+	EXPECT_EQ(Snapshot.m_OnlineUserCount, 2);
+	EXPECT_EQ(Snapshot.m_OnlineDummyCount, 1);
+	// 列表缓存不消费识别标记，游戏内标记继续使用独立的原租约。
+	ASSERT_EQ(Result.m_vLocalServerMarks.size(), 1u);
+	EXPECT_EQ(Result.m_vLocalServerMarks[0].m_Name, "player");
+}
+
+TEST(QmRealtime, InvalidDistributionDoesNotEraseOrRefreshLastSnapshot)
+{
+	SQmClientDistributionSnapshot Snapshot;
+	SQmClientUsersParseResult Result;
+	Result.m_Parsed = true;
+	Result.m_vServerDistribution = {{"one:8303", 2, 1}};
+	Result.m_OnlineUserCount = 2;
+	Result.m_OnlineDummyCount = 1;
+	ASSERT_TRUE(Snapshot.Apply(Result, 120));
+	SQmClientUsersParseResult Invalid;
+	ASSERT_FALSE(Snapshot.Apply(Invalid, 500));
+	ASSERT_EQ(Snapshot.m_vServers.size(), 1u);
+	EXPECT_EQ(Snapshot.m_OnlineUserCount, 2);
+	EXPECT_EQ(Snapshot.m_OnlineDummyCount, 1);
+	EXPECT_TRUE(Snapshot.IsStale(120));
+}
+
+TEST(QmRealtime, NewDistributionReplacesStaleSnapshotIncludingExplicitEmptyList)
+{
+	SQmClientDistributionSnapshot Snapshot;
+	SQmClientUsersParseResult First;
+	First.m_Parsed = true;
+	First.m_vServerDistribution = {{"one:8303", 2, 1}};
+	First.m_OnlineUserCount = 2;
+	First.m_OnlineDummyCount = 1;
+	ASSERT_TRUE(Snapshot.Apply(First, 120));
+	EXPECT_TRUE(Snapshot.IsStale(150));
+
+	SQmClientUsersParseResult Next;
+	Next.m_Parsed = true;
+	Next.m_vServerDistribution = {{"two:8303", 1, 0}};
+	Next.m_OnlineUserCount = 1;
+	ASSERT_TRUE(Snapshot.Apply(Next, 170));
+	ASSERT_EQ(Snapshot.m_vServers.size(), 1u);
+	EXPECT_EQ(Snapshot.m_vServers[0].m_ServerAddress, "two:8303");
+	EXPECT_EQ(Snapshot.m_OnlineUserCount, 1);
+	EXPECT_EQ(Snapshot.m_OnlineDummyCount, 0);
+	EXPECT_FALSE(Snapshot.IsStale(150));
+
+	SQmRealtimeMessage Message;
+	ASSERT_TRUE(Parse(R"({"type":"users","data":{"users":[]}})", Message));
+	SQmClientUsersParseResult Empty;
+	ASSERT_TRUE(ParseQmClientUsersJson(Message.m_pPayload.get(), "two:8303", Empty));
+	ASSERT_TRUE(Snapshot.Apply(Empty, 200));
+	EXPECT_TRUE(Snapshot.m_vServers.empty());
+	EXPECT_EQ(Snapshot.m_OnlineUserCount, 0);
+	EXPECT_EQ(Snapshot.m_OnlineDummyCount, 0);
+	EXPECT_FALSE(Snapshot.IsStale(180));
 }

@@ -11,7 +11,6 @@
 #include <game/client/components/damageind.h>
 #include <game/client/components/flow.h>
 #include <game/client/components/particles.h>
-#include <game/client/components/qmclient/modes.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>
 
@@ -25,15 +24,6 @@ CEffects::CEffects()
 
 void CEffects::AirJump(vec2 Pos, float Alpha, float Volume)
 {
-	const bool FocusMode = g_Config.m_QmFocusMode != 0;
-	const bool PlaySound = ShouldPlayFocusJumpSound(FocusMode, g_Config.m_QmFocusModeMuteJumpSounds != 0, g_Config.m_SndGame != 0);
-	if(ShouldHideFocusJumpEffects(FocusMode, g_Config.m_QmFocusModeHideJumpEffects != 0))
-	{
-		if(PlaySound)
-			GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_PLAYER_AIRJUMP, Volume, Pos);
-		return;
-	}
-
 	CParticle p;
 	p.SetDefault();
 	p.m_Spr = SPRITE_PART_AIRJUMP;
@@ -54,7 +44,7 @@ void CEffects::AirJump(vec2 Pos, float Alpha, float Volume)
 	p.m_Pos = Pos + vec2(6.0f, 16.0f);
 	GameClient()->m_Particles.Add(CParticles::GROUP_GENERAL, &p);
 
-	if(PlaySound)
+	if(g_Config.m_SndGame)
 		GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_PLAYER_AIRJUMP, Volume, Pos);
 }
 
@@ -89,9 +79,6 @@ void CEffects::PowerupShine(vec2 Pos, vec2 Size, float Alpha)
 void CEffects::FreezingFlakes(vec2 Pos, vec2 Size, float Alpha)
 {
 	if(!m_Add5hz)
-		return;
-
-	if(ShouldHideFocusFreezeEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideFreezeEffects != 0))
 		return;
 
 	CParticle p;
@@ -205,15 +192,6 @@ void CEffects::BulletTrail(vec2 Pos, float Alpha, float TimePassed)
 
 int CEffects::PlayerSpawn(vec2 Pos, float Alpha, float Volume)
 {
-	const bool PlaySound = ShouldPlayFocusDeathOrSpawnSound(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeMuteDeathSounds != 0, g_Config.m_SndGame);
-	if(ShouldHideFocusKillEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideKillEffects != 0))
-	{
-		++GameClient()->m_SpawnEffectsFiltered;
-		if(PlaySound)
-			GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_PLAYER_SPAWN, Volume, Pos);
-		return 0;
-	}
-
 	int CreatedParticles = 0;
 	for(int i = 0; i < 32; i++)
 	{
@@ -236,16 +214,13 @@ int CEffects::PlayerSpawn(vec2 Pos, float Alpha, float Volume)
 		else
 			++GameClient()->m_SpawnParticleAddFailures;
 	}
-	if(PlaySound)
+	if(g_Config.m_SndGame)
 		GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_PLAYER_SPAWN, Volume, Pos);
 	return CreatedParticles;
 }
 
 void CEffects::PlayerDeath(vec2 Pos, int ClientId, float Alpha)
 {
-	if(ShouldHideFocusKillEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideKillEffects != 0))
-		return;
-
 	ColorRGBA BloodColor(1.0f, 1.0f, 1.0f);
 
 	if(ClientId >= 0)
@@ -356,9 +331,6 @@ void CEffects::Confetti(vec2 Pos, float Alpha)
 
 void CEffects::Explosion(vec2 Pos, float Alpha)
 {
-	if(ShouldHideFocusExplosionEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideExplosionEffects != 0))
-		return;
-
 	// add to flow
 	for(int y = -8; y <= 8; y++)
 		for(int x = -8; x <= 8; x++)
@@ -425,56 +397,19 @@ void CEffects::Explosion(vec2 Pos, float Alpha)
 
 void CEffects::HammerHit(vec2 Pos, float Alpha, float Volume)
 {
-	const bool FocusMode = g_Config.m_QmFocusMode != 0;
-	const bool HideEffect = ShouldHideFocusHammerEffects(FocusMode, g_Config.m_QmFocusModeHideHammerEffects != 0);
-	const bool MuteSound = ShouldMuteFocusHammerSounds(FocusMode, g_Config.m_QmFocusModeMuteHammerSounds != 0);
-
-	if(!HideEffect)
-	{
-		CParticle p;
-		p.SetDefault();
-		p.m_Spr = SPRITE_PART_HIT01;
-		p.m_Pos = Pos;
-		p.m_LifeSpan = 0.3f;
-		p.m_StartSize = 120.0f;
-		p.m_EndSize = 0.0f;
-		p.m_Rot = random_angle();
-		p.m_Color.a = Alpha;
-		p.m_StartAlpha = Alpha;
-		GameClient()->m_Particles.Add(CParticles::GROUP_EXPLOSIONS, &p);
-	}
-	if(g_Config.m_SndGame && !MuteSound)
-		GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_HAMMER_HIT, Volume, Pos);
-}
-
-// TClient: falling particles behind tee - similar to freeze snowflakes
-void CEffects::FootTrail(vec2 Pos, vec2 Direction, float Alpha)
-{
-	if(!m_Add25hz)
-		return;
-
-	// Spawn particle behind the tee (opposite to facing direction)
-	float BackOffset = -Direction.x * random_float(10.0f, 20.0f);
-
 	CParticle p;
 	p.SetDefault();
-	p.m_Spr = SPRITE_PART_SNOWFLAKE;
-	p.m_Pos = Pos + vec2(BackOffset + random_float(-6.0f, 6.0f), random_float(-8.0f, 8.0f));
-	p.m_Vel = vec2(random_float(-10.0f, 10.0f), random_float(5.0f, 20.0f));
-	p.m_LifeSpan = random_float(0.6f, 1.0f);
-	p.m_StartSize = random_float(0.35f, 0.9f) * 16.0f; // varying sizes like freeze flakes
-	p.m_EndSize = p.m_StartSize * 0.3f;
-	p.m_UseAlphaFading = true;
-	p.m_StartAlpha = Alpha * 0.5f;
-	p.m_EndAlpha = 0.0f;
+	p.m_Spr = SPRITE_PART_HIT01;
+	p.m_Pos = Pos;
+	p.m_LifeSpan = 0.3f;
+	p.m_StartSize = 120.0f;
+	p.m_EndSize = 0.0f;
 	p.m_Rot = random_angle();
-	p.m_Rotspeed = random_float(-1.0f, 1.0f) * pi;
-	p.m_Gravity = random_float(150.0f, 300.0f); // fall down
-	p.m_Friction = 0.95f;
-	p.m_FlowAffected = 0.0f;
-	p.m_Collides = false;
-	p.m_Color = ColorRGBA(1.0f, 1.0f, 1.0f, Alpha * 0.5f);
-	GameClient()->m_Particles.Add(CParticles::GROUP_EXTRA, &p);
+	p.m_Color.a = Alpha;
+	p.m_StartAlpha = Alpha;
+	GameClient()->m_Particles.Add(CParticles::GROUP_EXPLOSIONS, &p);
+	if(g_Config.m_SndGame)
+		GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_HAMMER_HIT, Volume, Pos);
 }
 
 void CEffects::OnRender()

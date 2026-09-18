@@ -9,6 +9,10 @@
 #include <memory>
 
 class CQmSkinOutline;
+namespace QmChatAvatar
+{
+	struct SSource;
+}
 
 // do this better and nicer
 class CSkin
@@ -24,6 +28,8 @@ public:
 
 		IGraphics::CTextureHandle m_Feet;
 		IGraphics::CTextureHandle m_FeetOutline;
+
+		std::shared_ptr<const QmChatAvatar::SSource> m_pChatAvatar;
 
 		std::shared_ptr<CQmSkinOutline> m_pBodyOutline;
 		std::shared_ptr<CQmSkinOutline> m_pFeetOutline;

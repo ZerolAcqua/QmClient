@@ -41,6 +41,40 @@ TEST(QmCardRegistry, CoversAllCardsNoDuplicates)
 	}
 }
 
+// 意图：测图上传入口能从功能页与全局搜索找到，旧布局加载后仍保留独立卡片。
+TEST(QmCardRegistry, MapUploadHasFunctionPlacementAndSearchKeywords)
+{
+	const auto *pCard = qm_card_registry::FindByStableId("qm:map_upload");
+	ASSERT_NE(pCard, nullptr);
+	EXPECT_STREQ(pCard->m_pDefaultTab, "function");
+	EXPECT_EQ(pCard->m_DefaultColumn, qm_card_registry::ECardColumn::Right);
+	EXPECT_EQ(pCard->m_DefaultOrder, 8);
+	const auto Model = RegistryModelAfterRoundTrip();
+	for(const char *pQuery : {"上传地图", "测图", "map upload"})
+	{
+		const auto Results = qm_card_registry::SearchCards(pQuery, Model);
+		const auto It = std::find_if(Results.begin(), Results.end(), [](const auto &Result) {
+			return str_comp(Result.m_pStableId, "qm:map_upload") == 0;
+		});
+		ASSERT_NE(It, Results.end()) << pQuery;
+		EXPECT_STREQ(It->m_Target.m_pTab, "function");
+	}
+}
+
+// 意图：删除后的禅模式卡片不能再被默认布局或全局搜索恢复。
+TEST(QmCardRegistry, RemovedZenModeIsAbsentFromRegistryAndSearch)
+{
+	EXPECT_EQ(qm_card_registry::FindByStableId("qm:focus_mode"), nullptr);
+	const auto Model = RegistryModelAfterRoundTrip();
+	EXPECT_LT(Model.FindByStableId("qm:focus_mode"), 0);
+	for(const char *pQuery : {"禅模式", "Zen Mode", "focus mode"})
+	{
+		const auto Results = qm_card_registry::SearchCards(pQuery, Model);
+		for(const auto &Result : Results)
+			EXPECT_STRNE(Result.m_pStableId, "qm:focus_mode");
+	}
+}
+
 TEST(QmCardRegistry, TimeoutDisconnectSearchPointsToControls)
 {
 	qm_card_order::CModel Model;
@@ -389,7 +423,7 @@ TEST(QmCardRegistry, PlayerStandardPageCardsPersistInVisualOrder)
 		(std::vector<std::string>{"deck:player-country"}));
 }
 
-// 意图：Tee 页按预览、选项、列表拆卡后，宽屏默认保持预览与选项左右排列、搜索列表全宽。
+// 意图：恢复预览在左、选项在右、列表与队列在下方整宽卡的默认布局。
 TEST(QmCardRegistry, TeeStandardPageUsesThreeFunctionalCards)
 {
 	const qm_card_order::CModel Model = RegistryModelAfterRoundTrip();
@@ -998,11 +1032,9 @@ TEST(QmCardRegistry, QmCardsPreserveLegacyModuleSearchKeywords)
 		const char *m_pKeyword;
 	};
 	const SExpectedKeyword aExpected[] = {
-		{"qm:mini_features", "粒子拖尾"},
 		{"qm:mini_features", "候选栏"},
 		{"qm:friend_notify", "自动刷新"},
 		{"qm:block_words", "屏蔽词"},
-		{"qm:speedrun_timer", "速通"},
 		{"qm:voice", "按住说话"},
 		{"qm:background_3d", "月牙"},
 		{"qm:chat_bubble", "消息气泡"},
@@ -1067,7 +1099,7 @@ TEST(QmCardRegistry, MigratesLegacyKeyToNamespaced)
 	EXPECT_EQ(qm_card_registry::MigrateLegacyKey("keyword_reply"), nullptr); // UI 名不映射
 }
 
-// 意图：栖梦 38 个 m_pKey 必须全部可映射（迁移兜底全覆盖，无遗漏）。
+// 意图：栖梦 37 个 m_pKey 必须全部可映射（迁移兜底全覆盖，无遗漏）。
 TEST(QmCardRegistry, AllQimengLegacyKeysMigratable)
 {
 	for(const auto &E : qm_card_registry::Defaults())

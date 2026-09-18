@@ -12,7 +12,6 @@
 #include <generated/protocol.h>
 
 #include <game/client/components/effects.h>
-#include <game/client/components/qmclient/modes.h>
 #include <game/client/gameclient.h>
 #include <game/client/laser_data.h>
 #include <game/client/pickup_data.h>
@@ -108,7 +107,7 @@ void CItems::RenderProjectile(const CProjectileData *pCurrent, int ItemId)
 	// don't check for validity of the projectile for the current weapon here, so particle effects are rendered for mod compatibility
 	if(CurWeapon == WEAPON_GRENADE)
 	{
-		if(AllowEffects && !ShouldHideFocusExplosionEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideExplosionEffects != 0))
+		if(AllowEffects)
 			GameClient()->m_Effects.SmokeTrail(Pos, Vel * -1, Alpha, 0.0f);
 		static float s_Time = 0.0f;
 		static float s_LastLocalTime = LocalTime();
@@ -878,7 +877,7 @@ void CItems::ReconstructSmokeTrail(const CProjectileData *pCurrent, int DestroyT
 		if(Pt - MinTrailSpan > 0.01f)
 			TimePassed = minimum(TimePassed, (TimePassed - MinTrailSpan) / (Pt - MinTrailSpan) * (MinTrailSpan * 0.5f) + MinTrailSpan);
 		// add particle for this projectile
-		if(pCurrent->m_Type == WEAPON_GRENADE && !ShouldHideFocusExplosionEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideExplosionEffects != 0))
+		if(pCurrent->m_Type == WEAPON_GRENADE)
 			GameClient()->m_Effects.SmokeTrail(Pos, Vel * -1, Alpha, TimePassed);
 		else
 			GameClient()->m_Effects.BulletTrail(Pos, Alpha, TimePassed);

@@ -61,7 +61,7 @@ struct SHudSwitchCountdownTracker
 	}
 };
 
-constexpr float QmHudMediaIslandDesignScale = 0.8f;
+constexpr float QmHudMediaIslandDesignScale = 0.7f;
 
 constexpr float QmHudMediaIslandScaled(float Value)
 {
@@ -705,13 +705,6 @@ constexpr float QmHudMediaIslandBlobSpringWindowPeriods = 12.0f;
 // 退出不再额外加速：窗口内弹簧自然收敛到 0，加速会带走"被拉回"的过程本身。
 // 速度归一化基准：wn=9.0、zeta=0.60 时速度峰值 4.49，取 4.6 使最大拉伸落在 1.065 附近。
 constexpr float QmHudMediaIslandBlobSpringPeakVelocity = 4.6f;
-// 单帧步长上限：只防超大卡顿导致的跳变，正常帧远小于它。
-constexpr float QmHudMediaIslandBlobStepMaxSeconds = 0.20f;
-// 物理固定子步长。取 1/480s：比 wn=9 的时间尺度小两个数量级，积分的相位误差可忽略，
-// 同时让 60/120/144/240Hz 都恰好落在整数子步上。
-constexpr float QmHudMediaIslandBlobSpringInternalStepSeconds = 1.0f / 480.0f;
-// 单帧最多推进的子步数（对应 0.2s 上限），防极端卡顿后的追帧风暴。
-constexpr int QmHudMediaIslandBlobSpringMaxStepsPerFrame = 96;
 // 停车判据：窗口走完 + 速度归零 + 离目标亚像素。阈值 0.002 对应约 12.4px 行程上的
 // 0.025px，停车本身看不出来。
 constexpr float QmHudMediaIslandBlobRestOffset = 0.002f;
@@ -727,9 +720,6 @@ struct SHudMediaIslandBlobSpring
 	float m_Value = 0.0f;
 	float m_Velocity = 0.0f;
 	float m_StopSeconds = 0.0f;
-	// 固定子步长累加器：物理只在整数个 InternalStepSeconds 上推进，
-	// 因此帧率与步长都不影响结果（详见 Advance）。
-	float m_Accumulator = 0.0f;
 	// 最近一次求值得到的显示进度（0..1，过冲按 1 处理）。供"是否需要渲染"之类的
 	// 布尔判断复用，不参与动力学。
 	mutable float m_Progress = 0.0f;
@@ -746,18 +736,24 @@ inline float QmHudMediaIslandBlobSpringWindowSeconds()
 	return QmHudMediaIslandBlobSpringAngularFrequency > 0.0f ? QmHudMediaIslandBlobSpringWindowPeriods / QmHudMediaIslandBlobSpringAngularFrequency : 0.0f;
 }
 
-// 半隐式（symplectic）欧拉一步：无条件稳定，且保持欠阻尼的过冲特征。
+// 直接求欠阻尼弹簧在真实帧间隔后的位移和速度，避免固定子步产生重复姿态。
 inline void QmHudMediaIslandBlobSpringIntegrate(SHudMediaIslandBlobSpring &Spring, float Target, float StepSeconds)
 {
-	const float Displacement = Spring.m_Value - Target;
-	Spring.m_Velocity += (-QmHudMediaIslandBlobSpringAngularFrequency * QmHudMediaIslandBlobSpringAngularFrequency * Displacement -
-				     2.0f * QmHudMediaIslandBlobSpringDamping * QmHudMediaIslandBlobSpringAngularFrequency * Spring.m_Velocity) *
-			     StepSeconds;
-	Spring.m_Value += Spring.m_Velocity * StepSeconds;
+	const double AngularFrequency = QmHudMediaIslandBlobSpringAngularFrequency;
+	const double Damping = QmHudMediaIslandBlobSpringDamping;
+	const double DecayRate = Damping * AngularFrequency;
+	const double DampedFrequency = AngularFrequency * std::sqrt(1.0 - Damping * Damping);
+	const double Displacement = static_cast<double>(Spring.m_Value) - Target;
+	const double Velocity = Spring.m_Velocity;
+	const double Phase = DampedFrequency * StepSeconds;
+	const double Decay = std::exp(-DecayRate * StepSeconds);
+	const double CosPhase = std::cos(Phase);
+	const double SinPhase = std::sin(Phase);
+	Spring.m_Value = static_cast<float>(Target + Decay * (Displacement * CosPhase + (Velocity + DecayRate * Displacement) / DampedFrequency * SinPhase));
+	Spring.m_Velocity = static_cast<float>(Decay * (Velocity * CosPhase - (DecayRate * Velocity + AngularFrequency * AngularFrequency * Displacement) / DampedFrequency * SinPhase));
 }
 
-// 按帧推进。物理只在整数个 InternalStepSeconds 上跑，所以 60Hz 与 240Hz、
-// 以及一次大 dt 与多次小 dt，都会走完全相同的子步序列，结果逐位一致。
+// 按完整经过时间推进，任意刷新率和分帧方式都沿同一条连续轨迹运动。
 inline void QmHudMediaIslandBlobSpringAdvance(SHudMediaIslandBlobSpring &Spring, float DeltaSeconds, float PeriodSeconds, bool TargetVisible)
 {
 	if(!Spring.m_Initialized)
@@ -768,7 +764,6 @@ inline void QmHudMediaIslandBlobSpringAdvance(SHudMediaIslandBlobSpring &Spring,
 		Spring.m_Value = TargetVisible ? 0.0f : 1.0f;
 		Spring.m_Velocity = 0.0f;
 		Spring.m_StopSeconds = 0.0f;
-		Spring.m_Accumulator = 0.0f;
 		Spring.m_Progress = Spring.m_Value;
 	}
 	const float Target = QmHudMediaIslandBlobSpringTarget(TargetVisible);
@@ -783,19 +778,10 @@ inline void QmHudMediaIslandBlobSpringAdvance(SHudMediaIslandBlobSpring &Spring,
 	if(DeltaSeconds > 0.0f)
 	{
 		const float Period = std::max(0.0f, PeriodSeconds);
-		// 把"已消耗的子步时间"累加后再取整，未满一个子步的余量留在累加器里。
-		// 关键是累加器只保存余量（< 一个子步），所以同一总时长无论被切成多少帧，
-		// 走过的子步序列都一样 —— 帧率不影响结果。
-		const float Consumed = Spring.m_Accumulator + DeltaSeconds;
-		int Steps = (int)(Consumed / QmHudMediaIslandBlobSpringInternalStepSeconds);
-		Spring.m_Accumulator = Consumed - Steps * QmHudMediaIslandBlobSpringInternalStepSeconds;
-		if(Steps > QmHudMediaIslandBlobSpringMaxStepsPerFrame)
-			Steps = QmHudMediaIslandBlobSpringMaxStepsPerFrame;
-		for(int i = 0; i < Steps; ++i)
-		{
-			QmHudMediaIslandBlobSpringIntegrate(Spring, Target, QmHudMediaIslandBlobSpringInternalStepSeconds);
-			Spring.m_StopSeconds += QmHudMediaIslandBlobSpringInternalStepSeconds;
-		}
+		// 静止状态无需重复求解；长帧也只求解一次，不截断时间或积压追帧。
+		if(Spring.m_Value != Target || Spring.m_Velocity != 0.0f)
+			QmHudMediaIslandBlobSpringIntegrate(Spring, Target, DeltaSeconds);
+		Spring.m_StopSeconds += DeltaSeconds;
 		// 窗口走完、速度归零、且已贴住目标（亚像素）时停车，
 		// 让静止位姿精确落在 1 / 0（指数尾巴在数学上永远到不了零）。
 		// 判据必须看"离目标的距离"：过冲峰值处速度也为零，只看速度会停在峰值上。
@@ -803,7 +789,6 @@ inline void QmHudMediaIslandBlobSpringAdvance(SHudMediaIslandBlobSpring &Spring,
 		{
 			Spring.m_Value = Target;
 			Spring.m_Velocity = 0.0f;
-			Spring.m_Accumulator = 0.0f;
 		}
 	}
 	Spring.m_Progress = std::clamp(Spring.m_Value, 0.0f, 1.0f);
@@ -817,7 +802,6 @@ inline void QmHudMediaIslandBlobSetBinary(SHudMediaIslandBlobSpring &Spring, boo
 	Spring.m_Value = QmHudMediaIslandBlobSpringTarget(TargetVisible);
 	Spring.m_Velocity = 0.0f;
 	Spring.m_StopSeconds = QmHudMediaIslandBlobSpringWindowSeconds();
-	Spring.m_Accumulator = 0.0f;
 	Spring.m_Progress = Spring.m_Value;
 }
 
@@ -905,7 +889,7 @@ inline void QmHudAdvanceMediaIslandLiquidProgress(SHudMediaIslandBlobSpring &Spr
 		return;
 	}
 	const float PeriodSeconds = QmHudMediaIslandBlobSpringWindowSeconds();
-	const float DeltaSeconds = (float)std::clamp(RawDelta, 0.0, (double)QmHudMediaIslandBlobStepMaxSeconds);
+	const float DeltaSeconds = static_cast<float>(RawDelta);
 	QmHudMediaIslandBlobSpringAdvance(Spring, DeltaSeconds, PeriodSeconds, TargetVisible);
 }
 
@@ -989,7 +973,7 @@ struct SHudMediaIslandSdfCapsule
 	float m_SmoothUnion = 0.0f;
 };
 
-constexpr uint64_t QmHudMediaIslandBlurRefreshIntervalFrames = 3;
+constexpr uint64_t QmHudMediaIslandBlurRefreshIntervalFrames = 1;
 
 // 模糊底图只在透明度满 100% 时关闭：0% 也照常准备（"亚克力板"语义）。着色器里
 // Background.a 是整块板的不透明度：模糊底图与背景色先按它混合，再整体按它合成，

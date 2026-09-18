@@ -23,6 +23,7 @@
 
 #include <generated/client_data7.h>
 
+#include <game/client/components/qmclient/qm_chat_avatar.h>
 #include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/gameclient.h>
 #include <game/localization.h>
@@ -155,11 +156,48 @@ static std::shared_ptr<CQmSkinOutline> CreateSkinPartOutline(const CImageInfo &I
 	return nullptr;
 }
 
+static std::shared_ptr<const QmChatAvatar::SSource> CreateChatAvatarPartSource(const CImageInfo &Image, int Part)
+{
+	using namespace QmChatAvatar;
+	auto pSource = std::make_shared<SSource>();
+	const auto Copy = [&](ESprite Target, int Sprite) {
+		pSource->m_aSprites[Target] = CopySprite(Image, client_data7::g_pData->m_aSprites[Sprite]);
+	};
+	switch(Part)
+	{
+	case protocol7::SKINPART_BODY:
+		Copy(BODY, client_data7::SPRITE_TEE_BODY);
+		Copy(BODY_OUTLINE, client_data7::SPRITE_TEE_BODY_OUTLINE);
+		Copy(SHADOW, client_data7::SPRITE_TEE_BODY_SHADOW);
+		Copy(UPPER_OUTLINE, client_data7::SPRITE_TEE_BODY_UPPER_OUTLINE);
+		break;
+	case protocol7::SKINPART_FEET:
+		Copy(FEET, client_data7::SPRITE_TEE_FOOT);
+		Copy(FEET_OUTLINE, client_data7::SPRITE_TEE_FOOT_OUTLINE);
+		break;
+	case protocol7::SKINPART_EYES:
+		Copy(EYES, client_data7::SPRITE_TEE_EYES_NORMAL);
+		break;
+	case protocol7::SKINPART_MARKING:
+		Copy(MARKING, client_data7::SPRITE_TEE_MARKING);
+		break;
+	case protocol7::SKINPART_DECORATION:
+		Copy(DECORATION, client_data7::SPRITE_TEE_DECORATION);
+		Copy(DECORATION_OUTLINE, client_data7::SPRITE_TEE_DECORATION_OUTLINE);
+		break;
+	default:
+		return nullptr;
+	}
+	return pSource;
+}
+
 void CSkins7::CSkinPart::ApplyTo(CTeeRenderInfo::CSixup &SixupRenderInfo) const
 {
 	SixupRenderInfo.m_aOriginalTextures[m_Type] = m_OriginalTexture;
 	SixupRenderInfo.m_aColorableTextures[m_Type] = m_ColorableTexture;
 	SixupRenderInfo.m_apQmSkinOutlines[m_Type] = m_pQmSkinOutline;
+	SixupRenderInfo.m_apChatAvatarOriginal[m_Type] = m_pChatAvatarOriginal;
+	SixupRenderInfo.m_apChatAvatarColorable[m_Type] = m_pChatAvatarColorable;
 	if(m_Type == protocol7::SKINPART_BODY)
 	{
 		SixupRenderInfo.m_BloodColor = m_BloodColor;
@@ -246,7 +284,9 @@ bool CSkins7::LoadSkinPart(int PartType, const char *pName, int DirType)
 	GameClient()->GpuUploadLimiter()->OnUploaded();
 	Part.m_BloodColor = DetermineBloodColorFromInfo(Info);
 	Part.m_pQmSkinOutline = CreateSkinPartOutline(Info, PartType);
+	Part.m_pChatAvatarOriginal = CreateChatAvatarPartSource(Info, PartType);
 	ConvertToGrayscale(Info);
+	Part.m_pChatAvatarColorable = CreateChatAvatarPartSource(Info, PartType);
 	Part.m_ColorableTexture = Graphics()->LoadTextureRawMove(Info, 0, aFilename);
 	GameClient()->GpuUploadLimiter()->OnUploaded();
 
@@ -317,6 +357,8 @@ void CSkins7::ProcessCompletedJobs()
 			GameClient()->GpuUploadLimiter()->OnUploaded();
 			Part.m_BloodColor = Result.m_BloodColor;
 			Part.m_pQmSkinOutline = CreateSkinPartOutline(Result.m_OriginalImage, Result.m_PartType);
+			Part.m_pChatAvatarOriginal = CreateChatAvatarPartSource(Result.m_OriginalImage, Result.m_PartType);
+			Part.m_pChatAvatarColorable = CreateChatAvatarPartSource(Result.m_GrayscaleImage, Result.m_PartType);
 			Part.m_ColorableTexture = Graphics()->LoadTextureRawMove(Result.m_GrayscaleImage, 0, Result.m_aName);
 			GameClient()->GpuUploadLimiter()->OnUploaded();
 

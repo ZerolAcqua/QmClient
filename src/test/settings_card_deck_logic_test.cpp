@@ -263,7 +263,6 @@ TEST(SettingsPageLayout, DynamicVisualCardHeightsUseSharedMetrics)
 	EXPECT_FLOAT_EQ(ResolveQmVisualWeaponAnimationHeight(Metrics, true, true), 8.0f * Metrics.m_RowStep + Metrics.m_LineSpacing);
 	EXPECT_FLOAT_EQ(ResolveQmVisualCollisionHitboxHeight(Metrics, false), Metrics.m_RowStep);
 	EXPECT_FLOAT_EQ(ResolveQmVisualCollisionHitboxHeight(Metrics, true), 16.0f * Metrics.m_RowStep);
-	EXPECT_FLOAT_EQ(ResolveQmVisualFocusModeHeight(Metrics), 16.0f * Metrics.m_RowStep + 3.0f * (Metrics.m_SmallSize + Metrics.m_LineSpacing) + Metrics.m_LineSpacing);
 	EXPECT_FLOAT_EQ(ResolveQmVisualSkinTransitionHeight(Metrics, true) - ResolveQmVisualSkinTransitionHeight(Metrics, false), 5.0f * Metrics.m_RowStep);
 	EXPECT_GT(ResolveQmVisualSkinTransitionHeight(Metrics, false), 0.0f);
 	// 描边的两个范围开关、颜色和两个滑块始终各占一行。
@@ -445,16 +444,21 @@ TEST(SettingsCardDeck, BorderWidthDoesNotDependOnFocus)
 	EXPECT_FLOAT_EQ(ResolveSettingsCardBorderWidth(1.3f, 0.5f), 2.5f);
 }
 
-TEST(SettingsCardDeck, ChromeGeometryAlignsToThePhysicalPixelGrid)
+TEST(SettingsCardDeck, DrawGeometryKeepsSubpixelOffsetsThroughMotionAndRest)
 {
-	const CUIRect Rect{10.2f, 20.3f, 99.6f, 49.4f};
-	const CUIRect Aligned = ResolveSettingsCardChromeRect(Rect, 0.5f);
-	EXPECT_FLOAT_EQ(Aligned.x, 10.0f);
-	EXPECT_FLOAT_EQ(Aligned.y, 20.5f);
-	EXPECT_FLOAT_EQ(Aligned.w, 100.0f);
-	EXPECT_FLOAT_EQ(Aligned.h, 49.0f);
-	EXPECT_FLOAT_EQ(AlignSettingsCardValueToPixels(12.2f, 0.5f), 12.0f);
-	EXPECT_FLOAT_EQ(AlignSettingsCardValueToPixels(12.2f, 0.0f), 12.2f);
+	SSettingsCardSpec Spec;
+	const SSettingsCardFrame Start = BuildSettingsCardFrame({10.2f, 20.3f, 199.6f, 0.0f}, Spec, 49.4f, 1.0f);
+	for(const float Offset : {0.0f, 0.025f, 0.05f, 0.075f, 0.05f, 0.025f, 0.0f})
+	{
+		const SSettingsCardFrame Draw = ResolveSettingsCardDrawFrame(Start, Offset, Offset);
+		EXPECT_FLOAT_EQ(Draw.m_Rect.x, Start.m_Rect.x + Offset);
+		EXPECT_FLOAT_EQ(Draw.m_Rect.y, Start.m_Rect.y + Offset);
+		EXPECT_FLOAT_EQ(Draw.m_Rect.w, Start.m_Rect.w);
+		EXPECT_FLOAT_EQ(Draw.m_Rect.h, Start.m_Rect.h);
+		EXPECT_FLOAT_EQ(Draw.m_HandleRect.x, Start.m_HandleRect.x + Offset);
+		EXPECT_FLOAT_EQ(Draw.m_HandleRect.y, Start.m_HandleRect.y + Offset);
+		EXPECT_FLOAT_EQ(ResolveSettingsCardBorderWidth(1.3f, 0.5f), 2.5f);
+	}
 }
 
 TEST(SettingsPageLayout, GeneralDynamicCameraConsumesNoHiddenRowWhenCollapsed)

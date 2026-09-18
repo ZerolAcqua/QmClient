@@ -26,6 +26,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 
 namespace
 {
@@ -430,6 +431,14 @@ namespace
 		EXPECT_FLOAT_EQ(Layout.m_BodyControls.h, ResolveSettingsHslaRowsHeight(Metrics, false));
 		EXPECT_FLOAT_EQ(Layout.m_FeetControls.h, ResolveSettingsHslaRowsHeight(Metrics, false));
 		EXPECT_FLOAT_EQ(Layout.m_Height, Layout.m_FeetGroup.y + Layout.m_FeetGroup.h - View.y + Metrics.m_LineSpacing);
+		// 颜色滑条必须跟随卡片内容坐标，不能落回页面左上角。
+		for(const CUIRect &Controls : {Layout.m_BodyControls, Layout.m_FeetControls})
+		{
+			EXPECT_GE(Controls.x, View.x);
+			EXPECT_GE(Controls.y, View.y);
+			EXPECT_LE(Controls.x + Controls.w, View.x + View.w);
+			EXPECT_LE(Controls.y + Controls.h, View.y + Layout.m_Height);
+		}
 
 		const SSettingsTeeCustomColorsLayout Disabled = ResolveSettingsTeeCustomColorsLayout(View, false, Metrics);
 		EXPECT_FLOAT_EQ(Disabled.m_Height, Metrics.m_LineSpacing * 2.0f);
@@ -925,6 +934,85 @@ TEST(UiV2Anim, ZeroDeltaTimeDoesNotAdvance)
 	EXPECT_TRUE(Runtime.HasActiveAnimation(9, EUiAnimProperty::POS_X));
 }
 
+TEST(UiV2Anim, LongFrameConsumesTweenQueueTimeWithoutSkippingDelays)
+{
+	CUiV2AnimationRuntime Runtime;
+	Runtime.SetValue(901, EUiAnimProperty::POS_X, 0.0f);
+	SUiAnimRequest First = MakeRequest(901, EUiAnimProperty::POS_X, 10.0f, 0.1f, 1, EUiAnimInterruptPolicy::REPLACE, 901);
+	First.m_Transition.m_DelaySec = 0.05f;
+	SUiAnimRequest Second = MakeRequest(901, EUiAnimProperty::POS_X, 20.0f, 0.2f, 1, EUiAnimInterruptPolicy::QUEUE, 902);
+	Second.m_Transition.m_DelaySec = 0.1f;
+	ASSERT_TRUE(Runtime.RequestAnimation(First));
+	ASSERT_TRUE(Runtime.RequestAnimation(Second));
+	ASSERT_TRUE(Runtime.RequestAnimation(MakeRequest(901, EUiAnimProperty::POS_X, 30.0f, 0.0f, 1, EUiAnimInterruptPolicy::QUEUE, 903)));
+	const uint32_t aTrackIds[] = {901, 902, 903};
+	const uint32_t GroupId = Runtime.AwaitTracks(aTrackIds, 3);
+
+	Runtime.Advance(0.2f);
+	EXPECT_FLOAT_EQ(Runtime.GetValue(901, EUiAnimProperty::POS_X), 10.0f);
+	EXPECT_EQ(Runtime.ActiveTrackCount(), 1);
+	EXPECT_EQ(Runtime.QueuedTrackCount(), 1);
+	Runtime.Advance(0.2f);
+	EXPECT_NEAR(Runtime.GetValue(901, EUiAnimProperty::POS_X), 17.5f, 0.001f);
+	Runtime.Advance(60.0f);
+	EXPECT_FLOAT_EQ(Runtime.GetValue(901, EUiAnimProperty::POS_X), 30.0f);
+	EXPECT_EQ(Runtime.ActiveTrackCount(), 0);
+	EXPECT_EQ(Runtime.QueuedTrackCount(), 0);
+	for(const uint32_t TrackId : aTrackIds)
+	{
+		SUiAnimCompleteEvent Event;
+		ASSERT_TRUE(Runtime.PollCompletedEvent(Event));
+		EXPECT_EQ(Event.m_TrackId, TrackId);
+	}
+	SUiAnimGroupCompleteEvent Group;
+	ASSERT_TRUE(Runtime.PollGroupCompletedEvent(Group));
+	EXPECT_EQ(Group.m_GroupId, GroupId);
+}
+
+TEST(UiV2Anim, TweenProgressUsesElapsedTimeAtDifferentRefreshRates)
+{
+	for(const int RefreshRate : {60, 144, 240, 360})
+	{
+		SCOPED_TRACE(RefreshRate);
+		CUiV2AnimationRuntime Runtime;
+		Runtime.SetValue(904, EUiAnimProperty::POS_X, 0.0f);
+		ASSERT_TRUE(Runtime.RequestAnimation(MakeRequest(904, EUiAnimProperty::POS_X, 100.0f, 1.0f, 1, EUiAnimInterruptPolicy::REPLACE, 904)));
+		for(int Frame = 0; Frame < RefreshRate / 2; ++Frame)
+			Runtime.Advance(1.0f / RefreshRate);
+		EXPECT_NEAR(Runtime.GetValue(904, EUiAnimProperty::POS_X), 50.0f, 0.001f);
+		Runtime.Advance(0.25f);
+		EXPECT_NEAR(Runtime.GetValue(904, EUiAnimProperty::POS_X), 75.0f, 0.001f);
+		Runtime.Advance(60.0f);
+		EXPECT_FLOAT_EQ(Runtime.GetValue(904, EUiAnimProperty::POS_X), 100.0f);
+		EXPECT_FALSE(Runtime.HasActiveAnimation(904, EUiAnimProperty::POS_X));
+	}
+}
+
+TEST(UiV2Anim, DelayedInstantTweenCompletesAtDelayBoundary)
+{
+	CUiV2AnimationRuntime Runtime;
+	Runtime.SetValue(905, EUiAnimProperty::ALPHA, 0.0f);
+	SUiAnimRequest Request = MakeRequest(905, EUiAnimProperty::ALPHA, 1.0f, 0.0f, 1, EUiAnimInterruptPolicy::REPLACE, 905);
+	Request.m_Transition.m_DelaySec = 0.125f;
+	ASSERT_TRUE(Runtime.RequestAnimation(Request));
+	Runtime.Advance(0.125f);
+	EXPECT_FLOAT_EQ(Runtime.GetValue(905, EUiAnimProperty::ALPHA), 1.0f);
+	EXPECT_FALSE(Runtime.HasActiveAnimation(905, EUiAnimProperty::ALPHA));
+}
+
+TEST(UiV2Anim, InvalidElapsedTimeDoesNotPoisonActiveAnimation)
+{
+	CUiV2AnimationRuntime Runtime;
+	Runtime.SetValue(906, EUiAnimProperty::ALPHA, 0.0f);
+	ASSERT_TRUE(Runtime.RequestAnimation(MakeRequest(906, EUiAnimProperty::ALPHA, 1.0f, 1.0f, 1, EUiAnimInterruptPolicy::REPLACE, 906)));
+	for(const float Dt : {-1.0f, 0.0f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
+		Runtime.Advance(Dt);
+	EXPECT_FLOAT_EQ(Runtime.TimeSec(), 0.0f);
+	EXPECT_FLOAT_EQ(Runtime.GetValue(906, EUiAnimProperty::ALPHA), 0.0f);
+	Runtime.Advance(0.25f);
+	EXPECT_FLOAT_EQ(Runtime.GetValue(906, EUiAnimProperty::ALPHA), 0.25f);
+}
+
 TEST(UiV2Anim, ZeroDurationCompletesImmediately)
 {
 	CUiV2AnimationRuntime Runtime;
@@ -1207,7 +1295,7 @@ TEST(UiV2AnimSpring, ZeroDtSpringStaysPut)
 	EXPECT_TRUE(Runtime.HasActiveAnimation(103, EUiAnimProperty::ALPHA));
 }
 
-TEST(UiV2AnimSpring, ClampedDtNoExplosion)
+TEST(UiV2AnimSpring, LongFrameRemainsStable)
 {
 	CUiV2AnimationRuntime Runtime;
 	Runtime.SetValue(104, EUiAnimProperty::POS_X, 0.0f);
@@ -1257,8 +1345,10 @@ TEST(UiV2AnimSpring, AnalyticSolverIsFrameRateIndependent)
 	const auto RunHalfSecond = [&Spring](float Dt) {
 		CUiV2AnimationRuntime Runtime;
 		Runtime.SetValue(501, EUiAnimProperty::POS_X, 0.0f);
-		EXPECT_TRUE(Runtime.RequestAnimation(MakeSpringRequest(501, EUiAnimProperty::POS_X, 100.0f, 141)));
-		const int Steps = static_cast<int>(0.5f / Dt);
+		SUiAnimRequest Request = MakeSpringRequest(501, EUiAnimProperty::POS_X, 100.0f, 141);
+		Request.m_Transition.m_Spring = Spring;
+		EXPECT_TRUE(Runtime.RequestAnimation(Request));
+		const int Steps = static_cast<int>(std::round(0.5f / Dt));
 		for(int i = 0; i < Steps; ++i)
 			Runtime.Advance(Dt);
 		return Runtime.GetValue(501, EUiAnimProperty::POS_X);
@@ -1271,6 +1361,46 @@ TEST(UiV2AnimSpring, AnalyticSolverIsFrameRateIndependent)
 
 	// 解析解核对：ζ=0.5、ω0=10、t=0.5s → 107.47（欠阻尼过冲后回落中）。
 	EXPECT_NEAR(Value60, 107.47f, 0.05f);
+}
+
+TEST(UiV2AnimSpring, LongFramesAndRefreshRatesPreserveDelayedSpringProgress)
+{
+	for(const float Damping : {10.0f, 20.0f, 40.0f})
+	{
+		SCOPED_TRACE(Damping);
+		const auto Start = [Damping](CUiV2AnimationRuntime &Runtime) {
+			Runtime.SetValue(907, EUiAnimProperty::POS_X, 0.0f);
+			SUiAnimRequest Request = MakeSpringRequest(907, EUiAnimProperty::POS_X, 100.0f, 907);
+			Request.m_Transition.m_DelaySec = 0.12f;
+			Request.m_Transition.m_Spring.m_Stiffness = 100.0f;
+			Request.m_Transition.m_Spring.m_Damping = Damping;
+			EXPECT_TRUE(Runtime.RequestAnimation(Request));
+		};
+		CUiV2AnimationRuntime SingleFrame;
+		Start(SingleFrame);
+		SingleFrame.Advance(0.5f);
+		const float Expected = SingleFrame.GetValue(907, EUiAnimProperty::POS_X);
+		for(const int RefreshRate : {60, 144, 240, 360})
+		{
+			SCOPED_TRACE(RefreshRate);
+			CUiV2AnimationRuntime Runtime;
+			Start(Runtime);
+			for(int Frame = 0; Frame < RefreshRate / 2; ++Frame)
+				Runtime.Advance(1.0f / RefreshRate);
+			EXPECT_NEAR(Runtime.GetValue(907, EUiAnimProperty::POS_X), Expected, 0.005f);
+		}
+		CUiV2AnimationRuntime UnevenFrames;
+		Start(UnevenFrames);
+		for(const float Dt : {0.07f, 0.18f, 0.25f})
+			UnevenFrames.Advance(Dt);
+		EXPECT_NEAR(UnevenFrames.GetValue(907, EUiAnimProperty::POS_X), Expected, 0.005f);
+		UnevenFrames.Advance(60.0f);
+		EXPECT_FLOAT_EQ(UnevenFrames.GetValue(907, EUiAnimProperty::POS_X), 100.0f);
+		EXPECT_FALSE(UnevenFrames.HasActiveAnimation(907, EUiAnimProperty::POS_X));
+		SUiAnimCompleteEvent Event;
+		ASSERT_TRUE(UnevenFrames.PollCompletedEvent(Event));
+		EXPECT_EQ(Event.m_TrackId, 907u);
+	}
 }
 
 TEST(UiV2AnimSpring, ReplaceInheritsVelocity)
@@ -2753,12 +2883,13 @@ TEST(UiV2ScrollPhysics, NativeWheelStepMatchesDdnetScrollUnit)
 	State.AddWheelImpulse(-120.0f, Metrics, Config);
 
 	EXPECT_NEAR(State.Offset(), 0.0f, 0.01f);
-	EXPECT_NEAR(State.Velocity(), 0.0f, 0.01f);
+	EXPECT_NEAR(State.Velocity(), 60.0f, 0.01f);
 
 	State.Advance(1.0f / 60.0f, Metrics, Config);
 	EXPECT_GT(State.Offset(), 0.0f);
 	EXPECT_LT(State.Offset(), 10.0f);
-	EXPECT_NEAR(State.Velocity(), 0.0f, 0.01f);
+	EXPECT_GT(State.Velocity(), 0.0f);
+	EXPECT_LT(State.Velocity(), 60.0f);
 
 	for(int i = 0; i < 40; ++i)
 		State.Advance(1.0f / 60.0f, Metrics, Config);
@@ -2770,6 +2901,97 @@ TEST(UiV2ScrollPhysics, NativeWheelStepMatchesDdnetScrollUnit)
 		State.Advance(1.0f / 60.0f, Metrics, Config);
 	EXPECT_NEAR(State.Offset(), 20.0f, 0.01f);
 	EXPECT_NEAR(State.Velocity(), 0.0f, 0.01f);
+}
+
+TEST(UiV2ScrollPhysics, RepeatedAndReversedWheelEventsPreservePositionAndVelocity)
+{
+	const SQmScrollMetrics Metrics{100.0f, 500.0f};
+	const SQmScrollConfig Config = QmNativeWheelScrollConfig(1.0f, 0.5f);
+	CQmScrollState State;
+	State.SetOffset(100.0f, Metrics, Config);
+	State.AddWheelImpulse(-120.0f, Metrics, Config);
+	State.Advance(0.125f, Metrics, Config);
+	for(const float WheelDelta : {-120.0f, 240.0f})
+	{
+		const float Before = State.Offset();
+		const float Velocity = State.Velocity();
+		ASSERT_GT(Velocity, 0.0f);
+		State.AddWheelImpulse(WheelDelta, Metrics, Config);
+		EXPECT_FLOAT_EQ(State.Offset(), Before);
+		EXPECT_FLOAT_EQ(State.Velocity(), Velocity);
+		State.Advance(0.0001f, Metrics, Config);
+		EXPECT_NEAR((State.Offset() - Before) / 0.0001f, Velocity, 0.5f);
+	}
+	State.Advance(0.5f, Metrics, Config);
+	EXPECT_FLOAT_EQ(State.Offset(), 100.0f);
+	EXPECT_FLOAT_EQ(State.Velocity(), 0.0f);
+	EXPECT_FALSE(State.Animating());
+}
+
+TEST(UiV2ScrollPhysics, RetargetedWheelTrajectoryDoesNotDependOnFramePartition)
+{
+	const SQmScrollMetrics Metrics{100.0f, 500.0f};
+	const SQmScrollConfig Config = QmNativeWheelScrollConfig(1.0f, 0.5f);
+	const auto Sample = [&](int RefreshRate) {
+		CQmScrollState State;
+		State.SetOffset(100.0f, Metrics, Config);
+		const auto AdvanceSpan = [&](float Seconds) {
+			const int Frames = std::max(1, static_cast<int>(std::ceil(Seconds * RefreshRate)));
+			for(int Frame = 0; Frame < Frames; ++Frame)
+				State.Advance(Seconds / Frames, Metrics, Config);
+		};
+		State.AddWheelImpulse(-120.0f, Metrics, Config);
+		AdvanceSpan(0.125f);
+		State.AddWheelImpulse(-120.0f, Metrics, Config);
+		AdvanceSpan(0.125f);
+		State.AddWheelImpulse(240.0f, Metrics, Config);
+		AdvanceSpan(0.15f);
+		return std::array<float, 2>{State.Offset(), State.Velocity()};
+	};
+	const auto Expected = Sample(1);
+	for(const int RefreshRate : {60, 144, 240, 360})
+	{
+		SCOPED_TRACE(RefreshRate);
+		const auto Actual = Sample(RefreshRate);
+		EXPECT_NEAR(Actual[0], Expected[0], 0.001f);
+		EXPECT_NEAR(Actual[1], Expected[1], 0.01f);
+	}
+}
+
+TEST(UiV2ScrollPhysics, WheelBoundsInstantModeAndDirectDragStopMomentum)
+{
+	const SQmScrollMetrics Metrics{100.0f, 500.0f};
+	SQmScrollConfig Config = QmNativeWheelScrollConfig(1.0f, 0.5f);
+	CQmScrollState State;
+	State.SetOffset(395.0f, Metrics, Config);
+	State.AddWheelImpulse(-120.0f, Metrics, Config);
+	State.Advance(0.1f, Metrics, Config);
+	State.AddWheelImpulse(-1200.0f, Metrics, Config);
+	for(int Frame = 0; Frame < 180; ++Frame)
+	{
+		State.Advance(1.0f / 360.0f, Metrics, Config);
+		EXPECT_GE(State.Offset(), 0.0f);
+		EXPECT_LE(State.Offset(), Metrics.MaxOffset());
+		if(State.Offset() == Metrics.MaxOffset())
+			EXPECT_FLOAT_EQ(State.Velocity(), 0.0f);
+	}
+	State.Advance(1.0f, Metrics, Config);
+	EXPECT_FLOAT_EQ(State.Offset(), 400.0f);
+	EXPECT_FLOAT_EQ(State.Velocity(), 0.0f);
+	State.AddWheelImpulse(120.0f, Metrics, Config);
+	State.Advance(0.1f, Metrics, Config);
+	State.SetOffset(150.0f, Metrics, Config);
+	State.Advance(0.1f, Metrics, Config);
+	EXPECT_FLOAT_EQ(State.Offset(), 150.0f);
+	EXPECT_FLOAT_EQ(State.Velocity(), 0.0f);
+	EXPECT_FALSE(State.Animating());
+	State.AddWheelImpulse(-120.0f, Metrics, Config);
+	State.Advance(0.1f, Metrics, Config);
+	Config.m_NativeWheelAnimationTime = 0.0f;
+	State.AddWheelImpulse(-120.0f, Metrics, Config);
+	EXPECT_FLOAT_EQ(State.Offset(), 170.0f);
+	EXPECT_FLOAT_EQ(State.Velocity(), 0.0f);
+	EXPECT_FALSE(State.Animating());
 }
 
 TEST(UiV2ScrollPhysics, NativeWheelStepPreservesWheelMagnitude)
@@ -3990,20 +4212,44 @@ TEST(UiV2DropdownGeometry, RejectsPartiallyVisibleAnchorBeforeOpening)
 	EXPECT_FALSE(Result.m_AnchorVisible);
 }
 
-TEST(UiV2DropdownVisuals, SettingsStyleSharesTriggerAndPopupSurface)
+TEST(UiV2DropdownVisuals, SettingsPopupStaysDarkAndOpaqueWithTransparentOrBrightThemes)
 {
-	const SUiTheme Theme = ResolveUiTheme(ColorHSLA(0.20f, 0.50f, 0.40f, 1.0f), 0.75f);
-	const SQmDropdownVisualStyle Style = QmSettingsDropdownVisualStyle(Theme);
-	EXPECT_FLOAT_EQ(Style.m_TriggerColor.r, Theme.m_InputSurface.r);
-	EXPECT_FLOAT_EQ(Style.m_TriggerColor.g, Theme.m_InputSurface.g);
-	EXPECT_FLOAT_EQ(Style.m_TriggerColor.b, Theme.m_InputSurface.b);
-	EXPECT_FLOAT_EQ(Style.m_PopupBackgroundColor.a, Theme.m_Surface.a);
-	EXPECT_TRUE(Style.m_TransparentEntries);
-	EXPECT_FLOAT_EQ(Style.m_PopupBorderColor.a, Theme.m_Border.a);
-	EXPECT_FLOAT_EQ(Style.m_ActiveEntryColor.r, Theme.m_SurfaceHovered.r);
-	EXPECT_FLOAT_EQ(Style.m_ActiveEntryColor.g, Theme.m_SurfaceHovered.g);
-	EXPECT_FLOAT_EQ(Style.m_ActiveEntryColor.b, Theme.m_SurfaceHovered.b);
-	EXPECT_FLOAT_EQ(Style.m_ActiveEntryColor.a, Theme.m_SurfaceHovered.a);
+	for(const float Opacity : {0.0f, 0.05f, 0.75f, 1.0f})
+	{
+		SCOPED_TRACE(Opacity);
+		const SUiTheme Theme = ResolveUiTheme(ColorHSLA(0.20f, 0.50f, 0.90f, 1.0f), Opacity);
+		const SQmDropdownVisualStyle Style = QmSettingsDropdownVisualStyle(Theme);
+		EXPECT_FLOAT_EQ(Style.m_PopupBackgroundColor.a, 1.0f);
+		EXPECT_LE(Style.m_PopupBackgroundColor.r, 0.15f);
+		EXPECT_LE(Style.m_PopupBackgroundColor.g, 0.15f);
+		EXPECT_LE(Style.m_PopupBackgroundColor.b, 0.15f);
+		EXPECT_FALSE(Style.m_AnimatePopupAlpha);
+		EXPECT_FLOAT_EQ(Style.m_TriggerColor.r, Theme.m_InputSurface.r);
+		EXPECT_FLOAT_EQ(Style.m_TriggerColor.g, Theme.m_InputSurface.g);
+		EXPECT_FLOAT_EQ(Style.m_TriggerColor.b, Theme.m_InputSurface.b);
+		EXPECT_FLOAT_EQ(Style.m_TriggerColor.a, Theme.m_InputSurface.a);
+		EXPECT_TRUE(Style.m_TransparentEntries);
+	}
+}
+
+TEST(UiV2DropdownVisuals, SettingsPopupKeepsAccentBorderAndSelectionVisibleAtZeroOpacity)
+{
+	for(const float Hue : {0.0f, 0.60f})
+	{
+		SCOPED_TRACE(Hue);
+		const SUiTheme Theme = ResolveUiTheme(ColorHSLA(0.20f, 0.50f, 0.90f, 1.0f), 0.0f,
+			ColorHSLA(0.60f, 0.78f, 0.52f, 1.0f), ColorHSLA(Hue, 0.75f, 0.60f, 1.0f), ColorHSLA(Hue, 0.60f, 0.65f, 1.0f));
+		const SQmDropdownVisualStyle Style = QmSettingsDropdownVisualStyle(Theme);
+		EXPECT_FLOAT_EQ(Style.m_PopupBorderColor.r, Theme.m_Accent.r);
+		EXPECT_FLOAT_EQ(Style.m_PopupBorderColor.g, Theme.m_Accent.g);
+		EXPECT_FLOAT_EQ(Style.m_PopupBorderColor.b, Theme.m_Accent.b);
+		EXPECT_FLOAT_EQ(Style.m_PopupBorderColor.a, 1.0f);
+		EXPECT_FLOAT_EQ(Style.m_ActiveEntryColor.r, Theme.m_Selected.r);
+		EXPECT_FLOAT_EQ(Style.m_ActiveEntryColor.g, Theme.m_Selected.g);
+		EXPECT_FLOAT_EQ(Style.m_ActiveEntryColor.b, Theme.m_Selected.b);
+		EXPECT_GE(Style.m_ActiveEntryColor.a, 0.20f);
+		EXPECT_LE(Style.m_ActiveEntryColor.a, 0.30f);
+	}
 }
 
 TEST(UiV2DropdownGeometry, FlipsAboveWhenBelowWouldOverflow)

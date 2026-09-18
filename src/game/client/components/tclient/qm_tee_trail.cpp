@@ -84,18 +84,6 @@ namespace
 		ColorRGBA m_Color;
 	};
 
-	// 限制三次曲线切向量，折返时压短到零，避免普通 Catmull-Rom 在尖角处过冲。
-	vec2 Curve(vec2 P0, vec2 P1, vec2 P2, vec2 P3, float T)
-	{
-		const float D = distance(P1, P2);
-		const vec2 Segment = Unit(P2 - P1);
-		const vec2 Before = Unit(P1 - P0, Segment);
-		const vec2 After = Unit(P3 - P2, Segment);
-		const vec2 M1 = Unit(Before + Segment, Segment) * D * std::max(0.0f, dot(Before, Segment));
-		const vec2 M2 = Unit(Segment + After, Segment) * D * std::max(0.0f, dot(Segment, After));
-		return P1 * (2 * T * T * T - 3 * T * T + 1) + M1 * (T * T * T - 2 * T * T + T) + P2 * (-2 * T * T * T + 3 * T * T) + M2 * (T * T * T - T * T);
-	}
-
 	void PushQuad(std::vector<SQuad> &vOut, vec2 A, vec2 B, vec2 C, vec2 D, ColorRGBA Ca, ColorRGBA Cb, ColorRGBA Cc, ColorRGBA Cd, bool Additive)
 	{
 		if(vOut.size() >= MAX_QUADS || std::max({Ca.a, Cb.a, Cc.a, Cd.a}) < 0.001f)
@@ -222,6 +210,23 @@ namespace
 		}
 		return Result;
 	}
+}
+
+qm_tee_trail::SPreparedCurve qm_tee_trail::PrepareCurve(vec2 P0, vec2 P1, vec2 P2, vec2 P3)
+{
+	// 限制三次曲线切向量，折返时压短到零，避免普通 Catmull-Rom 在尖角处过冲。
+	const float D = distance(P1, P2);
+	const vec2 Segment = Unit(P2 - P1);
+	const vec2 Before = Unit(P1 - P0, Segment);
+	const vec2 After = Unit(P3 - P2, Segment);
+	const vec2 M1 = Unit(Before + Segment, Segment) * D * std::max(0.0f, dot(Before, Segment));
+	const vec2 M2 = Unit(Segment + After, Segment) * D * std::max(0.0f, dot(Segment, After));
+	return {P1, P2, M1, M2};
+}
+
+vec2 qm_tee_trail::SPreparedCurve::Evaluate(float T) const
+{
+	return m_Start * (2 * T * T * T - 3 * T * T + 1) + m_StartTangent * (T * T * T - 2 * T * T + T) + m_End * (-2 * T * T * T + 3 * T * T) + m_EndTangent * (T * T * T - T * T);
 }
 
 void qm_tee_trail::CTrailState::Reset()
@@ -372,6 +377,7 @@ void qm_tee_trail::BuildEffect(const std::vector<CTrailPart> &vTrail, int Style,
 		const auto &B = vTrail[i + 1];
 		const float Segment = aLengths[i + 1] - aLengths[i];
 		const int Divisions = std::max(1, int(Segment / Step));
+		const SPreparedCurve Curve = PrepareCurve(i > 0 ? vTrail[i - 1].m_Pos : A.m_Pos * 2 - B.m_Pos, A.m_Pos, B.m_Pos, i + 2 < Count ? vTrail[i + 2].m_Pos : B.m_Pos * 2 - A.m_Pos);
 		for(int j = 0; j < Divisions + (i + 2 == Count ? 1 : 0); ++j)
 		{
 			if(SampleCount == MAX_RENDER_POINTS)
@@ -393,7 +399,7 @@ void qm_tee_trail::BuildEffect(const std::vector<CTrailPart> &vTrail, int Style,
 			S.m_Alpha = std::clamp(S.m_Tint.a, 0.0f, 1.0f) * Remaining * Remaining * Tail;
 			if(Fade)
 				S.m_Alpha *= 1.0f - S.m_Head / Total;
-			S.m_Pos = Curve(i > 0 ? vTrail[i - 1].m_Pos : A.m_Pos * 2 - B.m_Pos, A.m_Pos, B.m_Pos, i + 2 < Count ? vTrail[i + 2].m_Pos : B.m_Pos * 2 - A.m_Pos, T);
+			S.m_Pos = Curve.Evaluate(T);
 		}
 	}
 	if(SampleCount < 2)

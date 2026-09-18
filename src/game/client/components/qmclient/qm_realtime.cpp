@@ -122,9 +122,12 @@ bool ParseQmRealtimeMessage(const char *pData, size_t Size, SQmRealtimeMessage &
 		// 与头衔 HTTP 接口同构：负载可以在 data 里，也可以直接放在消息顶层。
 		const json_value *pDataField = json_object_get(pRoot, "data");
 		const bool DataIsObject = pDataField != nullptr && pDataField->type == json_object;
-		OutMessage.m_HasTitles = DataIsObject || json_object_get(pRoot, "presences") != nullptr;
 		// 保留原树直到消息应用结束；payload 可以指向 data，但必须释放完整根对象。
 		const json_value *pPayload = DataIsObject ? pDataField : pRoot;
+		// 无效快照不能冒充空名单，避免清掉尚未过期的称号；合法空数组仍是权威结果。
+		int64_t ServerTime = 0;
+		OutMessage.m_HasTitles = json_object_get(pPayload, "presences")->type == json_array &&
+					 JsonIntField(pPayload, "server_time", ServerTime) && ServerTime > 0;
 		OutMessage.m_pTitlePayload = std::shared_ptr<const json_value>(pPayload, [pRoot](const json_value *) { json_value_free(pRoot); });
 		OutMessage.m_pPayload = OutMessage.m_pTitlePayload;
 		OutMessage.m_HasRealtimeData = DataIsObject;
@@ -184,6 +187,7 @@ bool ParseQmRealtimeMessage(const char *pData, size_t Size, SQmRealtimeMessage &
 		for(const auto &Entry : {
 			    std::pair<const char *, EQmRealtimeEvent>{"users", EQmRealtimeEvent::USERS},
 			    {"developers", EQmRealtimeEvent::DEVELOPERS},
+			    {"sponsors", EQmRealtimeEvent::SPONSORS},
 			    {"playtime", EQmRealtimeEvent::PLAYTIME},
 			    {"time", EQmRealtimeEvent::TIME},
 			    {"title_profile", EQmRealtimeEvent::TITLE_PROFILE},

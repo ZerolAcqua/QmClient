@@ -372,6 +372,21 @@ public:
 		bool m_NeedsUpdate = true;
 	};
 
+	class CUnresolvedSkinScanState
+	{
+	public:
+		void OnStateChange(CSkinContainer::EState OldState, CSkinContainer::EState NewState)
+		{
+			if(OldState != NewState && CSkinContainer::IsUnresolved(NewState))
+				m_Pending = true;
+		}
+
+		bool Consume() { return std::exchange(m_Pending, false); }
+
+	private:
+		bool m_Pending = false;
+	};
+
 	class CSkinLoadingStats
 	{
 	public:
@@ -382,6 +397,34 @@ public:
 		size_t m_NumLoaded = 0;
 		size_t m_NumError = 0;
 		size_t m_NumNotFound = 0;
+
+		void AddState(CSkinContainer::EState State)
+		{
+			switch(State)
+			{
+			case CSkinContainer::EState::UNLOADED:
+				m_NumUnloaded++;
+				break;
+			case CSkinContainer::EState::BACKGROUND_REQUESTED:
+				m_NumBackgroundRequested++;
+				break;
+			case CSkinContainer::EState::PENDING:
+				m_NumPending++;
+				break;
+			case CSkinContainer::EState::LOADING:
+				m_NumLoading++;
+				break;
+			case CSkinContainer::EState::LOADED:
+				m_NumLoaded++;
+				break;
+			case CSkinContainer::EState::ERROR:
+				m_NumError++;
+				break;
+			case CSkinContainer::EState::NOT_FOUND:
+				m_NumNotFound++;
+				break;
+			}
+		}
 
 		size_t RealInflight() const { return m_NumPending + m_NumLoading; }
 		bool AdmissionInvariantViolated(int CountFuseLimit) const
@@ -920,6 +963,7 @@ private:
 	 * LOADING，因此必须在解析彻底失败后重新通知一次，回退皮肤才会生效。
 	 */
 	std::vector<std::string> m_vSkinsUnresolvedThisFrame;
+	CUnresolvedSkinScanState m_UnresolvedSkinScanState;
 	/**
 	 * 本帧内 6.x 贴图被卸载的皮肤名。旧句柄在渲染信息里依旧 IsValid()，不重新通知一次，
 	 * 引用它的玩家、聊天头像与击杀提示会继续绑定已释放的纹理，画出没有贴图的白块。

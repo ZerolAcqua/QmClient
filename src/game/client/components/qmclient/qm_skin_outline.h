@@ -145,7 +145,7 @@ public:
 	{
 		if(Width <= 0 || Color.a <= 0.0f || m_Mask.m_pData == nullptr)
 			return;
-		if(m_CachedWidth != Width || !m_Texture.IsValid())
+		if(m_CachedWidth != Width || !m_Texture.IsValid() || !pGraphics->IsTextureHandleAllocated(m_Texture))
 		{
 			CImageInfo Image = BuildImage(Width);
 			m_QuadScale = vec2((float)Image.m_Width / m_Mask.m_Width, (float)Image.m_Height / m_Mask.m_Height);
@@ -153,7 +153,8 @@ public:
 			m_Texture = pGraphics->LoadTextureRawMove(Image, 0, "qm_skin_outline");
 			m_CachedWidth = Width;
 		}
-		if(!m_Texture.IsValid() || m_Texture.IsNullTexture())
+		// 句柄失效（设备重建、槽位复用）时画出来是实心块，当作不可绘制处理。
+		if(!m_Texture.IsValid() || m_Texture.IsNullTexture() || !pGraphics->IsTextureHandleAllocated(m_Texture))
 			return;
 		pGraphics->TextureSet(m_Texture);
 		pGraphics->QuadsBegin();

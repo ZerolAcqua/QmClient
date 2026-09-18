@@ -20,6 +20,7 @@ typedef struct _json_value json_value;
 //   pong      -> 用于测量往返时延
 //   state     -> data 为在线状态增量，如 {"online_users":12,"online_dummies":3}
 //   broadcast -> data 为 {"markdown":"...","version":N}，用于「新功能」弹窗
+//   sponsors  -> 独立赞助 Markdown 和版本号，与新闻互不覆盖
 //   titles    -> data 与头衔 HTTP 接口同一结构（{"server_time":N,"presences":[...]}），
 //                用于替代客户端每 5 秒一次的头衔 HTTP 轮询
 //
@@ -33,6 +34,7 @@ enum class EQmRealtimeEvent
 	PONG,
 	STATE,
 	BROADCAST,
+	SPONSORS,
 	TITLES,
 	USERS,
 	DEVELOPERS,

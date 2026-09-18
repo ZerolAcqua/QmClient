@@ -23,6 +23,7 @@
 #include "components/hud.h"
 #include "components/infomessages.h"
 #include "components/items.h"
+#include "components/jump_hint_utils.h"
 #include "components/mapimages.h"
 #include "components/maplayers.h"
 #include "components/mapsounds.h"
@@ -470,38 +471,12 @@ constexpr int QM_SKIN_CHANGE_TRANSITION_SCOPE_ALL = 2;
 
 namespace
 {
-	float QmBestInputInterpolationAmount(float Fraction, float DeltaLength, bool Enable)
-	{
-		if(!Enable)
-			return Fraction;
-		const float T = std::clamp(Fraction, 0.0f, 1.0f);
-		const float T2 = T * T;
-		const float CubicT = 3.0f * T2 - 2.0f * T2 * T;
-		switch(std::clamp(g_Config.m_QmBestInputInterpolation, 1, 3))
-		{
-		case 2:
-			return CubicT;
-		case 3:
-			return mix(T, CubicT, std::clamp(DeltaLength / 1000.0f, 0.0f, 1.0f));
-		default:
-			return T;
-		}
-	}
-
-	vec2 QmBestInputInterpolate(vec2 PrevPos, vec2 CurPos, float Fraction, bool Enable)
-	{
-		return mix(PrevPos, CurPos, QmBestInputInterpolationAmount(Fraction, length(CurPos - PrevPos), Enable));
-	}
-
 	float EffectiveFastInputOffsetTicks(const CGameClient *pGameClient)
 	{
 		SQmFastInputSettings Settings;
 		Settings.m_Enabled = pGameClient->TClientComponent().IsFastInputActive();
 		Settings.m_Mode = g_Config.m_QmFastInputMode;
 		Settings.m_FastAmountMs = g_Config.m_TcFastInputAmount;
-		Settings.m_BestOffset = g_Config.m_QmBestInputOffset;
-		Settings.m_BestSmoothing = g_Config.m_QmBestInputSmoothing;
-		Settings.m_BestLatencyComp = g_Config.m_QmBestInputLatencyComp;
 		Settings.m_SaikoPlusAmount = g_Config.m_QmSaikoPlusAmount;
 		return QmEffectiveFastInputOffsetTicks(Settings);
 	}
@@ -513,7 +488,7 @@ namespace
 
 	bool EffectiveFastInputOthers(const CGameClient *pGameClient)
 	{
-		return QmEffectiveFastInputOthers(pGameClient->TClientComponent().IsFastInputActive(), g_Config.m_QmFastInputMode, g_Config.m_TcFastInputOthers != 0, g_Config.m_QmBestInputOthers != 0, g_Config.m_QmSaikoPlusOthers != 0);
+		return QmEffectiveFastInputOthers(pGameClient->TClientComponent().IsFastInputActive(), g_Config.m_QmFastInputMode, g_Config.m_TcFastInputOthers != 0, g_Config.m_QmSaikoPlusOthers != 0);
 	}
 
 } // namespace
@@ -816,6 +791,8 @@ static void MigrateJumpHintConfig()
 	MigrateInt(g_Config.m_QmJumpHintX, g_Config.m_TcJumpHintXLegacy, DefaultConfig::QmJumpHintX, DefaultConfig::TcJumpHintXLegacy);
 	MigrateInt(g_Config.m_QmJumpHintY, g_Config.m_TcJumpHintYLegacy, DefaultConfig::QmJumpHintY, DefaultConfig::TcJumpHintYLegacy);
 	MigrateInt(g_Config.m_QmJumpHintSize, g_Config.m_TcJumpHintSizeLegacy, DefaultConfig::QmJumpHintSize, DefaultConfig::TcJumpHintSizeLegacy);
+
+	MigrateJumpHintDefaults(g_Config.m_QmJumpHintDefaultsMigrated, g_Config.m_QmJumpHint, g_Config.m_QmJumpHintText, sizeof(g_Config.m_QmJumpHintText));
 }
 
 // CFGFLAG_COLALPHA 将这组设置从六位 RGB 改为八位 ARGB。
@@ -1013,7 +990,6 @@ void CGameClient::OnInit()
 	m_ParticlesSkinLoaded = false;
 	m_SpawnEventsProcessed = 0;
 	m_SpawnEffectsDispatched = 0;
-	m_SpawnEffectsFiltered = 0;
 	m_SpawnParticleAddFailures = 0;
 	m_EmoticonsSkinLoaded = false;
 	m_HudSkinLoaded = false;
@@ -1199,6 +1175,9 @@ void CGameClient::OnUpdate()
 		for(auto &pComponent : m_vpAll)
 			pComponent->OnUpdate();
 	}
+
+	// 皮肤组件的 OnUpdate 已经处理完卸载/加载通知，这里再统一兜一次失效句柄。
+	RepairStaleTeeRenderInfos();
 
 	RefreshPredictionAfterConfigChange();
 
@@ -1620,7 +1599,6 @@ void CGameClient::OnReset()
 	m_SuppressEvents = false;
 	m_SpawnEventsProcessed = 0;
 	m_SpawnEffectsDispatched = 0;
-	m_SpawnEffectsFiltered = 0;
 	m_SpawnParticleAddFailures = 0;
 	m_NewTick = false;
 	m_NewPredictedTick = false;
@@ -1680,8 +1658,6 @@ void CGameClient::OnReset()
 	std::fill(std::begin(m_aEnableSpectatorCount), std::end(m_aEnableSpectatorCount), -1);
 	std::fill(std::begin(m_aLastUpdateTick), std::end(m_aLastUpdateTick), 0);
 	std::fill(std::begin(m_aQ1menGSyncMarkUntil), std::end(m_aQ1menGSyncMarkUntil), 0);
-	std::fill(std::begin(m_aQ1menGSyncFootParticlesEnabled), std::end(m_aQ1menGSyncFootParticlesEnabled), false);
-	std::fill(std::begin(m_aQ1menGSyncRemoteParticlesEnabled), std::end(m_aQ1menGSyncRemoteParticlesEnabled), false);
 	std::fill(std::begin(m_aQmVoiceSyncMarkUntil), std::end(m_aQmVoiceSyncMarkUntil), 0);
 	std::fill(std::begin(m_aQmDeveloperMarkUntil), std::end(m_aQmDeveloperMarkUntil), 0);
 	std::fill(std::begin(m_aQmDeveloperRainbow), std::end(m_aQmDeveloperRainbow), false);
@@ -1814,7 +1790,8 @@ void CGameClient::UpdatePositions()
 
 void CGameClient::OnRender()
 {
-	CPerfTimer FrameTimer;
+	const bool PerfEnabled = QmPerfEnabled();
+	CPerfTimer FrameTimer(PerfEnabled);
 
 	m_pFrameScheduler->BeginFrame(Client()->PerfFrame());
 	if(m_TClient.IsPreparingUpdateForShutdown())
@@ -1872,7 +1849,7 @@ void CGameClient::OnRender()
 
 	// update the local character and spectate position
 	{
-		CPerfTimer StageTimer;
+		CPerfTimer StageTimer(PerfEnabled);
 		UpdatePositions();
 		LogPerfStage(this, "update_positions", StageTimer.ElapsedMs());
 	}
@@ -1894,14 +1871,14 @@ void CGameClient::OnRender()
 
 	// update camera data prior to CControls::OnRender to allow CControls::m_aTargetPos to compensate using camera data
 	{
-		CPerfTimer StageTimer;
+		CPerfTimer StageTimer(PerfEnabled);
 		m_Camera.UpdateCamera();
 		UpdateSpectatorCursor();
 		LogPerfStage(this, "camera_and_cursor", StageTimer.ElapsedMs());
 	}
 
 	{
-		CPerfTimer StageTimer;
+		CPerfTimer StageTimer(PerfEnabled);
 		const char *pPerfPage = m_Menus.CurrentQmUiPerfPage();
 		if(pPerfPage != nullptr)
 			m_UiRuntimeV2.SetPerfContext(pPerfPage, m_Menus.CurrentQmUiPerfOperation());
@@ -1912,11 +1889,11 @@ void CGameClient::OnRender()
 	}
 
 	// render all systems
-	CPerfTimer ComponentsTimer;
+	CPerfTimer ComponentsTimer(PerfEnabled);
 	const auto RenderComponent = [&](CComponent *pComponent) {
 		if(pComponent == &m_Menus)
 		{
-			CPerfTimer StageTimer;
+			CPerfTimer StageTimer(PerfEnabled);
 			pComponent->OnRender();
 			LogPerfStage(this, "component_menus", StageTimer.ElapsedMs());
 		}
@@ -1943,7 +1920,7 @@ void CGameClient::OnRender()
 
 	// clear all events/input for this frame
 	{
-		CPerfTimer StageTimer;
+		CPerfTimer StageTimer(PerfEnabled);
 		m_QmImeManager.RenderCandidatePopup();
 		m_QmImeManager.OnFrame();
 		Input()->Clear();
@@ -2744,7 +2721,7 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 
 			if((pMsg->m_Team == 1 && (m_aClients[m_aLocalIds[0]].m_Team != m_aClients[m_aLocalIds[1]].m_Team || m_Teams.Team(m_aLocalIds[0]) != m_Teams.Team(m_aLocalIds[1]))) || pMsg->m_Team > 1)
 			{
-				m_Chat.OnMessage(MsgId, pRawMsg);
+				m_Chat.OnMessage(MsgId, pRawMsg, Conn);
 			}
 		}
 		return; // no need of all that stuff for the dummy
@@ -3271,12 +3248,6 @@ void CGameClient::ProcessEvents()
 			}
 
 			if(!Config()->m_SndGame)
-				continue;
-
-			const bool FocusMode = g_Config.m_QmFocusMode != 0;
-			if(pEvent->m_SoundId == SOUND_PLAYER_JUMP && !ShouldPlayFocusJumpSound(FocusMode, g_Config.m_QmFocusModeMuteJumpSounds != 0, Config()->m_SndGame))
-				continue;
-			if(pEvent->m_SoundId == SOUND_PLAYER_DIE && !ShouldPlayFocusDeathOrSpawnSound(FocusMode, g_Config.m_QmFocusModeMuteDeathSounds != 0, Config()->m_SndGame))
 				continue;
 
 			if(m_GameInfo.m_RaceSounds && ((pEvent->m_SoundId == SOUND_GUN_FIRE && !g_Config.m_SndGun) || (pEvent->m_SoundId == SOUND_PLAYER_PAIN_LONG && !g_Config.m_SndLongPain)))
@@ -4948,7 +4919,7 @@ void CGameClient::OnPredict()
 			if(g_Config.m_SndGame && !m_SuppressEvents)
 			{
 				if(Events & COREEVENT_GROUND_JUMP)
-					if(ShouldPlayFocusJumpSound(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeMuteJumpSounds != 0, g_Config.m_SndGame))
+					if(g_Config.m_SndGame)
 						m_Sounds.PlayAndRecord(CSounds::CHN_WORLD, SOUND_PLAYER_JUMP, 1.0f, Pos);
 				if(Events & COREEVENT_HOOK_ATTACH_GROUND)
 					m_Sounds.PlayAndRecord(CSounds::CHN_WORLD, SOUND_HOOK_ATTACH_GROUND, 1.0f, Pos);
@@ -5614,7 +5585,10 @@ void CGameClient::CClientData::UpdateRenderInfo()
 		(m_RenderInfoSkinDescriptor.m_Flags & CSkinDescriptor::FLAG_SIX) != 0,
 		CSkin::IsValidName(m_RenderInfoSkinDescriptor.m_aSkinName),
 		m_pGameClient != nullptr && m_pGameClient->m_Skins.FindOrNullptr(m_RenderInfoSkinDescriptor.m_aSkinName) != nullptr);
-	if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousSixSkinResident)
+	// 句柄「看起来有效」不等于纹理还在：设备重建、槽位释放、皮肤贴图被卸载之后，
+	// 继续复用旧渲染信息就会把 Tee 画成没有贴图的实心白块。失效时改走下面的 default 皮肤回退。
+	const bool PreviousRenderInfoAlive = !m_RenderInfo.HasStaleTexture(m_pGameClient != nullptr ? m_pGameClient->Graphics() : nullptr);
+	if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousRenderInfoAlive && PreviousSixSkinResident)
 	{
 		if(!m_RenderInfoFallbackResidencyRequested && m_RenderInfoSkinDescriptor.m_aSkinName[0] != '\0')
 		{
@@ -6951,16 +6925,12 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 	Settings.m_Enabled = m_TClient.IsFastInputActive();
 	Settings.m_Mode = g_Config.m_QmFastInputMode;
 	Settings.m_FastAmountMs = g_Config.m_TcFastInputAmount;
-	Settings.m_BestOffset = g_Config.m_QmBestInputOffset;
-	Settings.m_BestSmoothing = g_Config.m_QmBestInputSmoothing;
-	Settings.m_BestLatencyComp = g_Config.m_QmBestInputLatencyComp;
 	Settings.m_SaikoPlusAmount = g_Config.m_QmSaikoPlusAmount;
 	const float FastInputOffsetTicks = QmEffectiveFastInputOffsetTicks(Settings);
 	const int FastInputTicks = QmFastInputPredictionTicks(FastInputOffsetTicks, g_Config.m_QmFastInputMode);
 	const bool FastInputOthers = EffectiveFastInputOthers(this);
 	const bool IsLocal = ClientId == m_Snap.m_LocalClientId || (PredictDummy() && ClientId == m_aLocalIds[!g_Config.m_ClDummy]);
 	const int FastInputTicksClient = IsLocal ? FastInputTicks : (FastInputOthers ? QmFastInputPredictionTicksOthers(FastInputOffsetTicks, g_Config.m_QmFastInputMode) : 0);
-	const bool BestInputInterpolationEnabled = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode) == 3 && FastInputTicksClient > 0;
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 	int64_t Now = time_get();
 	for(int i = 0; i < 2; i++)
@@ -6980,7 +6950,7 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 			if(SmoothTick > 0 &&
 				m_aClients[ClientId].m_aPredTick[(SmoothTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
 				m_aClients[ClientId].m_aPredTick[SmoothTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicksClient)
-				Pos[i] = QmBestInputInterpolate(m_aClients[ClientId].m_aPredPos[(SmoothTick - 1) % 200], m_aClients[ClientId].m_aPredPos[SmoothTick % 200], SmoothIntra, BestInputInterpolationEnabled)[i];
+				Pos[i] = mix(m_aClients[ClientId].m_aPredPos[(SmoothTick - 1) % 200], m_aClients[ClientId].m_aPredPos[SmoothTick % 200], SmoothIntra)[i];
 		}
 	}
 	return Pos;
@@ -6991,11 +6961,9 @@ int CGameClient::GetFastInputPredictionAmountMs()
 	if(!m_TClient.IsFastInputActive())
 		return 0;
 	const int Mode = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode);
-	if(Mode == 0)
-		return std::max(0, g_Config.m_TcFastInputAmount);
 	if(Mode == 4)
 		return std::max(0, g_Config.m_QmSaikoPlusAmount / 5);
-	return std::max(0, g_Config.m_QmBestInputOffset / 5);
+	return std::max(0, g_Config.m_TcFastInputAmount);
 }
 
 int CGameClient::GetFastInputPredictionTicks()
@@ -7019,22 +6987,18 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 	Settings.m_Enabled = m_TClient.IsFastInputActive();
 	Settings.m_Mode = g_Config.m_QmFastInputMode;
 	Settings.m_FastAmountMs = g_Config.m_TcFastInputAmount;
-	Settings.m_BestOffset = g_Config.m_QmBestInputOffset;
-	Settings.m_BestSmoothing = g_Config.m_QmBestInputSmoothing;
-	Settings.m_BestLatencyComp = g_Config.m_QmBestInputLatencyComp;
 	Settings.m_SaikoPlusAmount = g_Config.m_QmSaikoPlusAmount;
 	const float FastInputOffsetTicks = QmEffectiveFastInputOffsetTicks(Settings);
 	const int FastInputTicks = QmFastInputPredictionTicks(FastInputOffsetTicks, g_Config.m_QmFastInputMode);
 	const bool FastInputOthers = EffectiveFastInputOthers(this);
 	const int FastInputTicksClient = ClientId == m_Snap.m_LocalClientId ? FastInputTicks : (FastInputOthers ? QmFastInputPredictionTicksOthers(FastInputOffsetTicks, g_Config.m_QmFastInputMode) : 0);
-	const bool BestInputInterpolationEnabled = QmFastInputNormalizedMode(g_Config.m_QmFastInputMode) == 3 && FastInputTicksClient > 0;
 	QmApplyFastInputOffset(FastInputOffsetTicks, PredTick, PredIntraTick);
 
 	if(PredTick > 0 &&
 		m_aClients[ClientId].m_aPredTick[(PredTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
 		m_aClients[ClientId].m_aPredTick[PredTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicksClient)
 	{
-		Pos = QmBestInputInterpolate(m_aClients[ClientId].m_aPredPos[(PredTick - 1) % 200], m_aClients[ClientId].m_aPredPos[PredTick % 200], PredIntraTick, BestInputInterpolationEnabled);
+		Pos = mix(m_aClients[ClientId].m_aPredPos[(PredTick - 1) % 200], m_aClients[ClientId].m_aPredPos[PredTick % 200], PredIntraTick);
 	}
 
 	return Pos;
@@ -7083,9 +7047,6 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 	Settings.m_Enabled = m_TClient.IsFastInputActive();
 	Settings.m_Mode = g_Config.m_QmFastInputMode;
 	Settings.m_FastAmountMs = g_Config.m_TcFastInputAmount;
-	Settings.m_BestOffset = g_Config.m_QmBestInputOffset;
-	Settings.m_BestSmoothing = g_Config.m_QmBestInputSmoothing;
-	Settings.m_BestLatencyComp = g_Config.m_QmBestInputLatencyComp;
 	Settings.m_SaikoPlusAmount = g_Config.m_QmSaikoPlusAmount;
 	const float FastInputOffsetTicks = QmEffectiveFastInputOffsetTicks(Settings);
 	const int FastInputTicks = QmFastInputPredictionTicks(FastInputOffsetTicks, g_Config.m_QmFastInputMode);
@@ -7998,16 +7959,51 @@ std::shared_ptr<CManagedTeeRenderInfo> CGameClient::CreateManagedTeeRenderInfo(c
 
 void CGameClient::UpdateManagedTeeRenderInfos()
 {
-	while(!m_vpManagedTeeRenderInfos.empty())
-	{
-		auto UnusedInfo = std::find_if(m_vpManagedTeeRenderInfos.begin(), m_vpManagedTeeRenderInfos.end(), [&](const auto &pItem) {
-			return pItem.use_count() <= 1;
-		});
-		if(UnusedInfo == m_vpManagedTeeRenderInfos.end())
+	// 一次稳定压缩保留仍被引用的条目，避免逐个删除反复扫描和移动整个尾部。
+	std::erase_if(m_vpManagedTeeRenderInfos, [](const auto &pItem) {
+		return pItem.use_count() <= 1;
+	});
+}
+
+void CGameClient::RepairStaleTeeRenderInfos()
+{
+	// 皮肤贴图被卸载、皮肤容器重建、图形设备重建这些路径只要漏掉一次通知，
+	// 引用旧句柄的渲染信息就会一直把 Tee 画成没有贴图的实心块（表现就是纯白块，且一直不恢复）。
+	// 这里每帧校验句柄是否还活着，失效就按当前皮肤重新解析；解析不到会走既有的 default 皮肤回退。
+	// 绘制期还有一层兜底（CRenderTools 只画存活句柄），因此白块最多存在一帧。
+	IGraphics *pGraphics = Graphics();
+	const auto RepairManagedInfo = [this, pGraphics](const std::shared_ptr<CManagedTeeRenderInfo> &pManagedTeeRenderInfo) {
+		if(!pManagedTeeRenderInfo->TeeRenderInfo().HasStaleTexture(pGraphics))
+			return;
+		if(pManagedTeeRenderInfo->m_StaleRepairAttempts < 3)
 		{
-			break;
+			++pManagedTeeRenderInfo->m_StaleRepairAttempts;
+			log_info("skins", "stale tee render info repaired: skin='%s' flags=%u attempt=%d",
+				pManagedTeeRenderInfo->m_SkinDescriptor.m_aSkinName, pManagedTeeRenderInfo->m_SkinDescriptor.m_Flags,
+				pManagedTeeRenderInfo->m_StaleRepairAttempts);
 		}
-		m_vpManagedTeeRenderInfos.erase(UnusedInfo);
+		RefreshSkin(pManagedTeeRenderInfo);
+	};
+	for(const std::shared_ptr<CManagedTeeRenderInfo> &pManagedTeeRenderInfo : m_vpManagedTeeRenderInfos)
+	{
+		RepairManagedInfo(pManagedTeeRenderInfo);
+	}
+	// 客户端渲染信息是托管信息的副本：托管信息已经刷新、副本还留着旧句柄时，副本要自己重解析
+	// （UpdateRenderInfo 会把失效的上一份判为不可复用，转而走 default 皮肤回退）。
+	for(CClientData &ClientData : m_aClients)
+	{
+		if(!ClientData.m_Active || ClientData.m_pSkinInfo == nullptr)
+			continue;
+		if(!ClientData.m_RenderInfo.HasStaleTexture(pGraphics))
+			continue;
+		if(ClientData.m_pSkinInfo->m_StaleRepairAttempts < 3)
+		{
+			++ClientData.m_pSkinInfo->m_StaleRepairAttempts;
+			log_info("skins", "stale client tee render info repaired: skin='%s' flags=%u attempt=%d",
+				ClientData.m_pSkinInfo->m_SkinDescriptor.m_aSkinName, ClientData.m_pSkinInfo->m_SkinDescriptor.m_Flags,
+				ClientData.m_pSkinInfo->m_StaleRepairAttempts);
+		}
+		ClientData.UpdateRenderInfo();
 	}
 }
 
@@ -8713,22 +8709,18 @@ void CGameClient::SetConnectInfo(const NETADDR *pAddress)
 void CGameClient::ClearQ1menGSyncMarks()
 {
 	std::fill(std::begin(m_aQ1menGSyncMarkUntil), std::end(m_aQ1menGSyncMarkUntil), 0);
-	std::fill(std::begin(m_aQ1menGSyncFootParticlesEnabled), std::end(m_aQ1menGSyncFootParticlesEnabled), false);
-	std::fill(std::begin(m_aQ1menGSyncRemoteParticlesEnabled), std::end(m_aQ1menGSyncRemoteParticlesEnabled), false);
 	std::fill(std::begin(m_aQ1menGSyncClientBrands), std::end(m_aQ1menGSyncClientBrands), EClientBrand::NONE);
 	for(auto &aQid : m_aaQ1menGSyncQid)
 		aQid[0] = '\0';
 }
 
-void CGameClient::MarkQ1menGSyncClient(int ClientId, int64_t ExpireTick, bool FootParticlesEnabled, bool RemoteParticlesEnabled, const char *pQid, EClientBrand ClientBrand)
+void CGameClient::MarkQ1menGSyncClient(int ClientId, int64_t ExpireTick, const char *pQid, EClientBrand ClientBrand)
 {
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
 		return;
 	if(ExpireTick <= 0)
 		return;
 	m_aQ1menGSyncMarkUntil[ClientId] = maximum(m_aQ1menGSyncMarkUntil[ClientId], ExpireTick);
-	m_aQ1menGSyncFootParticlesEnabled[ClientId] = FootParticlesEnabled;
-	m_aQ1menGSyncRemoteParticlesEnabled[ClientId] = RemoteParticlesEnabled;
 	m_aQ1menGSyncClientBrands[ClientId] = ClientBrand == EClientBrand::NONE ? EClientBrand::QM : ClientBrand;
 	if(pQid && pQid[0] != '\0')
 		str_copy(m_aaQ1menGSyncQid[ClientId], pQid, sizeof(m_aaQ1menGSyncQid[ClientId]));
@@ -8750,14 +8742,6 @@ const char *CGameClient::GetQ1menGClientQid(int ClientId) const
 	if(!IsQ1menGClientRecognized(ClientId))
 		return "";
 	return m_aaQ1menGSyncQid[ClientId];
-}
-
-bool CGameClient::ShouldRenderQ1menGRemoteFootParticles(int ClientId) const
-{
-	if(!IsQ1menGClientRecognized(ClientId))
-		return false;
-
-	return m_aQ1menGSyncRemoteParticlesEnabled[ClientId] && m_aQ1menGSyncFootParticlesEnabled[ClientId];
 }
 
 void CGameClient::ClearQmVoiceSyncMarks()

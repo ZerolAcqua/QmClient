@@ -14,6 +14,7 @@
 #include <game/client/components/nameplate_text_effects.h>
 #include <game/client/components/qmclient/chat_emoji.h>
 #include <game/client/components/qmclient/demo_display.h>
+#include <game/client/components/qmclient/friend_heart_icon.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/nameplate_layout.h>
 #include <game/client/components/qmclient/qm_title_color.h>
@@ -42,11 +43,6 @@ static constexpr std::array<ENameplateCoreRow, kNameplateCoreRowCount> s_aDefaul
 	ENameplateCoreRow::HOOK,
 	ENameplateCoreRow::CLAN,
 	ENameplateCoreRow::NAME};
-
-static bool FocusModeHidesChat()
-{
-	return g_Config.m_QmFocusMode != 0 && g_Config.m_QmFocusModeHideChat != 0;
-}
 
 struct SChatBubbleAnimState
 {
@@ -143,6 +139,48 @@ static ColorRGBA HookStrongWeakColor(EHookStrongWeakState State, float Alpha)
 	return ColorRGBA(1.0f, 1.0f, 1.0f, Alpha);
 }
 
+// QmClient：名牌文字特效的自适应降级状态（qm_nameplate_effect_auto_lod）。
+// 只在渲染线程、且只在 OnRender 的名牌渲染段内有效：档位每帧开场算一次，同一帧内所有名牌共用，
+// 因此不会出现同屏不同玩家效果不一致。OnRender 之外（设置页预览等）读到的是满档。
+static int s_QmNameplateEffectLodSmoothed = 0; // 平滑后的同屏名牌数
+static int s_QmNameplateEffectLodVisible = 0; // 上一帧真正画出特效层的名牌数
+static int s_QmNameplateEffectLodVisibleThisFrame = 0; // 本帧已画出的带特效名牌数
+static int s_QmNameplateEffectLodDraws = QM_TEXT_EFFECT_DRAWS_UNLIMITED; // 本帧每个名牌文本行允许的特效绘制次数
+
+static void QmNameplateEffectLodBeginFrame()
+{
+	const int FullDraws = QmNameplateEffectFullDraws(
+		g_Config.m_QmNameplateTextEffects,
+		g_Config.m_QmNameplateTextBorderRange,
+		g_Config.m_QmNameplateTextGlowRange);
+	if(g_Config.m_QmNameplateEffectAutoLod && FullDraws > 0)
+	{
+		s_QmNameplateEffectLodSmoothed = QmNameplateEffectLodSmoothCount(
+			s_QmNameplateEffectLodSmoothed,
+			s_QmNameplateEffectLodVisible,
+			QM_NAMEPLATE_EFFECT_LOD_DEAD_ZONE_NAMEPLATES,
+			QM_NAMEPLATE_EFFECT_LOD_STEP_UP_NAMEPLATES,
+			QM_NAMEPLATE_EFFECT_LOD_STEP_DOWN_NAMEPLATES);
+		s_QmNameplateEffectLodDraws = QmNameplateEffectLodIdealDraws(
+			s_QmNameplateEffectLodSmoothed,
+			FullDraws,
+			std::clamp(g_Config.m_QmNameplateEffectLodThreshold, 4, 64));
+	}
+	else
+	{
+		// 关掉自动档位时仍然跟踪人数，这样中途打开不会从过期值开始。
+		s_QmNameplateEffectLodSmoothed = s_QmNameplateEffectLodVisible;
+		s_QmNameplateEffectLodDraws = QM_TEXT_EFFECT_DRAWS_UNLIMITED;
+	}
+	s_QmNameplateEffectLodVisibleThisFrame = 0;
+}
+
+static void QmNameplateEffectLodEndFrame()
+{
+	s_QmNameplateEffectLodVisible = s_QmNameplateEffectLodVisibleThisFrame;
+	s_QmNameplateEffectLodDraws = QM_TEXT_EFFECT_DRAWS_UNLIMITED;
+}
+
 static SQmTextEffectRenderStyle BuildQmNameplateTextStyle(CGameClient &This, ColorRGBA TextColor, bool UseEffects)
 {
 	SQmTextEffectRenderStyle Style;
@@ -156,6 +194,8 @@ static SQmTextEffectRenderStyle BuildQmNameplateTextStyle(CGameClient &This, Col
 	Style.m_GlowColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_QmNameplateTextGlowColor, true));
 	Style.m_GlowRange = (float)std::clamp(g_Config.m_QmNameplateTextGlowRange, 1, 12);
 	Style.m_Time = This.Client()->GlobalTime();
+	// QmClient：同屏名牌多时按本帧档位削掉最外层特效；本体永远保留。
+	Style.m_MaxEffectDraws = UseEffects ? s_QmNameplateEffectLodDraws : QM_TEXT_EFFECT_DRAWS_UNLIMITED;
 	return Style;
 }
 
@@ -637,9 +677,11 @@ protected:
 	{
 		m_FontSize = Data.m_FontSize;
 		CTextCursor Cursor;
-		This.TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		// 好友爱心：图标字体没有实心爱心，改用默认字体回退的 U+2665（见 friend_heart_icon.h）。
+		// 字形在创建文本容器时就被解析，所以预设必须在 CreateOrAppendTextContainer 之前切换。
+		This.TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		Cursor.m_FontSize = m_FontSize;
-		This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, FontIcons::FONT_ICON_HEART);
+		This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, QM_FRIEND_HEART_ICON);
 		This.TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 	}
 
@@ -768,8 +810,8 @@ protected:
 			return;
 		const bool DynamicStyle = m_TitleRenderStyle.m_pStyle != nullptr;
 		const bool CustomColor = m_TitleColorStyle.m_Mode != EQmTitleColorMode::FOLLOW_SERVER;
-		// FOLLOW_SERVER 且无动态风格时，颜色来自名牌文本色而非本部件配置。
-		const bool VertexColored = DynamicStyle || m_TitleColorStyle.m_Rainbow || !CustomColor;
+		// 本地单色由渲染颜色施加；风格自带颜色、彩虹和跟随服务器使用顶点色。
+		const bool VertexColored = (DynamicStyle && !m_TitleRenderStyle.m_ColorOverride) || m_TitleColorStyle.m_Rainbow || !CustomColor;
 		const int Effect = std::clamp(g_Config.m_QmTitleEffect, 0, 3);
 		ColorRGBA Color(0.0f, 0.0f, 0.0f, m_Alpha);
 		ColorRGBA OutlineColor(0.85f, 0.85f, 0.85f, m_Alpha);
@@ -2111,7 +2153,13 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	CNamePlate &NamePlate = m_pData->m_aNamePlates[ClientId];
 	NamePlate.Update(*GameClient(), Data);
 	if(Alpha > 0.0f)
+	{
+		// QmClient：统计本帧真正画出特效层的名牌数（只有昵称/战队行带特效层，都要 ShowName），
+		// 作为下一帧的档位依据（用上一帧的数就不必为了数数再扫一遍全部客户端）。
+		if(Data.m_UseTextEffects && Data.m_ShowName)
+			++s_QmNameplateEffectLodVisibleThisFrame;
 		NamePlate.Render(*GameClient(), Position - vec2(0.0f, (float)g_Config.m_ClNamePlatesOffset), pLayoutReference);
+	}
 }
 
 // 构造预览用铭牌数据。ForceNameplateScopeAll=true 生成「全 scope 参考框」：
@@ -2483,8 +2531,6 @@ void CNamePlates::RenderChatBubble(vec2 Position, int ClientId, float Alpha)
 	// Check if chat bubbles are enabled
 	if(!g_Config.m_QmChatBubble)
 		return;
-	if(FocusModeHidesChat())
-		return;
 
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
 		return;
@@ -2842,7 +2888,7 @@ void CNamePlates::OnRender()
 	const bool RenderTClientExtras = g_Config.m_TcNameplatePingCircle || g_Config.m_TcNameplateCountry || g_Config.m_TcNameplateSkins || (g_Config.m_TcWarList && g_Config.m_TcWarListReason);
 	const bool RenderDirection = ShowDirection != 0;
 	const bool RenderNameplates = RenderNames || RenderClan || RenderClientIds || RenderStrongWeak || RenderTClientExtras || RenderDirection || ShowCoords || ShowCoordXAlignHint;
-	const bool RenderChatBubbles = g_Config.m_QmChatBubble != 0 && !FocusModeHidesChat();
+	const bool RenderChatBubbles = g_Config.m_QmChatBubble != 0;
 	const bool RenderFreezeWakeupPopups = GameClient()->HasFreezeWakeupPopups();
 	if(!RenderNameplates && !RenderChatBubbles && !RenderFreezeWakeupPopups)
 		return;
@@ -2851,6 +2897,9 @@ void CNamePlates::OnRender()
 	{
 		if(RenderNameplates)
 			UpdateCoordXAlignFrameState();
+
+		// QmClient：本帧的特效档位在这里定一次，同一帧内所有名牌共用同一档位。
+		QmNameplateEffectLodBeginFrame();
 
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
@@ -2890,6 +2939,8 @@ void CNamePlates::OnRender()
 					RenderChatBubble(RenderPos, i, 1.0f);
 			}
 		}
+
+		QmNameplateEffectLodEndFrame();
 	}
 
 	if(RenderFreezeWakeupPopups)

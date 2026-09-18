@@ -22,57 +22,57 @@
 
 namespace
 {
-constexpr float s_SuperChargeSecondsRequired = 1.5f;
-constexpr float s_SuperProjectileScale = 2.35f;
-constexpr float s_SuperChargeRingThickness = 4.0f;
-constexpr int s_SuperChargeRingSegments = 72;
-constexpr float s_SuperChargeRingAnimationSeconds = 0.18f;
+	constexpr float s_SuperChargeSecondsRequired = 1.5f;
+	constexpr float s_SuperProjectileScale = 2.35f;
+	constexpr float s_SuperChargeRingThickness = 4.0f;
+	constexpr int s_SuperChargeRingSegments = 72;
+	constexpr float s_SuperChargeRingAnimationSeconds = 0.18f;
 
-void RenderChargeRing(IGraphics *pGraphics, vec2 Center, float OuterRadius, float Thickness, float Progress, ColorRGBA FilledColor, ColorRGBA EmptyColor, int Segments)
-{
-	if(OuterRadius <= 0.0f || Thickness <= 0.0f || Segments <= 0)
-		return;
-	const float ClampedProgress = std::clamp(Progress, 0.0f, 1.0f);
-	const float InnerRadius = std::max(0.0f, OuterRadius - Thickness);
-	const float SegmentAngle = 2.0f * pi / (float)Segments;
-	const float AngleOffset = -0.5f * pi;
+	void RenderChargeRing(IGraphics *pGraphics, vec2 Center, float OuterRadius, float Thickness, float Progress, ColorRGBA FilledColor, ColorRGBA EmptyColor, int Segments)
+	{
+		if(OuterRadius <= 0.0f || Thickness <= 0.0f || Segments <= 0)
+			return;
+		const float ClampedProgress = std::clamp(Progress, 0.0f, 1.0f);
+		const float InnerRadius = std::max(0.0f, OuterRadius - Thickness);
+		const float SegmentAngle = 2.0f * pi / (float)Segments;
+		const float AngleOffset = -0.5f * pi;
 
-	pGraphics->TextureClear();
-	pGraphics->QuadsBegin();
-	pGraphics->SetColor(EmptyColor);
-	for(int i = 0; i < Segments; ++i)
-	{
-		const vec2 Dir1 = direction(AngleOffset + i * SegmentAngle);
-		const vec2 Dir2 = direction(AngleOffset + (i + 1) * SegmentAngle);
-		const IGraphics::CFreeformItem Item(
-			Center + Dir1 * InnerRadius, Center + Dir2 * InnerRadius,
-			Center + Dir1 * OuterRadius, Center + Dir2 * OuterRadius);
-		pGraphics->QuadsDrawFreeform(&Item, 1);
+		pGraphics->TextureClear();
+		pGraphics->QuadsBegin();
+		pGraphics->SetColor(EmptyColor);
+		for(int i = 0; i < Segments; ++i)
+		{
+			const vec2 Dir1 = direction(AngleOffset + i * SegmentAngle);
+			const vec2 Dir2 = direction(AngleOffset + (i + 1) * SegmentAngle);
+			const IGraphics::CFreeformItem Item(
+				Center + Dir1 * InnerRadius, Center + Dir2 * InnerRadius,
+				Center + Dir1 * OuterRadius, Center + Dir2 * OuterRadius);
+			pGraphics->QuadsDrawFreeform(&Item, 1);
+		}
+		pGraphics->SetColor(FilledColor);
+		const float FilledSegments = ClampedProgress * Segments;
+		const int WholeSegments = std::clamp((int)std::floor(FilledSegments), 0, Segments);
+		for(int i = 0; i < WholeSegments; ++i)
+		{
+			const vec2 Dir1 = direction(AngleOffset + i * SegmentAngle);
+			const vec2 Dir2 = direction(AngleOffset + (i + 1) * SegmentAngle);
+			const IGraphics::CFreeformItem Item(
+				Center + Dir1 * InnerRadius, Center + Dir2 * InnerRadius,
+				Center + Dir1 * OuterRadius, Center + Dir2 * OuterRadius);
+			pGraphics->QuadsDrawFreeform(&Item, 1);
+		}
+		const float PartialSegment = FilledSegments - WholeSegments;
+		if(PartialSegment > 0.0f && WholeSegments < Segments)
+		{
+			const float Angle1 = AngleOffset + WholeSegments * SegmentAngle;
+			const float Angle2 = Angle1 + SegmentAngle * PartialSegment;
+			const IGraphics::CFreeformItem Item(
+				Center + direction(Angle1) * InnerRadius, Center + direction(Angle2) * InnerRadius,
+				Center + direction(Angle1) * OuterRadius, Center + direction(Angle2) * OuterRadius);
+			pGraphics->QuadsDrawFreeform(&Item, 1);
+		}
+		pGraphics->QuadsEnd();
 	}
-	pGraphics->SetColor(FilledColor);
-	const float FilledSegments = ClampedProgress * Segments;
-	const int WholeSegments = std::clamp((int)std::floor(FilledSegments), 0, Segments);
-	for(int i = 0; i < WholeSegments; ++i)
-	{
-		const vec2 Dir1 = direction(AngleOffset + i * SegmentAngle);
-		const vec2 Dir2 = direction(AngleOffset + (i + 1) * SegmentAngle);
-		const IGraphics::CFreeformItem Item(
-			Center + Dir1 * InnerRadius, Center + Dir2 * InnerRadius,
-			Center + Dir1 * OuterRadius, Center + Dir2 * OuterRadius);
-		pGraphics->QuadsDrawFreeform(&Item, 1);
-	}
-	const float PartialSegment = FilledSegments - WholeSegments;
-	if(PartialSegment > 0.0f && WholeSegments < Segments)
-	{
-		const float Angle1 = AngleOffset + WholeSegments * SegmentAngle;
-		const float Angle2 = Angle1 + SegmentAngle * PartialSegment;
-		const IGraphics::CFreeformItem Item(
-			Center + direction(Angle1) * InnerRadius, Center + direction(Angle2) * InnerRadius,
-			Center + direction(Angle1) * OuterRadius, Center + direction(Angle2) * OuterRadius);
-		pGraphics->QuadsDrawFreeform(&Item, 1);
-	}
-	pGraphics->QuadsEnd();
-}
 }
 
 void CEmoticonProjectile::Init(vec2 Pos, vec2 Vel, int EmoticonID, float SizeScale)
@@ -290,15 +290,19 @@ void CEmoticon::OnRender()
 		if(!GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_Active ||
 			str_comp(GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_aName, RemoteEvent.m_PlayerName.c_str()) != 0)
 			continue;
-		if(RemoteEvent.m_SuperLaunch && g_Config.m_QmShowOtherSuperEmotes)
+		const auto Effect = QmEmoticon::ResolveRemoteEffect(RemoteEvent.m_Emoticon, RemoteEvent.m_LaunchMode, RemoteEvent.m_SuperLaunch,
+			g_Config.m_ClShowEmotes, GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_EmoticonIgnore,
+			g_Config.m_QmShowOtherSuperEmotes, g_Config.m_QmShowOtherLaunchEmotes);
+		m_aRemoteSuperHeadEmoticons[RemoteEvent.m_PlayerId] = -1;
+		m_aRemoteSuperHeadExpireTicks[RemoteEvent.m_PlayerId] = -1;
+		if(Effect == QmEmoticon::EEffect::SUPER_HEAD)
 		{
 			m_aRemoteSuperHeadEmoticons[RemoteEvent.m_PlayerId] = RemoteEvent.m_Emoticon;
 			m_aRemoteSuperHeadExpireTicks[RemoteEvent.m_PlayerId] = Client()->GameTick(g_Config.m_ClDummy) + 2 * Client()->GameTickSpeed();
 		}
-		if(!RemoteEvent.m_LaunchMode && !RemoteEvent.m_SuperLaunch)
+		if(Effect != QmEmoticon::EEffect::PROJECTILE && Effect != QmEmoticon::EEffect::SUPER_PROJECTILE)
 			continue;
-		if(!g_Config.m_QmShowOtherLaunchEmotes)
-			continue;
+		const bool SuperLaunch = Effect == QmEmoticon::EEffect::SUPER_PROJECTILE;
 
 		vec2 LaunchPos = GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_RenderPos;
 		LaunchPos.y -= 20.0f;
@@ -310,8 +314,8 @@ void CEmoticon::OnRender()
 		{
 			if(Projectile.m_Active)
 				continue;
-			Projectile.Init(LaunchPos, Vel, RemoteEvent.m_Emoticon, RemoteEvent.m_SuperLaunch ? s_SuperProjectileScale : 1.0f);
-			if(RemoteEvent.m_SuperLaunch)
+			Projectile.Init(LaunchPos, Vel, RemoteEvent.m_Emoticon, SuperLaunch ? s_SuperProjectileScale : 1.0f);
+			if(SuperLaunch)
 				GameClient()->m_Effects.Explosion(LaunchPos, 0.9f);
 			else
 				GameClient()->m_Effects.HammerHit(LaunchPos, 0.65f, 0.0f);
@@ -564,8 +568,8 @@ void CEmoticon::OnRender()
 		const float RingOuterRadius = 47.0f * PresentationScale * Phase;
 		const float RingThickness = s_SuperChargeRingThickness * PresentationScale * Phase;
 		const ColorRGBA FilledColor = Charge >= 1.0f ?
-			ColorRGBA(1.0f, 0.82f, 0.35f, 0.95f * PresentationAlpha) :
-			ColorRGBA(1.0f, 1.0f, 1.0f, 0.90f * PresentationAlpha);
+						      ColorRGBA(1.0f, 0.82f, 0.35f, 0.95f * PresentationAlpha) :
+						      ColorRGBA(1.0f, 1.0f, 1.0f, 0.90f * PresentationAlpha);
 		RenderChargeRing(Graphics(), ScreenCenter + Nudge, RingOuterRadius, RingThickness, Charge, FilledColor, FilledColor.WithMultipliedAlpha(0.28f), s_SuperChargeRingSegments);
 	};
 	RenderSuperChargeRing(m_SuperChargeRingExitEmote, m_SuperChargeRingExitPhase, m_SuperChargeRingExitCharge);
@@ -612,10 +616,12 @@ void CEmoticon::OnRender()
 
 void CEmoticon::Emote(int Emoticon)
 {
-	const bool UseSuperLaunch = m_SuperLaunchPending;
-	m_SuperLaunchPending = false;
+	const auto Effect = QmEmoticon::ConsumeEffect(Emoticon, m_LaunchModeActive, m_SuperLaunchPending);
+	if(Effect == QmEmoticon::EEffect::INVALID)
+		return;
+	const bool UseSuperLaunch = Effect == QmEmoticon::EEffect::SUPER_HEAD || Effect == QmEmoticon::EEffect::SUPER_PROJECTILE;
 
-	if(UseSuperLaunch && !m_LaunchModeActive)
+	if(Effect == QmEmoticon::EEffect::SUPER_HEAD)
 	{
 		m_LocalSuperHeadEmoticon = Emoticon;
 		m_LocalSuperHeadExpireTick = Client()->GameTick(g_Config.m_ClDummy) + 2 * Client()->GameTickSpeed();
@@ -626,7 +632,7 @@ void CEmoticon::Emote(int Emoticon)
 		m_LocalSuperHeadExpireTick = -1;
 	}
 
-	if(m_LaunchModeActive)
+	if(Effect == QmEmoticon::EEffect::PROJECTILE || Effect == QmEmoticon::EEffect::SUPER_PROJECTILE)
 	{
 		vec2 LaunchPos = GameClient()->m_LocalCharacterPos;
 		LaunchPos.y -= 20.0f;
@@ -677,8 +683,8 @@ bool CEmoticon::IsLocalSuperHeadEmoticon(int ClientId, int Emoticon) const
 	if(!g_Config.m_QmShowOtherSuperEmotes || ClientId < 0 || ClientId >= MAX_CLIENTS)
 		return false;
 	return Emoticon == m_aRemoteSuperHeadEmoticons[ClientId] &&
-		m_aRemoteSuperHeadExpireTicks[ClientId] >= 0 &&
-		Client()->GameTick(g_Config.m_ClDummy) <= m_aRemoteSuperHeadExpireTicks[ClientId];
+	       m_aRemoteSuperHeadExpireTicks[ClientId] >= 0 &&
+	       Client()->GameTick(g_Config.m_ClDummy) <= m_aRemoteSuperHeadExpireTicks[ClientId];
 }
 
 void CEmoticon::EyeEmote(int Emote)

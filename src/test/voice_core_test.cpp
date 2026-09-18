@@ -9,6 +9,7 @@
 
 #include <engine/shared/config.h>
 #include <engine/shared/json.h>
+#include <engine/shared/websocket_client.h>
 
 #include <game/client/components/qmclient/qmclient_utils.h>
 #include <game/client/components/qmclient/voice/voice_capture_pipeline.h>
@@ -21,9 +22,12 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <sstream>
+#include <utility>
 
 #if defined(CONF_RNNOISE)
 #include <rnnoise.h>
@@ -39,6 +43,276 @@ namespace VoiceUtils
 static constexpr int TEST_VOICE_NOISE_SUPPRESS_OFF = 0;
 static constexpr int TEST_VOICE_NOISE_SUPPRESS_SIMPLE = 1;
 static constexpr int TEST_VOICE_NOISE_SUPPRESS_RNNOISE = 2;
+
+namespace
+{
+	class CVoiceWebSocketMock final : public IQmWebSocketClient
+	{
+	public:
+		SQmWebSocketConnectConfig m_Config;
+		EQmWebSocketState m_State = EQmWebSocketState::IDLE;
+		bool m_Desired = false;
+		bool m_ConnectAccepted = true;
+		bool m_SendAccepted = true;
+		int m_ConnectCalls = 0;
+		int m_DisconnectCalls = 0;
+		int m_SendCalls = 0;
+		int64_t m_ConnectedTick = 0;
+		std::string m_Error;
+		IQmWebSocketClient::STuning m_Tuning;
+		std::deque<SQmWebSocketMessage> m_Incoming;
+		std::vector<std::string> m_vSent;
+
+		bool Available() const override { return true; }
+		const char *UnavailableReason() const override { return ""; }
+		bool Connect(const SQmWebSocketConnectConfig &Config, std::string &Error) override
+		{
+			++m_ConnectCalls;
+			m_Config = Config;
+			if(!m_ConnectAccepted)
+			{
+				Error = "connect rejected";
+				return false;
+			}
+			m_Desired = true;
+			m_State = EQmWebSocketState::CONNECTING;
+			return true;
+		}
+		void Disconnect() override
+		{
+			++m_DisconnectCalls;
+			m_Desired = false;
+			m_State = EQmWebSocketState::IDLE;
+			m_Incoming.clear();
+		}
+		bool Desired() const override { return m_Desired; }
+		EQmWebSocketState State() const override { return m_State; }
+		const char *StateName() const override { return "mock"; }
+		bool SendText(const char *, size_t) override { return false; }
+		void SetTuning(const IQmWebSocketClient::STuning &Tuning) override { m_Tuning = Tuning; }
+		bool SendBinary(const char *pData, size_t Size) override
+		{
+			++m_SendCalls;
+			if(!m_SendAccepted)
+				return false;
+			m_vSent.emplace_back(pData, Size);
+			return true;
+		}
+		bool PollMessage(SQmWebSocketMessage &Out) override
+		{
+			if(m_Incoming.empty())
+				return false;
+			Out = std::move(m_Incoming.front());
+			m_Incoming.pop_front();
+			return true;
+		}
+		size_t PendingMessages() const override { return m_Incoming.size(); }
+		int64_t LastConnectedTick() const override { return m_ConnectedTick; }
+		int64_t LastMessageTick() const override { return 0; }
+		int64_t SendCount() const override { return m_vSent.size(); }
+		int64_t RecvCount() const override { return 0; }
+		int64_t DroppedIncomingCount() const override { return 0; }
+		int64_t DroppedOutgoingCount() const override { return 0; }
+		int64_t ReconnectCount() const override { return 0; }
+		int LastPingRttMs() const override { return -1; }
+		const char *LastError() const override { return m_Error.c_str(); }
+		void Open()
+		{
+			m_State = EQmWebSocketState::CONNECTED;
+			++m_ConnectedTick;
+		}
+	};
+
+	class CVoiceWebSocketTest : public ::testing::Test
+	{
+	protected:
+		CVoiceWebSocketMock *m_pMock = new CVoiceWebSocketMock;
+		CVoiceWebSocketTransport m_Transport{std::unique_ptr<IQmWebSocketClient>(m_pMock)};
+
+		void Connect()
+		{
+			m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION);
+			m_pMock->Open();
+			ASSERT_TRUE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+			ASSERT_TRUE(m_Transport.Connected());
+			EXPECT_EQ(m_pMock->m_Tuning.m_OutgoingQueueCapacity, 8u);
+		}
+	};
+}
+
+TEST(VoiceUtils, VoiceWebSocketUrlMigratesOnlyOfficialUdpDefault)
+{
+	EXPECT_STREQ(EffectiveVoiceWebSocketUrl(nullptr), "wss://qmclient.icu/ws/voice");
+	EXPECT_STREQ(EffectiveVoiceWebSocketUrl(""), "wss://qmclient.icu/ws/voice");
+	EXPECT_STREQ(EffectiveVoiceWebSocketUrl("42.194.185.210:9987"), "wss://qmclient.icu/ws/voice");
+	EXPECT_STREQ(EffectiveVoiceWebSocketUrl("custom.example:9987"), "custom.example:9987");
+	EXPECT_STREQ(EffectiveVoiceWebSocketUrl("ws://voice.example:9987/ws/voice"), "ws://voice.example:9987/ws/voice");
+	EXPECT_STREQ(EffectiveVoiceWebSocketUrl("wss://voice.example/ws/voice"), "wss://voice.example/ws/voice");
+}
+
+TEST_F(CVoiceWebSocketTest, ParsesWsAndWssAndRejectsUdpOrHttpAddresses)
+{
+	m_Transport.Update("42.194.185.210:9987", false, 10, 20, VOICE_VERSION);
+	EXPECT_TRUE(m_Transport.UrlValid());
+	EXPECT_EQ(m_pMock->m_ConnectCalls, 0);
+	m_Transport.Update("", true, 10, 20, VOICE_VERSION);
+	EXPECT_TRUE(m_pMock->m_Config.m_UseTls);
+	EXPECT_EQ(m_pMock->m_Config.m_Host, "qmclient.icu");
+	EXPECT_EQ(m_pMock->m_Config.m_Port, 443);
+	EXPECT_EQ(m_pMock->m_Config.m_Path, "/ws/voice");
+	EXPECT_EQ(m_pMock->m_Config.m_MaxMessageSize, 128u * 1024u);
+	EXPECT_FALSE(m_pMock->m_Config.m_AllowInsecureTls);
+	m_Transport.Update("ws://voice.example:9000/ws/voice", true, 10, 20, VOICE_VERSION);
+	EXPECT_TRUE(m_Transport.UrlValid());
+	EXPECT_FALSE(m_pMock->m_Config.m_UseTls);
+	EXPECT_EQ(m_pMock->m_Config.m_Port, 9000);
+	for(const char *pInvalid : {"voice.example:9987", "http://voice.example/ws/voice", "wss:///ws/voice"})
+	{
+		m_Transport.Update(pInvalid, true, 10, 20, VOICE_VERSION);
+		EXPECT_FALSE(m_Transport.UrlValid());
+		EXPECT_FALSE(m_pMock->Desired());
+		EXPECT_STRNE(m_Transport.LastError(), "");
+	}
+	EXPECT_EQ(m_pMock->m_ConnectCalls, 2);
+}
+
+TEST_F(CVoiceWebSocketTest, ResetsOnceForEachConnectedOrDisconnectedSession)
+{
+	m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION);
+	EXPECT_TRUE(m_Transport.Connecting());
+	EXPECT_FALSE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+	m_pMock->Open();
+	EXPECT_TRUE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+	EXPECT_TRUE(m_Transport.Connected());
+	EXPECT_FALSE(m_Transport.Connecting());
+	EXPECT_FALSE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+	m_pMock->m_State = EQmWebSocketState::RECONNECTING;
+	m_pMock->m_Error = "connection lost";
+	EXPECT_TRUE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+	EXPECT_FALSE(m_Transport.Connected());
+	EXPECT_TRUE(m_Transport.Connecting());
+	EXPECT_STREQ(m_Transport.LastError(), "connection lost");
+	EXPECT_FALSE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+	m_pMock->Open();
+	EXPECT_TRUE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+	EXPECT_EQ(m_pMock->m_ConnectCalls, 1);
+	EXPECT_STREQ(m_Transport.LastError(), "");
+}
+
+TEST_F(CVoiceWebSocketTest, FastReconnectCannotConsumeOrSendBeforeRuntimeReset)
+{
+	Connect();
+	m_pMock->Open();
+	m_pMock->m_Incoming.push_back({EQmWebSocketMessageType::BINARY, std::string(VOICE_PACKET_HEADER_SIZE, 'a')});
+	uint8_t aPacket[VOICE_PACKET_HEADER_SIZE] = {};
+	SQmWebSocketMessage Packet;
+	EXPECT_FALSE(m_Transport.Connected());
+	EXPECT_FALSE(m_Transport.SendPacket(aPacket, sizeof(aPacket)));
+	EXPECT_FALSE(m_Transport.PollPacket(Packet));
+	EXPECT_EQ(m_pMock->PendingMessages(), 1u);
+	EXPECT_TRUE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+	EXPECT_TRUE(m_Transport.PollPacket(Packet));
+}
+
+TEST_F(CVoiceWebSocketTest, ServerRoomTokenAndProtocolChangesIsolateOldQueues)
+{
+	Connect();
+	const char *apUrls[] = {"ws://other.example/ws/voice", "ws://other.example/ws/voice", "ws://other.example/ws/voice", "ws://other.example/ws/voice"};
+	const uint32_t aContexts[] = {10, 11, 11, 11};
+	const uint32_t aTokens[] = {20, 20, 21, 21};
+	const uint8_t aVersions[] = {VOICE_VERSION, VOICE_VERSION, VOICE_VERSION, VOICE_VERSION + 1};
+	for(int i = 0; i < 4; ++i)
+	{
+		m_pMock->m_Incoming.push_back({EQmWebSocketMessageType::BINARY, std::string(VOICE_PACKET_HEADER_SIZE, 'a')});
+		const int DisconnectCalls = m_pMock->m_DisconnectCalls;
+		EXPECT_TRUE(m_Transport.Update(apUrls[i], true, aContexts[i], aTokens[i], aVersions[i]));
+		EXPECT_GT(m_pMock->m_DisconnectCalls, DisconnectCalls);
+		EXPECT_EQ(m_pMock->PendingMessages(), 0u);
+		EXPECT_FALSE(m_Transport.Connected());
+		m_pMock->Open();
+		EXPECT_TRUE(m_Transport.Update(apUrls[i], true, aContexts[i], aTokens[i], aVersions[i]));
+	}
+	EXPECT_EQ(m_pMock->m_ConnectCalls, 5);
+}
+
+TEST_F(CVoiceWebSocketTest, DisablingAndDisconnectingStopTheConnectionIntent)
+{
+	Connect();
+	m_pMock->m_Incoming.push_back({EQmWebSocketMessageType::BINARY, std::string(VOICE_PACKET_HEADER_SIZE, 'a')});
+	EXPECT_TRUE(m_Transport.Update("wss://voice.example/ws/voice", false, 10, 20, VOICE_VERSION));
+	EXPECT_FALSE(m_pMock->Desired());
+	EXPECT_EQ(m_pMock->PendingMessages(), 0u);
+	EXPECT_FALSE(m_Transport.Connected());
+	EXPECT_FALSE(m_Transport.Connecting());
+	EXPECT_TRUE(m_Transport.UrlValid());
+	EXPECT_FALSE(m_Transport.Update("wss://voice.example/ws/voice", false, 10, 20, VOICE_VERSION));
+	m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION);
+	EXPECT_EQ(m_pMock->m_ConnectCalls, 2);
+	m_Transport.Disconnect();
+	EXPECT_FALSE(m_pMock->Desired());
+	EXPECT_FALSE(m_Transport.Connected());
+	m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION);
+	EXPECT_EQ(m_pMock->m_ConnectCalls, 3);
+}
+
+TEST_F(CVoiceWebSocketTest, SendsOnlyValidBinaryPacketsWhileConnectedAndPropagatesFailure)
+{
+	uint8_t aPacket[VOICE_MAX_PACKET + 1] = {};
+	EXPECT_FALSE(m_Transport.SendPacket(aPacket, VOICE_PACKET_HEADER_SIZE));
+	Connect();
+	EXPECT_FALSE(m_Transport.SendPacket(nullptr, VOICE_PACKET_HEADER_SIZE));
+	EXPECT_FALSE(m_Transport.SendPacket(aPacket, 0));
+	EXPECT_FALSE(m_Transport.SendPacket(aPacket, VOICE_PACKET_HEADER_SIZE - 1));
+	EXPECT_FALSE(m_Transport.SendPacket(aPacket, sizeof(aPacket)));
+	EXPECT_EQ(m_pMock->m_SendCalls, 0);
+	EXPECT_TRUE(m_Transport.SendPacket(aPacket, VOICE_PACKET_HEADER_SIZE));
+	EXPECT_TRUE(m_Transport.SendPacket(aPacket, VOICE_MAX_PACKET));
+	ASSERT_EQ(m_pMock->m_vSent.size(), 2u);
+	EXPECT_EQ(m_pMock->m_vSent[0], std::string(VOICE_PACKET_HEADER_SIZE, '\0'));
+	EXPECT_EQ(m_pMock->m_vSent[1].size(), VOICE_MAX_PACKET);
+	m_pMock->m_SendAccepted = false;
+	EXPECT_FALSE(m_Transport.SendPacket(aPacket, VOICE_PACKET_HEADER_SIZE));
+	EXPECT_EQ(m_pMock->m_SendCalls, 3);
+	m_pMock->m_State = EQmWebSocketState::RECONNECTING;
+	EXPECT_FALSE(m_Transport.SendPacket(aPacket, VOICE_PACKET_HEADER_SIZE));
+	EXPECT_EQ(m_pMock->m_SendCalls, 3);
+}
+
+TEST_F(CVoiceWebSocketTest, ReceivesOnlyBinaryPacketsWithinVoiceSizeLimits)
+{
+	Connect();
+	m_pMock->m_Incoming = {
+		{EQmWebSocketMessageType::TEXT, std::string(VOICE_PACKET_HEADER_SIZE, 't')},
+		{EQmWebSocketMessageType::BINARY, ""},
+		{EQmWebSocketMessageType::BINARY, std::string(VOICE_PACKET_HEADER_SIZE - 1, 's')},
+		{EQmWebSocketMessageType::BINARY, std::string(VOICE_MAX_PACKET + 1, 'l')},
+		{EQmWebSocketMessageType::BINARY, std::string(VOICE_PACKET_HEADER_SIZE, 'a')},
+		{EQmWebSocketMessageType::BINARY, std::string(VOICE_MAX_PACKET, 'b')},
+	};
+	SQmWebSocketMessage Packet;
+	ASSERT_TRUE(m_Transport.PollPacket(Packet));
+	EXPECT_EQ(Packet.m_Type, EQmWebSocketMessageType::BINARY);
+	EXPECT_EQ(Packet.m_Data, std::string(VOICE_PACKET_HEADER_SIZE, 'a'));
+	ASSERT_TRUE(m_Transport.PollPacket(Packet));
+	EXPECT_EQ(Packet.m_Data, std::string(VOICE_MAX_PACKET, 'b'));
+	EXPECT_FALSE(m_Transport.PollPacket(Packet));
+	m_pMock->m_Incoming.push_back({EQmWebSocketMessageType::BINARY, std::string(VOICE_PACKET_HEADER_SIZE, 'c')});
+	m_pMock->m_State = EQmWebSocketState::RECONNECTING;
+	EXPECT_FALSE(m_Transport.PollPacket(Packet));
+	EXPECT_EQ(m_pMock->PendingMessages(), 1u);
+}
+
+TEST_F(CVoiceWebSocketTest, RejectedConnectReportsErrorWithoutBusyRetry)
+{
+	m_pMock->m_ConnectAccepted = false;
+	m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION);
+	EXPECT_TRUE(m_Transport.UrlValid());
+	EXPECT_FALSE(m_Transport.Connected());
+	EXPECT_FALSE(m_Transport.Connecting());
+	EXPECT_STREQ(m_Transport.LastError(), "connect rejected");
+	EXPECT_FALSE(m_Transport.Update("wss://voice.example/ws/voice", true, 10, 20, VOICE_VERSION));
+	EXPECT_EQ(m_pMock->m_ConnectCalls, 1);
+}
 
 TEST(VoiceUtils, WriteReadU16)
 {
@@ -105,7 +379,7 @@ TEST(VoiceUtils, WriteReadVoicePacketHeader)
 	SVoicePacketHeader Header;
 	Header.m_Version = 3;
 	Header.m_Type = VOICE_TYPE_AUDIO;
-	Header.m_PayloadSize = 123;
+	Header.m_PayloadSize = 0;
 	Header.m_ContextHash = 0x12345678u;
 	Header.m_TokenHash = 0xAABBCCDDu;
 	Header.m_Flags = VOICE_FLAG_VAD | VOICE_FLAG_LOOPBACK;
@@ -289,7 +563,7 @@ TEST(VoiceUtils, WriteReadVoicePacketHeaderKeepsContextTokenAndSender)
 	SVoicePacketHeader Header;
 	Header.m_Version = VOICE_VERSION;
 	Header.m_Type = VOICE_TYPE_AUDIO;
-	Header.m_PayloadSize = 32;
+	Header.m_PayloadSize = 0;
 	Header.m_ContextHash = 0xCAFEBABEu;
 	Header.m_TokenHash = 0x0BADF00Du;
 	Header.m_Flags = VOICE_FLAG_VAD;
@@ -357,6 +631,17 @@ TEST(VoiceUtils, ReadVoicePacketHeaderRejectsZeroSize)
 
 	SVoicePacketHeader Parsed;
 	EXPECT_FALSE(ReadVoicePacketHeader(aBuf, 0, Parsed));
+}
+
+TEST(VoiceUtils, ReadVoicePacketHeaderRejectsTrailingBytes)
+{
+	SVoicePacketHeader Header;
+	Header.m_Version = VOICE_VERSION;
+	Header.m_Type = VOICE_TYPE_PING;
+	Header.m_ContextHash = 1;
+	uint8_t aBuf[VOICE_PACKET_HEADER_SIZE + 1] = {};
+	ASSERT_TRUE(WriteVoicePacketHeader(aBuf, sizeof(aBuf), Header));
+	EXPECT_FALSE(ReadVoicePacketHeader(aBuf, sizeof(aBuf), Header));
 }
 
 TEST(VoiceUtils, WriteVoicePacketHeaderRejectsNullBuffer)
@@ -515,6 +800,24 @@ TEST(VoiceUtils, VoiceUiServerStatusDistinguishesLocalOfflineAndConnected)
 	Status.m_HaveSocket = true;
 	Status.m_PingMs = 42;
 	EXPECT_STREQ(VoiceUiServerStatus(Status), "connected");
+}
+
+TEST(VoiceUtils, VoiceUiConnectionProgressRespectsOfflineAndInvalidUrl)
+{
+	SVoiceUiStatus Status;
+	Status.m_Enabled = true;
+	Status.m_Connecting = true;
+	EXPECT_STREQ(VoiceUiServerStatus(Status), "offline");
+	EXPECT_STREQ(VoiceUiActionHint(Status), "join_server");
+	Status.m_Online = true;
+	EXPECT_STREQ(VoiceUiServerStatus(Status), "resolving");
+	EXPECT_STREQ(VoiceUiActionHint(Status), "check_server");
+	Status.m_ServerAddrValid = true;
+	EXPECT_STREQ(VoiceUiServerStatus(Status), "connecting");
+	EXPECT_STREQ(VoiceUiActionHint(Status), "wait_connection");
+	Status.m_Connecting = false;
+	EXPECT_STREQ(VoiceUiServerStatus(Status), "socket_error");
+	EXPECT_STREQ(VoiceUiActionHint(Status), "retry_socket");
 }
 
 TEST(VoiceUtils, VoiceUiRoomAndTransportStatusReflectPeerAndTraffic)
@@ -1619,7 +1922,7 @@ TEST(VoiceCore, VoiceProcessTraceCallbackRecordsStagesInOrder)
 	EXPECT_EQ(vStages[3], EVoiceProcessStage::HPF_COMPRESSOR);
 }
 
-TEST(VoiceCore, CaptureProcessOrderIsAgcThenMicGainThenDenoiseThenDynamics)
+TEST(VoiceCore, CaptureProcessKeepsOnlyMicGain)
 {
 	CRClientVoice Voice;
 	SRClientVoiceConfigSnapshot Config;
@@ -1651,12 +1954,14 @@ TEST(VoiceCore, CaptureProcessOrderIsAgcThenMicGainThenDenoiseThenDynamics)
 
 	SetVoiceProcessTraceCallback(nullptr, nullptr);
 
-	ASSERT_EQ(vStages.size(), 4u);
-	EXPECT_EQ(vStages[0], EVoiceProcessStage::AGC_GAIN);
-	EXPECT_EQ(vStages[1], EVoiceProcessStage::MIC_GAIN);
-	EXPECT_EQ(vStages[2], EVoiceProcessStage::DENOISE);
-	EXPECT_EQ(vStages[3], EVoiceProcessStage::HPF_COMPRESSOR);
-	EXPECT_GT(AgcGain, 0.0f);
+	ASSERT_EQ(vStages.size(), 1u);
+	EXPECT_EQ(vStages[0], EVoiceProcessStage::MIC_GAIN);
+	EXPECT_FLOAT_EQ(AgcGain, 1.0f);
+	EXPECT_FLOAT_EQ(NoiseFloor, 0.0f);
+	EXPECT_FLOAT_EQ(NoiseGate, 1.0f);
+	EXPECT_FLOAT_EQ(HpfPrevIn, 0.0f);
+	EXPECT_FLOAT_EQ(HpfPrevOut, 0.0f);
+	EXPECT_FLOAT_EQ(CompEnv, 0.0f);
 }
 
 TEST(VoiceCore, ComputeVoiceEncoderTargetsManualProfilesOverrideAdaptiveTable)
@@ -1709,9 +2014,12 @@ static size_t BuildVoicePacket(uint8_t *pBuf, uint8_t Version, uint8_t Type, uin
 		return 0;
 
 	size_t Offset = VOICE_PACKET_HEADER_SIZE;
-	if(PayloadSize > 0 && pPayload)
+	if(PayloadSize > 0)
 	{
-		mem_copy(pBuf + Offset, pPayload, PayloadSize);
+		if(pPayload)
+			mem_copy(pBuf + Offset, pPayload, PayloadSize);
+		else
+			mem_zero(pBuf + Offset, PayloadSize);
 		Offset += PayloadSize;
 	}
 	return Offset;
@@ -1739,7 +2047,7 @@ static bool ShouldProcessPayload(uint16_t PayloadSize, size_t Offset, int Bytes)
 }
 
 static EVoiceIncomingPacketDecision ClassifyTestPacket(uint8_t Version, uint8_t Type, uint16_t PayloadSize,
-	uint32_t ContextHash, uint32_t TokenHash, uint16_t SenderId, size_t PacketSize)
+	uint32_t ContextHash, uint32_t TokenHash, uint16_t SenderId, size_t PacketSize, uint8_t Flags = 0)
 {
 	SVoicePacketHeader Header;
 	Header.m_Version = Version;
@@ -1747,6 +2055,7 @@ static EVoiceIncomingPacketDecision ClassifyTestPacket(uint8_t Version, uint8_t 
 	Header.m_PayloadSize = PayloadSize;
 	Header.m_ContextHash = ContextHash;
 	Header.m_TokenHash = TokenHash;
+	Header.m_Flags = Flags;
 	Header.m_SenderId = SenderId;
 
 	SVoiceIncomingPacketContext Context;
@@ -1808,10 +2117,7 @@ TEST(VoiceCore, ProcessIncomingTruncatedPayload)
 		200, 0x12345678u, 0u, 0, 1, 100, 50.0f, 50.0f, nullptr);
 
 	uint16_t PayloadSize = 0;
-	ASSERT_TRUE(ParseVoicePacketPayloadSize(aPacket, (int)PacketSize, PayloadSize));
-	EXPECT_EQ(PayloadSize, 200);
-
-	EXPECT_FALSE(ShouldProcessPayload(PayloadSize, VOICE_PACKET_HEADER_SIZE, (int)PacketSize));
+	EXPECT_FALSE(ParseVoicePacketPayloadSize(aPacket, (int)PacketSize - 1, PayloadSize));
 }
 
 TEST(VoiceCore, ProcessIncomingBadMagic)
@@ -1844,6 +2150,8 @@ TEST(VoiceCore, ProcessIncomingClassifiesVersionTypeAndContextDrops)
 		EVoiceIncomingPacketDecision::DROP_TYPE);
 	EXPECT_EQ(ClassifyTestPacket(VOICE_VERSION, VOICE_TYPE_AUDIO, 8, 0, 0x11u, 1, VOICE_PACKET_HEADER_SIZE + 8),
 		EVoiceIncomingPacketDecision::DROP_CONTEXT);
+	EXPECT_EQ(ClassifyTestPacket(VOICE_VERSION, VOICE_TYPE_AUDIO, 8, 0x12345678u, 0x11u, 1, VOICE_PACKET_HEADER_SIZE + 8, 0x80),
+		EVoiceIncomingPacketDecision::DROP_FLAGS);
 }
 
 TEST(VoiceCore, ProcessIncomingClassifiesGroupSenderAndPayloadDrops)
@@ -1870,6 +2178,8 @@ TEST(VoiceCore, ProcessIncomingClassifiesAudioPingAndPongPaths)
 		EVoiceIncomingPacketDecision::HANDLE_PONG);
 	EXPECT_EQ(ClassifyTestPacket(VOICE_VERSION, VOICE_TYPE_PONG, 0, 0x12345678u, 0x40000011u, 1, VOICE_PACKET_HEADER_SIZE),
 		EVoiceIncomingPacketDecision::HANDLE_PONG);
+	EXPECT_EQ(ClassifyTestPacket(VOICE_VERSION, VOICE_TYPE_PING, 1, 0x12345678u, 0x11u, 1, VOICE_PACKET_HEADER_SIZE + 1),
+		EVoiceIncomingPacketDecision::DROP_PAYLOAD);
 }
 
 TEST(VoiceCore, ProcessIncomingAllowsSameGroupAcrossLegacyAndModePackedTokens)
@@ -1955,13 +2265,12 @@ TEST(VoiceCore, BuiltPacketsFollowPositiveProtocolPaths)
 		EVoiceIncomingPacketDecision::HANDLE_PONG);
 }
 
-TEST(QmClient, ParseQmClientUsersJsonSupportsNameFieldsAndLocalMarks)
+TEST(QmClient, ParseQmClientUsersJsonSupportsNameFields)
 {
 	const char *pJsonText =
 		"{\"users\":["
 		"{\"server_address\":\"addr-b\",\"player_name\":\"RemoteDummy\",\"dummy\":true},"
-		"{\"server\":\"addr-a\",\"name\":\"QmSeven\",\"client_type\":\"arg\",\"qid\":\"qm-7\",\"foot_particles_enabled\":1,"
-		"\"remote_particles_enabled\":true,\"voice_supported\":0},"
+		"{\"server\":\"addr-a\",\"name\":\"QmSeven\",\"client_type\":\"arg\",\"qid\":\"qm-7\",\"voice_supported\":0},"
 		"{\"server_address\":\"addr-a\",\"player_name\":\"QmEight\",\"dummy\":false,\"type\":\"qm\"}"
 		"]}";
 
@@ -1983,8 +2292,6 @@ TEST(QmClient, ParseQmClientUsersJsonSupportsNameFieldsAndLocalMarks)
 
 	ASSERT_EQ(Result.m_vLocalServerMarks.size(), 2u);
 	EXPECT_EQ(Result.m_vLocalServerMarks[0].m_Name, "QmSeven");
-	EXPECT_TRUE(Result.m_vLocalServerMarks[0].m_FootParticlesEnabled);
-	EXPECT_TRUE(Result.m_vLocalServerMarks[0].m_RemoteParticlesEnabled);
 	EXPECT_FALSE(Result.m_vLocalServerMarks[0].m_VoiceSupported);
 	EXPECT_EQ(Result.m_vLocalServerMarks[0].m_ClientBrand, EClientBrand::ARG);
 	EXPECT_EQ(Result.m_vLocalServerMarks[0].m_Qid, "qm-7");

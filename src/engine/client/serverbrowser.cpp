@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace
@@ -50,7 +51,38 @@ namespace
 
 	bool MatchesExactly(const char *a, const char *b)
 	{
-		return str_comp(a, &b[1]) == 0;
+		return str_comp(a, b) == 0;
+	}
+
+	struct SServerFilterToken
+	{
+		std::string m_Text;
+		bool (*m_pfnMatches)(const char *, const char *);
+	};
+
+	template<size_t N>
+	std::vector<SServerFilterToken> ParseServerFilterTokens(const char (&aInput)[N])
+	{
+		std::vector<SServerFilterToken> vTokens;
+		const char *pStr = aInput;
+		char aToken[N];
+		char aTrimmed[N];
+		while((pStr = str_next_token(pStr, IServerBrowser::SEARCH_EXCLUDE_TOKEN, aToken, sizeof(aToken))))
+		{
+			str_copy(aTrimmed, str_utf8_skip_whitespaces(aToken));
+			str_utf8_trim_right(aTrimmed);
+			const int Length = str_length(aTrimmed);
+			if(Length == 0)
+				continue;
+			if(aTrimmed[0] == '"' && aTrimmed[Length - 1] == '"')
+			{
+				// 保留单个引号和空引号均精确匹配空字符串的既有语义。
+				vTokens.push_back({Length > 1 ? std::string(aTrimmed + 1, Length - 2) : std::string(), MatchesExactly});
+			}
+			else
+				vTokens.push_back({aTrimmed, MatchesPart});
+		}
+		return vTokens;
 	}
 
 	NETADDR CommunityAddressKey(const NETADDR &Addr)
@@ -448,6 +480,9 @@ bool CServerBrowser::SortCompareFavoritesNumPlayersAndPing(int Index1, int Index
 void CServerBrowser::Filter()
 {
 	m_NumSortedPlayers = 0;
+	// 查询在本次过滤期间不变，只分词、裁剪和解析引号一次。
+	const auto vFilterTokens = ParseServerFilterTokens(g_Config.m_BrFilterString);
+	const auto vExcludeTokens = ParseServerFilterTokens(g_Config.m_BrExcludeString);
 
 	m_vSortedServerlist.clear();
 	m_vSortedServerlist.reserve(m_vpServerlist.size());
@@ -529,28 +564,13 @@ void CServerBrowser::Filter()
 			{
 				Info.m_QuickSearchHit = 0;
 
-				const char *pStr = g_Config.m_BrFilterString;
-				char aFilterStr[sizeof(g_Config.m_BrFilterString)];
-				char aFilterStrTrimmed[sizeof(g_Config.m_BrFilterString)];
-				while((pStr = str_next_token(pStr, IServerBrowser::SEARCH_EXCLUDE_TOKEN, aFilterStr, sizeof(aFilterStr))))
+				for(const SServerFilterToken &Token : vFilterTokens)
 				{
-					str_copy(aFilterStrTrimmed, str_utf8_skip_whitespaces(aFilterStr));
-					str_utf8_trim_right(aFilterStrTrimmed);
-
-					if(aFilterStrTrimmed[0] == '\0')
-					{
-						continue;
-					}
-					auto MatchesFn = MatchesPart;
-					const int FilterLen = str_length(aFilterStrTrimmed);
-					if(aFilterStrTrimmed[0] == '"' && aFilterStrTrimmed[FilterLen - 1] == '"')
-					{
-						aFilterStrTrimmed[FilterLen - 1] = '\0';
-						MatchesFn = MatchesExactly;
-					}
+					const auto MatchesFn = Token.m_pfnMatches;
+					const char *pFilterStr = Token.m_Text.c_str();
 
 					// match against server name
-					if(MatchesFn(Info.m_aName, aFilterStrTrimmed))
+					if(MatchesFn(Info.m_aName, pFilterStr))
 					{
 						Info.m_QuickSearchHit |= IServerBrowser::QUICK_SERVERNAME;
 					}
@@ -558,8 +578,8 @@ void CServerBrowser::Filter()
 					// match against players
 					for(int p = 0; p < minimum(Info.m_NumClients, (int)MAX_CLIENTS); p++)
 					{
-						if(MatchesFn(Info.m_aClients[p].m_aName, aFilterStrTrimmed) ||
-							MatchesFn(Info.m_aClients[p].m_aClan, aFilterStrTrimmed))
+						if(MatchesFn(Info.m_aClients[p].m_aName, pFilterStr) ||
+							MatchesFn(Info.m_aClients[p].m_aClan, pFilterStr))
 						{
 							if(g_Config.m_BrFilterConnectingPlayers &&
 								str_comp(Info.m_aClients[p].m_aName, "(connecting)") == 0 &&
@@ -573,7 +593,7 @@ void CServerBrowser::Filter()
 					}
 
 					// match against map
-					if(MatchesFn(Info.m_aMap, aFilterStrTrimmed))
+					if(MatchesFn(Info.m_aMap, pFilterStr))
 					{
 						Info.m_QuickSearchHit |= IServerBrowser::QUICK_MAPNAME;
 					}
@@ -585,42 +605,27 @@ void CServerBrowser::Filter()
 
 			if(!Filtered && g_Config.m_BrExcludeString[0] != '\0')
 			{
-				const char *pStr = g_Config.m_BrExcludeString;
-				char aExcludeStr[sizeof(g_Config.m_BrExcludeString)];
-				char aExcludeStrTrimmed[sizeof(g_Config.m_BrExcludeString)];
-				while((pStr = str_next_token(pStr, IServerBrowser::SEARCH_EXCLUDE_TOKEN, aExcludeStr, sizeof(aExcludeStr))))
+				for(const SServerFilterToken &Token : vExcludeTokens)
 				{
-					str_copy(aExcludeStrTrimmed, str_utf8_skip_whitespaces(aExcludeStr));
-					str_utf8_trim_right(aExcludeStrTrimmed);
-
-					if(aExcludeStrTrimmed[0] == '\0')
-					{
-						continue;
-					}
-					auto MatchesFn = MatchesPart;
-					const int FilterLen = str_length(aExcludeStrTrimmed);
-					if(aExcludeStrTrimmed[0] == '"' && aExcludeStrTrimmed[FilterLen - 1] == '"')
-					{
-						aExcludeStrTrimmed[FilterLen - 1] = '\0';
-						MatchesFn = MatchesExactly;
-					}
+					const auto MatchesFn = Token.m_pfnMatches;
+					const char *pExcludeStr = Token.m_Text.c_str();
 
 					// match against server name
-					if(MatchesFn(Info.m_aName, aExcludeStrTrimmed))
+					if(MatchesFn(Info.m_aName, pExcludeStr))
 					{
 						Filtered = true;
 						break;
 					}
 
 					// match against map
-					if(MatchesFn(Info.m_aMap, aExcludeStrTrimmed))
+					if(MatchesFn(Info.m_aMap, pExcludeStr))
 					{
 						Filtered = true;
 						break;
 					}
 
 					// match against gametype
-					if(MatchesFn(Info.m_aGameType, aExcludeStrTrimmed))
+					if(MatchesFn(Info.m_aGameType, pExcludeStr))
 					{
 						Filtered = true;
 						break;
@@ -642,7 +647,7 @@ void CServerBrowser::Filter()
 
 		if(Info.m_NumClients > 0)
 		{
-			auto Community = std::find_if(m_vCommunities.begin(), m_vCommunities.end(), [Info](const auto &Elem) {
+			auto Community = std::find_if(m_vCommunities.begin(), m_vCommunities.end(), [&Info](const auto &Elem) {
 				return str_comp(Elem.Id(), Info.m_aCommunityId) == 0;
 			});
 			if(Community != m_vCommunities.end())
@@ -676,6 +681,8 @@ int CServerBrowser::SortHash() const
 
 void CServerBrowser::Sort()
 {
+	// 先消费本次请求；过滤过程中若产生新请求，保留到下一次更新。
+	m_NeedResort = false;
 	// update number of filtered players
 	for(CServerEntry *pEntry : m_vpServerlist)
 	{
@@ -1392,7 +1399,6 @@ void CServerBrowser::Update()
 			pInfo->m_FavoriteAllowPing = m_pFavorites->IsPingAllowed(pInfo->m_aAddresses, pInfo->m_NumAddresses);
 		}
 		Sort();
-		m_NeedResort = false;
 	}
 }
 

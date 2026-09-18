@@ -6,17 +6,18 @@ QmClient 3.6 系列源码使用专用 WS 通道同步自有服务，后台同步
 
 | 通道 | 用途 |
 | --- | --- |
-| `wss://qmclient.icu/ws` | 在线识别、人数分布、远程粒子与语音在线状态、开发者标记、称号、游玩时长、服务器时间、广播 |
+| `wss://qmclient.icu/ws` | 在线识别、人数分布、语音在线状态、开发者标记、称号、游玩时长、服务器时间、广播 |
+| `wss://qmclient.icu/ws/voice` | 语音音频独立二进制连接（源码已迁移，待配套部署） |
 | `wss://qmclient.icu/ws/editor` | 编辑器协作房间操作和地图快照推送；进入协作时建立独立连接 |
 | `ws://127.0.0.1:9987/qm/realtime` | 中心进程与语音进程之间的内部连接，仅允许回环访问 |
 
-音频继续使用 UDP。DDNet、GitHub 等第三方查询及下载，以及用户主动进行的赞助码兑换、称号资料修改、广播发布，继续使用原传输方式。旧版客户端的 HTTP 接口保留兼容。
+语音音频源码已迁移到独立 WS/WSS，客户端与服务端均不再使用 UDP；本次未部署，线上状态不因此改变。切换要求见 [语音音频迁移](voice_websocket_migration.md)。DDNet、GitHub 等第三方查询及下载，以及用户主动进行的赞助码兑换、称号资料修改、广播发布，继续使用原传输方式。旧版客户端的 HTTP 接口保留兼容。
 
 ## 客户端传输
 
 `src/engine/shared/websocket_client_rust.cpp` 在工作线程收发，通过队列交给主线程。`qm_websocket.rs` 使用 tungstenite 和 rustls 校验 TLS 证书链、有效期及域名，信任根来自 Mozilla。附带的 libwebsockets 没有 TLS，因此不再用于客户端 WSS；服务端 `WEBSOCKETS` 构建选项不影响客户端通道。
 
-- 默认启用 `qm_websocket`；关闭后自有服务停止同步。空的 `qm_websocket_url` 使用官方地址。
+- 自有服务 WebSocket 始终启用，已删除“实时通道”开关及 `qm_websocket` 配置项；旧配置中的 `qm_websocket 0` 不再控制连接。空的 `qm_websocket_url` 使用官方地址。
 - 子协议为 `qmclient-json`。开发者和称号凭据只发送到精确匹配的官方主通道。
 - 断线指数退避重连，重新发送 hello 和当前玩家状态。旧连接队列清空，换服消息同时校验服务器地址。
 - 主通道消息上限 8 MiB；编辑器地图消息上限 32 MiB。队列同时限制条数和字节，满队列通过重连获取新快照。

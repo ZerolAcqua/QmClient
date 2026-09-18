@@ -19,12 +19,6 @@
 %c Team %d
 == %c 隊伍 %d
 
-%d dummies
-== %d 個分身
-
-%d dummy
-== %d 個分身
-
 %d items selected
 == 已選擇 %d 項
 
@@ -43,20 +37,8 @@
 %d selected items were deleted, but %d items could not be deleted. The first failing item was '%s'.
 == 已刪除 %d 個選中項，但有 %d 項無法刪除。第一個失敗項是“%s”。
 
-%d servers, %d users
-== %d 個伺服器，%d 個用戶
-
-%d servers, %d users, %d dummies
-== %d 個伺服器，%d 個用戶，%d 個分身
-
 %d teams
 == %d 個隊伍
-
-%d user
-== %d 個用戶
-
-%d users
-== %d 個用戶
 
 %d. %s | main: %s | dummy: %s
 == %d. %s | 本體：%s | 分身：%s
@@ -259,6 +241,9 @@ A demo with this name already exists
 
 A folder with this name already exists
 == 已有同名資料夾
+
+A player name is required.
+== 玩家名稱不能為空。
 
 A save is already being restored. Please wait.
 == 正在恢復存檔，請稍候。
@@ -554,6 +539,9 @@ After hammer fly, whether dummy switches back to previous weapon
 After Load
 == 加載後
 
+After uploading again, use: reload or hot_reload
+== 再次上傳後，輸入 reload 或 hot_reload 更新地圖
+
 Afterimage pop
 == 殘影彈出
 
@@ -779,9 +767,6 @@ Apply a saved profile by 1-based index to the current tee
 Apply a writable preset and edit first
 == 先應用一個可編輯的預設
 
-Apply Best input to other Tees
-== 將 Best input 應用於其他 Tee
-
 Apply Changes
 == 應用更改
 
@@ -965,9 +950,6 @@ Auto chat when dying in water
 Auto concurrency: %d (smart default)
 == 自動併發數：%d（智能默認）
 
-Auto disable when time expires
-== 時間耗盡後自動禁用
-
 Auto enable in Gores mode
 == Gores 模式自動啟用
 
@@ -1066,9 +1048,6 @@ Auto-close chat after unfreeze
 
 Auto-create CSV on game end
 == 遊戲結束時自動創建 CSV
-
-Auto-disable speedrun timer when time runs out
-== 時間耗盡後自動禁用速通計時器
 
 Auto-fetch all players' skins for dummy rotation queue
 == 自動獲取全圖玩家皮膚並作為分身輪換隊列
@@ -1363,24 +1342,6 @@ Benchmark frame times for number of seconds to file, then quit
 
 Best
 == 最高
-
-Best input
-== 最佳輸入
-
-Best input delay compensation percentage
-== Best input 延遲補償百分比
-
-Best input interpolation mode (1=linear 2=cubic 3=smooth)
-== Best input 插值模式（1=linear 2=cubic 3=smooth）
-
-Best input others
-== 最佳輸入其他
-
-Best input prediction offset (0.01 tick)
-== Best input 預測偏移（0.01 tick）
-
-Best input smooth percentage
-== Best input 平滑百分比
 
 Better scoreboard
 == 更好的計分板
@@ -1723,6 +1684,9 @@ Chat command
 
 Chat command (e.g. showall 1)
 == 聊天指令（例如：showall 1）
+
+Chat export cancelled
+== 已取消聊天匯出
 
 Chat export failed
 == 聊天記錄導出失敗
@@ -2189,8 +2153,8 @@ Configure QmClient HUD elements
 Configure remaining DDNet client preferences
 == Configure remaining DDNet client preferences
 
-Configure skin colors, eyes, and filters
-== Configure skin colors, eyes, and filters
+Configure skin downloads, prefix, and default eyes
+== 設定外觀下載、外觀前綴和預設眼睛
 
 Configure sound and audio packs
 == 設定音效與音效包
@@ -2257,6 +2221,9 @@ Connecting dummy
 
 Connecting to
 == 正在連接到
+
+Connecting to voice server
+== 正在連線至語音伺服器
 
 Connection disconnected
 == 連接已斷開
@@ -2404,6 +2371,9 @@ Could not load touch controls from file. See local console for details.
 
 Could not preview this image
 == 無法預覽這張圖片
+
+Could not read the map file.
+== 無法讀取地圖檔案。
 
 Could not resolve connect address '%s'. See local console for details.
 == 無法解析連接地址 '%s'。檢查本地控制台以獲取詳情。
@@ -3113,6 +3083,9 @@ Door Laser Outline Color
 Door laser outline color
 == 門的激光輪廓顏色
 
+Double-click: left applies to main, right applies to dummy
+== 雙擊：左鍵套用到本體，右鍵套用到分身
+
 Download community skins
 == 下載社群皮膚
 
@@ -3145,6 +3118,12 @@ Draft file is empty
 
 Drag HUD modules with the left mouse button
 == 按住鼠標左鍵拖動 HUD 模塊
+
+Drag to another category to move this friend.
+== 拖曳到其他分類以移動此好友。
+
+Drag to reorder; click to expand or collapse. Right-click or use the gear to manage categories
+== 拖曳調整順序，點擊展開或收起。右鍵或使用齒輪管理分類
 
 Dragger Inner Color
 == 光索實心顏色
@@ -3626,6 +3605,12 @@ Enable keyboard shortcuts in replay player
 Enable keyword reply
 == 啟用關鍵詞回覆
 
+Enable Kugou Music hook integration
+== 啟用酷狗音樂 Hook 整合
+
+Enable Kugou Music lyrics
+== 啟用 酷狗音樂 歌詞
+
 Enable left swipe offset on chat fade
 == 聊天消息淡出時啟用左滑偏移
 
@@ -3685,6 +3670,12 @@ Enable practice mode for teams. Allows /rescue but scores not recorded
 
 Enable QmClient style background 3D particles
 == 啟用 QmClient 風格背景 3D 粒子
+
+Enable QQ Music hook integration
+== 啟用QQ 音樂 Hook 整合
+
+Enable QQ Music lyrics
+== 啟用 QQ 音樂 歌詞
 
 Enable rainbow rendering for hook
 == 啟用鉤子彩虹渲染
@@ -3746,9 +3737,6 @@ Enable sound when rendering video
 Enable spectator cursor (if available)
 == 啟用觀看玩家的光標（如果可用）
 
-Enable speedrun timer
-== 啟用速通計時器
-
 Enable Spotify lyric integration
 == 啟用 Spotify 歌詞整合
 
@@ -3785,9 +3773,6 @@ Enable Tee trail
 Enable tee trails
 == 啟用 Tee 拖尾
 
-Enable the dedicated QmClient WebSocket service (no HTTP polling fallback)
-== 啟用 QmClient 專用 WebSocket 服務（不回退 HTTP 輪詢）
-
 Enable thinking mode (slower)
 == 啟用思考模式（較慢）
 
@@ -3823,12 +3808,6 @@ Enable warlist
 
 Enable word filter list
 == 啟用屏蔽詞列表
-
-Enable Zen Mode
-== 啟用禪模式（Zen Mode）
-
-Enable Zen mode
-== 啟用禪模式
 
 Enable/disable infinite hook.
 == 启用/禁用无限钩索
@@ -4010,6 +3989,9 @@ Exported %d chat messages
 Exported to %s
 == 已導出到 %s
 
+Exporting chat images: %d
+== 正在匯出聊天圖片：%d
+
 Expose playback controls to the operating system
 == Expose playback controls to the operating system
 
@@ -4154,6 +4136,9 @@ File for storing ranks if sv_use_sql is disabled or as backup SQL server.
 File with announcements, one per line.
 == 包含公告的文件，每行一個
 
+File: %s
+== 檔案：%s
+
 Fill
 == 填充
 
@@ -4235,9 +4220,6 @@ First page in console
 Flip:
 == 翻轉：
 
-Focus mode
-== 專注模式
-
 Folder
 == 文件夾
 
@@ -4246,9 +4228,6 @@ Folder Link
 
 Follow
 == 跟隨
-
-Follow server
-== 跟隨伺服器
 
 Follow Tee
 == 跟隨 Tee
@@ -4742,38 +4721,8 @@ Helpful for Gores: allow negative internal certainty for more conservative predi
 Hi!
 == 你好啊!
 
-Hide basic system info (join, version, rules) in Zen mode
-== 禪模式下隱藏入場、版本和規則等基礎系統信息
-
 Hide chat messages from players marked as enemies
 == 隱藏被標記為敵人的玩家聊天訊息
-
-Hide death/respawn effects
-== 隱藏死亡/重生特效
-
-Hide death/respawn effects in Zen Mode
-== 禪模式下隱藏死亡/重生特效
-
-Hide direction in Zen mode
-== 禪模式下隱藏方向
-
-Hide direction indicators
-== 隱藏方向
-
-Hide Echo messages
-== 隱藏 Echo 消息
-
-Hide Echo messages in Zen mode
-== 禪模式下隱藏 Echo 消息
-
-Hide explosion effects
-== 隱藏炮擊特效
-
-Hide freeze effects
-== 隱藏凍結特效
-
-Hide freeze effects in Zen Mode
-== 禪模式下隱藏凍結特效
 
 Hide ghosts of frozen players
 == 隱藏凍結玩家的影子
@@ -4781,56 +4730,14 @@ Hide ghosts of frozen players
 Hide guide lines
 == 隱藏輔助線
 
-Hide hammer effects
-== 隱藏錘擊特效
-
-Hide hammer effects in Zen Mode
-== 禪模式下隱藏錘擊特效
-
 Hide helper lines in Gores mode
 == Gores 模式下隱藏輔助線
-
-Hide helper lines in Zen mode
-== 禪模式下隱藏輔助線
-
-Hide HUD
-== 隱藏 HUD
-
-Hide HUD in Zen mode
-== 禪模式下隱藏 HUD
 
 Hide indicator for tees on your screen
 == 其他玩家在屏幕內時隱藏指示器
 
 Hide input emoticon
 == 隱藏輸入表情
-
-Hide join/version prompts
-== 隱藏入場/版本提示
-
-Hide jump effects
-== 隱藏跳躍特效
-
-Hide jump effects in Zen Mode
-== 禪模式下隱藏跳躍特效
-
-Hide kill and finish messages in Zen mode
-== 禪模式下隱藏擊殺和完成消息
-
-Hide kill/finish messages
-== 隱藏死亡/完成消息
-
-Hide map progress
-== 隱藏地圖進度
-
-Hide map progress bar in Zen mode
-== 禪模式下隱藏地圖進度條
-
-Hide nameplates
-== 隱藏名字板
-
-Hide names
-== 隱藏名字
 
 Hide non-friend names/clans and show client ID
 == 隱藏非好友姓名/戰隊並顯示客戶端 ID
@@ -4844,35 +4751,11 @@ Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
 == 隱藏玩家消息
 
-Hide player messages in Zen mode
-== 禪模式下隱藏玩家消息
-
-Hide player name plates in Zen Mode
-== 禪模式下隱藏玩家名字板
-
-Hide player names in Zen Mode
-== 禪模式下隱藏玩家名字
-
-Hide projectile effects in Zen Mode
-== 禪模式下隱藏炮擊特效
-
-Hide scoreboard
-== 隱藏計分板
-
-Hide scoreboard in Zen mode
-== 禪模式下隱藏計分板
-
 Hide sensitive info like /save password
 == 隱藏敏感信息，如 /save 密碼
 
 Hide server information on join
 == 進圖時隱藏伺服器資訊
-
-Hide server prompt notifications
-== 隱藏伺服器提示通知
-
-Hide server tip notifications (including notification bar) in Zen mode
-== 禪模式下隱藏伺服器提示通知（包括通知欄）
 
 Hide Settings Tabs
 == 隱藏設置選項卡
@@ -4891,15 +4774,6 @@ Hide toast
 
 Hide typing emoji during input
 == 輸入時不顯示打字表情
-
-Hide UI for focused gameplay
-== 隱去 UI 專注遊戲
-
-Hide weapon fire effects in Zen Mode
-== 禪模式下隱藏武器火焰特效
-
-Hide weapon muzzle flashes
-== 隱藏武器火焰
 
 High Detail
 == 顯示地圖細節
@@ -5014,9 +4888,6 @@ Horizontal position
 
 Hostname of DNSBL provider for IP verification
 == 用於 IP 驗證的 DNSBL 提供商的主機名
-
-Hours
-== 小時
 
 Hover for tooltip
 == 懸停查看提示
@@ -5288,9 +5159,6 @@ Input overlay X position (percent)
 Input overlay Y position (percent)
 == 輸入疊加 Y 位置（百分比）
 
-Input smoothing
-== 輸入平滑
-
 Input switch
 == 輸入切換
 
@@ -5299,9 +5167,6 @@ Insane
 
 Installing update. Please wait...
 == 正在安裝更新，請稍等...
-
-Interface
-== 界面
 
 Interface accent color
 == 介面強調色
@@ -5333,9 +5198,6 @@ Internet
 Internet (From online source)
 == Internet（來源於網絡）
 
-Interpolation
-== 插值
-
 Interval for auto-saving current editor map copy to "auto" folder (0=off)
 == 當前編輯器地圖副本自動保存到“auto”文件夾的時間間隔（0 表示關閉）
 
@@ -5353,6 +5215,9 @@ Invalid Demo
 
 Invalid ID
 == 無效的 ID
+
+Invalid map file or filename.
+== 地圖檔案或檔案名稱無效。
 
 Invalid option
 == 無效的投票選項
@@ -5446,6 +5311,9 @@ Jump hint
 
 Jump hint color
 == 跳躍提示顏色
+
+Jump hint defaults migration completed flag
+== 跳躍提示預設設定遷移完成標記
 
 Jump hint font size
 == 跳躍提示字體大小
@@ -5558,6 +5426,12 @@ Kills a player and announces the kill
 Kills team and disables practice mode
 == 處死隊伍並關閉練習模式
 
+Kugou hook heartbeat timeout (milliseconds)
+== 酷狗音樂 Hook 心跳逾時時間（毫秒）
+
+Kugou hook helper path (empty=beside QmClient)
+== 酷狗音樂 Hook 輔助程式路徑（留空則使用 QmClient 所在目錄中的程式）
+
 l = Local time
 == l = 本地時間
 
@@ -5578,6 +5452,12 @@ Language
 
 Language file to use
 == 使用什麼語言文件
+
+Large emoticons and launch mode
+== Large emoticons and launch mode
+
+Large emoticons and launched emoticons
+== Large emoticons and launched emoticons
 
 Large text announcement for friend joining
 == 大字播報進服好友
@@ -5626,9 +5506,6 @@ Last page in console
 
 Latency
 == 延遲
-
-Latency compensation
-== 延遲補償
 
 Latency Jitter
 == 延遲抖動
@@ -5870,12 +5747,6 @@ Local console log category filter mask (bit flags)
 Local only
 == 僅本地
 
-Local particle effects
-== 本地粒子效果
-
-Local particles: show particles behind own Tee (e.g. freeze snow)
-== 本地粒子：顯示自己 Tee 身後掉落的粒子（如凍結雪花）
-
 Local saves
 == 本地存檔
 
@@ -6011,6 +5882,12 @@ Map danger border
 Map download send window
 == 地圖下載發送窗口
 
+Map exceeds the client limit of 64 MiB.
+== 地圖超過用戶端的 64 MiB 上限。
+
+Map folders
+== 地圖資料夾
+
 Map play history
 == 地圖遊玩歷史
 
@@ -6055,6 +5932,21 @@ Map to use on server
 
 Map type:
 == 地圖類型：
+
+Map upload
+== 地圖上傳
+
+Map upload cancelled.
+== 已取消地圖上傳。
+
+Map upload in progress...
+== 正在上傳地圖……
+
+Map upload network error.
+== 地圖上傳時發生網路錯誤。
+
+Map uploaded successfully.
+== 地圖上傳成功。
 
 Margin when notification is docked
 == 通知欄貼邊時預留邊距
@@ -6260,9 +6152,6 @@ Microphone volume
 Microphone volume (percent)
 == 麥克風音量（百分比）
 
-Milliseconds
-== 毫秒
-
 Milliseconds to apply quick input early
 == 快速輸入提前應用的毫秒數
 
@@ -6322,9 +6211,6 @@ Minimum time between map votes (in seconds)
 
 Minimum width for name column in server browser
 == 伺服器瀏覽器中名稱列的最小寬度
-
-Minutes
-== 分鐘
 
 Minutes on server before a player can call a map change vote (0 = disabled)
 == 玩家可以否決地圖更改投票之前伺服器上的時間分鐘數（0 = 禁用）
@@ -6386,6 +6272,9 @@ Mouse sensitivity in menu/editor
 Mouse size
 == 滑鼠大小
 
+Move a friend category to a position
+== 將好友分類移動到指定位置
+
 Move left
 == 向左移動
 
@@ -6413,32 +6302,14 @@ Multi-View
 Mute
 == 靜音
 
-Mute death/respawn sound in Zen Mode
-== 禪模式下靜音死亡/重生音效
-
-Mute death/respawn sounds
-== 靜音死亡/重生
-
 Mute emoticons
 == 屏蔽表情
 
 Mute flag sounds
 == 使旗幟聲音靜音
 
-Mute hammer sound in Zen mode
-== 禪模式下靜音錘擊音效
-
-Mute hammer sounds
-== 靜音錘擊
-
 Mute hook sound
 == 靜音掛鉤聲音
-
-Mute jump sound in Zen Mode
-== 禪模式下靜音跳躍音效
-
-Mute jump sounds
-== 靜音跳躍
 
 Mute map sounds
 == 靜音地圖聲音
@@ -6557,6 +6428,9 @@ Name:
 Name: %s
 == 名稱：%s
 
+Nameplate count that still keeps full text effect quality; beyond it effect layers scale down by count (higher=keep more)
+== 仍保持完整文字特效品質的名牌數量上限；超過後特效層數依人數遞減（越大保留越多）
+
 Nameplate hook strength icon scope (0=Own 1=Others 2=Strong hook 3=Weak hook 4=All players)
 == 名牌鉤子強度圖標範圍（0=自己 1=他人 2=強鉤 3=弱鉤 4=所有玩家）
 
@@ -6583,6 +6457,9 @@ Nameplate text border color
 
 Nameplate text border range
 == 名牌文字邊框範圍
+
+Nameplate text effect auto LOD (0=Off 1=On: trim outer effect layers when crowded)
+== 名牌文字特效自動降級（0=關，1=開：同屏擁擠時削減外層特效）
 
 Nameplate text effects (1=Border 2=Gradient 4=Rainbow 8=Glow)
 == 名牌文字效果（1=邊框 2=漸變 4=彩虹 8=發光）
@@ -6710,9 +6587,6 @@ Nickname
 No
 == 否
 
-No active QmClient reports yet
-== 暫無活躍的棲夢客戶端上報
-
 No animation
 == 無動畫
 
@@ -6800,6 +6674,9 @@ No login required
 No map play history yet
 == 暫無地圖遊玩歷史
 
+No map selected
+== 尚未選擇地圖
+
 No matching assets.
 == 沒有匹配的材質。
 
@@ -6841,6 +6718,9 @@ No results
 
 No safe position found
 == 未找到安全位置
+
+No saved maps found
+== 找不到已儲存的地圖
 
 No saved profiles available yet. Save one first.
 == 沒有可用模板，請先保存一個模板。
@@ -6910,9 +6790,6 @@ Not downloaded
 
 Not enabled
 == 未啟用
-
-Not in the current browser list
-== 不在當前瀏覽器列表中
 
 Not open, check input device or mic permission
 == 未打開，請檢查輸入設備或麥克風權限
@@ -7592,6 +7469,9 @@ Player stats
 Player stats and info display
 == 玩家統計與信息顯示
 
+Player: %s
+== 玩家：%s
+
 Players
 == 玩家
 
@@ -7751,8 +7631,8 @@ Prediction margin
 Prediction margin when frozen
 == 凍結時的預測邊距
 
-Prediction offset
-== 預測偏移
+Preparing chat export: %d%%
+== 正在準備聊天匯出：%d%%
 
 Preparing demo playback
 == 正在準備回放
@@ -7777,6 +7657,9 @@ Press ESC to close. Watch the scale-in spring on open.
 
 Press Esc to exit the HUD editor
 == 按 Esc 退出 HUD 編輯器
+
+Press F2, log in, then use: change_map map_name
+== 按 F2 登入管理後，輸入：change_map 地圖名
 
 Prev. weapon
 == 上一個武器
@@ -7808,8 +7691,8 @@ Preview import file
 Preview laser bodies, outlines, and impacts
 == Preview laser bodies, outlines, and impacts
 
-Preview player and dummy appearance
-== Preview player and dummy appearance
+Preview player and dummy appearance and colors
+== 預覽本體與分身的外觀和顏色
 
 Preview player and dummy nameplates
 == Preview player and dummy nameplates
@@ -7970,9 +7853,6 @@ Pyramid
 q = Connection quality
 == q = 連接質量
 
-Qm
-== 棲夢
-
 Qm UI custom icon color
 == Qm 介面圖示自訂顏色
 
@@ -8009,9 +7889,6 @@ QmClient community and project information
 QmClient information and project links
 == QmClient information and project links
 
-QmClient online distribution
-== 棲夢客戶端在線分佈
-
 QmClient Settings
 == QmClient 設置
 
@@ -8030,6 +7907,12 @@ QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
 QQ group: 1076765929 (click to copy)
 == QQ 群：1076765929（點擊複製）
 
+QQ Music hook heartbeat timeout (milliseconds)
+== QQ 音樂 Hook 心跳逾時時間（毫秒）
+
+QQ Music hook helper path (empty=beside QmClient)
+== QQ 音樂 Hook 輔助程式路徑（留空則使用 QmClient 所在目錄中的程式）
+
 Quads are used for background decoration
 == 顯示用作背景裝飾的貼圖
 
@@ -8042,8 +7925,8 @@ Queue preset: %s
 Quick action menu for players
 == 對玩家快捷操作菜單
 
-Quick input mode (0=Fast 3=Best 4=Saiko+; 1/2 legacy mapped to Best)
-== 快速輸入模式（0=Fast 3=Best 4=Saiko+；1/2 兼容舊值並映射到 Best）
+Quick input mode (0=Fast 4=Saiko+; legacy values fall back to Fast)
+== 快速輸入模式（0=Fast 4=Saiko+；歷史值回落到 Fast）
 
 Quit
 == 退出
@@ -8122,9 +8005,6 @@ Ratio threshold for local target language detection
 
 Really? Not even a little?
 == 真的？一點都不考慮一下嗎？
-
-Realtime channel
-== 即時通道
 
 Realtime channel heartbeat interval (seconds, 0 uses default)
 == 即時通道心跳間隔（秒，0 使用預設值）
@@ -8275,12 +8155,6 @@ Remote console password for helper (limited access)
 
 Remote console password for moderator (limited access)
 == 主持人的遠程控制台密碼（有限訪問）
-
-Remote particle effects
-== 遠程粒子效果
-
-Remote particles: sync and render other players via central server (requires both local+remote enabled)
-== 遠程粒子：通過中心服同步並渲染其他玩家（需對方開啟本地+遠程）
 
 Remove
 == 刪除
@@ -8645,6 +8519,9 @@ Restarting. Please wait…
 Restore a two-player save? /qm Yes uses the newest; /qm Yes number selects another. /qm No dismisses.
 == 是否恢復雙人存檔？/qm Yes 讀取最新一筆，/qm Yes 序號 選擇其他存檔，/qm No 忽略本次提示。
 
+Restore Kugou files
+== 還原酷狗原始檔案
+
 Restore old single-segment hook collision line behavior
 == 恢復舊版單段鉤子輔助線行為
 
@@ -8674,9 +8551,6 @@ Rifle laser outline color
 
 Right jump
 == 右跳
-
-Right-click or use the gear to manage categories
-== 右鍵或使用齒輪管理分類
 
 Right-click to disable auto-translate
 == 右鍵關閉自動翻譯
@@ -8993,6 +8867,9 @@ Search
 Search and navigate settings
 == 搜尋並前往設定
 
+Search and pick skins and manage the skin queue
+== 搜尋並選擇外觀，同時管理外觀輪換佇列
+
 Search donor asset
 == 搜索來源材質
 
@@ -9002,9 +8879,6 @@ Search main asset
 Search settings by title, feature, or keyword
 == Search settings by title, feature, or keyword
 
-Search skins and manage the skin queue
-== Search skins and manage the skin queue
-
 Searching
 == 正在搜索
 
@@ -9013,9 +8887,6 @@ Sec-WebSocket-Protocol sent during the realtime handshake
 
 Secondary
 == 次要
-
-Seconds
-== 秒
 
 Seconds to wait before reconnecting (0=off, when server is full)
 == 重新連接前等待多少秒（伺服器已滿時，0 表示關閉）
@@ -9029,6 +8900,9 @@ SecretId
 SecretKey
 == 密鑰
 
+Select a saved .map file (client limit: 64 MiB).
+== 選擇已儲存的 .map 檔案（用戶端上限：64 MiB）。
+
 Select all chat
 == 全選聊天記錄
 
@@ -9037,6 +8911,9 @@ Select button by touch
 
 Select export
 == 選擇導出內容
+
+Select map
+== 選擇地圖
 
 Select the country flag for each player
 == Select the country flag for each player
@@ -9061,9 +8938,6 @@ Selected item color
 
 Selected part: %d
 == 所選部件：%d
-
-Selected server
-== 已選中伺服器
 
 Selected timertype is not supported by your client
 == 你當前客戶端不支持所選計時器類型
@@ -9188,9 +9062,6 @@ Server hostname (0.7 only)
 Server info
 == 伺服器信息
 
-Server IP
-== 伺服器 IP
-
 Server kick/spec votes are no longer actively moderated.
 == 伺服器的踢人/旁觀投票已不再由主動管理員模式接管
 
@@ -9221,8 +9092,11 @@ Server stress (debug builds only).
 Server type (novice, moderate, etc.)
 == 伺服器類型（novice、moderate 等）
 
-Set a voice server to enable QmClient distribution
-== 需要先配置語音伺服器，才能啟用棲夢客戶端在線分佈
+Server URL
+== 伺服器 URL
+
+Server-assigned style
+== 伺服器分配風格
 
 Set all to Rifle
 == 統一為激光槍顏色
@@ -9277,6 +9151,9 @@ Set team for all players (spectators = -1, game = 0)
 
 Set timeout protection code s
 == 設置超時保護碼
+
+Set up Kugou lyrics
+== 設定酷狗歌詞接入
 
 Set voice input device
 == 設置語音輸入設備
@@ -9884,6 +9761,12 @@ Show other players' hook collision lines (2 always shown)
 Show other players' hook collision lines when rendering video
 == 渲染視頻時顯示其他玩家的鉤子輔助線
 
+Show other players' large emoticons
+== Show other players' large emoticons
+
+Show other players' launched emoticons
+== Show other players' launched emoticons
+
 Show other team players (2=own team only)
 == 顯示其他隊伍的玩家（2 只顯示自己隊伍）
 
@@ -10274,6 +10157,9 @@ Size of strength/weakness icon and number
 Skin
 == 皮膚
 
+Skin copying is only available for 0.6 skins
+== 僅支援複製 0.6 皮膚
+
 Skin could not be found.
 == 未找到皮膚。
 
@@ -10594,30 +10480,6 @@ Speed up the demo
 
 Speed:
 == 速度：
-
-Speedrun countdown timer
-== 速通倒計時器
-
-Speedrun Timer
-== 速通計時器
-
-Speedrun timer
-== 速通計時器
-
-Speedrun timer hours
-== 速通計時器小時
-
-Speedrun timer milliseconds
-== 速通計時器毫秒
-
-Speedrun timer minutes
-== 速通計時器分鐘
-
-Speedrun timer seconds
-== 速通計時器秒
-
-Speedrun timer time (MM:SS, legacy)
-== 速通計時器時間（MMSS 格式，兼容舊版）
 
 Sphere
 == 球體
@@ -11261,6 +11123,9 @@ The selected part stays highlighted while you adjust its color.
 The server is running a non-standard tuning on a pure game type.
 == 此伺服器運行著經過調整的非標準遊戲模式。
 
+The server rejected the map upload.
+== 伺服器拒絕了地圖上傳。
+
 The update is ready and will be installed when you exit.
 == 更新已準備就緒，將在結束用戶端時安裝。
 
@@ -11414,9 +11279,6 @@ Time client is banned if economy authentication fails. 0 just closes connection.
 Time client is banned if remote console auth fails. 0 to only use kick
 == 如果遠程控制台身份驗證失敗，客戶端被禁止的時間。0 讓它只使用踢
 
-TIME EXPIRED!
-== 時間耗盡！
-
 Time in seconds before economy authentication timeout.
 == 經濟身份驗證超時之前的時間（秒）
 
@@ -11527,6 +11389,9 @@ Toggle dummy
 
 Toggle dyncam
 == 動態視野開關
+
+Toggle emote launcher
+== Toggle emote launcher
 
 Toggle fast practice mode
 == 切換快速練習模式
@@ -11795,9 +11660,6 @@ UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or netwo
 UDP seems to be filtered.
 == UDP 疑似被過濾。
 
-UDP socket not open
-== UDP 套接字未打開
-
 UI color
 == 用戶界面顏色
 
@@ -11887,6 +11749,9 @@ Uncertainty duration
 
 Unclassified audio issue
 == 音頻異常未分類
+
+Unexpected map upload response.
+== 地圖上傳介面傳回了異常回應。
 
 Unfinished
 == 未完成
@@ -12014,6 +11879,15 @@ Update Rate
 Update rate for mapping 64 player IDs to vanilla IDs
 == 64 玩家 ID 與原版 ID 的映射更新率
 
+Upload .map files. Server and admin passwords: s.
+== 上傳 .map 檔案；伺服器密碼和管理密碼均為 s。
+
+Upload a saved map to the public test server
+== 將已儲存的地圖上傳到公用測圖伺服器
+
+Upload map
+== 上傳地圖
+
 Uploading map data to GPU
 == 正在將地圖數據傳輸至顯卡
 
@@ -12097,6 +11971,9 @@ Use high bandwidth mode (doubles server bandwidth, LAN only)
 
 Use k key to kill (restart), q to pause and watch other players. See settings for other key binds.
 == 使用 K 鍵自殺（重新開始），Q 鍵暫停並旁觀其他玩家。其他按鍵綁定可在設置中查看。
+
+Use large emote
+== Use large emote
 
 Use mouse sensitivity when dynamic camera is on
 == 開啟動態攝像頭時使用鼠標感應
@@ -12332,8 +12209,8 @@ Voice protocol version
 Voice room token (optional)
 == 語音房間 Token（可選）
 
-Voice server address host:port
-== 語音伺服器地址 host:port
+Voice server URL (ws:// or wss://)
+== 語音伺服器 URL（ws:// 或 wss://）
 
 Voice stereo output
 == 語音立體聲輸出
@@ -12998,12 +12875,6 @@ Your timeout code has been set. 0.7 clients can not reclaim their tees on timeou
 z = Zoom
 == z = 縮放
 
-Zen Mode
-== 禪模式
-
-Zen mode key
-== 禪模式按鍵
-
 Zhipu AI
 == 智譜清言
 
@@ -13051,6 +12922,15 @@ Zoom to current mouse target
 
 ⚠️ Tencent Cloud API not configured
 == ⚠️ 騰訊雲 API 密鑰未配置
+
+发射表情按键
+== 发射表情按键
+
+显示他人发射表情
+== 显示他人发射表情
+
+显示他人大表情
+== 显示他人大表情
 
 [Assets editor blend mode]
 Color
@@ -13439,6 +13319,10 @@ required
 [Team status]
 solo
 == 單人
+
+[Title color mode]
+Use style colors
+== 使用風格顏色
 
 [Touch button behavior]
 Bind

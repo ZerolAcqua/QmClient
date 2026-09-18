@@ -45,7 +45,6 @@ PAGE_STABLE_IDS = {
 	"qmclient_hud": (
 		"qm:coords",
 		"qm:player_stats",
-		"qm:speedrun_timer",
 		"qm:debug_graph",
 		"qm:input_overlay",
 		"qm:hud_notifications",
@@ -75,7 +74,6 @@ PAGE_STABLE_IDS = {
 		"qm:chat_bubble",
 		"qm:camera_view",
 		"qm:skin_transition",
-		"qm:focus_mode",
 		"qm:weapon_animation",
 		"qm:entity_overlay",
 		"qm:collision_hitbox",

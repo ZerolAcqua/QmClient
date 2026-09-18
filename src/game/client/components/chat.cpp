@@ -25,7 +25,7 @@
 #include <game/client/components/message_gradient.h>
 #include <game/client/components/qmclient/colored_parts.h>
 #include <game/client/components/qmclient/demo_display.h>
-#include <game/client/components/qmclient/modes.h>
+#include <game/client/components/qmclient/qm_chat_avatar.h>
 #include <game/client/components/qmclient/qm_title_color.h>
 #include <game/client/components/qmclient/qm_title_render.h>
 #include <game/client/components/scoreboard.h>
@@ -396,6 +396,7 @@ void CChat::CLine::Reset(CChat &This)
 	m_TimesRepeated = 0;
 	m_vMergedAuthors.clear();
 	m_pManagedTeeRenderInfo = nullptr;
+	m_pExportMetadata.reset();
 	m_pTranslateResponse = nullptr;
 
 	// 递增翻译 ID，标记内容已变更
@@ -551,21 +552,13 @@ int CChat::CountInitializedLines() const
 
 int CChat::CountVisibleLinesFrom(int BacklogLine) const
 {
-	const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
-	const bool FocusHideChat = FocusModeActive && g_Config.m_QmFocusModeHideChat;
-	const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
-	const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
-	const bool FocusHideEcho = FocusModeActive && g_Config.m_QmFocusModeHideEcho;
-
 	int Count = 0;
 	for(int i = BacklogLine; i < MAX_LINES; ++i)
 	{
 		const CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
 		if(!Line.m_Initialized)
 			break;
-		const bool ServerMessageIsBasicInfo = Line.m_ServerMessageClass == QmHudNotifications::EServerMessageClass::BasicInfo;
-		if(ShouldRenderFocusFilteredChatLine(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, Line.m_ClientId, Line.m_ForceVisible, ServerMessageIsBasicInfo))
-			++Count;
+		++Count;
 	}
 	return Count;
 }
@@ -756,9 +749,8 @@ void CChat::ConchainChatWidth(IConsole::IResult *pResult, void *pUserData, ICons
 
 void CChat::Echo(const char *pString)
 {
-	const bool FocusHideEcho = g_Config.m_QmFocusMode != 0 && g_Config.m_QmFocusModeHideEcho;
 	const unsigned EchoColor = g_Config.m_ClMessageClientColor;
-	if(!FocusHideEcho && GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
+	if(GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
 	{
 		char aBuf[1024];
 		str_format(aBuf, sizeof(aBuf), "— %s", pString);
@@ -770,9 +762,8 @@ void CChat::Echo(const char *pString)
 
 void CChat::Echo(const char *pString, bool ForceVisible)
 {
-	const bool FocusHideEcho = g_Config.m_QmFocusMode != 0 && g_Config.m_QmFocusModeHideEcho && !ForceVisible;
 	const unsigned EchoColor = g_Config.m_ClMessageClientColor;
-	if(!FocusHideEcho && GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
+	if(GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
 	{
 		char aBuf[1024];
 		str_format(aBuf, sizeof(aBuf), "— %s", pString);
@@ -1268,7 +1259,7 @@ void CChat::DisableMode()
 	}
 }
 
-void CChat::OnMessage(int MsgType, void *pRawMsg)
+void CChat::OnMessage(int MsgType, void *pRawMsg, int SourceConnection)
 {
 	if(GameClient()->m_SuppressEvents)
 		return;
@@ -1290,21 +1281,18 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 				str_copy(aBuf, pMsg->m_pMessage);
 				Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat/server", aBuf, color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageSystemColor)));
 			};
-			const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
-			const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
-			const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
 			QmHudNotifications::SServerMessageAnalysis ServerMessageAnalysis;
-			const bool ServerMessageHandled = GameClient()->m_QmHudNotifications.HandleServerChat(pMsg->m_pMessage, g_Config.m_QmHudNotificationsSystem != 0, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, &ServerMessageAnalysis);
-			if(ServerMessageHandled && QmHudNotifications::ShouldSuppressServerMessageChat(ServerMessageAnalysis, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages))
+			const bool ServerMessageHandled = GameClient()->m_QmHudNotifications.HandleServerChat(pMsg->m_pMessage, g_Config.m_QmHudNotificationsSystem != 0, &ServerMessageAnalysis);
+			if(ServerMessageHandled && QmHudNotifications::ShouldSuppressServerMessageChat(ServerMessageAnalysis))
 			{
 				PrintSuppressedServerMessage();
 				return;
 			}
-			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage, false, ServerMessageAnalysis.m_Class);
+			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage, false, ServerMessageAnalysis.m_Class, SourceConnection);
 		}
 		else
 		{
-			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
+			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage, false, std::nullopt, SourceConnection);
 		}
 
 		SaveChatLogLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
@@ -1355,6 +1343,11 @@ static constexpr const char *SAVES_HEADER[] = {
 	"Map",
 	"Code",
 };
+
+void CChat::OnMessage(int MsgType, void *pRawMsg)
+{
+	OnMessage(MsgType, pRawMsg, g_Config.m_ClDummy);
+}
 
 // TODO: remove this in a few releases (in 2027 or later)
 //       it got deprecated by CGameClient::StoreSave
@@ -1492,7 +1485,34 @@ void CChat::SaveChatLogLine(int ClientId, int Team, const char *pLine)
 		Engine()->AddJob(pJob);
 }
 
-void CChat::PrintBlockedMessageToConsole(int ClientId, int Team, const char *pLine)
+static std::shared_ptr<const QmChatExport::SMetadata> CaptureChatExportMetadata(CGameClient *pGameClient, int ClientId, int Team, const char *pName, const char *pMessage, int SourceConnection)
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return nullptr;
+	auto pMetadata = std::make_shared<QmChatExport::SMetadata>();
+	pMetadata->m_Sender = pName;
+	pMetadata->m_Message = pMessage;
+	const int LocalId = pGameClient->m_Snap.m_LocalClientId;
+	const bool DemoPlayback = pGameClient->Client()->State() == IClient::STATE_DEMOPLAYBACK;
+	const int Connection = SourceConnection >= 0 && SourceConnection < NUM_DUMMIES ? SourceConnection : g_Config.m_ClDummy;
+	pMetadata->m_Local = Team == TEAM_WHISPER_SEND || pGameClient->IsLocalClientId(ClientId) ||
+			     (DemoPlayback && ClientId == LocalId);
+	// 发出私聊时协议中的ClientId指向收件人，头像应取实际发件人。
+	const int SenderId = QmChatExport::ResolveSenderId(ClientId, Team == TEAM_WHISPER_SEND, Connection, pGameClient->m_aLocalIds, std::size(pGameClient->m_aLocalIds), LocalId, DemoPlayback);
+	if(SenderId >= 0 && SenderId < MAX_CLIENTS && pGameClient->m_aClients[SenderId].m_Active)
+	{
+		pMetadata->m_pAvatar = QmChatAvatar::Capture(pGameClient->m_aClients[SenderId].m_RenderInfo, Connection);
+		if(Team == TEAM_WHISPER_SEND)
+		{
+			char aSenderName[MAX_NAME_LENGTH];
+			pGameClient->FormatStreamerName(SenderId, aSenderName, sizeof(aSenderName));
+			pMetadata->m_Sender = std::string(aSenderName) + " " + pName;
+		}
+	}
+	return pMetadata;
+}
+
+void CChat::PrintBlockedMessageToConsole(int ClientId, int Team, const char *pLine, int SourceConnection)
 {
 	char aName[64] = "";
 	bool Highlighted = false;
@@ -1557,7 +1577,8 @@ void CChat::PrintBlockedMessageToConsole(int ClientId, int Team, const char *pLi
 
 	char aBuf[1024];
 	str_format(aBuf, sizeof(aBuf), "%s%s%s", aName, ClientId >= 0 ? ": " : "", pLine);
-	Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, pFrom, aBuf, ChatLogColor);
+	GameClient()->m_GameConsole.PrintLineWithColorSpans(IConsole::OUTPUT_LEVEL_STANDARD, pFrom, aBuf, ChatLogColor, nullptr, 0,
+		CaptureChatExportMetadata(GameClient(), ClientId, Team, aName, pLine, SourceConnection));
 }
 
 ColorRGBA CChat::PlayerNameColor(int ClientId, int NameColor, bool TeamMessage) const
@@ -1657,7 +1678,7 @@ void CChat::PrintLineToConsole(const CLine &Line) const
 	if(!Merged)
 	{
 		str_format(aBuf, sizeof(aBuf), "%s%s%s", Line.m_aName, Line.m_ClientId >= 0 ? ": " : "", Line.m_aText);
-		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, pFrom, aBuf, ChatLogColor);
+		GameClient()->m_GameConsole.PrintLineWithColorSpans(IConsole::OUTPUT_LEVEL_STANDARD, pFrom, aBuf, ChatLogColor, nullptr, 0, Line.m_pExportMetadata);
 		return;
 	}
 
@@ -1678,7 +1699,14 @@ void CChat::PrintLineToConsole(const CLine &Line) const
 	str_format(aCount, sizeof(aCount), " [%d]: ", Line.m_TimesRepeated + 1);
 	str_append(aBuf, aCount, sizeof(aBuf));
 	str_append(aBuf, Line.m_aText, sizeof(aBuf));
-	GameClient()->m_GameConsole.PrintLineWithColorSpans(IConsole::OUTPUT_LEVEL_STANDARD, pFrom, aBuf, ChatLogColor, vColorSpans.data(), vColorSpans.size());
+	auto pMetadata = std::make_shared<QmChatExport::SMetadata>();
+	if(Line.m_pExportMetadata)
+		*pMetadata = *Line.m_pExportMetadata;
+	char aRepeated[16];
+	str_format(aRepeated, sizeof(aRepeated), " [%d]", Line.m_TimesRepeated + 1);
+	pMetadata->m_Sender = std::string(Line.m_aName) + aRepeated;
+	pMetadata->m_Message = Line.m_aText;
+	GameClient()->m_GameConsole.PrintLineWithColorSpans(IConsole::OUTPUT_LEVEL_STANDARD, pFrom, aBuf, ChatLogColor, vColorSpans.data(), vColorSpans.size(), std::move(pMetadata));
 }
 
 void CChat::FlushPendingConsoleLine(bool Force)
@@ -1703,7 +1731,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible
 	AddLine(ClientId, Team, pLine, ForceVisible, std::nullopt);
 }
 
-void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible, std::optional<QmHudNotifications::EServerMessageClass> KnownServerMessageClass)
+void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible, std::optional<QmHudNotifications::EServerMessageClass> KnownServerMessageClass, int SourceConnection)
 {
 	if(*pLine == 0 ||
 		(ClientId == SERVER_MSG && !g_Config.m_ClShowChatSystem) ||
@@ -1750,7 +1778,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible
 				const ColorRGBA LogColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_QmBlockWordsConsoleColor));
 				Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat/blocklist", aBuf, LogColor);
 			}
-			PrintBlockedMessageToConsole(ClientId, Team, pLine);
+			PrintBlockedMessageToConsole(ClientId, Team, pLine, SourceConnection);
 			BlockWordsConsolePrinted = true;
 			if(CanHideBlockWordsMessage)
 			{
@@ -1831,6 +1859,15 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible
 		{
 			PreviousLine.m_Friend = false;
 			PreviousLine.m_pManagedTeeRenderInfo = nullptr;
+			if(PreviousLine.m_pExportMetadata)
+			{
+				auto pMetadata = std::make_shared<QmChatExport::SMetadata>(*PreviousLine.m_pExportMetadata);
+				pMetadata->m_pAvatar.reset();
+				pMetadata->m_Local = std::all_of(PreviousLine.m_vMergedAuthors.begin(), PreviousLine.m_vMergedAuthors.end(), [this](const SMergedAuthor &Author) {
+					return GameClient()->IsLocalClientId(Author.m_ClientId);
+				});
+				PreviousLine.m_pExportMetadata = std::move(pMetadata);
+			}
 		}
 		PreviousLine.m_ConsoleSuppressed |= BlockWordsConsolePrinted;
 		TextRender()->DeleteTextContainer(PreviousLine.m_TextContainerIndex);
@@ -1963,6 +2000,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible
 			AddMergedAuthor(CurrentLine, ClientId);
 	}
 
+	CurrentLine.m_pExportMetadata = CaptureChatExportMetadata(GameClient(), ClientId, Team, CurrentLine.m_aName, CurrentLine.m_aText, SourceConnection);
 	if(g_Config.m_QmMessageMerge && ClientId >= 0 && Team < TEAM_WHISPER_SEND && !CurrentLine.m_ConsoleSuppressed)
 		m_PendingConsoleLineIndex = m_CurrentLine;
 	else
@@ -2041,11 +2079,6 @@ void CChat::OnPrepareLines(float y)
 {
 	float x = 5.0f;
 	float FontSize = this->FontSize();
-	const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
-	const bool FocusHideChat = FocusModeActive && g_Config.m_QmFocusModeHideChat;
-	const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
-	const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
-	const bool FocusHideEcho = FocusModeActive && g_Config.m_QmFocusModeHideEcho;
 
 	const bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive();
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;
@@ -2090,11 +2123,6 @@ void CChat::OnPrepareLines(float y)
 		CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
 		if(!Line.m_Initialized)
 			break;
-		const bool ServerMessageIsBasicInfo = Line.m_ServerMessageClass == QmHudNotifications::EServerMessageClass::BasicInfo;
-		if(!ShouldRenderFocusFilteredChatLine(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, Line.m_ClientId, Line.m_ForceVisible, ServerMessageIsBasicInfo))
-		{
-			continue;
-		}
 		if(!ShowLargeArea && !Line.m_ForceVisible && Line.m_Presentation.m_State == EPresentationState::COLLAPSED)
 		{
 			continue;
@@ -2597,14 +2625,6 @@ void CChat::OnRender()
 	FlushPendingConsoleLine(false);
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
-	const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
-	const bool FocusHideChat = FocusModeActive && g_Config.m_QmFocusModeHideChat;
-	const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
-	const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
-	const bool FocusHideEcho = FocusModeActive && g_Config.m_QmFocusModeHideEcho;
-	const bool HasForceVisibleLine = std::any_of(std::begin(m_aLines), std::end(m_aLines), [](const CLine &Line) { return Line.m_Initialized && Line.m_ForceVisible; });
-	if(!ShouldRenderAnyFocusFilteredChat(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, HasForceVisibleLine))
-		return;
 
 	const bool HudEditorPreview = GameClient()->m_HudEditor.IsActive();
 	const bool InputActive = m_Mode != MODE_NONE;
@@ -2951,11 +2971,6 @@ void CChat::OnRender()
 		CLine &Line = m_aLines[LineIndex];
 		if(!Line.m_Initialized)
 			break;
-		const bool ServerMessageIsBasicInfo = Line.m_ServerMessageClass == QmHudNotifications::EServerMessageClass::BasicInfo;
-		if(!ShouldRenderFocusFilteredChatLine(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, Line.m_ClientId, Line.m_ForceVisible, ServerMessageIsBasicInfo))
-		{
-			continue;
-		}
 		if(!ShowLargeArea && !Line.m_ForceVisible && Line.m_Presentation.m_State == EPresentationState::COLLAPSED)
 		{
 			continue;
@@ -3406,11 +3421,6 @@ void CChat::RenderTranslateButton(const CUIRect &ButtonRect)
 
 bool CChat::TranslateVisibleChatLines()
 {
-	const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
-	const bool FocusHideChat = FocusModeActive && g_Config.m_QmFocusModeHideChat;
-	const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
-	const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
-	const bool FocusHideEcho = FocusModeActive && g_Config.m_QmFocusModeHideEcho;
 	const bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive();
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;
 	const int OffsetType = IsScoreBoardOpen ? 1 : 0;
@@ -3423,9 +3433,6 @@ bool CChat::TranslateVisibleChatLines()
 		CLine &Line = m_aLines[LineIndex];
 		if(!Line.m_Initialized)
 			break;
-		const bool ServerMessageIsBasicInfo = Line.m_ServerMessageClass == QmHudNotifications::EServerMessageClass::BasicInfo;
-		if(!ShouldRenderFocusFilteredChatLine(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, Line.m_ClientId, Line.m_ForceVisible, ServerMessageIsBasicInfo))
-			continue;
 		if(!ShowLargeArea && !Line.m_ForceVisible && Line.m_Presentation.m_State == EPresentationState::COLLAPSED)
 			continue;
 		if(!ShowLargeArea && Line.m_Presentation.m_LayoutVisibility <= 0.001f && Line.m_Presentation.m_RenderAlpha <= 0.001f)

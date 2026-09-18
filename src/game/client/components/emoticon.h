@@ -7,11 +7,52 @@
 #include <engine/client/enums.h>
 #include <engine/console.h>
 
+#include <generated/protocol.h>
+
 #include <game/client/component.h>
 #include <game/client/components/tclient/bindwheel.h>
 #include <game/client/ui.h>
 
 #include <string>
+
+namespace QmEmoticon
+{
+	enum class EEffect
+	{
+		INVALID,
+		NONE,
+		SUPER_HEAD,
+		PROJECTILE,
+		SUPER_PROJECTILE,
+	};
+
+	inline EEffect ResolveEffect(int Emoticon, bool LaunchMode, bool SuperLaunch)
+	{
+		if(Emoticon < 0 || Emoticon >= NUM_EMOTICONS)
+			return EEffect::INVALID;
+		if(LaunchMode)
+			return SuperLaunch ? EEffect::SUPER_PROJECTILE : EEffect::PROJECTILE;
+		return SuperLaunch ? EEffect::SUPER_HEAD : EEffect::NONE;
+	}
+
+	inline EEffect ConsumeEffect(int Emoticon, bool LaunchMode, bool &SuperPending)
+	{
+		const bool SuperLaunch = SuperPending;
+		SuperPending = false;
+		return ResolveEffect(Emoticon, LaunchMode, SuperLaunch);
+	}
+
+	inline EEffect ResolveRemoteEffect(int Emoticon, bool LaunchMode, bool SuperLaunch, bool ShowEmotes, bool EmoticonIgnored, bool ShowSuper, bool ShowLaunch)
+	{
+		if(!ShowEmotes || EmoticonIgnored)
+			return EEffect::NONE;
+		const EEffect Effect = ResolveEffect(Emoticon, LaunchMode, SuperLaunch);
+		if((Effect == EEffect::SUPER_HEAD && !ShowSuper) ||
+			((Effect == EEffect::PROJECTILE || Effect == EEffect::SUPER_PROJECTILE) && !ShowLaunch))
+			return EEffect::NONE;
+		return Effect;
+	}
+}
 
 class CCollision;
 

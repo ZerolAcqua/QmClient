@@ -1,6 +1,7 @@
 #include "qm_soda_lyric_file.h"
 
 #include "music_lyrics_krc.h"
+#include "music_lyrics_qrc.h"
 
 #include <engine/external/json-parser/json.h>
 
@@ -107,6 +108,17 @@ namespace QmSodaLyricFile
 		std::string Error;
 		if(LyricType == "krc")
 			Parsed = QmMusicLyrics::ParseKrcText(LyricContent, &pOut->m_Timeline, &Error);
+		else if(LyricType == "qrc")
+		{
+			std::string Content;
+			if(LyricContent.find("LyricContent=") != std::string::npos || LyricContent.find("<QrcInfos") != std::string::npos)
+			{
+				if(QmMusicLyrics::ExtractQrcLyricContent(LyricContent, &Content, &Error))
+					Parsed = QmMusicLyrics::ParseQrcRlrc(Content, &pOut->m_Timeline, &Error);
+			}
+			else
+				Parsed = QmMusicLyrics::ParseQrcRlrc(LyricContent, &pOut->m_Timeline, &Error);
+		}
 		else
 			Parsed = NeteaseLyrics::ParseLrc(LyricContent, &pOut->m_Timeline, &Error);
 		if(!Parsed)

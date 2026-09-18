@@ -9,12 +9,16 @@
 
 #include <generated/protocol.h>
 
+#include <game/client/components/emoticon.h>
+#include <game/client/components/jump_hint_utils.h>
+#include <game/client/components/qmclient/friend_enter_tracker.h>
 #include <game/client/components/qmclient/map_progress.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/translate/translate_ui_settings.h>
 
 #include <gtest/gtest.h>
 
+#include <limits>
 #include <string>
 
 namespace
@@ -327,16 +331,16 @@ TEST(QmGoresMode, UnlinkedFastInputConfigIsNotChanged)
 	EXPECT_FALSE(Changed);
 }
 
-TEST(QmFastInputMode, NormalizesLegacyModesToBestInput)
+TEST(QmFastInputMode, NormalizesLegacyBestModesToFastInput)
 {
 	EXPECT_EQ(QmFastInputNormalizedMode(0), 0);
-	EXPECT_EQ(QmFastInputNormalizedMode(1), 3);
-	EXPECT_EQ(QmFastInputNormalizedMode(2), 3);
-	EXPECT_EQ(QmFastInputNormalizedMode(3), 3);
+	EXPECT_EQ(QmFastInputNormalizedMode(1), 0);
+	EXPECT_EQ(QmFastInputNormalizedMode(2), 0);
+	EXPECT_EQ(QmFastInputNormalizedMode(3), 0);
 	EXPECT_EQ(QmFastInputNormalizedMode(4), 4);
 }
 
-TEST(QmFastInputMode, ComputesFastBestAndSaikoOffsets)
+TEST(QmFastInputMode, ComputesFastAndSaikoOffsets)
 {
 	SQmFastInputSettings Settings;
 	Settings.m_Enabled = true;
@@ -345,11 +349,9 @@ TEST(QmFastInputMode, ComputesFastBestAndSaikoOffsets)
 	Settings.m_FastAmountMs = 40;
 	EXPECT_FLOAT_EQ(QmEffectiveFastInputOffsetTicks(Settings), 2.0f);
 
+	// 历史 Best(3) 已删除，必须回落到 Fast 的偏移。
 	Settings.m_Mode = 3;
-	Settings.m_BestOffset = 250;
-	Settings.m_BestSmoothing = 50;
-	Settings.m_BestLatencyComp = 20;
-	EXPECT_FLOAT_EQ(QmEffectiveFastInputOffsetTicks(Settings), 2.25f);
+	EXPECT_FLOAT_EQ(QmEffectiveFastInputOffsetTicks(Settings), 2.0f);
 
 	Settings.m_Mode = 4;
 	Settings.m_SaikoPlusAmount = 175;
@@ -359,7 +361,7 @@ TEST(QmFastInputMode, ComputesFastBestAndSaikoOffsets)
 TEST(QmFastInputMode, PredictionTicksUseSaikoPlusExtraLocalTickOnly)
 {
 	EXPECT_EQ(QmFastInputPredictionTicks(0.01f, 0), 1);
-	EXPECT_EQ(QmFastInputPredictionTicks(1.25f, 3), 2);
+	EXPECT_EQ(QmFastInputPredictionTicks(1.25f, 0), 2);
 	EXPECT_EQ(QmFastInputPredictionTicks(1.25f, 4), 3);
 	EXPECT_EQ(QmFastInputPredictionTicksOthers(1.25f, 4), 2);
 }
@@ -375,12 +377,12 @@ TEST(QmFastInputMode, AppliesOffsetWithoutNegativeIntra)
 
 TEST(QmFastInputMode, ChoosesOthersToggleByMode)
 {
-	EXPECT_FALSE(QmEffectiveFastInputOthers(false, 0, true, true, true));
-	EXPECT_TRUE(QmEffectiveFastInputOthers(true, 0, true, false, false));
-	EXPECT_TRUE(QmEffectiveFastInputOthers(true, 3, false, true, false));
-	EXPECT_TRUE(QmEffectiveFastInputOthers(true, 4, false, false, true));
-	EXPECT_FALSE(QmEffectiveFastInputOthers(true, 3, true, false, true));
-	EXPECT_FALSE(QmEffectiveFastInputOthers(true, 4, true, true, false));
+	EXPECT_FALSE(QmEffectiveFastInputOthers(false, 0, true, true));
+	EXPECT_TRUE(QmEffectiveFastInputOthers(true, 0, true, false));
+	EXPECT_TRUE(QmEffectiveFastInputOthers(true, 3, true, false));
+	EXPECT_TRUE(QmEffectiveFastInputOthers(true, 4, false, true));
+	EXPECT_FALSE(QmEffectiveFastInputOthers(true, 3, false, true));
+	EXPECT_FALSE(QmEffectiveFastInputOthers(true, 4, true, false));
 }
 
 TEST(QmFastInputMode, MarginUsesLargestFastInputContribution)
@@ -393,9 +395,9 @@ TEST(QmFastInputMode, MarginUsesLargestFastInputContribution)
 	Settings.m_FastAmountMs = 40;
 	EXPECT_EQ(QmFastInputBasePredictionMarginMs(Settings), 40);
 
+	// 历史 Best(3) 已删除，边距同样回落到 Fast 的贡献值。
 	Settings.m_Mode = 3;
-	Settings.m_BestOffset = 250;
-	EXPECT_EQ(QmFastInputBasePredictionMarginMs(Settings), 50);
+	EXPECT_EQ(QmFastInputBasePredictionMarginMs(Settings), 40);
 
 	Settings.m_Mode = 4;
 	Settings.m_SaikoPlusAmount = 175;
@@ -435,7 +437,7 @@ TEST(QmGoresMode, ActiveGoresClearsDummyHammerState)
 
 TEST(QmGoresMode, DummyHammerOverrideRestoresOnlyAutomaticChanges)
 {
-	SQmFocusConfigOverrideState State;
+	SQmConfigOverrideState State;
 	bool Changed = false;
 	EXPECT_EQ(ApplyQmGoresDummyHammerOverride(State, true, true, 1, Changed), 0);
 	EXPECT_TRUE(Changed);
@@ -633,291 +635,44 @@ TEST(QmGoresMode, BudgetedWorkDoesNotAdvanceWithoutPositiveBudget)
 	EXPECT_EQ(Cursor, 2);
 }
 
-TEST(QmFocusMode, ConfigOverrideRestoresOnlyAutoHiddenValues)
+TEST(QmConfigOverride, ConfigOverrideRestoresOnlyAutoHiddenValues)
 {
-	SQmFocusConfigOverrideState State;
+	SQmConfigOverrideState State;
 	bool Changed = false;
 
-	int Value = ApplyQmFocusConfigOverride(State, true, 1, 0, Changed);
+	int Value = ApplyQmConfigOverride(State, true, 1, 0, Changed);
 	EXPECT_TRUE(Changed);
 	EXPECT_EQ(Value, 0);
 	EXPECT_TRUE(State.m_WasActive);
 	EXPECT_EQ(State.m_SavedValue, 1);
 
-	Value = ApplyQmFocusConfigOverride(State, false, 0, 0, Changed);
+	Value = ApplyQmConfigOverride(State, false, 0, 0, Changed);
 	EXPECT_TRUE(Changed);
 	EXPECT_EQ(Value, 1);
 	EXPECT_FALSE(State.m_WasActive);
 }
 
-TEST(QmFocusMode, ConfigOverrideKeepsUserChangesMadeWhileActive)
+TEST(QmConfigOverride, ConfigOverrideKeepsUserChangesMadeWhileActive)
 {
-	SQmFocusConfigOverrideState State;
+	SQmConfigOverrideState State;
 	bool Changed = false;
 
-	EXPECT_EQ(ApplyQmFocusConfigOverride(State, true, 1, 0, Changed), 0);
+	EXPECT_EQ(ApplyQmConfigOverride(State, true, 1, 0, Changed), 0);
 	EXPECT_TRUE(Changed);
 
 	const int UserChangedValue = 2;
-	EXPECT_EQ(ApplyQmFocusConfigOverride(State, false, UserChangedValue, 0, Changed), UserChangedValue);
+	EXPECT_EQ(ApplyQmConfigOverride(State, false, UserChangedValue, 0, Changed), UserChangedValue);
 	EXPECT_FALSE(Changed);
 	EXPECT_FALSE(State.m_WasActive);
 }
 
-TEST(QmFocusMode, HudScoreboardNamesAndNameplatesRequireFocusModeAndTheirOwnToggle)
-{
-	EXPECT_TRUE(ShouldHideFocusHud(true, true));
-	EXPECT_FALSE(ShouldHideFocusHud(true, false));
-	EXPECT_FALSE(ShouldHideFocusHud(false, true));
-
-	EXPECT_TRUE(ShouldHideFocusScoreboard(true, true));
-	EXPECT_FALSE(ShouldHideFocusScoreboard(true, false));
-	EXPECT_FALSE(ShouldHideFocusScoreboard(false, true));
-
-	EXPECT_TRUE(ShouldHideFocusNames(true, true));
-	EXPECT_FALSE(ShouldHideFocusNames(true, false));
-	EXPECT_FALSE(ShouldHideFocusNames(false, true));
-
-	EXPECT_TRUE(ShouldHideFocusNameplates(true, true));
-	EXPECT_FALSE(ShouldHideFocusNameplates(true, false));
-	EXPECT_FALSE(ShouldHideFocusNameplates(false, true));
-}
-
-TEST(QmFocusMode, SpectatorHudStaysVisibleWhenFocusModeAutoHidesMainHud)
-{
-	EXPECT_TRUE(ShouldRenderFocusSpectatorHud(true, true, false, true, true));
-	EXPECT_TRUE(ShouldRenderFocusSpectatorHud(true, true, true, true, true));
-	EXPECT_FALSE(ShouldRenderFocusSpectatorHud(false, true, false, true, true));
-	EXPECT_FALSE(ShouldRenderFocusSpectatorHud(true, false, false, true, true));
-	EXPECT_FALSE(ShouldRenderFocusSpectatorHud(true, true, false, false, true));
-	EXPECT_FALSE(ShouldRenderFocusSpectatorHud(true, true, false, true, false));
-}
-
-TEST(QmFocusMode, VisualEffectChildrenDoNotInheritTheLegacyVisualParentToggle)
-{
-	EXPECT_FALSE(ShouldHideFocusJumpEffects(true, false));
-	EXPECT_TRUE(ShouldHideFocusJumpEffects(true, true));
-	EXPECT_FALSE(ShouldHideFocusKillEffects(true, false));
-	EXPECT_TRUE(ShouldHideFocusKillEffects(true, true));
-	EXPECT_FALSE(ShouldHideFocusExplosionEffects(true, false));
-	EXPECT_TRUE(ShouldHideFocusExplosionEffects(true, true));
-	EXPECT_FALSE(ShouldHideFocusFreezeEffects(true, false));
-	EXPECT_TRUE(ShouldHideFocusFreezeEffects(true, true));
-	EXPECT_FALSE(ShouldHideFocusFreezeEffects(false, true));
-	EXPECT_FALSE(ShouldHideFocusHammerEffects(true, false));
-	EXPECT_TRUE(ShouldHideFocusHammerEffects(true, true));
-	EXPECT_FALSE(ShouldHideFocusHammerEffects(false, true));
-	EXPECT_FALSE(ShouldHideFocusMuzzleEffects(true, false));
-	EXPECT_TRUE(ShouldHideFocusMuzzleEffects(true, true));
-	EXPECT_FALSE(ShouldHideFocusMuzzleEffects(false, true));
-	EXPECT_FALSE(ShouldHideFocusJumpEffects(false, true));
-	EXPECT_FALSE(ShouldHideFocusKillEffects(false, true));
-	EXPECT_FALSE(ShouldHideFocusExplosionEffects(false, true));
-}
-
-TEST(QmFocusMode, UncheckedJumpEffectsStayVisibleInFocusMode)
-{
-	EXPECT_FALSE(ShouldHideFocusJumpEffects(true, false));
-}
-
-TEST(QmFocusMode, MapProgressAndInfoMessagesUseTheirOwnChildToggles)
-{
-	EXPECT_FALSE(ShouldHideFocusMapProgress(true, false));
-	EXPECT_TRUE(ShouldHideFocusMapProgress(true, true));
-	EXPECT_FALSE(ShouldHideFocusInfoMessages(true, false));
-	EXPECT_TRUE(ShouldHideFocusInfoMessages(true, true));
-	EXPECT_FALSE(ShouldHideFocusMapProgress(false, true));
-	EXPECT_FALSE(ShouldHideFocusInfoMessages(false, true));
-}
-
-TEST(QmFocusMode, IndependentMapProgressUsesItsOwnToggleAndBottomStyle)
+TEST(QmMapProgress, IndependentMapProgressUsesItsOwnToggleAndBottomStyle)
 {
 	EXPECT_FALSE(ShouldRenderMapProgressBar(false, 0, false, true));
 	EXPECT_TRUE(ShouldRenderMapProgressBar(true, 1, false, true));
 	EXPECT_FALSE(ShouldRenderMapProgressBar(true, 1, true, true));
 	EXPECT_FALSE(ShouldRenderMapProgressBar(true, 0, false, false));
 	EXPECT_TRUE(ShouldRenderMapProgressBar(true, 0, false, true));
-}
-
-TEST(QmFocusMode, JumpSoundMuteIsIndependentFromJumpVisualEffects)
-{
-	EXPECT_TRUE(ShouldPlayFocusJumpSound(true, false, true));
-	EXPECT_FALSE(ShouldPlayFocusJumpSound(true, true, true));
-	EXPECT_TRUE(ShouldPlayFocusJumpSound(false, true, true));
-	EXPECT_FALSE(ShouldPlayFocusJumpSound(true, false, false));
-}
-
-TEST(QmFocusMode, DeathOrSpawnSoundUsesDeathSoundMuteToggle)
-{
-	EXPECT_TRUE(ShouldPlayFocusDeathOrSpawnSound(true, false, true));
-	EXPECT_FALSE(ShouldPlayFocusDeathOrSpawnSound(true, true, true));
-	EXPECT_TRUE(ShouldPlayFocusDeathOrSpawnSound(false, true, true));
-	EXPECT_FALSE(ShouldPlayFocusDeathOrSpawnSound(true, false, false));
-}
-
-TEST(QmFocusMode, HammerSoundMuteRequiresFocusModeAndHammerSoundToggle)
-{
-	EXPECT_FALSE(ShouldMuteFocusHammerSounds(true, false));
-	EXPECT_TRUE(ShouldMuteFocusHammerSounds(true, true));
-	EXPECT_FALSE(ShouldMuteFocusHammerSounds(false, true));
-}
-
-TEST(QmFocusMode, AirJumpDecisionSeparatesParticlesAndSound)
-{
-	SQmAirJumpEffectDecision Decision = GetQmAirJumpEffectDecision(true, false, true, true);
-	EXPECT_TRUE(Decision.m_SpawnParticles);
-	EXPECT_FALSE(Decision.m_PlaySound);
-
-	Decision = GetQmAirJumpEffectDecision(true, true, false, true);
-	EXPECT_FALSE(Decision.m_SpawnParticles);
-	EXPECT_TRUE(Decision.m_PlaySound);
-
-	Decision = GetQmAirJumpEffectDecision(true, false, false, false);
-	EXPECT_TRUE(Decision.m_SpawnParticles);
-	EXPECT_FALSE(Decision.m_PlaySound);
-}
-
-TEST(QmFocusMode, DirectionIndicatorsAndGuideLinesAreControlledSeparately)
-{
-	EXPECT_TRUE(ShouldHideFocusDirectionIndicators(true, true));
-	EXPECT_FALSE(ShouldHideFocusDirectionIndicators(true, false));
-	EXPECT_FALSE(ShouldHideFocusDirectionIndicators(false, true));
-
-	EXPECT_TRUE(ShouldHideFocusGuideLines(true, true));
-	EXPECT_FALSE(ShouldHideFocusGuideLines(true, false));
-	EXPECT_FALSE(ShouldHideFocusGuideLines(false, true));
-}
-
-TEST(QmFocusMode, UncheckedDirectionAndGuideIndicatorsStayVisibleInFocusMode)
-{
-	EXPECT_FALSE(ShouldHideFocusDirectionIndicators(true, false));
-	EXPECT_FALSE(ShouldHideFocusGuideLines(true, false));
-}
-
-TEST(QmFocusMode, ForceVisibleClientLinesRemainVisibleWhenChatIsHidden)
-{
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(true, true, true, true, -2, true, false));
-	EXPECT_FALSE(ShouldRenderAnyFocusFilteredChat(true, true, true, true, false));
-	EXPECT_TRUE(ShouldRenderAnyFocusFilteredChat(true, true, true, true, true));
-}
-
-TEST(QmFocusMode, ChatFiltersSeparatePlayerSystemAndEchoMessages)
-{
-	EXPECT_FALSE(ShouldRenderFocusFilteredChatLine(true, false, false, false, 3, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(true, false, false, false, -1, false, true));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(true, false, false, false, -1, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(true, false, false, false, -2, false, false));
-
-	EXPECT_FALSE(ShouldRenderFocusFilteredChatLine(false, true, false, false, -1, false, true));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(false, true, false, false, -1, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(false, true, false, false, 3, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(false, true, false, false, -2, false, false));
-
-	EXPECT_FALSE(ShouldRenderFocusFilteredChatLine(false, false, true, false, -1, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(false, false, true, false, -1, false, true));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(false, false, true, false, 3, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(false, false, true, false, -2, false, false));
-
-	EXPECT_FALSE(ShouldRenderFocusFilteredChatLine(false, false, false, true, -2, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(false, false, false, true, 3, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(false, false, false, true, -1, false, false));
-}
-
-TEST(QmFocusMode, UnknownChatLinesFollowSystemMessageVisibility)
-{
-	EXPECT_FALSE(ShouldRenderFocusFilteredChatLine(false, false, true, false, -3, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(true, true, false, true, -3, false, false));
-}
-
-TEST(QmFocusMode, ChatAreaRendersWhenAnyMessageClassIsVisible)
-{
-	EXPECT_TRUE(ShouldRenderAnyFocusFilteredChat(false, true, true, true, false));
-	EXPECT_TRUE(ShouldRenderAnyFocusFilteredChat(true, false, true, true, false));
-	EXPECT_TRUE(ShouldRenderAnyFocusFilteredChat(true, true, false, true, false));
-	EXPECT_TRUE(ShouldRenderAnyFocusFilteredChat(true, true, true, false, false));
-}
-
-TEST(QmFocusMode, ConfigSnapshotKeepsExplicitVisualChildrenIndependent)
-{
-	SQmFocusModeConfig Config;
-	Config.m_FocusActive = true;
-
-	const SQmFocusModeDecisions Decisions = GetQmFocusModeDecisions(Config);
-	EXPECT_TRUE(Decisions.m_AirJump.m_SpawnParticles);
-	EXPECT_TRUE(Decisions.m_AirJump.m_PlaySound);
-	EXPECT_FALSE(Decisions.m_HideKillEffects);
-	EXPECT_FALSE(Decisions.m_HideExplosionEffects);
-	EXPECT_FALSE(Decisions.m_HideFreezeEffects);
-	EXPECT_FALSE(Decisions.m_HideHammerEffects);
-	EXPECT_FALSE(Decisions.m_HideMuzzleEffects);
-
-	Config.m_HideMuzzleEffects = true;
-	EXPECT_TRUE(GetQmFocusModeDecisions(Config).m_HideMuzzleEffects);
-}
-
-TEST(QmFocusMode, ConfigSnapshotSeparatesNameTextFromWholeNameplate)
-{
-	SQmFocusModeConfig Config;
-	Config.m_FocusActive = true;
-	Config.m_HideNames = true;
-
-	SQmFocusModeDecisions Decisions = GetQmFocusModeDecisions(Config);
-	EXPECT_TRUE(Decisions.m_HideNames);
-	EXPECT_FALSE(Decisions.m_HideNameplates);
-
-	Config.m_HideNames = false;
-	Config.m_HideNameplates = true;
-	Decisions = GetQmFocusModeDecisions(Config);
-	EXPECT_FALSE(Decisions.m_HideNames);
-	EXPECT_TRUE(Decisions.m_HideNameplates);
-}
-
-TEST(QmFocusMode, ConfigSnapshotSeparatesChatMessageClasses)
-{
-	SQmFocusModeConfig Config;
-	Config.m_FocusActive = true;
-	Config.m_HidePlayerMessages = true;
-	Config.m_HideSystemInfoMessages = false;
-	Config.m_HideSystemPromptMessages = true;
-	Config.m_HideEchoMessages = true;
-	Config.m_HideHud = true;
-	Config.m_HideScoreboard = true;
-	Config.m_HideNames = true;
-	Config.m_HideNameplates = true;
-
-	const SQmFocusModeDecisions Decisions = GetQmFocusModeDecisions(Config);
-	EXPECT_TRUE(Decisions.m_HideHud);
-	EXPECT_TRUE(Decisions.m_HideScoreboard);
-	EXPECT_TRUE(Decisions.m_HideNames);
-	EXPECT_TRUE(Decisions.m_HideNameplates);
-	EXPECT_FALSE(ShouldRenderFocusFilteredChatLine(Decisions.m_HidePlayerMessages, Decisions.m_HideSystemInfoMessages, Decisions.m_HideSystemPromptMessages, Decisions.m_HideEchoMessages, 0, false, false));
-	EXPECT_TRUE(ShouldRenderFocusFilteredChatLine(Decisions.m_HidePlayerMessages, Decisions.m_HideSystemInfoMessages, Decisions.m_HideSystemPromptMessages, Decisions.m_HideEchoMessages, -1, false, true));
-	EXPECT_FALSE(ShouldRenderFocusFilteredChatLine(Decisions.m_HidePlayerMessages, Decisions.m_HideSystemInfoMessages, Decisions.m_HideSystemPromptMessages, Decisions.m_HideEchoMessages, -1, false, false));
-	EXPECT_FALSE(ShouldRenderFocusFilteredChatLine(Decisions.m_HidePlayerMessages, Decisions.m_HideSystemInfoMessages, Decisions.m_HideSystemPromptMessages, Decisions.m_HideEchoMessages, -2, false, false));
-}
-
-TEST(QmFocusMode, ConfigSnapshotMapProgressRequiresStyleAndGoresProgressAndChildToggle)
-{
-	SQmFocusModeConfig Config;
-	Config.m_FocusActive = true;
-	Config.m_MapProgressEnabled = true;
-	Config.m_MapProgressStyle = 0;
-	Config.m_PlayerStatsHudEnabled = false;
-	Config.m_GoresMapProgressEnabled = true;
-	Config.m_HideMapProgress = false;
-
-	EXPECT_TRUE(GetQmFocusModeDecisions(Config).m_RenderMapProgressBar);
-
-	Config.m_MapProgressStyle = 1;
-	EXPECT_TRUE(GetQmFocusModeDecisions(Config).m_RenderMapProgressBar);
-
-	Config.m_PlayerStatsHudEnabled = true;
-	EXPECT_FALSE(GetQmFocusModeDecisions(Config).m_RenderMapProgressBar);
-
-	Config.m_MapProgressStyle = 0;
-	Config.m_PlayerStatsHudEnabled = false;
-	Config.m_HideMapProgress = true;
-	EXPECT_FALSE(GetQmFocusModeDecisions(Config).m_RenderMapProgressBar);
 }
 
 TEST(QmTranslateUiSettings, DefaultColorsMatchSettingsPreviewDefaults)
@@ -1102,4 +857,223 @@ TEST(QmTranslateUiSettings, MigrationMarkerPreservesIntentionalTransparentColor)
 	EXPECT_EQ(Background, 0x00A1B2C3u);
 	EXPECT_EQ(Selected, 0x00000000u);
 	EXPECT_EQ(Normal, 0x00D4E5F6u);
+}
+
+TEST(QmJumpHint, DefaultsAreChineseAndDisabled)
+{
+	EXPECT_EQ(DefaultConfig::QmJumpHint, 0);
+	EXPECT_EQ(DefaultConfig::QmJumpHintDefaultsMigrated, 0);
+	EXPECT_STREQ(DefaultConfig::QmJumpHintText, "三格边缘跳:\\n左起跳: .34|.31|.16\\n左二段跳: .41|.28|.25|.13\\n右起跳: .63|.66|.81\\n右二段跳: .56|.69|.72|.84");
+	EXPECT_STREQ(JUMP_HINT_DEFAULT_TEXT, DefaultConfig::QmJumpHintText);
+}
+
+TEST(QmJumpHint, UpgradeReplacesOriginalEnglishAndDisablesOnce)
+{
+	int Migrated = 0;
+	int Enabled = 1;
+	char aText[512] = "3 Tiles Edge Jump:\\nLeft Jump: .34|.31|.16\\nLeft Double Jump: .41|.28|.25|.13\\nRight Jump: .63|.66|.81\\nRight Double Jump: .56|.69|.72|.84";
+	MigrateJumpHintDefaults(Migrated, Enabled, aText, sizeof(aText));
+	EXPECT_EQ(Migrated, 1);
+	EXPECT_EQ(Enabled, 0);
+	EXPECT_STREQ(aText, JUMP_HINT_DEFAULT_TEXT);
+
+	// 用户重新开启后，后续启动不得再次关闭。
+	Enabled = 1;
+	MigrateJumpHintDefaults(Migrated, Enabled, aText, sizeof(aText));
+	EXPECT_EQ(Enabled, 1);
+	EXPECT_STREQ(aText, JUMP_HINT_DEFAULT_TEXT);
+}
+
+TEST(QmJumpHint, UpgradePreservesCustomTextIncludingModifiedEnglish)
+{
+	for(const char *pText : {"我的三跳提示\\n保留这一行", "3 Tiles Edge Jump:\\nLeft Jump: .34", ""})
+	{
+		int Migrated = 0;
+		int Enabled = 1;
+		char aText[512];
+		str_copy(aText, pText, sizeof(aText));
+		MigrateJumpHintDefaults(Migrated, Enabled, aText, sizeof(aText));
+		EXPECT_EQ(Migrated, 1);
+		EXPECT_EQ(Enabled, 0);
+		EXPECT_STREQ(aText, pText);
+	}
+}
+
+TEST(QmJumpHint, CompletedMigrationPreservesSubsequentUserChoices)
+{
+	int Migrated = 1;
+	int Enabled = 1;
+	char aText[512] = "3 Tiles Edge Jump:\\nLeft Jump: .34|.31|.16\\nLeft Double Jump: .41|.28|.25|.13\\nRight Jump: .63|.66|.81\\nRight Double Jump: .56|.69|.72|.84";
+	const std::string UserText = aText;
+	MigrateJumpHintDefaults(Migrated, Enabled, aText, sizeof(aText));
+	EXPECT_EQ(Enabled, 1);
+	EXPECT_STREQ(aText, UserText.c_str());
+}
+
+TEST(QmEmoticon, InvalidRequestsConsumePendingSuperEmote)
+{
+	for(const int Emoticon : {-1, static_cast<int>(NUM_EMOTICONS), std::numeric_limits<int>::min(), std::numeric_limits<int>::max()})
+	{
+		bool SuperPending = true;
+		EXPECT_EQ(QmEmoticon::ConsumeEffect(Emoticon, true, SuperPending), QmEmoticon::EEffect::INVALID);
+		EXPECT_FALSE(SuperPending);
+		EXPECT_EQ(QmEmoticon::ConsumeEffect(0, true, SuperPending), QmEmoticon::EEffect::PROJECTILE);
+	}
+}
+
+TEST(QmEmoticon, ValidBoundaryIdsConsumeSuperEmoteOnce)
+{
+	for(const int Emoticon : {0, NUM_EMOTICONS - 1})
+	{
+		bool SuperPending = true;
+		EXPECT_EQ(QmEmoticon::ConsumeEffect(Emoticon, false, SuperPending), QmEmoticon::EEffect::SUPER_HEAD);
+		EXPECT_FALSE(SuperPending);
+		EXPECT_EQ(QmEmoticon::ConsumeEffect(Emoticon, false, SuperPending), QmEmoticon::EEffect::NONE);
+	}
+}
+
+TEST(QmEmoticon, LocalAndRemoteEffectsAgreeForEveryLaunchMode)
+{
+	struct SCase
+	{
+		bool m_Launch;
+		bool m_Super;
+		QmEmoticon::EEffect m_Expected;
+	};
+	const SCase aCases[] = {
+		{false, false, QmEmoticon::EEffect::NONE},
+		{false, true, QmEmoticon::EEffect::SUPER_HEAD},
+		{true, false, QmEmoticon::EEffect::PROJECTILE},
+		{true, true, QmEmoticon::EEffect::SUPER_PROJECTILE},
+	};
+	for(const auto &Case : aCases)
+	{
+		bool SuperPending = Case.m_Super;
+		EXPECT_EQ(QmEmoticon::ConsumeEffect(4, Case.m_Launch, SuperPending), Case.m_Expected);
+		EXPECT_EQ(QmEmoticon::ResolveRemoteEffect(4, Case.m_Launch, Case.m_Super, true, false, true, true), Case.m_Expected);
+	}
+}
+
+TEST(QmEmoticon, GlobalAndPerPlayerMuteSuppressAllRemoteEffects)
+{
+	for(const bool Launch : {false, true})
+	{
+		for(const bool Super : {false, true})
+		{
+			EXPECT_EQ(QmEmoticon::ResolveRemoteEffect(4, Launch, Super, false, false, true, true), QmEmoticon::EEffect::NONE);
+			EXPECT_EQ(QmEmoticon::ResolveRemoteEffect(4, Launch, Super, true, true, true, true), QmEmoticon::EEffect::NONE);
+		}
+	}
+}
+
+TEST(QmEmoticon, RemoteVisibilityFiltersHeadAndProjectileIndependently)
+{
+	for(const bool ShowSuper : {false, true})
+	{
+		for(const bool ShowLaunch : {false, true})
+		{
+			EXPECT_EQ(QmEmoticon::ResolveRemoteEffect(4, false, true, true, false, ShowSuper, ShowLaunch), ShowSuper ? QmEmoticon::EEffect::SUPER_HEAD : QmEmoticon::EEffect::NONE);
+			EXPECT_EQ(QmEmoticon::ResolveRemoteEffect(4, true, false, true, false, ShowSuper, ShowLaunch), ShowLaunch ? QmEmoticon::EEffect::PROJECTILE : QmEmoticon::EEffect::NONE);
+			EXPECT_EQ(QmEmoticon::ResolveRemoteEffect(4, true, true, true, false, ShowSuper, ShowLaunch), ShowLaunch ? QmEmoticon::EEffect::SUPER_PROJECTILE : QmEmoticon::EEffect::NONE);
+		}
+	}
+}
+
+TEST(QmFriendEnterTracker, InitialRosterIsSilentAndNewFriendEntersOnce)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	const qm_friend_notify::CEnterTracker::CClient Existing{1, "Existing", "Clan", true, false};
+	const qm_friend_notify::CEnterTracker::CClient NewFriend{2, "NewFriend", "Clan", true, false};
+	EXPECT_TRUE(Tracker.Update({Existing}, 0.0, false).empty());
+	EXPECT_EQ(Tracker.Update({Existing, NewFriend}, 0.2, false), std::vector<std::string>{"NewFriend"});
+	EXPECT_TRUE(Tracker.Update({Existing, NewFriend}, 0.4, false).empty());
+}
+
+TEST(QmFriendEnterTracker, SameSlotIdentityAndFriendChangesAreSilent)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	EXPECT_TRUE(Tracker.Update({{1, "Stranger", "OldClan", false, false}}, 0.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({{1, "Friend", "OldClan", true, false}}, 0.2, false).empty());
+	EXPECT_TRUE(Tracker.Update({{1, "Friend", "NewClan", true, false}}, 0.4, false).empty());
+	EXPECT_TRUE(Tracker.Update({{1, "Friend", "NewClan", false, false}}, 0.6, false).empty());
+	EXPECT_TRUE(Tracker.Update({{1, "Friend", "NewClan", true, false}}, 0.8, false).empty());
+}
+
+TEST(QmFriendEnterTracker, ShortSnapshotAbsenceDoesNotReannounceFriend)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	const qm_friend_notify::CEnterTracker::CClient Friend{1, "Friend", "Clan", true, false};
+	EXPECT_TRUE(Tracker.Update({Friend}, 0.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({}, 1.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({}, 3.8, false).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, 3.9, false).empty());
+	EXPECT_TRUE(Tracker.Update({}, 4.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, 6.9, false).empty());
+}
+
+TEST(QmFriendEnterTracker, ConfirmedAbsenceAllowsReentryAtGraceBoundary)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	const qm_friend_notify::CEnterTracker::CClient Friend{1, "Friend", "Clan", true, false};
+	EXPECT_TRUE(Tracker.Update({Friend}, 0.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({}, 1.0, false).empty());
+	EXPECT_EQ(Tracker.Update({Friend}, 4.0, false), std::vector<std::string>{"Friend"});
+	EXPECT_TRUE(Tracker.Update({Friend}, 4.2, false).empty());
+}
+
+TEST(QmFriendEnterTracker, ObservationPauseDoesNotCountAsAbsence)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	const qm_friend_notify::CEnterTracker::CClient Friend{1, "Friend", "Clan", true, false};
+	EXPECT_TRUE(Tracker.Update({Friend}, 0.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, 100.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({}, 200.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({Friend}, 200.2, false).empty());
+}
+
+TEST(QmFriendEnterTracker, IdentityMovingSlotsWithinGraceIsSilent)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	EXPECT_TRUE(Tracker.Update({{1, "Friend", "Clan", true, false}}, 0.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({}, 1.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({{2, "Friend", "Clan", true, false}}, 3.9, false).empty());
+	EXPECT_EQ(Tracker.Update({{1, "NewFriend", "Clan", true, false}, {2, "Friend", "Clan", true, false}}, 4.0, false), std::vector<std::string>{"NewFriend"});
+}
+
+TEST(QmFriendEnterTracker, IdentityMovingSlotsAfterConfirmedAbsenceEnters)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	EXPECT_TRUE(Tracker.Update({{1, "Friend", "Clan", true, false}}, 0.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({}, 1.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({}, 4.0, false).empty());
+	EXPECT_EQ(Tracker.Update({{2, "Friend", "Clan", true, false}}, 4.2, false), std::vector<std::string>{"Friend"});
+}
+
+TEST(QmFriendEnterTracker, SlotMigrationRespectsIgnoreClan)
+{
+	for(const bool IgnoreClan : {false, true})
+	{
+		qm_friend_notify::CEnterTracker Tracker;
+		EXPECT_TRUE(Tracker.Update({{1, "Friend", "OldClan", true, false}}, 0.0, IgnoreClan).empty());
+		EXPECT_TRUE(Tracker.Update({}, 1.0, IgnoreClan).empty());
+		const auto vNames = Tracker.Update({{2, "Friend", "NewClan", true, false}}, 1.2, IgnoreClan);
+		EXPECT_EQ(vNames, IgnoreClan ? std::vector<std::string>{} : std::vector<std::string>{"Friend"});
+	}
+}
+
+TEST(QmFriendEnterTracker, LocalPlayersAndNonFriendsDoNotNotify)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	EXPECT_TRUE(Tracker.Update({}, 0.0, false).empty());
+	EXPECT_TRUE(Tracker.Update({{1, "Main", "Clan", true, true}, {2, "Dummy", "Clan", true, true}, {3, "Stranger", "Clan", false, false}}, 0.2, false).empty());
+	EXPECT_TRUE(Tracker.Update({{1, "Main", "Clan", true, false}, {2, "Dummy", "Clan", true, false}, {3, "Stranger", "Clan", true, false}}, 0.4, false).empty());
+}
+
+TEST(QmFriendEnterTracker, ResetBuildsANewSilentBaseline)
+{
+	qm_friend_notify::CEnterTracker Tracker;
+	EXPECT_TRUE(Tracker.Update({}, 0.0, false).empty());
+	EXPECT_EQ(Tracker.Update({{1, "Friend", "Clan", true, false}}, 0.2, false), std::vector<std::string>{"Friend"});
+	Tracker.Reset();
+	EXPECT_TRUE(Tracker.Update({{1, "Friend", "Clan", true, false}, {2, "Another", "Clan", true, false}}, 1.0, false).empty());
 }

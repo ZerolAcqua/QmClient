@@ -2718,8 +2718,11 @@ void CUi::RenderPopupMenus()
 		const float SurfaceAlpha = 1.0f - 0.15f * Remaining * Remaining * Remaining * Remaining;
 		ColorRGBA BackgroundColor = PopupMenu.m_Props.m_BackgroundColor;
 		ColorRGBA BorderColor = PopupMenu.m_Props.m_BorderColor;
-		BackgroundColor.a *= SurfaceAlpha;
-		BorderColor.a *= SurfaceAlpha;
+		if(PopupMenu.m_Props.m_AnimateAlpha)
+		{
+			BackgroundColor.a *= SurfaceAlpha;
+			BorderColor.a *= SurfaceAlpha;
+		}
 		DrawRoundedSurface(this, PopupRect, BackgroundColor, BorderColor, ui_token::radius::CARD, SPopupMenu::POPUP_BORDER, PopupMenu.m_Props.m_Corners);
 		PopupRect.Margin(SPopupMenu::POPUP_BORDER, &PopupRect);
 		PopupRect.Margin(SPopupMenu::POPUP_MARGIN, &PopupRect);
@@ -3169,6 +3172,7 @@ int CUi::DoDropDown(CUIRect *pRect, int CurSelection, const char *const *pStrs, 
 		State.m_SelectionPopupContext.m_Viewport = Viewport;
 		State.m_SelectionPopupContext.m_Props.m_BorderColor = DropDownProps.m_VisualStyle.m_PopupBorderColor;
 		State.m_SelectionPopupContext.m_Props.m_BackgroundColor = DropDownProps.m_VisualStyle.m_PopupBackgroundColor;
+		State.m_SelectionPopupContext.m_Props.m_AnimateAlpha = DropDownProps.m_VisualStyle.m_AnimatePopupAlpha;
 		State.m_SelectionPopupContext.m_ActiveEntryColor = DropDownProps.m_VisualStyle.m_ActiveEntryColor;
 		State.m_SelectionPopupContext.m_TransparentButtons = DropDownProps.m_VisualStyle.m_TransparentEntries;
 		// 自定义条目前景必须在弹层绘制前挂上：弹层内容在本帧稍后才渲染。
@@ -3188,6 +3192,7 @@ int CUi::DoDropDown(CUIRect *pRect, int CurSelection, const char *const *pStrs, 
 		State.m_SelectionPopupContext.m_SpecialFontRenderMode = SpecialFontRenderMode;
 		State.m_SelectionPopupContext.m_Props.m_BorderColor = DropDownProps.m_VisualStyle.m_PopupBorderColor;
 		State.m_SelectionPopupContext.m_Props.m_BackgroundColor = DropDownProps.m_VisualStyle.m_PopupBackgroundColor;
+		State.m_SelectionPopupContext.m_Props.m_AnimateAlpha = DropDownProps.m_VisualStyle.m_AnimatePopupAlpha;
 		State.m_SelectionPopupContext.m_ActiveEntryColor = DropDownProps.m_VisualStyle.m_ActiveEntryColor;
 		for(int i = 0; i < Num; ++i)
 			State.m_SelectionPopupContext.m_vEntries.emplace_back(pStrs[i]);

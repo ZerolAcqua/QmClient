@@ -23,7 +23,7 @@ namespace
 #if defined(CONF_FAMILY_WINDOWS)
 		size_t HookCount = 0;
 		const SQmMusicHookEntry *apHooks = QmMusicHookRegistry(&HookCount);
-		// 每轮只创建一次全系统快照，三个应用共享同一次采样。
+		// 每轮只创建一次全系统快照，所有已注册应用共享同一次采样。
 		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 		if(hSnapshot == INVALID_HANDLE_VALUE)
 			return 0;

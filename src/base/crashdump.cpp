@@ -12,6 +12,11 @@ void crashdump_init_if_available(const char *log_file_path)
 	(void)log_file_path;
 }
 
+void crashdump_set_graphics_backend(const char *pBackendName)
+{
+	(void)pBackendName;
+}
+
 #else
 
 #include "log.h"
@@ -890,5 +895,10 @@ void crashdump_init_if_available(const char *log_file_path)
 void crashdump_init_if_available(const char *log_file_path)
 {
 	(void)log_file_path;
+}
+
+void crashdump_set_graphics_backend(const char *pBackendName)
+{
+	(void)pBackendName;
 }
 #endif

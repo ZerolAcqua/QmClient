@@ -2400,6 +2400,7 @@ public:
 	int m_AppearanceSettingsTab = APPEARANCE_TAB_HUD;
 	CLineInputBuffered<128> m_GlobalCardSearchInput;
 	void ClearQmClientSettingsSearchInputs();
+	void ClearQmTitlePreviewContainers();
 
 	// DDRace
 	int DoButton_CheckBox_Tristate(const void *pId, const char *pText, TRISTATE Checked, const CUIRect *pRect);

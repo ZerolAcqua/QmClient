@@ -11,6 +11,7 @@
 
 #include <game/client/components/emoticon.h>
 #include <game/client/components/jump_hint_utils.h>
+#include <game/client/components/qmclient/emoticon_projectile.h>
 #include <game/client/components/qmclient/friend_enter_tracker.h>
 #include <game/client/components/qmclient/map_progress.h>
 #include <game/client/components/qmclient/modes.h>
@@ -1076,4 +1077,118 @@ TEST(QmFriendEnterTracker, ResetBuildsANewSilentBaseline)
 	EXPECT_EQ(Tracker.Update({{1, "Friend", "Clan", true, false}}, 0.2, false), std::vector<std::string>{"Friend"});
 	Tracker.Reset();
 	EXPECT_TRUE(Tracker.Update({{1, "Friend", "Clan", true, false}, {2, "Another", "Clan", true, false}}, 1.0, false).empty());
+}
+
+TEST(QmEmoticonProjectile, TransparentPixelsDoNotCollideAndRotationFollowsImage)
+{
+	unsigned char aPixels[4 * 4 * 4] = {};
+	for(int Y = 0; Y < 4; ++Y)
+		aPixels[(Y * 4 + 3) * 4 + 3] = 255;
+	QmEmoticon::CAlphaMask Mask;
+	Mask.Build(aPixels, 4, 4);
+	const auto Wall = [](int X, int Y) { return X == 1 && Y == 0; };
+	EXPECT_FALSE(Mask.Overlaps(vec2(16, 16), 32, pi, Wall));
+	EXPECT_TRUE(Mask.Overlaps(vec2(20, 16), 32, 0, Wall));
+	EXPECT_FALSE(Mask.Overlaps(vec2(20, 16), 32, pi, Wall));
+	EXPECT_TRUE(Mask.Overlaps(vec2(16, 16), 64, 0, Wall));
+}
+
+TEST(QmEmoticonProjectile, EmptyAndHollowImagesPreserveTransparentAreas)
+{
+	unsigned char aPixels[3 * 3 * 4] = {};
+	QmEmoticon::CAlphaMask Mask;
+	const auto CenterTile = [](int X, int Y) { return X == 0 && Y == 0; };
+	Mask.Build(aPixels, 3, 3);
+	EXPECT_FALSE(Mask.Overlaps(vec2(16, 16), 96, 0, CenterTile));
+	for(int I = 0; I < 9; ++I)
+		aPixels[I * 4 + 3] = I == 4 ? 0 : 255;
+	Mask.Build(aPixels, 3, 3);
+	EXPECT_FALSE(Mask.Overlaps(vec2(16, 16), 96, 0, CenterTile));
+	EXPECT_TRUE(Mask.Overlaps(vec2(18, 16), 96, 0, CenterTile));
+}
+
+TEST(QmEmoticonProjectile, FastProjectileCannotCrossOneTileWall)
+{
+	const unsigned char aPixel[] = {255, 255, 255, 255};
+	QmEmoticon::CAlphaMask Mask;
+	Mask.Build(aPixel, 1, 1);
+	CEmoticonProjectile Projectile;
+	Projectile.Init(vec2(-100, 16), vec2(1200, 0), 0);
+	Projectile.m_AngVel = 0;
+	const auto Wall = [](int X, int) { return X == 0; };
+	Projectile.Update(0.2f, Mask, Wall);
+	EXPECT_LT(Projectile.m_Pos.x, -31.9f);
+	EXPECT_LT(Projectile.m_Vel.x, 0);
+	EXPECT_FALSE(Mask.Overlaps(Projectile.m_Pos, Projectile.Size(), Projectile.m_Angle, Wall));
+}
+
+TEST(QmEmoticonProjectile, FramePartitionsHaveSameMotion)
+{
+	QmEmoticon::CAlphaMask Mask;
+	CEmoticonProjectile First, Second;
+	First.Init(vec2(0, 0), vec2(1200, -400), 0);
+	Second = First;
+	const auto Air = [](int, int) { return false; };
+	for(int I = 0; I < 30; ++I)
+		First.Update(1.0f / 30, Mask, Air);
+	for(int I = 0; I < 144; ++I)
+		Second.Update(1.0f / 144, Mask, Air);
+	EXPECT_NEAR(First.m_Pos.x, Second.m_Pos.x, 0.01f);
+	EXPECT_NEAR(First.m_Pos.y, Second.m_Pos.y, 0.01f);
+}
+
+TEST(QmEmoticonProjectile, PoolAlwaysAcceptsNewestLaunch)
+{
+	CEmoticonProjectile aProjectiles[2];
+	EXPECT_EQ(QmEmoticon::ProjectileSlot(aProjectiles), &aProjectiles[0]);
+	aProjectiles[0].Init(vec2(0, 0), vec2(0, 0), 0);
+	EXPECT_EQ(QmEmoticon::ProjectileSlot(aProjectiles), &aProjectiles[1]);
+	aProjectiles[1].Init(vec2(0, 0), vec2(0, 0), 1);
+	aProjectiles[0].m_LifeTime = 1;
+	EXPECT_EQ(QmEmoticon::ProjectileSlot(aProjectiles), &aProjectiles[0]);
+}
+
+TEST(QmEmoticonProjectile, LatestCursorSelectsWithoutRendering)
+{
+	EXPECT_EQ(QmEmoticon::SelectedSector(vec2(170, 0), 110, NUM_EMOTICONS), 0);
+	EXPECT_EQ(QmEmoticon::SelectedSector(vec2(0, -170), 110, NUM_EMOTICONS), 12);
+	EXPECT_EQ(QmEmoticon::SelectedSector(vec2(0, 0), 110, NUM_EMOTICONS), -1);
+}
+
+TEST(QmEmoticonProjectile, SuperProjectileStartsOutsideNearbyFloor)
+{
+	const unsigned char aPixel[] = {255, 255, 255, 255};
+	QmEmoticon::CAlphaMask Mask;
+	Mask.Build(aPixel, 1, 1);
+	CEmoticonProjectile Projectile;
+	Projectile.Init(vec2(0, -20), vec2(1200, -400), 0, 2.35f);
+	const auto Floor = [](int, int Y) { return Y >= 0; };
+	ASSERT_TRUE(Projectile.PlaceOutside(Mask, Floor));
+	EXPECT_LE(Projectile.m_Pos.y + Projectile.Size() / 2, 0);
+	EXPECT_FALSE(Mask.Overlaps(Projectile.m_Pos, Projectile.Size(), Projectile.m_Angle, Floor));
+}
+
+TEST(QmEmoticonProjectile, LifetimeEndsEvenAfterLongFrame)
+{
+	QmEmoticon::CAlphaMask Mask;
+	CEmoticonProjectile Projectile;
+	Projectile.Init(vec2(0, 0), vec2(1200, -400), 0);
+	Projectile.Update(4, Mask, [](int, int) { return false; });
+	EXPECT_FALSE(Projectile.m_Active);
+}
+
+TEST(QmEmoticonProjectile, FadeGrowthCannotForceImageThroughNarrowCorridor)
+{
+	const unsigned char aPixel[] = {255, 255, 255, 255};
+	QmEmoticon::CAlphaMask Mask;
+	Mask.Build(aPixel, 1, 1);
+	CEmoticonProjectile Projectile;
+	Projectile.Init(vec2(32, 32), vec2(0, 0), 0);
+	Projectile.m_AngVel = 0;
+	Projectile.m_LifeTime = 0.5f;
+	const auto Corridor = [](int, int Y) { return Y < 0 || Y >= 2; };
+	Projectile.Update(0.1f, Mask, Corridor);
+	EXPECT_TRUE(Projectile.m_Active);
+	EXPECT_FLOAT_EQ(Projectile.Size(), 64);
+	EXPECT_FALSE(Mask.Overlaps(Projectile.m_Pos, Projectile.Size(), Projectile.m_Angle, Corridor));
 }

@@ -785,6 +785,20 @@ namespace
 		}
 	}
 
+	// 屏幕映射单位 → 物理像素比例。写在绘制前：绘制期间 HUD 编辑器会改写屏幕映射，
+	// 那时再算出来的是缩放后的尺寸（会连带放大羽化宽度），不是 SDF 需要的像素密度。
+	float CurrentScreenPixelSize(IGraphics *pGraphics)
+	{
+		if(pGraphics == nullptr)
+			return 1.0f;
+		float ScreenX0 = 0.0f;
+		float ScreenY0 = 0.0f;
+		float ScreenX1 = 0.0f;
+		float ScreenY1 = 0.0f;
+		pGraphics->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+		return QmHudMediaIslandScreenPixelSize(ScreenX0, ScreenY0, ScreenX1, ScreenY1, pGraphics->ScreenWidth(), pGraphics->ScreenHeight());
+	}
+
 	void DrawMediaIslandCountdownSatellite(
 		IGraphics *pGraphics,
 		vec2 Center,
@@ -827,6 +841,38 @@ namespace
 			pGraphics->RenderMediaIslandSdf(GpuSdfParams);
 		else
 			DrawMediaIslandGeometryFallback(pGraphics, State);
+	}
+
+	// 录制红点：走灵动岛同一条 SDF 绘制链路，只画一个「宽高 = 直径、圆角 = 半径」的圆，
+	// 因此轮廓是逐像素抗锯齿出来的，不再有几何多边形的硬边。呼吸透明度仍由调用方传入的
+	// Alpha 决定，大小、颜色、显示条件都不变。灵动岛与独立计时胶囊共用本函数。
+	// 不支持 SDF 的后端（HasMediaIslandSdf 为假）退回原来的几何圆。
+	void DrawHudRecordingStatusDot(IGraphics *pGraphics, vec2 Center, float DotSize, float Alpha, float ScreenPixelSize)
+	{
+		if(pGraphics == nullptr || DotSize <= 0.0f || Alpha <= 0.0f)
+			return;
+
+		const float Radius = DotSize * 0.5f;
+		if(!pGraphics->HasMediaIslandSdf())
+		{
+			DrawSmoothCircle(pGraphics, Center, Radius, ColorRGBA(1.0f, 0.15f, 0.15f, Alpha));
+			return;
+		}
+
+		SHudMediaIslandSdfRenderState State;
+		State.m_BackgroundColor = ColorRGBA(1.0f, 0.15f, 0.15f, Alpha);
+		State.m_MainRect = {Center.x - Radius, Center.y - Radius, DotSize, DotSize};
+		// 圆角取半径：在正方形里就是正圆；不设 item/capsule/轮廓环，避免 SDF 去画岛的其他部分。
+		State.m_MainRadius = Radius;
+		State.m_MainCorners = IGraphics::CORNER_ALL;
+		State.m_ScreenPixelSize = std::max(ScreenPixelSize, 0.0001f);
+		// 不加外阴影，也不取模糊底图：红点要的是纯色圆点，任何一层都会让它发灰。
+		State.m_Rect = QmHudMediaIslandSdfOuterRect(State);
+
+		IGraphics::SMediaIslandSdfParams GpuSdfParams;
+		if(!QmHudMediaIslandBuildGpuSdfParams(State, GpuSdfParams))
+			return;
+		pGraphics->RenderMediaIslandSdf(GpuSdfParams);
 	}
 
 	EQmIcon MediaIslandCountdownIcon(EHudMediaIslandCountdownType Type, bool Completed = false, bool SwapOutgoing = false)
@@ -1262,6 +1308,8 @@ void CHud::RenderGameTimer()
 	if(!TimerCapsule.m_Visible)
 		return;
 
+	const float RecordingDotScreenPixelSize = CurrentScreenPixelSize(Graphics());
+
 	constexpr float TimerRadius = QmHudMediaIslandScaled(8.0f);
 	constexpr float StatusSectionGap = QmHudMediaIslandScaled(3.0f);
 	constexpr float StatusPaddingLeft = QmHudMediaIslandScaled(4.0f);
@@ -1326,7 +1374,7 @@ void CHud::RenderGameTimer()
 		Graphics()->DrawRect(DividerX, TimerCapsule.m_BoxY + QmHudMediaIslandScaled(4.0f), QmHudMediaIslandScaled(0.75f), TimerCapsule.m_BoxH - QmHudMediaIslandScaled(8.0f), ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f * StatusAlpha), IGraphics::CORNER_ALL, QmHudMediaIslandScaled(0.375f));
 
 		const vec2 DotCenter(StatusSectionX + StatusPaddingLeft + StatusDotSize * 0.5f, TimerCapsule.m_BoxY + TimerCapsule.m_BoxH * 0.5f);
-		DrawSmoothCircle(Graphics(), DotCenter, StatusDotSize * 0.5f, ColorRGBA(1.0f, 0.15f, 0.15f, 0.95f * StatusAlpha));
+		DrawHudRecordingStatusDot(Graphics(), DotCenter, StatusDotSize, QmHudRecordingDotAlpha(time_get() / (double)time_freq()) * StatusAlpha, RecordingDotScreenPixelSize);
 
 		if(StatusTextAlpha > 0.001f && StatusWidth > RawCollapsedWidth + QmHudMediaIslandScaled(2.0f))
 		{
@@ -3242,9 +3290,7 @@ void CHud::RenderFollowSwitchCountdowns()
 	constexpr float SatelliteRadius = 9.0f + 2.5f * 0.5f;
 	constexpr float RingRadius = SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_RADIUS_SCALE;
 	const float RingThickness = std::max(1.0f, SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_THICKNESS_SCALE);
-	const float ScreenPixelSize = std::max(
-		(ScreenX1 - ScreenX0) / std::max(1, Graphics()->ScreenWidth()),
-		(ScreenY1 - ScreenY0) / std::max(1, Graphics()->ScreenHeight()));
+	const float ScreenPixelSize = QmHudMediaIslandScreenPixelSize(ScreenX0, ScreenY0, ScreenX1, ScreenY1, Graphics()->ScreenWidth(), Graphics()->ScreenHeight());
 	const ColorRGBA RingColor = MediaIslandCountdownColor(EHudMediaIslandCountdownType::SWITCH);
 	ColorRGBA BackgroundColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_QmHudIslandBgColor));
 	BackgroundColor.a = std::clamp(g_Config.m_QmHudIslandBgOpacity / 100.0f, 0.0f, 1.0f);
@@ -3408,9 +3454,7 @@ void CHud::RenderFollowHookCountdown()
 	constexpr float SatelliteRadius = 9.0f + 2.5f * 0.5f;
 	constexpr float RingRadius = SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_RADIUS_SCALE;
 	const float RingThickness = std::max(1.0f, SatelliteRadius * MEDIA_ISLAND_SATELLITE_RING_THICKNESS_SCALE);
-	const float ScreenPixelSize = std::max(
-		(ScreenX1 - ScreenX0) / std::max(1, Graphics()->ScreenWidth()),
-		(ScreenY1 - ScreenY0) / std::max(1, Graphics()->ScreenHeight()));
+	const float ScreenPixelSize = QmHudMediaIslandScreenPixelSize(ScreenX0, ScreenY0, ScreenX1, ScreenY1, Graphics()->ScreenWidth(), Graphics()->ScreenHeight());
 
 	const float Delta = Client()->RenderFrameTime();
 	if(!Ring.m_Initialized)
@@ -4912,9 +4956,7 @@ void CHud::RenderMediaIsland()
 		SdfItem.m_RingColor = MediaIslandCountdownColor(Item.m_Type);
 	}
 
-	const float ScreenPixelSize = std::max(
-		(TransformedScreenX1 - TransformedScreenX0) / std::max(1, Graphics()->ScreenWidth()),
-		(TransformedScreenY1 - TransformedScreenY0) / std::max(1, Graphics()->ScreenHeight()));
+	const float ScreenPixelSize = QmHudMediaIslandScreenPixelSize(TransformedScreenX0, TransformedScreenY0, TransformedScreenX1, TransformedScreenY1, Graphics()->ScreenWidth(), Graphics()->ScreenHeight());
 	CurrentSdfState.m_MainRect = MainIslandSdfRect;
 	CurrentSdfState.m_MainRadius = EntrancePose.m_Radius;
 	CurrentSdfState.m_MainCorners = HudEditorScope.m_Corners;
@@ -5236,7 +5278,7 @@ void CHud::RenderMediaIsland()
 		else
 		{
 			const vec2 DotCenter(StatusSectionX + StatusPaddingLeft + StatusDotSize * 0.5f, IslandY + BaseIslandHeight * 0.5f);
-			DrawSmoothCircle(Graphics(), DotCenter, StatusDotSize * 0.5f, ColorRGBA(1.0f, 0.15f, 0.15f, 0.95f * StatusAlpha * EntranceContentAlpha));
+			DrawHudRecordingStatusDot(Graphics(), DotCenter, StatusDotSize, QmHudRecordingDotAlpha(time_get() / (double)time_freq()) * StatusAlpha * EntranceContentAlpha, ScreenPixelSize);
 
 			if(StatusTextAlpha > 0.001f && StatusWidth > RawCollapsedStatusWidth + QmHudMediaIslandScaled(2.0f))
 			{

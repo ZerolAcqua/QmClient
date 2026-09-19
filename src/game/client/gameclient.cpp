@@ -615,6 +615,7 @@ void CGameClient::OnConsoleInit()
 	AddComponent(&m_Mod, "mod");
 	AddComponent(&m_CustomCommunities, "custom_communities");
 	AddComponent(&m_PlayerPoints, "player_points");
+	AddComponent(&m_Emoticon.m_RenderProjectiles, "emoticon_projectiles");
 	AddComponent(&m_Hud, "hud");
 	AddComponent(&m_Spectator, "spectator");
 	AddComponent(&m_Emoticon, "emoticon");
@@ -7494,8 +7495,16 @@ void CGameClient::LoadEmoticonsSkin(const char *pPath, bool AsDir)
 	}
 	else if(PngLoaded && Graphics()->CheckImageDivisibility(aPath, ImgInfo, g_pData->m_aSprites[SPRITE_OOP].m_pSet->m_Gridx, g_pData->m_aSprites[SPRITE_OOP].m_pSet->m_Gridy, true) && Graphics()->IsImageFormatRgba(aPath, ImgInfo))
 	{
-		for(int i = 0; i < 16; ++i)
-			m_EmoticonsSkin.m_aSpriteEmoticons[i] = Graphics()->LoadSpriteTexture(ImgInfo, &g_pData->m_aSprites[SPRITE_OOP + i]);
+		for(int i = 0; i < NUM_EMOTICONS; ++i)
+		{
+			const auto *pSprite = &g_pData->m_aSprites[SPRITE_OOP + i];
+			m_EmoticonsSkin.m_aSpriteEmoticons[i] = Graphics()->LoadSpriteTexture(ImgInfo, pSprite);
+			const int CellWidth = ImgInfo.m_Width / pSprite->m_pSet->m_Gridx;
+			const int CellHeight = ImgInfo.m_Height / pSprite->m_pSet->m_Gridy;
+			const int Stride = ImgInfo.m_Width * 4;
+			m_Emoticon.SetCollisionMask(i, ImgInfo.m_pData + pSprite->m_Y * CellHeight * Stride + pSprite->m_X * CellWidth * 4,
+				pSprite->m_W * CellWidth, pSprite->m_H * CellHeight, Stride);
+		}
 
 		m_EmoticonsSkinLoaded = true;
 	}

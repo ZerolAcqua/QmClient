@@ -75,37 +75,6 @@ namespace
 	}
 }
 
-void CEmoticonProjectile::Init(vec2 Pos, vec2 Vel, int EmoticonID, float SizeScale)
-{
-	m_Pos = Pos;
-	m_Vel = Vel;
-	m_EmoticonID = EmoticonID;
-	m_LifeTime = 3.0f;
-	m_SizeScale = std::max(SizeScale, 0.1f);
-	m_Active = true;
-	m_Angle = 0.0f;
-	m_AngVel = (float)((rand() % 100) - 50) / 10.0f;
-}
-
-void CEmoticonProjectile::Update(float Dt, CCollision *pCollision)
-{
-	if(!m_Active)
-		return;
-	m_LifeTime -= Dt;
-	if(m_LifeTime < 0.0f)
-	{
-		m_Active = false;
-		return;
-	}
-	m_Vel.y += 1500.0f * Dt;
-	vec2 Move = m_Vel * Dt;
-	int Bounces = 0;
-	pCollision->MovePoint(&m_Pos, &Move, 0.6f, &Bounces);
-	if(Dt > 0.0001f)
-		m_Vel = Move / Dt;
-	m_Angle += m_AngVel * Dt;
-}
-
 static uint64_t EmoticonPresentationNodeKey(const char *pScope)
 {
 	static const uint64_t s_BaseKey = static_cast<uint64_t>(str_quickhash("qm_extra_emoticon_presentation"));
@@ -145,6 +114,7 @@ static float EmoticonStaggerReveal(int Index, int Count, float PresentationAlpha
 
 CEmoticon::CEmoticon()
 {
+	m_RenderProjectiles.m_pEmoticon = this;
 	OnReset();
 }
 
@@ -152,16 +122,18 @@ void CEmoticon::ConKeyEmoticon(IConsole::IResult *pResult, void *pUserData)
 {
 	CEmoticon *pSelf = (CEmoticon *)pUserData;
 
-	if(pSelf->GameClient()->m_Scoreboard.IsActive())
-		return;
-
-	if(!pSelf->GameClient()->m_Snap.m_SpecInfo.m_Active && pSelf->Client()->State() != IClient::STATE_DEMOPLAYBACK)
+	const bool Active = pResult->GetInteger(0) != 0;
+	// 释放必须先处理，避免计分板等状态变化吞掉松开事件。
+	if(!Active)
 	{
-		if(pSelf->GameClient()->m_BindWheel.IsActive())
-			pSelf->m_Active = false;
-		else
-			pSelf->m_Active = pResult->GetInteger(0) != 0;
+		pSelf->SetActive(false);
+		return;
 	}
+	if(!pSelf->GameClient()->m_Scoreboard.IsActive() &&
+		!pSelf->GameClient()->m_Snap.m_SpecInfo.m_Active &&
+		pSelf->Client()->State() == IClient::STATE_ONLINE &&
+		!pSelf->GameClient()->m_BindWheel.IsActive())
+		pSelf->SetActive(true);
 }
 
 void CEmoticon::ConEmote(IConsole::IResult *pResult, void *pUserData)
@@ -198,10 +170,11 @@ void CEmoticon::OnReset()
 	m_WasActive = false;
 	m_Active = false;
 	m_PresentationInitialized = false;
+	m_SelectorMouse = vec2(0, 0);
 	m_SelectedEmote = -1;
 	m_SelectedEyeEmote = -1;
 	m_LaunchModeActive = false;
-	m_SuperChargeSeconds = 0.0f;
+	m_SuperChargeStarted = 0;
 	m_SuperChargeProgress = 0.0f;
 	m_SuperChargeTrackedEmote = -1;
 	m_SuperChargeRingEmote = -1;
@@ -224,7 +197,54 @@ void CEmoticon::OnReset()
 
 void CEmoticon::OnRelease()
 {
+	SetActive(false);
+}
+
+void CEmoticon::UpdateSelection()
+{
+	if(length(m_SelectorMouse) > 170.0f)
+		m_SelectorMouse = normalize(m_SelectorMouse) * 170.0f;
+	m_SelectedEmote = QmEmoticon::SelectedSector(m_SelectorMouse, 110.0f, NUM_EMOTICONS);
+	m_SelectedEyeEmote = m_SelectedEmote == -1 ? QmEmoticon::SelectedSector(m_SelectorMouse, 40.0f, NUM_EMOTES) : -1;
+	if(!GameClient()->m_GameInfo.m_AllowEyeWheel || !g_Config.m_ClEyeWheel || GameClient()->m_aLocalIds[g_Config.m_ClDummy] < 0)
+		m_SelectedEyeEmote = -1;
+	const int64_t Now = time_get();
+	if(m_SuperChargeTrackedEmote != m_SelectedEmote)
+	{
+		m_SuperChargeTrackedEmote = m_SelectedEmote;
+		m_SuperChargeStarted = Now;
+	}
+	m_SuperChargeProgress = m_SelectedEmote < 0 ? 0.0f :
+						      std::clamp((float)((Now - m_SuperChargeStarted) / (double)time_freq()) / s_SuperChargeSecondsRequired, 0.0f, 1.0f);
+}
+
+void CEmoticon::SetActive(bool Active)
+{
+	if(Active == m_Active)
+		return;
+	if(Active)
+	{
+		m_Active = true;
+		m_TouchPressedOutside = false;
+		m_SuperChargeTrackedEmote = -1;
+		m_SuperChargeStarted = time_get();
+		UpdateSelection();
+		return;
+	}
+	UpdateSelection();
 	m_Active = false;
+	m_WasActive = true;
+	if(!m_TouchPressedOutside && Client()->State() == IClient::STATE_ONLINE &&
+		!GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_pLocalCharacter)
+	{
+		if(m_SelectedEmote != -1)
+		{
+			m_SuperLaunchPending = m_SuperChargeProgress >= 1.0f;
+			Emote(m_SelectedEmote);
+		}
+		if(m_SelectedEyeEmote != -1)
+			EyeEmote(m_SelectedEyeEmote);
+	}
 }
 
 void CEmoticon::ToggleLaunchMode()
@@ -242,6 +262,7 @@ bool CEmoticon::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 
 	Ui()->ConvertMouseMove(&x, &y, CursorType);
 	m_SelectorMouse += vec2(x, y);
+	UpdateSelection();
 	return true;
 }
 
@@ -268,86 +289,12 @@ void CEmoticon::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
-	static const auto PositiveMod = [](float x, float y) -> float {
-		return std::fmod(x + y, y);
-	};
-
-	static const float s_InnerMouseLimitRadius = 40.0f;
 	static const float s_InnerOuterMouseBoundaryRadius = 110.0f;
 	static const float s_OuterMouseLimitRadius = 170.0f;
 	static const float s_InnerItemRadius = 70.0f;
 	static const float s_OuterItemRadius = 150.0f;
 	static const float s_InnerCircleRadius = 100.0f;
 	static const float s_OuterCircleRadius = 190.0f;
-
-	CQmClient::SQmRemoteEmoticonEvent RemoteEvent;
-	while(GameClient()->m_QmClient.PollQmRemoteEmoticonEvent(RemoteEvent))
-	{
-		if(RemoteEvent.m_ClientId == GameClient()->m_QmClient.QmClientId())
-			continue;
-		if(RemoteEvent.m_PlayerId < 0 || RemoteEvent.m_PlayerId >= MAX_CLIENTS || RemoteEvent.m_Emoticon < 0 || RemoteEvent.m_Emoticon >= NUM_EMOTICONS)
-			continue;
-		if(!GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_Active ||
-			str_comp(GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_aName, RemoteEvent.m_PlayerName.c_str()) != 0)
-			continue;
-		const auto Effect = QmEmoticon::ResolveRemoteEffect(RemoteEvent.m_Emoticon, RemoteEvent.m_LaunchMode, RemoteEvent.m_SuperLaunch,
-			g_Config.m_ClShowEmotes, GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_EmoticonIgnore,
-			g_Config.m_QmShowOtherSuperEmotes, g_Config.m_QmShowOtherLaunchEmotes);
-		m_aRemoteSuperHeadEmoticons[RemoteEvent.m_PlayerId] = -1;
-		m_aRemoteSuperHeadExpireTicks[RemoteEvent.m_PlayerId] = -1;
-		if(Effect == QmEmoticon::EEffect::SUPER_HEAD)
-		{
-			m_aRemoteSuperHeadEmoticons[RemoteEvent.m_PlayerId] = RemoteEvent.m_Emoticon;
-			m_aRemoteSuperHeadExpireTicks[RemoteEvent.m_PlayerId] = Client()->GameTick(g_Config.m_ClDummy) + 2 * Client()->GameTickSpeed();
-		}
-		if(Effect != QmEmoticon::EEffect::PROJECTILE && Effect != QmEmoticon::EEffect::SUPER_PROJECTILE)
-			continue;
-		const bool SuperLaunch = Effect == QmEmoticon::EEffect::SUPER_PROJECTILE;
-
-		vec2 LaunchPos = GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_RenderPos;
-		LaunchPos.y -= 20.0f;
-		vec2 Dir = direction(GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_RenderCur.m_Angle / 256.0f);
-		if(length(Dir) <= 0.0001f)
-			Dir = vec2(1.0f, 0.0f);
-		const vec2 Vel = Dir * 1200.0f + vec2(0.0f, -400.0f);
-		for(auto &Projectile : m_aProjectiles)
-		{
-			if(Projectile.m_Active)
-				continue;
-			Projectile.Init(LaunchPos, Vel, RemoteEvent.m_Emoticon, SuperLaunch ? s_SuperProjectileScale : 1.0f);
-			if(SuperLaunch)
-				GameClient()->m_Effects.Explosion(LaunchPos, 0.9f);
-			else
-				GameClient()->m_Effects.HammerHit(LaunchPos, 0.65f, 0.0f);
-			break;
-		}
-	}
-
-	for(auto &Projectile : m_aProjectiles)
-	{
-		if(!Projectile.m_Active)
-			continue;
-		float Width, Height;
-		Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, &Width, &Height);
-		const vec2 Center = GameClient()->m_Camera.m_Center;
-		Graphics()->MapScreen(Center.x - Width / 2.0f, Center.y - Height / 2.0f, Center.x + Width / 2.0f, Center.y + Height / 2.0f);
-		Projectile.Update(Client()->RenderFrameTime(), Collision());
-		Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[Projectile.m_EmoticonID]);
-		Graphics()->QuadsBegin();
-		Graphics()->QuadsSetRotation(Projectile.m_Angle);
-		float Scale = std::max(Projectile.m_SizeScale, 0.1f);
-		float Alpha = 1.0f;
-		if(Projectile.m_LifeTime < 0.5f)
-		{
-			Scale *= 1.0f + (0.5f - Projectile.m_LifeTime) * 2.0f;
-			Alpha = Projectile.m_LifeTime * 2.0f;
-		}
-		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
-		IGraphics::CQuadItem QuadItem(Projectile.m_Pos.x, Projectile.m_Pos.y, 64.0f * Scale, 64.0f * Scale);
-		Graphics()->QuadsDraw(&QuadItem, 1);
-		Graphics()->QuadsEnd();
-		Ui()->MapScreen();
-	}
 
 	if(!m_Active)
 	{
@@ -358,11 +305,6 @@ void CEmoticon::OnRender()
 			m_TouchPressedOutside = false;
 		}
 
-		if(m_WasActive && m_SelectedEmote != -1)
-		{
-			m_SuperLaunchPending = m_SuperChargeTrackedEmote == m_SelectedEmote && m_SuperChargeProgress >= 1.0f;
-			Emote(m_SelectedEmote);
-		}
 		if(m_WasActive && m_SuperChargeRingEmote != -1)
 		{
 			m_SuperChargeRingExitEmote = m_SuperChargeRingEmote;
@@ -372,11 +314,9 @@ void CEmoticon::OnRender()
 			m_SuperChargeRingPhase = 0.0f;
 			m_SuperChargeRingCharge = 0.0f;
 		}
-		if(m_WasActive && m_SelectedEyeEmote != -1)
-			EyeEmote(m_SelectedEyeEmote);
 		m_WasActive = false;
 		m_SuperChargeTrackedEmote = -1;
-		m_SuperChargeSeconds = 0.0f;
+		m_SuperChargeStarted = 0;
 		m_SuperChargeProgress = 0.0f;
 	}
 	else
@@ -404,6 +344,7 @@ void CEmoticon::OnRender()
 			if(TouchCenterDistance <= s_OuterMouseLimitRadius)
 			{
 				m_SelectorMouse = TouchPos;
+				UpdateSelection();
 			}
 			else if(TouchCenterDistance > s_OuterCircleRadius)
 			{
@@ -412,7 +353,7 @@ void CEmoticon::OnRender()
 		}
 		else if(WasTouchPressed)
 		{
-			m_Active = false;
+			SetActive(false);
 		}
 	}
 
@@ -438,37 +379,7 @@ void CEmoticon::OnRender()
 		return;
 
 	if(m_Active)
-	{
-		if(length(m_SelectorMouse) > s_OuterMouseLimitRadius)
-			m_SelectorMouse = normalize(m_SelectorMouse) * s_OuterMouseLimitRadius;
-
-		const float SelectorAngle = angle(m_SelectorMouse);
-
-		m_SelectedEmote = -1;
-		m_SelectedEyeEmote = -1;
-		if(length(m_SelectorMouse) > s_InnerOuterMouseBoundaryRadius)
-			m_SelectedEmote = PositiveMod(std::round(SelectorAngle / (2.0f * pi) * NUM_EMOTICONS), NUM_EMOTICONS);
-		else if(length(m_SelectorMouse) > s_InnerMouseLimitRadius)
-			m_SelectedEyeEmote = PositiveMod(std::round(SelectorAngle / (2.0f * pi) * NUM_EMOTES), NUM_EMOTES);
-	}
-
-	if(m_Active && m_SelectedEmote != -1)
-	{
-		if(m_SuperChargeTrackedEmote != m_SelectedEmote)
-		{
-			m_SuperChargeTrackedEmote = m_SelectedEmote;
-			m_SuperChargeSeconds = 0.0f;
-		}
-		else
-			m_SuperChargeSeconds = std::min(s_SuperChargeSecondsRequired, m_SuperChargeSeconds + Client()->RenderFrameTime());
-		m_SuperChargeProgress = std::clamp(m_SuperChargeSeconds / s_SuperChargeSecondsRequired, 0.0f, 1.0f);
-	}
-	else if(m_Active)
-	{
-		m_SuperChargeTrackedEmote = -1;
-		m_SuperChargeSeconds = 0.0f;
-		m_SuperChargeProgress = 0.0f;
-	}
+		UpdateSelection();
 
 	if(m_Active && m_SelectedEmote != -1)
 	{
@@ -614,6 +525,88 @@ void CEmoticon::OnRender()
 	RenderTools()->RenderCursor(ScreenCenter + m_SelectorMouse * PresentationScale, 24.0f * PresentationScale, PresentationAlpha);
 }
 
+void CEmoticon::RenderProjectiles()
+{
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
+	CQmClient::SQmRemoteEmoticonEvent RemoteEvent;
+	while(GameClient()->m_QmClient.PollQmRemoteEmoticonEvent(RemoteEvent))
+	{
+		if(RemoteEvent.m_ClientId == GameClient()->m_QmClient.QmClientId())
+			continue;
+		if(RemoteEvent.m_PlayerId < 0 || RemoteEvent.m_PlayerId >= MAX_CLIENTS || RemoteEvent.m_Emoticon < 0 || RemoteEvent.m_Emoticon >= NUM_EMOTICONS)
+			continue;
+		if(!GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_Active ||
+			str_comp(GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_aName, RemoteEvent.m_PlayerName.c_str()) != 0)
+			continue;
+		const auto Effect = QmEmoticon::ResolveRemoteEffect(RemoteEvent.m_Emoticon, RemoteEvent.m_LaunchMode, RemoteEvent.m_SuperLaunch,
+			g_Config.m_ClShowEmotes, GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_EmoticonIgnore,
+			g_Config.m_QmShowOtherSuperEmotes, g_Config.m_QmShowOtherLaunchEmotes);
+		m_aRemoteSuperHeadEmoticons[RemoteEvent.m_PlayerId] = -1;
+		m_aRemoteSuperHeadExpireTicks[RemoteEvent.m_PlayerId] = -1;
+		if(Effect == QmEmoticon::EEffect::SUPER_HEAD)
+		{
+			m_aRemoteSuperHeadEmoticons[RemoteEvent.m_PlayerId] = RemoteEvent.m_Emoticon;
+			m_aRemoteSuperHeadExpireTicks[RemoteEvent.m_PlayerId] = Client()->GameTick(g_Config.m_ClDummy) + 2 * Client()->GameTickSpeed();
+		}
+		if(Effect != QmEmoticon::EEffect::PROJECTILE && Effect != QmEmoticon::EEffect::SUPER_PROJECTILE)
+			continue;
+		vec2 LaunchPos = GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_RenderPos;
+		LaunchPos.y -= 20.0f;
+		SpawnProjectile(LaunchPos, direction(GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_RenderCur.m_Angle / 256.0f),
+			RemoteEvent.m_Emoticon, Effect == QmEmoticon::EEffect::SUPER_PROJECTILE);
+	}
+
+	float OldX0, OldY0, OldX1, OldY1;
+	Graphics()->GetScreen(&OldX0, &OldY0, &OldX1, &OldY1);
+	float Width, Height;
+	Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, &Width, &Height);
+	const vec2 Center = GameClient()->m_Camera.m_Center;
+	Graphics()->MapScreen(Center.x - Width / 2, Center.y - Height / 2, Center.x + Width / 2, Center.y + Height / 2);
+	Graphics()->BlendNormal();
+	const auto Solid = [&](int X, int Y) { return Collision()->CheckPoint(X * 32 + 16, Y * 32 + 16); };
+	for(auto &Projectile : m_aProjectiles)
+	{
+		if(!Projectile.m_Active)
+			continue;
+		const auto &Mask = m_aCollisionMasks[Projectile.m_EmoticonID];
+		Projectile.Update(Client()->RenderFrameTime(), Mask, Solid);
+		if(!Projectile.m_Active)
+			continue;
+		const float Fraction = std::clamp((float)(Projectile.m_Accumulator / CEmoticonProjectile::STEP), 0.0f, 1.0f);
+		vec2 Pos = mix(Projectile.m_PreviousPos, Projectile.m_Pos, Fraction);
+		float Angle = mix(Projectile.m_PreviousAngle, Projectile.m_Angle, Fraction);
+		// 转角附近插值可能切入墙角，遇到这种情况使用已求解的位置。
+		if(Mask.Overlaps(Pos, Projectile.Size(), Angle, Solid))
+		{
+			Pos = Projectile.m_Pos;
+			Angle = Projectile.m_Angle;
+		}
+		Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[Projectile.m_EmoticonID]);
+		Graphics()->QuadsBegin();
+		Graphics()->QuadsSetSubset(0, 0, 1, 1);
+		Graphics()->QuadsSetRotation(Angle);
+		Graphics()->SetColor(1, 1, 1, std::clamp(Projectile.m_LifeTime * 2, 0.0f, 1.0f));
+		IGraphics::CQuadItem Quad(Pos.x, Pos.y, Projectile.Size(), Projectile.Size());
+		Graphics()->QuadsDraw(&Quad, 1);
+		Graphics()->QuadsEnd();
+	}
+	Graphics()->QuadsSetRotation(0);
+	Graphics()->MapScreen(OldX0, OldY0, OldX1, OldY1);
+}
+
+void CEmoticon::SpawnProjectile(vec2 Pos, vec2 Dir, int Emoticon, bool Super)
+{
+	Dir = length(Dir) > 0.0001f ? normalize(Dir) : vec2(1, 0);
+	auto *pProjectile = QmEmoticon::ProjectileSlot(m_aProjectiles);
+	pProjectile->Init(Pos, Dir * 1200.0f + vec2(0, -400), Emoticon, Super ? s_SuperProjectileScale : 1.0f);
+	pProjectile->m_Active = pProjectile->PlaceOutside(m_aCollisionMasks[Emoticon], [&](int X, int Y) { return Collision()->CheckPoint(X * 32 + 16, Y * 32 + 16); });
+	if(Super)
+		GameClient()->m_Effects.Explosion(Pos, 0.9f);
+	else
+		GameClient()->m_Effects.HammerHit(Pos, 0.65f, 0.0f);
+}
+
 void CEmoticon::Emote(int Emoticon)
 {
 	const auto Effect = QmEmoticon::ConsumeEffect(Emoticon, m_LaunchModeActive, m_SuperLaunchPending);
@@ -636,21 +629,7 @@ void CEmoticon::Emote(int Emoticon)
 	{
 		vec2 LaunchPos = GameClient()->m_LocalCharacterPos;
 		LaunchPos.y -= 20.0f;
-		vec2 Dir = normalize(GameClient()->m_Controls.m_aMousePos[g_Config.m_ClDummy]);
-		if(length(Dir) <= 0.0001f)
-			Dir = vec2(1.0f, 0.0f);
-		const vec2 Vel = Dir * 1200.0f + vec2(0.0f, -400.0f);
-		for(auto &Projectile : m_aProjectiles)
-		{
-			if(Projectile.m_Active)
-				continue;
-			Projectile.Init(LaunchPos, Vel, Emoticon, UseSuperLaunch ? s_SuperProjectileScale : 1.0f);
-			if(UseSuperLaunch)
-				GameClient()->m_Effects.Explosion(LaunchPos, 0.9f);
-			else
-				GameClient()->m_Effects.HammerHit(LaunchPos, 0.65f, 0.0f);
-			break;
-		}
+		SpawnProjectile(LaunchPos, GameClient()->m_Controls.m_aMousePos[g_Config.m_ClDummy], Emoticon, UseSuperLaunch);
 	}
 
 	CNetMsg_Cl_Emoticon Msg;

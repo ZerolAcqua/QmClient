@@ -10,6 +10,7 @@
 #include <generated/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/components/qmclient/emoticon_projectile.h>
 #include <game/client/components/tclient/bindwheel.h>
 #include <game/client/ui.h>
 
@@ -54,22 +55,6 @@ namespace QmEmoticon
 	}
 }
 
-class CCollision;
-
-struct CEmoticonProjectile
-{
-	vec2 m_Pos;
-	vec2 m_Vel;
-	float m_Angle;
-	float m_AngVel;
-	int m_EmoticonID;
-	float m_LifeTime;
-	float m_SizeScale;
-	bool m_Active;
-
-	void Init(vec2 Pos, vec2 Vel, int EmoticonID, float SizeScale = 1.0f);
-	void Update(float Dt, CCollision *pCollision);
-};
 struct SQmLocalBlinkState
 {
 	static constexpr int DURATION_TICKS = 4;
@@ -112,7 +97,7 @@ class CEmoticon : public CComponent
 		MAX_PROJECTILES = 64
 	};
 	CEmoticonProjectile m_aProjectiles[MAX_PROJECTILES];
-	float m_SuperChargeSeconds = 0.0f;
+	int64_t m_SuperChargeStarted = 0;
 	float m_SuperChargeProgress = 0.0f;
 	int m_SuperChargeTrackedEmote = -1;
 	int m_SuperChargeRingEmote = -1;
@@ -133,9 +118,25 @@ class CEmoticon : public CComponent
 	static void ConSuperEmote(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleLaunchMode(IConsole::IResult *pResult, void *pUserData);
 	void ToggleLaunchMode();
+	void UpdateSelection();
+	void SetActive(bool Active);
+	void RenderProjectiles();
+	void SpawnProjectile(vec2 Pos, vec2 Dir, int Emoticon, bool Super);
+	QmEmoticon::CAlphaMask m_aCollisionMasks[NUM_EMOTICONS];
 
 public:
 	CEmoticon();
+	class CRenderProjectiles : public CComponent
+	{
+	public:
+		CEmoticon *m_pEmoticon = nullptr;
+		int Sizeof() const override { return sizeof(*this); }
+		void OnRender() override { m_pEmoticon->RenderProjectiles(); }
+	} m_RenderProjectiles;
+	void SetCollisionMask(int Emoticon, const unsigned char *pPixels, int Width, int Height, int Stride)
+	{
+		m_aCollisionMasks[Emoticon].Build(pPixels, Width, Height, Stride);
+	}
 	int Sizeof() const override { return sizeof(*this); }
 
 	void OnReset() override;

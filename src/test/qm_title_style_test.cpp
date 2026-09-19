@@ -42,6 +42,49 @@ namespace
 	}
 }
 
+// 两类预览即使已经隐藏，也必须在窗口重建和退出时释放，避免文字渲染器断言。
+TEST(QmTitleStyle, PreviewContainersAreClearedOnResizeAndShutdown)
+{
+	const std::string QmMenus = ReadQmTitleStyleSource("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string Menus = ReadQmTitleStyleSource("src/game/client/components/menus.cpp");
+	const size_t Start = QmMenus.find("void CMenus::ClearQmTitlePreviewContainers()");
+	ASSERT_NE(Start, std::string::npos);
+	const size_t End = QmMenus.find("\n}", Start);
+	ASSERT_NE(End, std::string::npos);
+	const std::string Cleanup = QmMenus.substr(Start, End - Start);
+	EXPECT_NE(Cleanup.find("DeleteTextContainer(s_TitleFinishedPreviewContainer)"), std::string::npos);
+	EXPECT_NE(Cleanup.find("for(auto &Container : s_aTitleStylePreviewContainers)"), std::string::npos);
+	EXPECT_NE(Cleanup.find("DeleteTextContainer(Container)"), std::string::npos);
+	for(const char *pHook : {"void CMenus::OnWindowResize()", "void CMenus::OnShutdown()"})
+	{
+		const size_t HookStart = Menus.find(pHook);
+		ASSERT_NE(HookStart, std::string::npos);
+		const size_t HookEnd = Menus.find("\n}", HookStart);
+		ASSERT_NE(HookEnd, std::string::npos);
+		EXPECT_NE(Menus.substr(HookStart, HookEnd - HookStart).find("ClearQmTitlePreviewContainers();"), std::string::npos) << pHook;
+	}
+}
+
+// 成品预览复用可被清理的同一个句柄；清理后下一帧必须重新创建，不能软更新失效容器。
+TEST(QmTitleStyle, FinishedPreviewRecreatesClearedContainer)
+{
+	const std::string Menus = ReadQmTitleStyleSource("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const size_t Start = Menus.find("static void RenderQmTitleFinishedPreview(");
+	ASSERT_NE(Start, std::string::npos);
+	const size_t End = Menus.find("\n}", Start);
+	ASSERT_NE(End, std::string::npos);
+	const std::string Preview = Menus.substr(Start, End - Start);
+	EXPECT_NE(Preview.find("STextContainerIndex &PreviewContainer = s_TitleFinishedPreviewContainer;"), std::string::npos);
+	EXPECT_EQ(Preview.find("static STextContainerIndex PreviewContainer;"), std::string::npos);
+	const size_t Guard = Preview.find("if(PreviewContainer.Valid())");
+	ASSERT_NE(Guard, std::string::npos);
+	const size_t Reuse = Preview.find("pTextRender->RecreateTextContainerSoft(PreviewContainer, &PreviewCursor, aPreviewText);", Guard);
+	ASSERT_NE(Reuse, std::string::npos);
+	const size_t Else = Preview.find("else", Reuse);
+	ASSERT_NE(Else, std::string::npos);
+	EXPECT_NE(Preview.find("pTextRender->CreateOrAppendTextContainer(PreviewContainer, &PreviewCursor, aPreviewText);", Else), std::string::npos);
+}
+
 // ---------------------------------------------------------------------------
 // P1：引擎顶点分色的回归断言
 // ---------------------------------------------------------------------------

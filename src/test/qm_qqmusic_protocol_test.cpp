@@ -43,12 +43,10 @@ TEST(QQMusicProtocol, ApiResponseMustBelongToRequestedSong)
 	SLyrics Lyrics;
 	EXPECT_FALSE(ParseLyricsResponse(R"({"req_0":{"code":0,"data":{"songID":2,"lyric":"[00:01.00]wrong"}}})", 1, false, Lyrics));
 	EXPECT_TRUE(Lyrics.m_Content.empty());
-	ASSERT_TRUE(ParseLyricsResponse(R"({"req_0":{"code":0,"data":{"songID":1,"crypt":1,"lyric":"[0,1000]hello(0,1000)","trans":"[00:00.00]你好"
-}
-}
-})", 1, false, Lyrics));
+	// 歌词/翻译里含 `你好")`，默认分隔符会提前终止字面量，这里用自定义分隔符 json。
+	ASSERT_TRUE(ParseLyricsResponse(R"json({"req_0":{"code":0,"data":{"songID":1,"crypt":1,"lyric":"[0,1000]hello(0,1000)","trans":"[00:00.00]你好"}}})json", 1, false, Lyrics));
 	EXPECT_EQ(Lyrics.m_Type, "qrc");
-EXPECT_EQ(Lyrics.m_Translation, "[00:00.00]你好");
+	EXPECT_EQ(Lyrics.m_Translation, "[00:00.00]你好");
 }
 
 TEST(QQMusicProtocol, EmptyLyricsAndErrorsHaveDifferentOutcomes)

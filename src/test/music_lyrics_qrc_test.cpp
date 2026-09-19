@@ -1,4 +1,7 @@
 #include <game/client/components/qmclient/music_lyrics/music_lyrics_qrc.h>
+// SelectCurrentLine / SelectLatestStartedLine / SSelectedLine 声明在独立的 timeline 头里，
+// qrc 头只给出 STimeline 与解析入口。
+#include <game/client/components/qmclient/netease/netease_lyric_timeline.h>
 
 #include <gtest/gtest.h>
 

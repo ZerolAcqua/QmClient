@@ -22,6 +22,8 @@ struct SQmTitlePresence
 	std::string m_Style;
 };
 
+std::string NormalizeQmServerAddress(const char *pServerAddress);
+
 // 解析在线头衔列表。pOutServerTime 非空时回传服务端时间（Unix 秒），
 // 客户端用它把动画相位对齐到所有客户端一致的基准。
 std::vector<SQmTitlePresence> ParseQmTitlePresences(const json_value *pRoot, const char *pServerAddress, int64_t *pOutServerTime = nullptr);

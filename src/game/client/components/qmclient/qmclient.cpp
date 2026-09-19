@@ -1603,7 +1603,10 @@ void CQmClient::SendQmAnonymousEmoticon(int Emoticon, int PlayerId, bool LaunchM
 	Writer.WriteBoolValue(SuperLaunch);
 	Writer.EndObject();
 	const std::string Body = Writer.GetOutputString();
-	m_pQmAnonymousEmote->SendText(Body.c_str(), Body.size());
+	if(m_pQmAnonymousEmote->SendText(Body.c_str(), Body.size()))
+		LogQmAnonymousEmoteEvent("emoticon_sent", Body.c_str());
+	else
+		LogQmAnonymousEmoteEvent("emoticon_send_failed", nullptr);
 }
 
 bool CQmClient::PollQmRemoteEmoticonEvent(SQmRemoteEmoticonEvent &OutEvent)
@@ -1625,16 +1628,49 @@ void CQmClient::LogQmRealtimeEvent(const char *pStage, const char *pDetail) cons
 void CQmClient::QueueQmRemoteEmoticonEvent(const SQmRealtimeMessage &Message)
 {
 	if(!Message.m_HasEmoticon || Client()->State() != IClient::STATE_ONLINE || !Client()->ServerAddress())
+	{
+		LogQmAnonymousEmoteEvent("event_dropped", "invalid state or payload");
 		return;
+	}
 
 	char aServer[NETADDR_MAXSTRSIZE] = "";
 	net_addr_str(Client()->ServerAddress(), aServer, sizeof(aServer), true);
-	if(str_comp(Message.m_EmoticonServerAddress.c_str(), aServer) != 0 ||
-		Message.m_EmoticonPlayerName.size() > MAX_NAME_LENGTH || Message.m_EmoticonClientId.size() > 64)
+	const std::string CurrentServer = NormalizeQmServerAddress(aServer);
+	const std::string EventServer = NormalizeQmServerAddress(Message.m_EmoticonServerAddress.c_str());
+	if(EventServer.empty() || CurrentServer != EventServer)
+	{
+		LogQmAnonymousEmoteEvent("event_dropped", "server address mismatch");
 		return;
+	}
+	if(Message.m_EmoticonPlayerName.size() > MAX_NAME_LENGTH || Message.m_EmoticonClientId.size() > 64)
+	{
+		LogQmAnonymousEmoteEvent("event_dropped", "identity field too long");
+		return;
+	}
+
+	int PlayerId = Message.m_PlayerId;
+	if(!GameClient()->m_aClients[PlayerId].m_Active)
+	{
+		PlayerId = -1;
+		for(int Candidate = 0; Candidate < MAX_CLIENTS; ++Candidate)
+		{
+			if(GameClient()->m_aClients[Candidate].m_Active &&
+				str_comp(GameClient()->m_aClients[Candidate].m_aName, Message.m_EmoticonPlayerName.c_str()) == 0)
+			{
+				PlayerId = Candidate;
+				break;
+			}
+		}
+		if(PlayerId < 0)
+		{
+			LogQmAnonymousEmoteEvent("event_dropped", "player not found");
+			return;
+		}
+		LogQmAnonymousEmoteEvent("player_id_remapped", Message.m_EmoticonPlayerName.c_str());
+	}
 
 	SQmRemoteEmoticonEvent Event;
-	Event.m_PlayerId = Message.m_PlayerId;
+	Event.m_PlayerId = PlayerId;
 	Event.m_Emoticon = Message.m_Emoticon;
 	Event.m_LaunchMode = Message.m_LaunchMode;
 	Event.m_SuperLaunch = Message.m_SuperLaunch;
@@ -1645,6 +1681,7 @@ void CQmClient::QueueQmRemoteEmoticonEvent(const SQmRealtimeMessage &Message)
 	if(m_QmRemoteEmoticonEvents.size() >= 128)
 		m_QmRemoteEmoticonEvents.pop_front();
 	m_QmRemoteEmoticonEvents.push_back(std::move(Event));
+	LogQmAnonymousEmoteEvent("emoticon_received", Message.m_EmoticonPlayerName.c_str());
 }
 
 void CQmClient::QueueQmAnonymousEmoticonEvent(const SQmRealtimeMessage &Message)
@@ -1980,7 +2017,7 @@ std::string CQmClient::BuildQmAnonymousEmoteHello() const
 	Writer.WriteAttribute("player_name");
 	Writer.WriteStrValue(g_Config.m_PlayerName);
 	Writer.WriteAttribute("server_address");
-	Writer.WriteStrValue(aServer);
+	Writer.WriteStrValue(NormalizeQmServerAddress(aServer).c_str());
 	Writer.WriteAttribute("session_id");
 	Writer.WriteStrValue(m_aQmAnonymousSessionId);
 	Writer.WriteAttribute("players");
@@ -2014,7 +2051,12 @@ void CQmClient::SendQmAnonymousEmoteHello()
 		return;
 	const std::string Body = BuildQmAnonymousEmoteHello();
 	if(m_pQmAnonymousEmote->SendText(Body.c_str(), Body.size()))
+	{
 		m_QmAnonymousEmoteHelloBody = Body;
+		LogQmAnonymousEmoteEvent("hello_sent", Body.c_str());
+	}
+	else
+		LogQmAnonymousEmoteEvent("hello_send_failed", nullptr);
 }
 
 void CQmClient::UpdateQmAnonymousEmotes()
@@ -2056,7 +2098,11 @@ void CQmClient::UpdateQmAnonymousEmotes()
 		SQmRealtimeMessage Parsed;
 		if(!ParseQmRealtimeMessage(Message.m_Data.c_str(), Message.m_Data.size(), Parsed))
 			continue;
-		if(Parsed.m_Event == EQmRealtimeEvent::PING)
+		if(Parsed.m_Type == "hello_ack")
+			LogQmAnonymousEmoteEvent("hello_ack", Message.m_Data.c_str());
+		else if(Parsed.m_Type == "error")
+			LogQmAnonymousEmoteEvent("server_error", Message.m_Data.c_str());
+		else if(Parsed.m_Event == EQmRealtimeEvent::PING)
 			m_pQmAnonymousEmote->SendText("{\"type\":\"pong\"}", 15);
 		else if(Parsed.m_Event == EQmRealtimeEvent::EMOTICON)
 			QueueQmAnonymousEmoticonEvent(Parsed);

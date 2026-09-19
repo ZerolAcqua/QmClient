@@ -7,6 +7,7 @@
 #include <engine/shared/protocol.h>
 
 #include <algorithm>
+#include <cctype>
 #include <unordered_map>
 #include <utility>
 
@@ -77,6 +78,68 @@ namespace
 		return EClientBrand::QM;
 	}
 } // namespace
+
+std::string NormalizeQmServerAddress(const char *pServerAddress)
+{
+	std::string Address = pServerAddress ? pServerAddress : "";
+	while(!Address.empty() && std::isspace((unsigned char)Address.front()))
+		Address.erase(Address.begin());
+	while(!Address.empty() && std::isspace((unsigned char)Address.back()))
+		Address.pop_back();
+	std::transform(Address.begin(), Address.end(), Address.begin(), [](unsigned char Character) {
+		return (char)std::tolower(Character);
+	});
+	const size_t Scheme = Address.find("://");
+	if(Scheme != std::string::npos)
+		Address.erase(0, Scheme + 3);
+	while(!Address.empty() && Address.back() == '/')
+		Address.pop_back();
+	if(Address.empty())
+		return {};
+
+	std::string Host = Address;
+	std::string Port;
+	if(Address.front() == '[')
+	{
+		const size_t Close = Address.find(']');
+		if(Close == std::string::npos)
+			return {};
+		Host = Address.substr(1, Close - 1);
+		if(Close + 1 < Address.size() && Address[Close + 1] == ':')
+			Port = Address.substr(Close + 2);
+	}
+	else if(std::count(Address.begin(), Address.end(), ':') == 1)
+	{
+		const size_t Separator = Address.rfind(':');
+		Host = Address.substr(0, Separator);
+		Port = Address.substr(Separator + 1);
+	}
+	while(!Host.empty() && Host.back() == '.')
+		Host.pop_back();
+	if(Host.empty())
+		return {};
+	if(!Port.empty() && !std::all_of(Port.begin(), Port.end(), [](unsigned char Character) {
+		return std::isdigit(Character) != 0;
+	}))
+		return {};
+	if(!Port.empty())
+	{
+		try
+		{
+			const unsigned long NumericPort = std::stoul(Port);
+			if(NumericPort < 1 || NumericPort > 65535)
+				return {};
+			Port = std::to_string(NumericPort);
+		}
+		catch(...)
+		{
+			return {};
+		}
+	}
+	if(Host.find(':') != std::string::npos)
+		return "[" + Host + "]" + (Port.empty() ? "" : ":" + Port);
+	return Host + (Port.empty() ? "" : ":" + Port);
+}
 
 bool SQmClientDistributionSnapshot::Apply(SQmClientUsersParseResult &Result, int64_t ExpireTick)
 {

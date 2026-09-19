@@ -536,8 +536,7 @@ void CEmoticon::RenderProjectiles()
 			continue;
 		if(RemoteEvent.m_PlayerId < 0 || RemoteEvent.m_PlayerId >= MAX_CLIENTS || RemoteEvent.m_Emoticon < 0 || RemoteEvent.m_Emoticon >= NUM_EMOTICONS)
 			continue;
-		if(!GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_Active ||
-			str_comp(GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_aName, RemoteEvent.m_PlayerName.c_str()) != 0)
+		if(!GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_Active)
 			continue;
 		const auto Effect = QmEmoticon::ResolveRemoteEffect(RemoteEvent.m_Emoticon, RemoteEvent.m_LaunchMode, RemoteEvent.m_SuperLaunch,
 			g_Config.m_ClShowEmotes, GameClient()->m_aClients[RemoteEvent.m_PlayerId].m_EmoticonIgnore,

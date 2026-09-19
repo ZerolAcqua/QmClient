@@ -677,6 +677,7 @@ void CQmClient::OnInit()
 	InitQmSponsors();
 	// 实时通道：worker 线程在 StartQmRealtime 里起，真正连接由 OnUpdate 驱动。
 	StartQmRealtime();
+	StartQmAnonymousEmotes();
 }
 
 void CQmClient::OnShutdown()
@@ -687,6 +688,7 @@ void CQmClient::OnShutdown()
 		TouchQmClientLifecycleMarker(true);
 		SendQmRealtimeStop();
 	}
+	StopQmAnonymousEmotes();
 	StopQmRealtime();
 	for(auto *pTask : {&m_pQmDdnetPlayerTask, &m_pTitleOperation, &m_pQmNewsPublishTask, &m_pQmSponsorsPublishTask})
 	{
@@ -704,6 +706,7 @@ void CQmClient::OnShutdown()
 void CQmClient::OnUpdate()
 {
 	UpdateQmRealtime();
+	UpdateQmAnonymousEmotes();
 	UpdateQmClientRecognition();
 	UpdateTitleAuthentication();
 	UpdateQmClientLifecycleAndServerTime();
@@ -722,6 +725,8 @@ void CQmClient::OnStateChange(int NewState, int OldState)
 		TouchQmClientLifecycleMarker(true);
 		SendQmRealtimeStop();
 	}
+	if(NewState != IClient::STATE_ONLINE && OldState == IClient::STATE_ONLINE)
+		StopQmAnonymousEmotes();
 	if(NewState == IClient::STATE_ONLINE && OldState != IClient::STATE_ONLINE)
 		secure_random_password(m_aQmDeveloperSessionId, sizeof(m_aQmDeveloperSessionId), sizeof(m_aQmDeveloperSessionId) - 1);
 	else if(NewState != IClient::STATE_ONLINE && OldState == IClient::STATE_ONLINE)
@@ -1577,9 +1582,11 @@ void CQmClient::QmRealtimeRequestTitleRefresh()
 	m_QmRealtimeNextPresenceCheck = 0;
 }
 
-void CQmClient::SendQmRealtimeEmoticon(int Emoticon, int PlayerId, bool LaunchMode, bool SuperLaunch)
+void CQmClient::SendQmAnonymousEmoticon(int Emoticon, int PlayerId, bool LaunchMode, bool SuperLaunch)
 {
-	if(!QmRealtimeConnected() || Emoticon < 0 || Emoticon >= NUM_EMOTICONS || PlayerId < 0 || PlayerId >= MAX_CLIENTS || (!LaunchMode && !SuperLaunch))
+	if(m_pQmAnonymousEmote == nullptr || m_pQmAnonymousEmote->State() != EQmWebSocketState::CONNECTED ||
+		m_aQmAnonymousClientId[0] == '\0' || Emoticon < 0 || Emoticon >= NUM_EMOTICONS ||
+		PlayerId < 0 || PlayerId >= MAX_CLIENTS || (!LaunchMode && !SuperLaunch))
 		return;
 
 	CJsonStringWriter Writer;
@@ -1596,7 +1603,7 @@ void CQmClient::SendQmRealtimeEmoticon(int Emoticon, int PlayerId, bool LaunchMo
 	Writer.WriteBoolValue(SuperLaunch);
 	Writer.EndObject();
 	const std::string Body = Writer.GetOutputString();
-	m_pQmRealtime->SendText(Body.c_str(), Body.size());
+	m_pQmAnonymousEmote->SendText(Body.c_str(), Body.size());
 }
 
 bool CQmClient::PollQmRemoteEmoticonEvent(SQmRemoteEmoticonEvent &OutEvent)
@@ -1613,6 +1620,36 @@ void CQmClient::LogQmRealtimeEvent(const char *pStage, const char *pDetail) cons
 	if(!g_Config.m_QmWebSocketLog)
 		return;
 	log_info("qmclient", "realtime %s: %s", pStage, pDetail != nullptr ? pDetail : "");
+}
+
+void CQmClient::QueueQmRemoteEmoticonEvent(const SQmRealtimeMessage &Message)
+{
+	if(!Message.m_HasEmoticon || Client()->State() != IClient::STATE_ONLINE || !Client()->ServerAddress())
+		return;
+
+	char aServer[NETADDR_MAXSTRSIZE] = "";
+	net_addr_str(Client()->ServerAddress(), aServer, sizeof(aServer), true);
+	if(str_comp(Message.m_EmoticonServerAddress.c_str(), aServer) != 0 ||
+		Message.m_EmoticonPlayerName.size() > MAX_NAME_LENGTH || Message.m_EmoticonClientId.size() > 64)
+		return;
+
+	SQmRemoteEmoticonEvent Event;
+	Event.m_PlayerId = Message.m_PlayerId;
+	Event.m_Emoticon = Message.m_Emoticon;
+	Event.m_LaunchMode = Message.m_LaunchMode;
+	Event.m_SuperLaunch = Message.m_SuperLaunch;
+	Event.m_Sequence = Message.m_EmoticonSequence;
+	Event.m_ClientId = Message.m_EmoticonClientId;
+	Event.m_PlayerName = Message.m_EmoticonPlayerName;
+	Event.m_ServerAddress = Message.m_EmoticonServerAddress;
+	if(m_QmRemoteEmoticonEvents.size() >= 128)
+		m_QmRemoteEmoticonEvents.pop_front();
+	m_QmRemoteEmoticonEvents.push_back(std::move(Event));
+}
+
+void CQmClient::QueueQmAnonymousEmoticonEvent(const SQmRealtimeMessage &Message)
+{
+	QueueQmRemoteEmoticonEvent(Message);
 }
 
 void CQmClient::StartQmRealtime()
@@ -1733,28 +1770,7 @@ void CQmClient::HandleQmRealtimeMessage(const SQmRealtimeMessage &Message)
 		ApplyQmRealtimeTitles(Message);
 		break;
 	case EQmRealtimeEvent::EMOTICON:
-		if(Message.m_HasEmoticon && Client()->State() == IClient::STATE_ONLINE && Client()->ServerAddress())
-		{
-			char aServer[NETADDR_MAXSTRSIZE] = "";
-			net_addr_str(Client()->ServerAddress(), aServer, sizeof(aServer), true);
-			if(str_comp(Message.m_EmoticonServerAddress.c_str(), aServer) == 0 &&
-				Message.m_EmoticonPlayerName.size() <= MAX_NAME_LENGTH &&
-				Message.m_EmoticonClientId.size() <= 64)
-			{
-				SQmRemoteEmoticonEvent Event;
-				Event.m_PlayerId = Message.m_PlayerId;
-				Event.m_Emoticon = Message.m_Emoticon;
-				Event.m_LaunchMode = Message.m_LaunchMode;
-				Event.m_SuperLaunch = Message.m_SuperLaunch;
-				Event.m_Sequence = Message.m_EmoticonSequence;
-				Event.m_ClientId = Message.m_EmoticonClientId;
-				Event.m_PlayerName = Message.m_EmoticonPlayerName;
-				Event.m_ServerAddress = Message.m_EmoticonServerAddress;
-				if(m_QmRemoteEmoticonEvents.size() >= 128)
-					m_QmRemoteEmoticonEvents.pop_front();
-				m_QmRemoteEmoticonEvents.push_back(std::move(Event));
-			}
-		}
+		// 表情已经迁移到匿名专用通道，账号/头衔通道不再承载该事件。
 		break;
 	case EQmRealtimeEvent::USERS:
 	case EQmRealtimeEvent::DEVELOPERS:
@@ -1871,6 +1887,188 @@ void CQmClient::UpdateQmRealtime()
 	{
 		m_QmRealtimeTitleRevision = m_TitleRevision;
 		QmRealtimeRequestTitleRefresh();
+	}
+}
+
+void CQmClient::LogQmAnonymousEmoteEvent(const char *pStage, const char *pDetail) const
+{
+	if(!g_Config.m_QmWebSocketLog)
+		return;
+	log_info("qmclient", "anonymous_emote %s: %s", pStage, pDetail != nullptr ? pDetail : "");
+}
+
+void CQmClient::StartQmAnonymousEmotes()
+{
+	StopQmAnonymousEmotes();
+	str_copy(m_aQmAnonymousEmoteUrl, "wss://arghena.site/api/sync/anonymous/ws", sizeof(m_aQmAnonymousEmoteUrl));
+	m_pQmAnonymousEmote = CreateQmWebSocketClient({});
+	if(m_pQmAnonymousEmote && m_pQmAnonymousEmote->Available())
+	{
+		IQmWebSocketClient::STuning Tuning;
+		Tuning.m_HeartbeatMs = g_Config.m_QmWebSocketHeartbeat * 1000;
+		Tuning.m_BackoffBaseMs = g_Config.m_QmWebSocketBackoffBaseMs;
+		Tuning.m_BackoffMaxMs = g_Config.m_QmWebSocketBackoffMaxMs;
+		Tuning.m_OutgoingQueueCapacity = 16;
+		m_pQmAnonymousEmote->SetTuning(Tuning);
+	}
+}
+
+void CQmClient::StopQmAnonymousEmotes()
+{
+	if(m_pQmAnonymousEmote)
+	{
+		m_pQmAnonymousEmote->Disconnect();
+		m_pQmAnonymousEmote.reset();
+	}
+	m_aQmAnonymousClientId[0] = '\0';
+	m_aQmAnonymousSessionId[0] = '\0';
+	m_QmAnonymousEmoteConnectedTick = 0;
+	m_QmAnonymousEmoteNextHelloCheck = 0;
+	m_QmAnonymousEmoteHelloBody.clear();
+}
+
+void CQmClient::EnsureQmAnonymousEmoteConnection()
+{
+	if(m_pQmAnonymousEmote == nullptr)
+		StartQmAnonymousEmotes();
+	if(m_pQmAnonymousEmote == nullptr || !m_pQmAnonymousEmote->Available() || m_pQmAnonymousEmote->Desired())
+		return;
+
+	SQmWebSocketConnectConfig Config;
+	const std::string ParseError = ParseQmWebSocketUrl(m_aQmAnonymousEmoteUrl, Config);
+	if(!ParseError.empty())
+	{
+		if(!m_QmAnonymousEmoteFailureLogged)
+		{
+			m_QmAnonymousEmoteFailureLogged = true;
+			LogQmAnonymousEmoteEvent("invalid_url", ParseError.c_str());
+		}
+		return;
+	}
+	Config.m_Protocol = "qmclient-json";
+	Config.m_MaxMessageSize = 128 * 1024;
+	Config.m_AllowInsecureTls = false;
+
+	std::string Error;
+	if(!m_pQmAnonymousEmote->Connect(Config, Error))
+	{
+		if(!m_QmAnonymousEmoteFailureLogged)
+		{
+			m_QmAnonymousEmoteFailureLogged = true;
+			LogQmAnonymousEmoteEvent("connect_rejected", Error.c_str());
+		}
+		return;
+	}
+	m_QmAnonymousEmoteFailureLogged = false;
+	LogQmAnonymousEmoteEvent("connecting", m_aQmAnonymousEmoteUrl);
+}
+
+std::string CQmClient::BuildQmAnonymousEmoteHello() const
+{
+	char aServer[NETADDR_MAXSTRSIZE] = "";
+	if(Client()->State() == IClient::STATE_ONLINE && Client()->ServerAddress())
+		net_addr_str(Client()->ServerAddress(), aServer, sizeof(aServer), true);
+
+	CJsonStringWriter Writer;
+	Writer.BeginObject();
+	Writer.WriteAttribute("type");
+	Writer.WriteStrValue("hello");
+	Writer.WriteAttribute("v");
+	Writer.WriteIntValue(2);
+	Writer.WriteAttribute("client_id");
+	Writer.WriteStrValue(m_aQmAnonymousClientId);
+	Writer.WriteAttribute("player_name");
+	Writer.WriteStrValue(g_Config.m_PlayerName);
+	Writer.WriteAttribute("server_address");
+	Writer.WriteStrValue(aServer);
+	Writer.WriteAttribute("session_id");
+	Writer.WriteStrValue(m_aQmAnonymousSessionId);
+	Writer.WriteAttribute("players");
+	Writer.BeginArray();
+	if(aServer[0])
+	{
+		for(int Dummy = 0; Dummy < NUM_DUMMIES; ++Dummy)
+		{
+			const int Id = GameClient()->m_aLocalIds[Dummy];
+			if((Dummy == 1 && !Client()->DummyConnected()) || Id < 0 || Id >= MAX_CLIENTS || !GameClient()->m_aClients[Id].m_Active)
+				continue;
+			Writer.BeginObject();
+			Writer.WriteAttribute("player_id");
+			Writer.WriteIntValue(Id);
+			Writer.WriteAttribute("player_name");
+			Writer.WriteStrValue(GameClient()->m_aClients[Id].m_aName);
+			Writer.WriteAttribute("dummy");
+			Writer.WriteBoolValue(Dummy == 1);
+			Writer.EndObject();
+		}
+	}
+	Writer.EndArray();
+	Writer.EndObject();
+	return Writer.GetOutputString();
+}
+
+void CQmClient::SendQmAnonymousEmoteHello()
+{
+	if(m_pQmAnonymousEmote == nullptr || m_pQmAnonymousEmote->State() != EQmWebSocketState::CONNECTED ||
+		Client()->State() != IClient::STATE_ONLINE || !Client()->ServerAddress())
+		return;
+	const std::string Body = BuildQmAnonymousEmoteHello();
+	if(m_pQmAnonymousEmote->SendText(Body.c_str(), Body.size()))
+		m_QmAnonymousEmoteHelloBody = Body;
+}
+
+void CQmClient::UpdateQmAnonymousEmotes()
+{
+	if(m_QmClientShutdownReported)
+		return;
+	if(Client()->State() != IClient::STATE_ONLINE || !Client()->ServerAddress())
+	{
+		if(m_pQmAnonymousEmote && m_pQmAnonymousEmote->Desired())
+			StopQmAnonymousEmotes();
+		return;
+	}
+
+	EnsureQmAnonymousEmoteConnection();
+	if(!m_pQmAnonymousEmote || !m_pQmAnonymousEmote->Available())
+		return;
+	if(m_pQmAnonymousEmote->State() != EQmWebSocketState::CONNECTED)
+	{
+		m_QmAnonymousEmoteConnectedTick = 0;
+		return;
+	}
+
+	const int64_t ConnectedTick = m_pQmAnonymousEmote->LastConnectedTick();
+	if(m_QmAnonymousEmoteConnectedTick != ConnectedTick)
+	{
+		m_QmAnonymousEmoteConnectedTick = ConnectedTick;
+		m_QmAnonymousEmoteHelloBody.clear();
+		secure_random_password(m_aQmAnonymousClientId, sizeof(m_aQmAnonymousClientId), sizeof(m_aQmAnonymousClientId) - 1);
+		secure_random_password(m_aQmAnonymousSessionId, sizeof(m_aQmAnonymousSessionId), sizeof(m_aQmAnonymousSessionId) - 1);
+		SendQmAnonymousEmoteHello();
+		LogQmAnonymousEmoteEvent("connected", m_aQmAnonymousEmoteUrl);
+	}
+
+	SQmWebSocketMessage Message;
+	for(int Count = 0; Count < 8 && m_pQmAnonymousEmote->PollMessage(Message); ++Count)
+	{
+		if(Message.m_Type != EQmWebSocketMessageType::TEXT)
+			continue;
+		SQmRealtimeMessage Parsed;
+		if(!ParseQmRealtimeMessage(Message.m_Data.c_str(), Message.m_Data.size(), Parsed))
+			continue;
+		if(Parsed.m_Event == EQmRealtimeEvent::PING)
+			m_pQmAnonymousEmote->SendText("{\"type\":\"pong\"}", 15);
+		else if(Parsed.m_Event == EQmRealtimeEvent::EMOTICON)
+			QueueQmAnonymousEmoticonEvent(Parsed);
+	}
+
+	const int64_t Now = time_get_impl();
+	if(Now >= m_QmAnonymousEmoteNextHelloCheck)
+	{
+		m_QmAnonymousEmoteNextHelloCheck = Now + time_freq() / 4;
+		const std::string Body = BuildQmAnonymousEmoteHello();
+		if(Body != m_QmAnonymousEmoteHelloBody)
+			SendQmAnonymousEmoteHello();
 	}
 }
 

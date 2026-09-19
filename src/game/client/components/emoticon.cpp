@@ -532,7 +532,7 @@ void CEmoticon::RenderProjectiles()
 	CQmClient::SQmRemoteEmoticonEvent RemoteEvent;
 	while(GameClient()->m_QmClient.PollQmRemoteEmoticonEvent(RemoteEvent))
 	{
-		if(RemoteEvent.m_ClientId == GameClient()->m_QmClient.QmClientId())
+		if(RemoteEvent.m_ClientId == GameClient()->m_QmClient.QmAnonymousClientId())
 			continue;
 		if(RemoteEvent.m_PlayerId < 0 || RemoteEvent.m_PlayerId >= MAX_CLIENTS || RemoteEvent.m_Emoticon < 0 || RemoteEvent.m_Emoticon >= NUM_EMOTICONS)
 			continue;
@@ -644,7 +644,7 @@ void CEmoticon::Emote(int Emoticon)
 	}
 	const int LocalClientId = GameClient()->m_aLocalIds[g_Config.m_ClDummy];
 	if(LocalClientId >= 0)
-		GameClient()->m_QmClient.SendQmRealtimeEmoticon(Emoticon, LocalClientId, m_LaunchModeActive, UseSuperLaunch);
+		GameClient()->m_QmClient.SendQmAnonymousEmoticon(Emoticon, LocalClientId, m_LaunchModeActive, UseSuperLaunch);
 }
 
 void CEmoticon::SuperEmote(int Emoticon)

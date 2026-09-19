@@ -474,6 +474,15 @@ struct SQmTitleStylePreviewContext
 
 // 样式预览的文本容器按风格序号缓存；弹层每帧重建可见条目，这里逐项复用自己的容器。
 static std::array<STextContainerIndex, 64> s_aTitleStylePreviewContainers;
+static STextContainerIndex s_TitleFinishedPreviewContainer;
+
+void CMenus::ClearQmTitlePreviewContainers()
+{
+	// 清理全部条目，包括已折叠或滚出屏幕的预览；删除后下次绘制会重新创建。
+	TextRender()->DeleteTextContainer(s_TitleFinishedPreviewContainer);
+	for(auto &Container : s_aTitleStylePreviewContainers)
+		TextRender()->DeleteTextContainer(Container);
+}
 
 // 卡片内展开的风格列表：可见行数、行高/间距/内边距，测量与绘制必须用同一组常量。
 constexpr int MAX_VISIBLE_STYLE_ITEMS = 6;
@@ -614,7 +623,7 @@ static void RenderQmTitleFinishedPreview(ITextRender *pTextRender, CRenderTools 
 
 	const ColorRGBA PreviousTextColor = pTextRender->GetTextColor();
 	pTextRender->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
-	static STextContainerIndex PreviewContainer;
+	STextContainerIndex &PreviewContainer = s_TitleFinishedPreviewContainer;
 	if(PreviewContainer.Valid())
 		pTextRender->RecreateTextContainerSoft(PreviewContainer, &PreviewCursor, aPreviewText);
 	else

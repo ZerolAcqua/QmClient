@@ -42,6 +42,14 @@
 using namespace FontIcons;
 
 static constexpr ColorRGBA gs_HighlightedTextColor = ColorRGBA(0.4f, 0.4f, 1.0f, 1.0f);
+// 「梦」列的人数颜色，与计分板 Qm 客户端标签同色。
+static constexpr ColorRGBA QM_CLIENT_COUNT_COLOR = ColorRGBA(0.38f, 0.89f, 1.0f, 1.0f);
+// 服务器列表正文字号。所有列都常显，所以字号比菜单正文（12）小一号，
+// 用行高 15（见 ms_ListheaderHeight）换出横向空间给名称和地图。
+static constexpr float SERVER_LIST_TEXT_SIZE = 11.0f;
+// 列表滚动条轨道的底色倍率。轨道本身是白色 25%，直接叠在已经变暗的列表正文上会形成
+// 一条比卡片亮得多的竖带，看起来像第二个框；按倍率压暗后仍能看见，但不抢卡片整体。
+static constexpr float SERVER_LIST_SCROLLBAR_RAIL_ALPHA_SCALE = 0.28f;
 
 static ColorRGBA BrowserOpacityColor(ColorRGBA Color, float AlphaScale = 1.0f)
 {
@@ -362,9 +370,10 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	CUIRect Headers;
 	View.HSplitTop(ms_ListheaderHeight, &Headers, &View);
 	const CUIRect ListView = View;
-	Headers.Draw(BrowserOpacityColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f)), IGraphics::CORNER_T, 5.0f);
+	// 表头与正文都直接用卡片自身的底色，不再各自铺一层半透明表面。原先表头的白 25% 与正文的
+	// 黑 15% 会在同一张卡片里做出两种底色、两种圆角（表头只圆上边、正文无圆角），叠起来就是
+	// 用户看到的「框里还有一层」。
 	Headers.VSplitRight(s_ListBox.ScrollbarWidthMax(), &Headers, nullptr);
-	View.Draw(BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f)), IGraphics::CORNER_NONE, 0.0f);
 
 	{
 		CUIRect ResetBtn;
@@ -374,11 +383,12 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		if(Ui()->DoButton_FontIcon(&s_ResetColsButton, FONT_ICON_ARROW_ROTATE_RIGHT, 0, &ResetBtn, BUTTONFLAG_LEFT))
 		{
 			g_Config.m_BrColWidthName = 120;
-			g_Config.m_BrColWidthGametype = 50;
-			g_Config.m_BrColWidthMap = 120;
-			g_Config.m_BrColWidthFriends = 20;
-			g_Config.m_BrColWidthPlayers = 60;
-			g_Config.m_BrColWidthPing = 40;
+			g_Config.m_BrColNameSplit = 600;
+			g_Config.m_BrColWidthGametype = 68;
+			g_Config.m_BrColWidthFriends = 14;
+			g_Config.m_BrColWidthPlayers = 40;
+			g_Config.m_BrColWidthQmClients = 24;
+			g_Config.m_BrColWidthPing = 30;
 			ConfigManager()->Save();
 		}
 		if(Ui()->HotItem() == &s_ResetColsButton)
@@ -405,6 +415,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		COL_MAP,
 		COL_FRIENDS,
 		COL_PLAYERS,
+		COL_QM_CLIENTS,
 		COL_PING,
 	};
 
@@ -421,37 +432,45 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		UI_ELEM_MAP_3,
 		UI_ELEM_FINISH_ICON,
 		UI_ELEM_PLAYERS,
+		UI_ELEM_QM_CLIENTS,
 		UI_ELEM_FRIEND_ICON,
 		UI_ELEM_PING,
 		UI_ELEM_KEY_ICON,
 		NUM_UI_ELEMS,
 	};
 
+	// 服务器列表按「所有列都常显」排布：不隐藏任何列，靠小字号（SERVER_LIST_TEXT_SIZE）、
+	// 紧凑行高（ms_ListheaderHeight）和贴内容定宽把宽度让回给名称与地图。
 	constexpr float ClickableIconSpace = 20.0f;
 
 	static SColumn s_aCols[] = {
 		{-1, -1, "", -1, 2.0f, {0}},
 		{COL_FLAG_LOCK, -1, "", -1, 14.0f, {0}},
 		{COL_FLAG_FAV, IServerBrowser::SORT_FAVORITES, "", -1, ClickableIconSpace, {0}},
-		{COL_COMMUNITY, -1, "", -1, 28.0f, {0}},
+		{COL_COMMUNITY, -1, "", -1, 24.0f, {0}},
 		{COL_NAME, IServerBrowser::SORT_NAME, Localizable("Name"), 0, 50.0f, {0}},
-		{COL_GAMETYPE, IServerBrowser::SORT_GAMETYPE, Localizable("Type"), 1, 50.0f, {0}},
-		{COL_MAP, IServerBrowser::SORT_MAP, Localizable("Map"), 1, 120.0f + (Headers.w - 480) / 8, {0}},
-		{COL_FRIENDS, IServerBrowser::SORT_NUMFRIENDS, "", 1, ClickableIconSpace, {0}},
-		{COL_PLAYERS, IServerBrowser::SORT_NUMPLAYERS, Localizable("Players"), 1, 60.0f, {0}},
+		// 类型列按最长常见值 "DDraceNetwork" 定宽，别再把它裁成 "DDraceN"。
+		{COL_GAMETYPE, IServerBrowser::SORT_GAMETYPE, Localizable("Type"), 1, 68.0f, {0}},
+		// 地图列宽度在下面按「名称 : 地图 = 6 : 4」重新分配，这里的值只是初值。
+		{COL_MAP, IServerBrowser::SORT_MAP, Localizable("Map"), 1, 110.0f, {0}},
+		{COL_FRIENDS, IServerBrowser::SORT_NUMFRIENDS, "", 1, 14.0f, {0}},
+		{COL_PLAYERS, IServerBrowser::SORT_NUMPLAYERS, Localizable("Players"), 1, 40.0f, {0}},
+		// 「梦」列：统计该服在线梦客户端（含 Arg）人数。人数来自中心服下发的在线分布，
+		// 本地没有对应的 SORT_ 值；列头是品牌字，不走 Localize。
+		{COL_QM_CLIENTS, -1, "梦", 1, 24.0f, {0}},
 		{-1, -1, "", 1, 4.0f, {0}},
-		{COL_PING, IServerBrowser::SORT_PING, Localizable("Ping"), 1, 40.0f, {0}},
+		{COL_PING, IServerBrowser::SORT_PING, Localizable("Ping"), 1, 30.0f, {0}},
 	};
 
 	auto ClampConfigWidth = [](int Value, int MinWidth, int MaxWidth) {
 		return std::clamp(Value, MinWidth, MaxWidth);
 	};
 
-	s_aCols[5].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthGametype, 36, 300);
-	s_aCols[6].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthMap, 60, 800);
-	s_aCols[7].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthFriends, 18, 120);
-	s_aCols[8].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthPlayers, 48, 240);
-	s_aCols[10].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthPing, 32, 180);
+	s_aCols[5].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthGametype, 62, 300);
+	s_aCols[7].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthFriends, 12, 120);
+	s_aCols[8].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthPlayers, 34, 240);
+	s_aCols[9].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthQmClients, 20, 120);
+	s_aCols[11].m_Width = (float)ClampConfigWidth(g_Config.m_BrColWidthPing, 26, 180);
 
 	const int NumCols = std::size(s_aCols);
 
@@ -459,9 +478,9 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		switch(ColId)
 		{
 		case COL_GAMETYPE: return &g_Config.m_BrColWidthGametype;
-		case COL_MAP: return &g_Config.m_BrColWidthMap;
 		case COL_FRIENDS: return &g_Config.m_BrColWidthFriends;
 		case COL_PLAYERS: return &g_Config.m_BrColWidthPlayers;
+		case COL_QM_CLIENTS: return &g_Config.m_BrColWidthQmClients;
 		case COL_PING: return &g_Config.m_BrColWidthPing;
 		default: return nullptr;
 		}
@@ -470,11 +489,11 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	auto GetColMinWidth = [](int ColId) {
 		switch(ColId)
 		{
-		case COL_GAMETYPE: return 36.0f;
-		case COL_MAP: return 60.0f;
-		case COL_FRIENDS: return 18.0f;
-		case COL_PLAYERS: return 48.0f;
-		case COL_PING: return 32.0f;
+		case COL_GAMETYPE: return 62.0f;
+		case COL_FRIENDS: return 12.0f;
+		case COL_PLAYERS: return 34.0f;
+		case COL_QM_CLIENTS: return 20.0f;
+		case COL_PING: return 26.0f;
 		default: return 10.0f;
 		}
 	};
@@ -483,9 +502,9 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		switch(ColId)
 		{
 		case COL_GAMETYPE: return 300.0f;
-		case COL_MAP: return 800.0f;
 		case COL_FRIENDS: return 120.0f;
 		case COL_PLAYERS: return 240.0f;
+		case COL_QM_CLIENTS: return 120.0f;
 		case COL_PING: return 180.0f;
 		default: return 1000.0f;
 		}
@@ -504,6 +523,9 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		float m_MaxWidth;
 	};
 
+	// 列间空白。所有列都常显，所以这里从 2px 起步，宽度全部让给内容。
+	constexpr float ColumnGapWidth = 2.0f;
+
 	static std::vector<SResizeHandle> s_vResizeHandles;
 	s_vResizeHandles.clear();
 
@@ -517,12 +539,13 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			if(i + 1 < NumCols)
 			{
 				CUIRect Gap;
-				Headers.VSplitLeft(2.0f, &Gap, &Headers);
+				Headers.VSplitLeft(ColumnGapWidth, &Gap, &Headers);
 				int *pConfig = GetColWidthConfig(s_aCols[i].m_Id);
 				if(pConfig)
 				{
-					Gap.x -= 3.0f;
-					Gap.w = 8.0f;
+					// 手柄 6px：右侧列间距只有 2px，8px 手柄会和后一列的手柄叠在一起抢悬停。
+					Gap.x -= 2.0f;
+					Gap.w = 6.0f;
 					s_vResizeHandles.push_back({Gap, i, pConfig, GetColMinWidth(s_aCols[i].m_Id), GetColMaxWidth(s_aCols[i].m_Id)});
 				}
 			}
@@ -535,14 +558,35 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		{
 			Headers.VSplitRight(s_aCols[i].m_Width, &Headers, &s_aCols[i].m_Rect);
 			CUIRect Gap;
-			Headers.VSplitRight(2.0f, &Headers, &Gap);
+			Headers.VSplitRight(ColumnGapWidth, &Headers, &Gap);
 			int *pConfig = GetColWidthConfig(s_aCols[i].m_Id);
 			if(pConfig)
 			{
-				Gap.x -= 3.0f;
-				Gap.w = 8.0f;
+				// 与左侧列手柄同理，6px 才不与相邻列抢悬停。
+				Gap.x -= 2.0f;
+				Gap.w = 6.0f;
 				s_vResizeHandles.push_back({Gap, i, pConfig, GetColMinWidth(s_aCols[i].m_Id), GetColMaxWidth(s_aCols[i].m_Id)});
 			}
+		}
+	}
+
+	// 名称与地图分掉剩余宽度。地图宽度由比例推导，所以没有自己的拖拽手柄
+	// （拖名称列的右边界就是在两者之间挪比例）。
+	const float MinNameFlexWidth = (float)ClampConfigWidth(g_Config.m_BrColWidthName, 60, 1000);
+	float SplitNameWidth = 0.0f;
+	float SplitMapWidth = 0.0f;
+	{
+		const float MinMap = 90.0f;
+		const float Split = std::clamp((float)g_Config.m_BrColNameSplit / 1000.0f, 0.35f, 0.75f);
+		const float FreeWidth = maximum(Headers.w - MinNameFlexWidth - MinMap, 0.0f);
+		SplitNameWidth = MinNameFlexWidth + FreeWidth * Split;
+		SplitMapWidth = MinMap + FreeWidth * (1.0f - Split);
+		for(auto &Col : s_aCols)
+		{
+			if(Col.m_Id == COL_NAME)
+				Col.m_Width = SplitNameWidth;
+			else if(Col.m_Id == COL_MAP)
+				Col.m_Width = SplitMapWidth;
 		}
 	}
 
@@ -561,7 +605,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		if(PlayersOrPing && g_Config.m_BrSortOrder == 2 && (Col.m_Sort == IServerBrowser::SORT_NUMPLAYERS || Col.m_Sort == IServerBrowser::SORT_PING))
 			Checked = 2;
 
-		if(DoButton_GridHeader(&Col.m_Id, Localize(Col.m_pCaption), Checked, &Col.m_Rect))
+		if(DoButton_GridHeader(&Col.m_Id, Col.m_Id == COL_QM_CLIENTS ? Col.m_pCaption : Localize(Col.m_pCaption), Checked, &Col.m_Rect))
 		{
 			if(Col.m_Sort != -1)
 			{
@@ -595,29 +639,22 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	static int s_ResizeDragColIndex = -1;
 	static float s_ResizeDragStartMouseX = 0.0f;
 	static float s_ResizeDragStartWidth = 0.0f;
-	static float s_ResizeDragStartFlexWidth = 0.0f;
 	static float s_ResizeDragCurrentWidth = 0.0f;
-
-	const float MinNameWidth = (float)ClampConfigWidth(g_Config.m_BrColWidthName, 60, 1000);
-
-	const int FlexColIndex = [&]() {
-		for(int i = 0; i < NumCols; i++)
-			if(s_aCols[i].m_Direction == 0)
-				return i;
-		return -1;
-	}();
 
 	for(const auto &Handle : s_vResizeHandles)
 	{
 		const void *pHandleId = &s_aCols[Handle.m_ColIndex].m_Width;
 		const int ColIdx = Handle.m_ColIndex;
 		const bool IsRightCol = s_aCols[ColIdx].m_Direction == 1;
+		// 名称列不是固定宽度，而是「名称 : 地图」比例，所以拖它改的是比例。
+		const bool IsNameSplit = s_aCols[ColIdx].m_Id == COL_NAME;
 
 		if(s_ResizeDragColIndex == ColIdx)
 		{
 			if(!Ui()->MouseButton(0))
 			{
-				SetColWidthConfig(Handle.m_pWidthConfig, s_ResizeDragCurrentWidth, Handle.m_MinWidth, Handle.m_MaxWidth);
+				if(!IsNameSplit)
+					SetColWidthConfig(Handle.m_pWidthConfig, s_ResizeDragCurrentWidth, Handle.m_MinWidth, Handle.m_MaxWidth);
 				s_ResizeDragColIndex = -1;
 				Ui()->SetActiveItem(nullptr);
 				ConfigManager()->Save();
@@ -626,16 +663,21 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			{
 				float DeltaX = Ui()->MouseX() - s_ResizeDragStartMouseX;
 				float NewWidth = s_ResizeDragStartWidth + (IsRightCol ? -DeltaX : DeltaX);
-				NewWidth = std::clamp(NewWidth, Handle.m_MinWidth, Handle.m_MaxWidth);
 
-				if(IsRightCol && FlexColIndex >= 0)
+				if(IsNameSplit)
 				{
-					float MaxWidth = s_ResizeDragStartWidth + s_ResizeDragStartFlexWidth - MinNameWidth;
-					NewWidth = minimum(NewWidth, MaxWidth);
+					const float MinMap = 90.0f;
+					NewWidth = std::clamp(NewWidth, MinNameFlexWidth, s_ResizeDragStartWidth + SplitMapWidth - MinMap);
+					const float FreeWidth = SplitMapWidth + SplitNameWidth - MinNameFlexWidth - MinMap;
+					if(FreeWidth > 0.0f)
+						g_Config.m_BrColNameSplit = std::clamp((int)((NewWidth - MinNameFlexWidth) / FreeWidth * 1000.0f + 0.5f), 0, 1000);
 				}
-				NewWidth = maximum(NewWidth, Handle.m_MinWidth);
-				s_ResizeDragCurrentWidth = NewWidth;
-				SetColWidthConfig(Handle.m_pWidthConfig, NewWidth, Handle.m_MinWidth, Handle.m_MaxWidth);
+				else
+				{
+					NewWidth = std::clamp(NewWidth, Handle.m_MinWidth, Handle.m_MaxWidth);
+					s_ResizeDragCurrentWidth = NewWidth;
+					SetColWidthConfig(Handle.m_pWidthConfig, NewWidth, Handle.m_MinWidth, Handle.m_MaxWidth);
+				}
 			}
 		}
 		else if(Ui()->MouseHovered(&Handle.m_Rect))
@@ -645,8 +687,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			{
 				s_ResizeDragColIndex = ColIdx;
 				s_ResizeDragStartMouseX = Ui()->MouseX();
-				s_ResizeDragStartWidth = s_aCols[ColIdx].m_Width;
-				s_ResizeDragStartFlexWidth = FlexColIndex >= 0 ? s_aCols[FlexColIndex].m_Rect.w : 0.0f;
+				s_ResizeDragStartWidth = IsNameSplit ? SplitNameWidth : s_aCols[ColIdx].m_Width;
 				s_ResizeDragCurrentWidth = s_ResizeDragStartWidth;
 				Ui()->SetActiveItem(pHandleId);
 			}
@@ -684,6 +725,27 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	}
 
 	const int NumServers = ServerBrowser()->NumSortedServers();
+
+	// 「梦」列：该服在线梦客户端（含 Arg）人数，按服务器地址查中心服下发的在线分布。
+	std::unordered_map<std::string, int> QmClientsByServer;
+	{
+		const std::vector<SQmClientServerDistribution> &vDistribution = GameClient()->m_QmClient.QmClientServerDistribution();
+		QmClientsByServer.reserve(vDistribution.size());
+		for(const SQmClientServerDistribution &Distribution : vDistribution)
+		{
+			const int Count = Distribution.m_UserCount + Distribution.m_DummyCount;
+			if(Count > 0 && !Distribution.m_ServerAddress.empty())
+				QmClientsByServer.emplace(Distribution.m_ServerAddress, Count);
+		}
+	}
+	const auto FindQmClientCount = [&QmClientsByServer](const CServerInfo *pInfo) {
+		if(QmClientsByServer.empty() || pInfo->m_NumAddresses <= 0)
+			return 0;
+		char aAddress[NETADDR_MAXSTRSIZE];
+		net_addr_str(&pInfo->m_aAddresses[0], aAddress, sizeof(aAddress), true);
+		const auto It = QmClientsByServer.find(aAddress);
+		return It == QmClientsByServer.end() ? 0 : It->second;
+	};
 
 	// display important messages in the middle of the screen so no
 	// users misses it
@@ -809,7 +871,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			RowsRendered++;
 		}
 
-		const float FontSize = 12.0f;
+		const float FontSize = SERVER_LIST_TEXT_SIZE;
 		char aTemp[64];
 		for(const auto &Col : s_aCols)
 		{
@@ -855,6 +917,8 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			}
 			else if(Id == COL_NAME)
 			{
+				// 左侧留 3px：列间距被压到 2px 后，文字会贴上前一列的图标/分隔线。
+				Button.VSplitLeft(3.0f, nullptr, &Button);
 				SLabelProperties Props;
 				Props.m_MaxWidth = Button.w;
 				Props.m_StopAtEnd = true;
@@ -875,6 +939,8 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			}
 			else if(Id == COL_GAMETYPE)
 			{
+				// 与名称列同样留 3px，避免高亮色文字贴住左侧分隔线。
+				Button.VSplitLeft(3.0f, nullptr, &Button);
 				SLabelProperties Props;
 				Props.m_MaxWidth = Button.w;
 				Props.m_StopAtEnd = true;
@@ -949,6 +1015,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			}
 			else if(Id == COL_PLAYERS)
 			{
+				Button.VMargin(2.0f, &Button);
 				str_format(aTemp, sizeof(aTemp), "%i/%i", pItem->m_NumFilteredPlayers, ServerBrowser()->Max(*pItem));
 				if(g_Config.m_BrFilterString[0] && (pItem->m_QuickSearchHit & IServerBrowser::QUICK_PLAYER))
 				{
@@ -957,9 +1024,22 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 				Ui()->DoLabelStreamed(*pUiElement->Rect(UI_ELEM_PLAYERS), &Button, aTemp, FontSize, TEXTALIGN_MR);
 				TextRender()->TextColor(TextRender()->DefaultTextColor());
 			}
+			else if(Id == COL_QM_CLIENTS)
+			{
+				const int QmClients = FindQmClientCount(pItem);
+				// 没有梦客户端的服务器留空，避免整列都是 0 的噪音。
+				if(QmClients > 0)
+				{
+					Button.VMargin(2.0f, &Button);
+					str_format(aTemp, sizeof(aTemp), "%d", QmClients);
+					TextRender()->TextColor(QM_CLIENT_COUNT_COLOR);
+					Ui()->DoLabelStreamed(*pUiElement->Rect(UI_ELEM_QM_CLIENTS), &Button, aTemp, FontSize, TEXTALIGN_MR);
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+				}
+			}
 			else if(Id == COL_PING)
 			{
-				Button.VMargin(4.0f, &Button);
+				Button.VMargin(2.0f, &Button);
 				FormatServerbrowserPing(aTemp, pItem);
 				if(g_Config.m_UiColorizePing)
 				{
@@ -1008,11 +1088,13 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		constexpr float FadeHeight = 44.0f;
 		Fade.y += maximum(Fade.h - FadeHeight, 0.0f);
 		Fade.h = minimum(Fade.h, FadeHeight);
+		// 底部渐隐只是提示还能继续滚动。它是直角矩形，铺到卡片底边上会切出一条横向暗带，
+		// 所以压到刚好能看出来即可。
 		Fade.Draw4(
 			BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f)),
 			BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f)),
-			BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.38f)),
-			BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.38f)),
+			BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)),
+			BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)),
 			IGraphics::CORNER_NONE, 0.0f);
 	}
 	if(NewSelected != m_SelectedIndex)
@@ -4059,10 +4141,12 @@ void CMenus::RenderServerbrowser(CUIRect MainView, bool DrawBackground)
 	ServerListBase.h = maximum(StatusBox.y - ColumnGap - ServerListBase.y, 0.0f);
 	if(UseNewUi)
 	{
-		ServerListBase.Draw(BrowserPanelColor(), IGraphics::CORNER_ALL, ui_token::radius::CARD);
 		StatusBox.Draw(BrowserPanelElevatedColor(), IGraphics::CORNER_ALL, ui_token::radius::CARD);
 		ToolBoxBase.Draw(BrowserPanelColor(), IGraphics::CORNER_ALL, ui_token::radius::CARD);
-		ServerListBase.Margin(10.0f, &ServerListBase);
+		// 服务器列表只保留这一张卡片当外框：表头与列表内容直接画到卡片上，
+		// 不再额外内缩，避免同色半透明叠加出「框中框」的深色内块。
+		ServerListBase.Draw(BrowserPanelColor(), IGraphics::CORNER_ALL, ui_token::radius::CARD);
+		ServerListBase.Margin(2.0f, &ServerListBase);
 		StatusBox.Margin(10.0f, &StatusBox);
 		ToolBoxBase.Margin(10.0f, &ToolBoxBase);
 	}
@@ -4091,7 +4175,12 @@ void CMenus::RenderServerbrowser(CUIRect MainView, bool DrawBackground)
 			Ui()->ClipEnable(&ServerListBase);
 			ServerList.x += TransitionOffset;
 		}
-		RenderServerbrowserServerList(ServerList, WasListboxItemActivated);
+		// 滚动条轨道与滑块由 Ui()->ScaleBackgroundAlpha() 缩放。列表正文不再额外压暗后，
+		// 轨道要按倍率调低，否则它会成为卡片里最亮的一块。
+		{
+			CUiBackgroundAlphaScaleScope ListOpacityScope(Ui(), SERVER_LIST_SCROLLBAR_RAIL_ALPHA_SCALE);
+			RenderServerbrowserServerList(ServerList, WasListboxItemActivated);
+		}
 		if(DoClip)
 		{
 			if(TransitionAlpha > 0.0f)

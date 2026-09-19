@@ -140,12 +140,31 @@ private:
 	int64_t m_QmRealtimeUsersExpireTick = 0;
 	std::deque<SQmRemoteEmoticonEvent> m_QmRemoteEmoticonEvents;
 	void HandleQmRealtimeMessage(const SQmRealtimeMessage &Message);
+	void QueueQmRemoteEmoticonEvent(const SQmRealtimeMessage &Message);
 	void ApplyQmRealtimeState(const SQmRealtimeMessage &Message);
 	void ApplyQmRealtimeBroadcast(const SQmRealtimeMessage &Message);
 	void ApplyQmRealtimeTitles(const SQmRealtimeMessage &Message);
 	// 头衔名单的唯一落地入口，复用已有身份校验与租约规则。
 	void ApplyQmTitlePresences(const json_value *pRoot, const char *pServerAddress);
 	void LogQmRealtimeEvent(const char *pStage, const char *pDetail) const;
+
+	// 匿名表情专用 WS 通道。该通道不发送账号、HWID 或持久化游玩时长 ID。
+	std::unique_ptr<IQmWebSocketClient> m_pQmAnonymousEmote;
+	char m_aQmAnonymousEmoteUrl[256] = "";
+	char m_aQmAnonymousClientId[65] = "";
+	char m_aQmAnonymousSessionId[65] = "";
+	bool m_QmAnonymousEmoteFailureLogged = false;
+	int64_t m_QmAnonymousEmoteConnectedTick = 0;
+	int64_t m_QmAnonymousEmoteNextHelloCheck = 0;
+	std::string m_QmAnonymousEmoteHelloBody;
+	void StartQmAnonymousEmotes();
+	void StopQmAnonymousEmotes();
+	void UpdateQmAnonymousEmotes();
+	void EnsureQmAnonymousEmoteConnection();
+	void SendQmAnonymousEmoteHello();
+	std::string BuildQmAnonymousEmoteHello() const;
+	void QueueQmAnonymousEmoticonEvent(const SQmRealtimeMessage &Message);
+	void LogQmAnonymousEmoteEvent(const char *pStage, const char *pDetail) const;
 
 	int64_t m_QmClientServerNow = 0;
 	int64_t m_QmClientServerSessionStart = 0;
@@ -251,8 +270,9 @@ public:
 	void QmRealtimeRestart();
 	// 请求服务端重推当前服务器的头衔名单（兑换/保存头衔、发现服务端变更后调用）。
 	void QmRealtimeRequestTitleRefresh();
-	void SendQmRealtimeEmoticon(int Emoticon, int PlayerId, bool LaunchMode, bool SuperLaunch);
+	void SendQmAnonymousEmoticon(int Emoticon, int PlayerId, bool LaunchMode, bool SuperLaunch);
 	bool PollQmRemoteEmoticonEvent(SQmRemoteEmoticonEvent &OutEvent);
+	const char *QmAnonymousClientId() const { return m_aQmAnonymousClientId; }
 };
 
 #endif

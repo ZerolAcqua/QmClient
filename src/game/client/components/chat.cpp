@@ -66,18 +66,30 @@ static SQmChatEmojiCursorLayout LayoutQmChatEmoji(CTextCursor &Cursor, float Siz
 					     Cursor.m_AlignedFontSize + Cursor.m_AlignedLineSpacing :
 					     Cursor.m_FontSize;
 	const float LineRight = Cursor.m_StartX + Cursor.m_LineWidth;
-	if(Cursor.m_LineWidth > 0.0f && Cursor.m_X > Cursor.m_StartX && Cursor.m_X + Size > LineRight)
+
+	// 放不下时先按剩余宽度缩小；缩到最小可读尺寸仍放不下才换行。
+	// 直接换行会让长名字后的单表情消息多占一行，缩小能让表情留在名字同一行。
+	float EmojiSize = QmChatEmojiFitSize(Size, LineRight - Cursor.m_X);
+	if(EmojiSize <= 0.0f)
 	{
-		Cursor.m_X = Cursor.m_StartX;
-		Cursor.m_Y += TextLineHeight;
-		++Cursor.m_LineCount;
+		if(Cursor.m_LineWidth > 0.0f && Cursor.m_X > Cursor.m_StartX)
+		{
+			Cursor.m_X = Cursor.m_StartX;
+			Cursor.m_Y += TextLineHeight;
+			++Cursor.m_LineCount;
+			EmojiSize = QmChatEmojiFitSize(Size, Cursor.m_LineWidth);
+		}
+		if(EmojiSize <= 0.0f)
+			EmojiSize = Size;
 	}
 
-	const CUIRect Rect = {Cursor.m_X, Cursor.m_Y, Size, Size};
-	Cursor.m_X += Size;
+	// 表情框底边压到文字基线上，避免整块表情挂在基线之下侵入下一行。
+	const float AlignedFontSize = Cursor.m_AlignedFontSize > 0.0f ? Cursor.m_AlignedFontSize : Cursor.m_FontSize;
+	const CUIRect Rect = {Cursor.m_X, Cursor.m_Y + QmChatEmojiBaselineOffset(AlignedFontSize, EmojiSize), EmojiSize, EmojiSize};
+	Cursor.m_X += EmojiSize;
 	Cursor.m_LongestLineWidth = maximum(Cursor.m_LongestLineWidth, Cursor.m_X - Cursor.m_StartX);
-	Cursor.m_MaxCharacterHeight = maximum(Cursor.m_MaxCharacterHeight, Size);
-	return {Rect, Rect.y - Cursor.m_StartY + Size};
+	Cursor.m_MaxCharacterHeight = maximum(Cursor.m_MaxCharacterHeight, EmojiSize);
+	return {Rect, maximum(Cursor.Height(), Rect.y - Cursor.m_StartY + EmojiSize)};
 }
 
 static int BlockWordsSeparatorLength(const char *pStr)
@@ -514,6 +526,8 @@ void CChat::ClearLines()
 	m_LastPresentationUpdateTime = 0;
 	m_LargeAreaOpenTick = 0;
 	m_LastPresentationShowLargeArea = false;
+	// 清屏时直接丢弃 echo 重复计数，不清算：补出来的统计行会立刻被清掉。
+	ResetPendingEchoRepeat();
 }
 
 int CChat::GetLineIndex(const CLine *pLine) const
@@ -747,8 +761,53 @@ void CChat::ConchainChatWidth(IConsole::IResult *pResult, void *pUserData, ICons
 	pChat->RebuildChat();
 }
 
+bool CChat::GateEchoRepeat(const char *pString)
+{
+	// echo 合并始终生效（不受 qm_message_merge 影响）：相同文本在窗口内连续出现时返回 true，
+	// 调用方什么都不做——控制台聊天栏与通知栏都不会被刷屏。
+	const int WindowMs = std::clamp(g_Config.m_QmEchoMergeWindowMs, 0, 60000);
+	const int64_t Now = time();
+	if(WindowMs > 0 && pString != nullptr && pString[0] != '\0' && str_comp(m_aPendingEchoRepeat, pString) == 0 &&
+		Now >= m_PendingEchoRepeatTime && Now - m_PendingEchoRepeatTime <= time_freq() * WindowMs / 1000)
+	{
+		++m_PendingEchoRepeatCount;
+		m_PendingEchoRepeatTime = Now;
+		return true;
+	}
+
+	// 换了一条 echo 或被关闭时，先把上一段的 [N] 统计收口。
+	if(!HasPendingEchoRepeat())
+		return false;
+
+	// 用滑动窗口而不是「不同文本才收口」：否则重复段过长时末尾统计永远不落地。
+	// 计数交给聊天渲染已有的 [N] 显示（CLIENT_MSG 用的是 "[N] 文本" 前缀，与玩家消息合并
+	// 共用同一套计数），这里不再拼第二份后缀。
+	char aText[sizeof(m_aPendingEchoRepeat)];
+	str_copy(aText, m_aPendingEchoRepeat);
+	const int RepeatCount = m_PendingEchoRepeatCount;
+	const int64_t LastTime = m_PendingEchoRepeatTime;
+	ResetPendingEchoRepeat();
+	if(WindowMs > 0 && Now >= LastTime && Now - LastTime <= time_freq() * WindowMs / 1000)
+		AddLine(CLIENT_MSG, 0, aText, false, std::nullopt, -1, RepeatCount);
+	return false;
+}
+
+void CChat::EchoLine(const char *pString, bool ForceVisible)
+{
+	AddLine(CLIENT_MSG, 0, pString, ForceVisible);
+	if(pString != nullptr && pString[0] != '\0')
+	{
+		str_copy(m_aPendingEchoRepeat, pString);
+		m_PendingEchoRepeatCount = 1;
+		m_PendingEchoRepeatTime = time();
+	}
+}
+
 void CChat::Echo(const char *pString)
 {
+	// 合并判定放在最外层：被抑制的重复 echo 连 Console()->Print 都不会走到。
+	if(GateEchoRepeat(pString))
+		return;
 	const unsigned EchoColor = g_Config.m_ClMessageClientColor;
 	if(GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
 	{
@@ -757,11 +816,13 @@ void CChat::Echo(const char *pString)
 		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat/client", aBuf, color_cast<ColorRGBA>(ColorHSLA(EchoColor)));
 		return;
 	}
-	AddLine(CLIENT_MSG, 0, pString);
+	EchoLine(pString, false);
 }
 
 void CChat::Echo(const char *pString, bool ForceVisible)
 {
+	if(GateEchoRepeat(pString))
+		return;
 	const unsigned EchoColor = g_Config.m_ClMessageClientColor;
 	if(GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
 	{
@@ -770,7 +831,7 @@ void CChat::Echo(const char *pString, bool ForceVisible)
 		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat/client", aBuf, color_cast<ColorRGBA>(ColorHSLA(EchoColor)));
 		return;
 	}
-	AddLine(CLIENT_MSG, 0, pString, ForceVisible);
+	EchoLine(pString, ForceVisible);
 }
 
 void CChat::OnConsoleInit()
@@ -1731,7 +1792,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible
 	AddLine(ClientId, Team, pLine, ForceVisible, std::nullopt);
 }
 
-void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible, std::optional<QmHudNotifications::EServerMessageClass> KnownServerMessageClass, int SourceConnection)
+void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible, std::optional<QmHudNotifications::EServerMessageClass> KnownServerMessageClass, int SourceConnection, int TimesRepeated)
 {
 	if(*pLine == 0 ||
 		(ClientId == SERVER_MSG && !g_Config.m_ClShowChatSystem) ||
@@ -1742,6 +1803,11 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible
 					  (GameClient()->m_Snap.m_LocalClientId != ClientId && g_Config.m_ClShowChatTeamMembersOnly && GameClient()->IsOtherTeam(ClientId) && GameClient()->m_Teams.Team(GameClient()->m_Snap.m_LocalClientId) != TEAM_FLOCK) ||
 					  (GameClient()->m_Snap.m_LocalClientId != ClientId && GameClient()->m_aClients[ClientId].m_Foe))))
 		return;
+
+	// 其它消息出现时先给上一段 echo 重复计数收口，避免统计被后面的消息挤掉。
+	// 必须放在下面「不显示客户端消息」的提前返回之前：被过滤掉的 echo 也要能触发收口。
+	if(HasPendingEchoRepeat())
+		GateEchoRepeat(nullptr);
 
 	// TClient
 	if(ClientId == CLIENT_MSG && !g_Config.m_TcShowChatClient)
@@ -1908,6 +1974,8 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible
 	CurrentLine.m_CustomColor = CustomColor;
 	CurrentLine.m_ForceVisible = ForceVisible;
 	CurrentLine.m_ConsoleSuppressed = BlockWordsConsolePrinted;
+	// echo 重复段的计数直接落到行上，聊天渲染已有的 [N] 计数显示会负责呈现它。
+	CurrentLine.m_TimesRepeated = TimesRepeated;
 
 	// check for highlighted name
 	if(Client()->State() != IClient::STATE_DEMOPLAYBACK)

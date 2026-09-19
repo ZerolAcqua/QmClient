@@ -539,7 +539,7 @@ ColorRGBA CMenus::ms_ColorTabbarActiveIngame;
 ColorRGBA CMenus::ms_ColorTabbarHoverIngame;
 
 float CMenus::ms_ButtonHeight = 25.0f;
-float CMenus::ms_ListheaderHeight = 17.0f;
+float CMenus::ms_ListheaderHeight = 15.0f;
 
 CMenus::CMenus()
 {
@@ -1394,10 +1394,13 @@ void CMenus::PrepareSettingsTabLabelCache(float MainViewWidth, float TabBarWidth
 int CMenus::DoButton_GridHeader(const void *pId, const char *pText, int Checked, const CUIRect *pRect, int Align)
 {
 	CUiScopedGaussianBlurSuppression GaussianBlurSuppression(Ui());
+	// 表头底色取消后，已排序指示成了列表里最亮的一块表面。保留它作为「当前排序列」的提示，
+	// 但压到接近卡片底色的量级，并且不跟着透明度过低而消失。
+	const float SortedAlpha = std::clamp(0.34f + g_Config.m_QmMapBrowserOpacity / 100.0f * 0.6f, 0.0f, 0.55f);
 	if(Checked == 2)
-		DrawRoundedSurface(Ui(), *pRect, ColorRGBA(1, 0.98f, 0.5f, 0.55f), ColorRGBA(), 5.0f, 0.0f, IGraphics::CORNER_T);
+		DrawRoundedSurface(Ui(), *pRect, ColorRGBA(1, 0.98f, 0.5f, SortedAlpha), ColorRGBA(), 5.0f, 0.0f, IGraphics::CORNER_T);
 	else if(Checked)
-		DrawRoundedSurface(Ui(), *pRect, ColorRGBA(1, 1, 1, 0.5f), ColorRGBA(), 5.0f, 0.0f, IGraphics::CORNER_T);
+		DrawRoundedSurface(Ui(), *pRect, ColorRGBA(1, 1, 1, SortedAlpha), ColorRGBA(), 5.0f, 0.0f, IGraphics::CORNER_T);
 
 	CUIRect Temp;
 	pRect->VMargin(5.0f, &Temp);
@@ -5501,6 +5504,7 @@ void CMenus::OnReset()
 
 void CMenus::OnShutdown()
 {
+	ClearQmTitlePreviewContainers();
 	m_QmMapUpload.Cancel();
 	if(m_SettingsPerfWindowTracker.HasActiveWindow())
 	{
@@ -7111,6 +7115,7 @@ void CMenus::OnStateChange(int NewState, int OldState)
 
 void CMenus::OnWindowResize()
 {
+	ClearQmTitlePreviewContainers();
 	TextRender()->DeleteTextContainer(m_MotdTextContainerIndex);
 	TextRender()->DeleteTextContainer(m_IngameMotdParagraphCache.m_BuildTextContainerIndex);
 	m_IngameMotdParagraphCache.m_Valid = false;

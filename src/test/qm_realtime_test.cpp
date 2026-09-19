@@ -103,6 +103,33 @@ TEST(QmRealtime, UnknownEventsAreIgnoredNotFatal)
 	EXPECT_EQ(Message.m_Type, "future_event");
 }
 
+TEST(QmRealtime, ParsesAnonymousQmclientJsonEmoticonEvents)
+{
+	SQmRealtimeMessage Message;
+	ASSERT_TRUE(Parse(R"({"type":"emoticon","v":2,"data":{"client_id":"anonymous-client","player_id":3,"player_name":"tester","server_address":"example:8303","emoticon":4,"launch_mode":true,"super_launch":false,"sequence":12}})", Message));
+	EXPECT_EQ(Message.m_Event, EQmRealtimeEvent::EMOTICON);
+	ASSERT_TRUE(Message.m_HasEmoticon);
+	EXPECT_EQ(Message.m_Emoticon, 4);
+	EXPECT_EQ(Message.m_PlayerId, 3);
+	EXPECT_TRUE(Message.m_LaunchMode);
+	EXPECT_FALSE(Message.m_SuperLaunch);
+	EXPECT_EQ(Message.m_EmoticonClientId, "anonymous-client");
+	EXPECT_EQ(Message.m_EmoticonPlayerName, "tester");
+	EXPECT_EQ(Message.m_EmoticonServerAddress, "example:8303");
+	EXPECT_EQ(Message.m_EmoticonSequence, 12u);
+}
+
+TEST(QmRealtime, RejectsInvalidOrLegacyAnonymousEmoticonPayloads)
+{
+	SQmRealtimeMessage Message;
+	ASSERT_TRUE(Parse(R"({"type":"emoticon","v":2,"data":{"client_id":"anonymous-client","player_id":3,"player_name":"tester","server_address":"example:8303","emoticon":999,"launch_mode":true,"super_launch":false}})", Message));
+	EXPECT_FALSE(Message.m_HasEmoticon);
+
+	ASSERT_TRUE(Parse(R"({"type":"event","event":{"type":"emoticon","emoticon":4,"launchMode":true,"superLaunch":false}})", Message));
+	EXPECT_EQ(Message.m_Event, EQmRealtimeEvent::UNKNOWN);
+	EXPECT_FALSE(Message.m_HasEmoticon);
+}
+
 TEST(QmRealtime, RejectsNonProtocolPayloads)
 {
 	SQmRealtimeMessage Message;

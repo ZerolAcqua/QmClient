@@ -1550,21 +1550,76 @@ TEST(QmNewUiMenuBranches, BrowserUsesExplicitQmNewUiShellBranch)
 	EXPECT_NE(Source.find("ServerListBase.h = maximum(StatusBox.y - ColumnGap - ServerListBase.y, 0.0f);"), std::string::npos);
 	EXPECT_EQ(Source.find("ServerListBase.HSplitBottom(ColumnGap, &ServerListBase, nullptr);"), std::string::npos);
 	EXPECT_NE(Source.find("ServerListBase.Margin(std::clamp(ServerListBase.w * 0.006f, 1.0f, 4.0f), &ServerListBase);"), std::string::npos);
+	// 服务器列表只保留外层卡片框：New UI 分支不再额外内缩。
+	EXPECT_NE(Source.find("ServerListBase.Margin(2.0f, &ServerListBase);"), std::string::npos);
+	EXPECT_EQ(Source.find("ServerListBase.Margin(10.0f, &ServerListBase);"), std::string::npos);
 	EXPECT_NE(TopOldUiBlock.find("View.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);"), std::string::npos);
 	EXPECT_NE(TopOldUiBlock.find("View.Margin(10.0f, &View);"), std::string::npos);
 	EXPECT_EQ(TopOldUiBlock.find("View.Margin(std::clamp(View.w * 0.008f, 4.0f, 8.0f), &View);"), std::string::npos);
 }
 
-TEST(QmNewUiMenuBranches, BrowserInteriorBackgroundsUseMapBrowserOpacity)
+TEST(QmNewUiMenuBranches, BrowserServerListKeepsSinglePanelFrame)
 {
 	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
+	const std::string RenderServerbrowser = FunctionBody(Source, "void CMenus::RenderServerbrowser(");
+	ASSERT_FALSE(RenderServerbrowser.empty());
 
+	// 列表区块只画一次卡片背景，避免同色半透明叠加出「框中框」的深色内块。
+	size_t PanelDrawCount = 0;
+	for(size_t Pos = RenderServerbrowser.find("ServerListBase.Draw("); Pos != std::string::npos; Pos = RenderServerbrowser.find("ServerListBase.Draw(", Pos + 1))
+		PanelDrawCount++;
+	EXPECT_EQ(PanelDrawCount, 1);
+	EXPECT_NE(RenderServerbrowser.find("ServerListBase.Draw(BrowserPanelColor(), IGraphics::CORNER_ALL, ui_token::radius::CARD);"), std::string::npos);
+
+	// 表头与列表的内层底色由 RenderServerbrowserServerList 负责，仍是列表自身的层次，
+	// 不再有第二张卡片。
+	EXPECT_EQ(RenderServerbrowser.find("ServerListBase.Draw(BrowserPanelElevatedColor()"), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, BrowserServerListUsesOneSurfaceColor)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
+	const std::string ListBody = FunctionBody(Source, "void CMenus::RenderServerbrowserServerList(");
+	ASSERT_FALSE(ListBody.empty());
+
+	// 表头与列表正文不再各自铺一层半透明表面：同一张卡片里出现两种底色、两种圆角
+	// （表头只圆上边、正文无圆角）就是「框里还有一层」的来源。
+	EXPECT_EQ(ListBody.find("Headers.Draw(BrowserOpacityColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f))"), std::string::npos);
+	EXPECT_EQ(ListBody.find("View.Draw(BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f))"), std::string::npos);
+
+	// 页面半透明仍然生效，只是不再用于列表内部的叠加层。
 	EXPECT_NE(Source.find("g_Config.m_QmMapBrowserOpacity / 100.0f"), std::string::npos);
-	EXPECT_NE(Source.find("Headers.Draw(BrowserOpacityColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f))"), std::string::npos);
-	EXPECT_NE(Source.find("View.Draw(BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f))"), std::string::npos);
+	EXPECT_NE(ListBody.find("BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f))"), std::string::npos);
 	EXPECT_NE(Source.find("View.Draw(BrowserPanelColor(0.82f)"), std::string::npos);
 	EXPECT_NE(Source.find("Tab.Draw(BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.3f))"), std::string::npos);
 	EXPECT_EQ(Source.find("BrowserOpacityColor(ColorRGBA(0.0f, 0.0f, 0.3f))"), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, BrowserServerListDimsScrollbarRailWithCardSurface)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
+	const std::string RenderServerbrowser = FunctionBody(Source, "void CMenus::RenderServerbrowser(");
+	ASSERT_FALSE(RenderServerbrowser.empty());
+
+	// 滚动条轨道的白色 25% 由 ScaleBackgroundAlpha 缩放，必须跟着卡片一起压暗，
+	// 否则它会成为卡片里最亮的一块表面。
+	const size_t ScopePos = RenderServerbrowser.find("CUiBackgroundAlphaScaleScope ListOpacityScope(Ui(), SERVER_LIST_SCROLLBAR_RAIL_ALPHA_SCALE);");
+	ASSERT_NE(ScopePos, std::string::npos);
+	const size_t CallPos = RenderServerbrowser.find("RenderServerbrowserServerList(ServerList, WasListboxItemActivated);");
+	ASSERT_NE(CallPos, std::string::npos);
+	EXPECT_LT(ScopePos, CallPos);
+	EXPECT_NE(Source.find("static constexpr float SERVER_LIST_SCROLLBAR_RAIL_ALPHA_SCALE = 0.28f;"), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, BrowserSortedHeaderIndicatorStaysVisibleOnSingleSurface)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/menus.cpp");
+	const std::string GridHeader = FunctionBody(Source, "int CMenus::DoButton_GridHeader(");
+	ASSERT_FALSE(GridHeader.empty());
+
+	// 表头底色取消后，已排序指示不能再是固定的 0.5 白块，也不能跟着透明度过低而消失。
+	EXPECT_EQ(GridHeader.find("ColorRGBA(1, 1, 1, 0.5f)"), std::string::npos);
+	EXPECT_NE(GridHeader.find("const float SortedAlpha = std::clamp(0.34f + g_Config.m_QmMapBrowserOpacity / 100.0f * 0.6f, 0.0f, 0.55f);"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, AppearanceNamePlateContainsNameplateTextControlsWithoutInternalScrollRegion)
@@ -3721,6 +3776,55 @@ TEST(QmNewUiMenuBranches, FriendAutoFollowDistinguishesManualAndAutomaticConnect
 	ASSERT_FALSE(FriendNotifyBody.empty());
 	EXPECT_NE(FriendNotifyBody.find("RenderValue(\"qmclient-friend-auto-follow-delay\", \"Auto-follow delay\""), std::string::npos);
 	EXPECT_NE(FriendNotifyBody.find("&g_Config.m_QmFriendAutoFollowDelay, 0, 30, \"s\""), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, ServerBrowserQmClientColumnUsesDistributionCount)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
+	const std::string BrowserServerList = FunctionBody(Source, "void CMenus::RenderServerbrowserServerList(");
+	ASSERT_FALSE(BrowserServerList.empty());
+
+	// 「梦」列直接显示中心服下发的在线分布总数（Qm + Arg），并按服务器地址匹配。
+	// 列定义与宽度配置的断言在 ServerBrowserColumnsStayVisibleAndSizedToContent 里。
+	EXPECT_NE(Source.find("MACRO_CONFIG_INT(BrColWidthQmClients, br_col_width_qm_clients"), std::string::npos);
+	EXPECT_NE(Source.find("g_Config.m_BrColWidthQmClients = 24;"), std::string::npos);
+	EXPECT_NE(BrowserServerList.find("GameClient()->m_QmClient.QmClientServerDistribution()"), std::string::npos);
+	EXPECT_NE(BrowserServerList.find("const int Count = Distribution.m_UserCount + Distribution.m_DummyCount;"), std::string::npos);
+	EXPECT_NE(BrowserServerList.find("net_addr_str(&pInfo->m_aAddresses[0], aAddress, sizeof(aAddress), true);"), std::string::npos);
+	// 没有梦客户端的服务器留空，不写 0。
+	EXPECT_NE(BrowserServerList.find("if(QmClients > 0)"), std::string::npos);
+	// 本地拿不到排序键，所以该列表头不带排序；列头是品牌字，直接显示不走 Localize。
+	EXPECT_NE(Source.find("if(DoButton_GridHeader(&Col.m_Id, Col.m_Id == COL_QM_CLIENTS ? Col.m_pCaption : Localize(Col.m_pCaption), Checked, &Col.m_Rect))"), std::string::npos);
+}
+
+TEST(QmNewUiMenuBranches, ServerBrowserColumnsStayVisibleAndSizedToContent)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
+	const std::string BrowserServerList = FunctionBody(Source, "void CMenus::RenderServerbrowserServerList(");
+	ASSERT_FALSE(BrowserServerList.empty());
+
+	// 所有列常显：不做列可见性开关，靠小字号 + 紧凑行高 + 贴内容定宽解决拥挤。
+	EXPECT_NE(Source.find("static constexpr float SERVER_LIST_TEXT_SIZE = 11.0f;"), std::string::npos);
+	EXPECT_NE(BrowserServerList.find("const float FontSize = SERVER_LIST_TEXT_SIZE;"), std::string::npos);
+	EXPECT_NE(ReadTextFile("src/game/client/components/menus.cpp").find("float CMenus::ms_ListheaderHeight = 15.0f;"), std::string::npos);
+
+	// 类型列必须放得下 "DDraceNetwork"，不能再裁成 "DDraceN"。
+	EXPECT_NE(Source.find("{COL_GAMETYPE, IServerBrowser::SORT_GAMETYPE, Localizable(\"Type\"), 1, 68.0f, {0}},"), std::string::npos);
+
+	// 名称与地图按比例分剩余宽度；地图不再吃固定公式，否则宽屏下会把名称挤到截断。
+	EXPECT_NE(BrowserServerList.find("const float Split = std::clamp((float)g_Config.m_BrColNameSplit / 1000.0f, 0.35f, 0.75f);"), std::string::npos);
+	EXPECT_EQ(Source.find("(Headers.w - 480)"), std::string::npos);
+	EXPECT_NE(ReadTextFile("src/engine/shared/config_variables.h").find("br_col_name_split"), std::string::npos);
+	EXPECT_EQ(Source.find("g_Config.m_BrColWidthMap"), std::string::npos);
+
+	// 名称列的拖拽改的是比例，不是固定宽度。
+	EXPECT_NE(BrowserServerList.find("const bool IsNameSplit = s_aCols[ColIdx].m_Id == COL_NAME;"), std::string::npos);
+	EXPECT_NE(BrowserServerList.find("g_Config.m_BrColNameSplit = std::clamp((int)((NewWidth - MinNameFlexWidth) / FreeWidth * 1000.0f + 0.5f), 0, 1000);"), std::string::npos);
+
+	// 列间距压到 2px 后，拖拽手柄必须跟着收窄，否则相邻列的手柄会互相抢悬停。
+	EXPECT_NE(BrowserServerList.find("constexpr float ColumnGapWidth = 2.0f;"), std::string::npos);
+	EXPECT_NE(BrowserServerList.find("Gap.x -= 2.0f;"), std::string::npos);
+	EXPECT_EQ(BrowserServerList.find("Gap.w = 8.0f;"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, ShortServerNamesCoverKnownFamilies)

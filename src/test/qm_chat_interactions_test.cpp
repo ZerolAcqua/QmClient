@@ -169,6 +169,66 @@ TEST(QmChatMessageMerge, SettingIsDefaultOnLocalizedInDreamFeaturesAndVersioned)
 	EXPECT_NE(Version.find("#define QMCLIENT_VERSION \""), std::string::npos);
 }
 
+TEST(QmEchoMessageMerge, MergeIsIndependentFromPlayerMessageMergeAndAlwaysOn)
+{
+	const std::string Config = ReadTestSourceFile("src/engine/shared/config_variables_qmclient.h");
+	const std::string ChatHeader = ReadTestSourceFile("src/game/client/components/chat.h");
+	const std::string Chat = ReadTestSourceFile("src/game/client/components/chat.cpp");
+	const std::string Gate = SourceFunctionBody(Chat, "bool CChat::GateEchoRepeat(");
+	const std::string EchoLine = SourceFunctionBody(Chat, "void CChat::EchoLine(");
+	const std::string Echo1 = SourceFunctionBody(Chat, "void CChat::Echo(const char *pString)\n");
+	const std::string AddLine = SourceFunctionBody(Chat, "void CChat::AddLine(int ClientId, int Team, const char *pLine, bool ForceVisible, std::optional");
+
+	ASSERT_FALSE(Gate.empty());
+	ASSERT_FALSE(EchoLine.empty());
+	ASSERT_FALSE(Echo1.empty());
+
+	// 独立的窗口配置，默认 2000ms，不受 qm_message_merge 影响。
+	EXPECT_NE(Config.find("MACRO_CONFIG_INT(QmEchoMergeWindowMs, qm_echo_merge_window_ms, 2000, 0, 60000"), std::string::npos);
+
+	// 闸门必须在「通知栏 / 控制台聊天栏」两条分支之前：被抑制的重复连 Console()->Print 都走不到。
+	const size_t GateCall = Echo1.find("if(GateEchoRepeat(pString))");
+	const size_t QueueEchoCall = Echo1.find("QueueEcho(pString, EchoColor)");
+	const size_t ConsolePrint = Echo1.find("Console()->Print");
+	ASSERT_NE(GateCall, std::string::npos);
+	ASSERT_NE(QueueEchoCall, std::string::npos);
+	ASSERT_NE(ConsolePrint, std::string::npos);
+	EXPECT_LT(GateCall, QueueEchoCall);
+	EXPECT_LT(GateCall, ConsolePrint);
+
+	// 两个 Echo 重载都过闸门，且各自只经由 EchoLine 落地，不再自己调 AddLine。
+	const std::string Echo2 = SourceFunctionBody(Chat, "void CChat::Echo(const char *pString, bool ForceVisible)");
+	ASSERT_FALSE(Echo2.empty());
+	for(const std::string *pEcho : {&Echo1, &Echo2})
+	{
+		EXPECT_NE(pEcho->find("if(GateEchoRepeat(pString))"), std::string::npos);
+		EXPECT_NE(pEcho->find("EchoLine(pString,"), std::string::npos);
+		EXPECT_EQ(pEcho->find("AddLine("), std::string::npos);
+	}
+
+	// 合并判定只看文本与滑动窗口，不读 qm_message_merge。
+	EXPECT_NE(Gate.find("str_comp(m_aPendingEchoRepeat, pString) == 0"), std::string::npos);
+	EXPECT_NE(Gate.find("time_freq() * WindowMs / 1000"), std::string::npos);
+	EXPECT_EQ(Gate.find("m_QmMessageMerge"), std::string::npos);
+	EXPECT_NE(EchoLine.find("AddLine(CLIENT_MSG, 0, pString, ForceVisible);"), std::string::npos);
+
+	// 计数走聊天渲染已有的 [N]，不额外拼后缀。
+	EXPECT_EQ(Gate.find("×%d"), std::string::npos);
+	EXPECT_NE(Gate.find("AddLine(CLIENT_MSG, 0, aText, false, std::nullopt, -1, RepeatCount);"), std::string::npos);
+
+	// 其它消息写入前必须先收口，否则统计会被后面的消息挤掉。
+	EXPECT_NE(AddLine.find("if(HasPendingEchoRepeat())"), std::string::npos);
+	EXPECT_NE(AddLine.find("GateEchoRepeat(nullptr);"), std::string::npos);
+	EXPECT_NE(AddLine.find("CurrentLine.m_TimesRepeated = TimesRepeated;"), std::string::npos);
+	EXPECT_NE(ChatHeader.find("int SourceConnection = -1, int TimesRepeated = 0);"), std::string::npos);
+
+	// 清屏直接丢弃计数，不清算（补出来的统计行会立刻被清掉）。
+	const std::string ClearLines = SourceFunctionBody(Chat, "void CChat::ClearLines()");
+	ASSERT_FALSE(ClearLines.empty());
+	EXPECT_NE(ClearLines.find("ResetPendingEchoRepeat();"), std::string::npos);
+	EXPECT_EQ(ClearLines.find("GateEchoRepeat("), std::string::npos);
+}
+
 TEST(QmWarListEnemyChat, FilteringKeepsChatLogPersistenceIndependent)
 {
 	const std::string Config = ReadTestSourceFile("src/engine/shared/config_variables_qmclient.h");

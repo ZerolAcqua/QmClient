@@ -102,6 +102,77 @@ namespace
 	}
 }
 
+TEST(QmHudMediaIslandRecording, BreathCompletesOneGentleCycleInTwoPointFourSeconds)
+{
+	EXPECT_NEAR(QmHudRecordingDotAlpha(0.0), 0.95f, 0.00001f);
+	EXPECT_NEAR(QmHudRecordingDotAlpha(0.6), 0.80f, 0.00001f);
+	EXPECT_NEAR(QmHudRecordingDotAlpha(1.2), 0.65f, 0.00001f);
+	EXPECT_NEAR(QmHudRecordingDotAlpha(1.8), 0.80f, 0.00001f);
+	EXPECT_NEAR(QmHudRecordingDotAlpha(2.4), 0.95f, 0.00001f);
+}
+
+TEST(QmHudMediaIslandRecording, BreathStaysVisibleAndSmoothAcrossCycleBoundary)
+{
+	float PreviousAlpha = QmHudRecordingDotAlpha(0.0);
+	for(int Step = 1; Step <= 480; ++Step)
+	{
+		const double Seconds = Step * 0.01;
+		const float Alpha = QmHudRecordingDotAlpha(Seconds);
+		EXPECT_GE(Alpha, 0.65f);
+		EXPECT_LE(Alpha, 0.95f);
+		EXPECT_LT(std::abs(Alpha - PreviousAlpha), 0.004f);
+		EXPECT_NEAR(Alpha, QmHudRecordingDotAlpha(Seconds + 2.4), 0.00001f);
+		PreviousAlpha = Alpha;
+	}
+}
+
+TEST(QmHudMediaIslandRecording, ScreenPixelSizeTakesTheLargerAxisScale)
+{
+	// 非等比映射：x 方向 2 倍、y 方向 1 倍，羽化必须按较细的方向取够宽。
+	EXPECT_FLOAT_EQ(QmHudMediaIslandScreenPixelSize(0.0f, 0.0f, 200.0f, 100.0f, 100, 100), 2.0f);
+	EXPECT_FLOAT_EQ(QmHudMediaIslandScreenPixelSize(0.0f, 0.0f, 100.0f, 300.0f, 100, 100), 3.0f);
+	// 屏幕尺寸退化时按 1 像素处理，不产生除零。
+	EXPECT_FLOAT_EQ(QmHudMediaIslandScreenPixelSize(0.0f, 0.0f, 100.0f, 100.0f, 0, 0), 100.0f);
+	EXPECT_FLOAT_EQ(QmHudMediaIslandScreenPixelSize(0.0f, 0.0f, 400.0f, 300.0f, 800, 600), 0.5f);
+}
+
+// 意图：录制红点从几何圆改为灵动岛同款 SDF 逐像素抗锯齿圆（宽高 = 直径、圆角 = 半径），
+// 两条绘制路径（灵动岛状态区、独立计时胶囊状态区）都必须走同一个入口，且不支持 SDF 时
+// 仍退回几何圆；红点不得顺带打开外阴影或模糊底图。
+TEST(QmHudMediaIslandSource, RecordingDotUsesTheIslandSdfWithGeometryFallback)
+{
+	const std::string Source = ReadTestSourceFile("src/game/client/components/hud.cpp");
+	const std::string DotBody = FunctionBody(Source, "void DrawHudRecordingStatusDot(");
+	const std::string GameTimerBody = FunctionBody(Source, "void CHud::RenderGameTimer()");
+	const std::string IslandBody = FunctionBody(Source, "void CHud::RenderMediaIsland()");
+	ASSERT_FALSE(DotBody.empty());
+	ASSERT_FALSE(GameTimerBody.empty());
+	ASSERT_FALSE(IslandBody.empty());
+
+	// SDF 分支：正方形主体 + 半径圆角 = 正圆，只走 SDF 命令，不额外画 item/胶囊/轮廓环。
+	EXPECT_NE(DotBody.find("State.m_MainRect = {Center.x - Radius, Center.y - Radius, DotSize, DotSize}"), std::string::npos);
+	EXPECT_NE(DotBody.find("State.m_MainRadius = Radius"), std::string::npos);
+	EXPECT_NE(DotBody.find("RenderMediaIslandSdf(GpuSdfParams)"), std::string::npos);
+
+	// 几何兜底与「不加层」：无 SDF 时退回原来的圆，且红点不带外阴影/模糊底图。
+	EXPECT_NE(DotBody.find("HasMediaIslandSdf()"), std::string::npos);
+	EXPECT_NE(DotBody.find("DrawSmoothCircle(pGraphics, Center, Radius"), std::string::npos);
+	EXPECT_EQ(DotBody.find("m_BackdropUv"), std::string::npos);
+	EXPECT_EQ(DotBody.find("m_OuterShadow"), std::string::npos);
+	EXPECT_EQ(DotBody.find("m_ItemCount"), std::string::npos);
+
+	// 两条录制红点路径共用本入口：几何圆不再被直接调用（兜底在入口内部）。
+	EXPECT_NE(GameTimerBody.find("DrawHudRecordingStatusDot("), std::string::npos);
+	EXPECT_NE(IslandBody.find("DrawHudRecordingStatusDot("), std::string::npos);
+	EXPECT_EQ(GameTimerBody.find("DrawSmoothCircle("), std::string::npos);
+	EXPECT_EQ(IslandBody.find("DrawSmoothCircle(Graphics(), DotCenter"), std::string::npos);
+	EXPECT_EQ(Source.find("DrawHudRecordingStatusDot("), Source.rfind("DrawHudRecordingStatusDot("));
+
+	// 羽化比例与岛共用同一份实现，且必须在 HUD 编辑器改写屏幕映射之前取。
+	EXPECT_NE(GameTimerBody.find("CurrentScreenPixelSize(Graphics())"), std::string::npos);
+	EXPECT_LT(GameTimerBody.find("CurrentScreenPixelSize(Graphics())"), GameTimerBody.find("BeginTransform"));
+}
+
 TEST(QmHudFrozenTeeState, ConfirmedDeathSuppressesStaleTimedAndDeepFreeze)
 {
 	SHudFrozenTeeState State;

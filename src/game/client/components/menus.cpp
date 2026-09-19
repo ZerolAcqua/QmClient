@@ -2925,7 +2925,9 @@ void CMenus::RenderLoading(const char *pCaption, const char *pContent, int Incre
 		Box.HSplitBottom(30.0f, &Box, nullptr);
 		Box.HSplitBottom(25.0f, &Box, &ProgressBar);
 		ProgressBar.VMargin(20.0f, &ProgressBar);
-		Ui()->RenderProgressBar(ProgressBar, CurLoadRenderCount / (float)m_LoadingState.m_Total);
+		const float LoadingProgress = CurLoadRenderCount / (float)m_LoadingState.m_Total;
+		const ColorRGBA LoadingFillColor = ms_GuiColor;
+		GameClient()->m_Hud.RenderProgressBarWithTee(ProgressBar, LoadingProgress, LoadingFillColor);
 	}
 
 	Graphics()->SetColor(1.0, 1.0, 1.0, 1.0);

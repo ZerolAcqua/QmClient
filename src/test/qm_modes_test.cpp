@@ -676,6 +676,19 @@ TEST(QmMapProgress, IndependentMapProgressUsesItsOwnToggleAndBottomStyle)
 	EXPECT_TRUE(ShouldRenderMapProgressBar(true, 0, false, true));
 }
 
+TEST(QmLoadingProgress, UsesSharedTeeProgressVisuals)
+{
+	const std::string MenusSource = ReadTestSourceFile("src/game/client/components/menus.cpp");
+	const size_t LoadingPos = MenusSource.find("void CMenus::RenderLoading");
+	ASSERT_NE(LoadingPos, std::string::npos);
+	const size_t LoadingEnd = MenusSource.find("void CMenus::FinishLoading", LoadingPos);
+	ASSERT_NE(LoadingEnd, std::string::npos);
+	const std::string LoadingBody = MenusSource.substr(LoadingPos, LoadingEnd - LoadingPos);
+	EXPECT_NE(LoadingBody.find("RenderProgressBarWithTee"), std::string::npos);
+	EXPECT_EQ(LoadingBody.find("Ui()->RenderProgressBar"), std::string::npos);
+	EXPECT_EQ(LoadingBody.find("m_QmPlayerStatsMapProgress &&"), std::string::npos);
+}
+
 TEST(QmTranslateUiSettings, DefaultColorsMatchSettingsPreviewDefaults)
 {
 	ExpectColorNear(color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::QmTranslateBtnColorDisabled, true)), ColorRGBA(0.16f, 0.16f, 0.16f, 0.82f));

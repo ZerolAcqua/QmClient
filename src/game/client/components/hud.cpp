@@ -6755,6 +6755,42 @@ void CHud::RenderJumpHint()
 	GameClient()->m_HudEditor.EndTransform(HudEditorScope);
 }
 
+void CHud::RenderProgressBarWithTee(const CUIRect &BarRect, float Progress, const ColorRGBA &FillColor, bool AnimateTee)
+{
+	Progress = std::clamp(Progress, 0.0f, 1.0f);
+	const float BarRadius = BarRect.h * 0.5f;
+	const ColorRGBA TrackColor = LerpColor(ColorRGBA(0.02f, 0.03f, 0.03f, 0.78f), FillColor.WithAlpha(0.26f), 0.32f);
+	DrawSmoothRoundedRect(Graphics(), BarRect.x, BarRect.y, BarRect.w, BarRect.h, BarRadius, TrackColor, IGraphics::CORNER_ALL);
+	const float FillWidth = BarRect.w * Progress;
+	if(FillWidth > 0.0f)
+		DrawSmoothRoundedRect(Graphics(), BarRect.x, BarRect.y, FillWidth, BarRect.h, BarRadius, FillColor, IGraphics::CORNER_ALL);
+
+	int TeeClientId = GameClient()->m_aLocalIds[g_Config.m_ClDummy ? 1 : 0];
+	if(TeeClientId < 0 || TeeClientId >= MAX_CLIENTS)
+		TeeClientId = GameClient()->m_Snap.m_LocalClientId;
+	if(TeeClientId < 0 || TeeClientId >= MAX_CLIENTS)
+		return;
+
+	CTeeRenderInfo TeeInfo = GameClient()->m_aClients[TeeClientId].m_RenderInfo;
+	TeeInfo.m_Size = std::clamp(BarRect.h * 1.7f, 14.0f, 30.0f);
+	const float TeePadding = TeeInfo.m_Size * 0.28f;
+	const float TeeX = std::clamp(BarRect.x + BarRect.w * Progress, BarRect.x + TeePadding, BarRect.x + BarRect.w - TeePadding);
+	const float TeeAnchorY = BarRect.y + BarRect.h * 0.5f - std::clamp(BarRect.h * 0.15f, 1.0f, 3.0f);
+	const CAnimState *pTeeState = CAnimState::GetIdle();
+	CAnimState RunState;
+	if(AnimateTee)
+	{
+		const float RunTime = std::fmod(time_get() / (float)time_freq() * 2.5f, 1.0f);
+		RunState.Set(&g_pData->m_aAnimations[ANIM_BASE], 0.0f);
+		RunState.Add(&g_pData->m_aAnimations[ANIM_RUN_RIGHT], RunTime, 1.0f);
+		pTeeState = &RunState;
+	}
+	vec2 OffsetToMid;
+	CRenderTools::GetRenderTeeOffsetToRenderedTee(pTeeState, &TeeInfo, OffsetToMid);
+	DrawSmoothCircle(Graphics(), vec2(TeeX, TeeAnchorY), std::clamp(BarRect.h * 0.48f, 4.0f, 10.0f), FillColor.WithAlpha(0.22f));
+	RenderTools()->RenderTee(pTeeState, &TeeInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), vec2(TeeX, TeeAnchorY + OffsetToMid.y));
+}
+
 void CHud::RenderMapProgressBar()
 {
 	const bool Preview = GameClient()->m_HudEditor.IsActive();
@@ -6785,19 +6821,15 @@ void CHud::RenderMapProgressBar()
 	const bool ProgressIncreased = ProgressWasInitialized && DisplayedProgress > PreviousDisplayedProgress + 0.000001f;
 	const ColorRGBA ConfiguredColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_QmPlayerStatsMapProgressColor, true));
 	const ColorRGBA FillColor = ColorRGBA(ConfiguredColor.r, ConfiguredColor.g, ConfiguredColor.b, std::clamp(maximum(ConfiguredColor.a, 0.65f), 0.0f, 1.0f));
-	const ColorRGBA TrackColor = LerpColor(ColorRGBA(0.02f, 0.03f, 0.03f, 0.78f), FillColor.WithAlpha(0.26f), 0.32f);
 	const ColorRGBA TextColor = LerpColor(ColorRGBA(0.92f, 0.97f, 1.0f, 1.0f), FillColor.WithAlpha(1.0f), 0.72f);
 
 	const float WidthRatio = std::clamp(g_Config.m_QmPlayerStatsMapProgressWidth / 100.0f, 0.10f, 0.80f);
 	const float BarWidth = std::clamp(m_Width * WidthRatio, 80.0f, maximum(80.0f, m_Width - 12.0f));
 	const float BarHeight = (float)g_Config.m_QmPlayerStatsMapProgressHeight;
-	const float BarRadius = BarHeight * 0.5f;
 	const float RawBarX = m_Width * (g_Config.m_QmPlayerStatsMapProgressPosX / 100.0f) - BarWidth * 0.5f;
 	const float RawBarY = m_Height * (g_Config.m_QmPlayerStatsMapProgressPosY / 100.0f);
 	const float BarX = std::round(std::clamp(RawBarX, 6.0f, maximum(6.0f, m_Width - BarWidth - 6.0f)));
 	const float BarY = std::round(std::clamp(RawBarY, 6.0f, maximum(6.0f, m_Height - BarHeight - 6.0f)));
-	const float FillWidth = BarWidth * DisplayedProgress;
-
 	char aProgressText[32];
 	if(HasProgress)
 		str_format(aProgressText, sizeof(aProgressText), "%.1f%%", DisplayedProgress * 100.0f);
@@ -6811,9 +6843,7 @@ void CHud::RenderMapProgressBar()
 	const float TextY = std::round(std::clamp(BarY - TextSize - TextGap, 2.0f, maximum(2.0f, m_Height - TextSize - 2.0f)));
 	const auto HudEditorScope = GameClient()->m_HudEditor.BeginTransform(EHudEditorElement::MapProgressBar, {BarX, TextY, BarWidth, BarY + BarHeight - TextY});
 
-	DrawSmoothRoundedRect(Graphics(), BarX, BarY, BarWidth, BarHeight, BarRadius, TrackColor, HudEditorScope.m_Corners);
-	if(FillWidth > 0.0f)
-		DrawSmoothRoundedRect(Graphics(), BarX, BarY, FillWidth, BarHeight, BarRadius, FillColor, HudEditorScope.m_Corners);
+	RenderProgressBarWithTee({BarX, BarY, BarWidth, BarHeight}, DisplayedProgress, FillColor, ProgressIncreased);
 
 	const unsigned int PrevTextFlags = TextRender()->GetRenderFlags();
 	const ColorRGBA PrevTextColor = TextRender()->GetTextColor();
@@ -6827,33 +6857,6 @@ void CHud::RenderMapProgressBar()
 	TextRender()->SetRenderFlags(PrevTextFlags);
 	GameClient()->m_HudEditor.UpdateVisibleRect(EHudEditorElement::MapProgressBar, {BarX, TextY, BarWidth, BarY + BarHeight - TextY});
 
-	int TeeClientId = GameClient()->m_aLocalIds[DummyIndex];
-	if(TeeClientId < 0 || TeeClientId >= MAX_CLIENTS)
-		TeeClientId = GameClient()->m_Snap.m_LocalClientId;
-
-	if(TeeClientId >= 0 && TeeClientId < MAX_CLIENTS)
-	{
-		CTeeRenderInfo TeeInfo = GameClient()->m_aClients[TeeClientId].m_RenderInfo;
-		TeeInfo.m_Size = std::clamp(BarHeight * 1.7f, 14.0f, 30.0f);
-
-		const float TeePadding = TeeInfo.m_Size * 0.28f;
-		const float TeeX = std::clamp(BarX + BarWidth * DisplayedProgress, BarX + TeePadding, BarX + BarWidth - TeePadding);
-		const float TeeAnchorY = BarY + BarHeight * 0.5f - std::clamp(BarHeight * 0.15f, 1.0f, 3.0f);
-		const CAnimState *pTeeState = CAnimState::GetIdle();
-		CAnimState RunState;
-		if(ProgressIncreased)
-		{
-			const float RunTime = std::fmod(time_get() / (float)time_freq() * 2.5f, 1.0f);
-			RunState.Set(&g_pData->m_aAnimations[ANIM_BASE], 0.0f);
-			RunState.Add(&g_pData->m_aAnimations[ANIM_RUN_RIGHT], RunTime, 1.0f);
-			pTeeState = &RunState;
-		}
-		vec2 OffsetToMid;
-		CRenderTools::GetRenderTeeOffsetToRenderedTee(pTeeState, &TeeInfo, OffsetToMid);
-
-		DrawSmoothCircle(Graphics(), vec2(TeeX, TeeAnchorY), std::clamp(BarHeight * 0.48f, 4.0f, 10.0f), FillColor.WithAlpha(0.22f));
-		RenderTools()->RenderTee(pTeeState, &TeeInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), vec2(TeeX, TeeAnchorY + OffsetToMid.y));
-	}
 	GameClient()->m_HudEditor.EndTransform(HudEditorScope);
 }
 

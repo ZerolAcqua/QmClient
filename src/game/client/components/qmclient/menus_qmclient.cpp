@@ -1648,12 +1648,14 @@ void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOn
 			s_CachedSponsorsRevision = SponsorsRevision;
 			return std::cref(Lines);
 		};
-		Sponsors.m_Measure = [this, LineHeight, LineSpacing, BuildSponsorLines, HasSponsorDeveloper](float ContentWidth) {
+		Sponsors.m_Measure = [this, UiScale, LineHeight, LineSpacing, BuildSponsorLines, HasSponsorDeveloper](float ContentWidth) {
 			const float ImageHeight = FindMenuImage("sponsor") != nullptr ? std::clamp(ContentWidth * 0.18f, LineHeight * 2.0f, LineHeight * 4.0f) : 0.0f;
 			const float QrHeight = s_ShowSponsorQrCode ? LineHeight * 0.5f + std::clamp(ContentWidth, LineHeight * 8.0f, LineHeight * 12.0f) : 0.0f;
 			const float SponsorLinesHeight = ResolveSettingsRowsHeight((int)BuildSponsorLines(ContentWidth).get().size(), LineHeight, LineSpacing);
+			const float AuthorTeeSize = std::max(LineHeight * 2.0f, 50.0f * UiScale);
+			const float AuthorsHeight = 3.0f * (AuthorTeeSize + LineSpacing);
 			const float DeveloperHeight = HasSponsorDeveloper ? 2.0f * (LineHeight + LineSpacing) : 0.0f;
-			return ImageHeight + LineHeight + QrHeight + 2.0f * (LineHeight + LineSpacing) + SponsorLinesHeight + LineSpacing + LineHeight + DeveloperHeight;
+			return ImageHeight + LineHeight + QrHeight + AuthorsHeight + LineSpacing + LineHeight + SponsorLinesHeight + LineSpacing + LineHeight + DeveloperHeight;
 		};
 		Sponsors.m_MeasureRevision = (uint64_t)SponsorsRevision << 3 | (FindMenuImage("sponsor") != nullptr ? 1u : 0u) | (s_ShowSponsorQrCode ? 2u : 0u) | (HasSponsorDeveloper ? 4u : 0u);
 		Sponsors.m_Render = [this, UiScale, BodySize, LineHeight, LineSpacing, TipSize, ReadOnly, BuildSponsorLines, HasSponsorDeveloper](CUIRect Content) {
@@ -1716,8 +1718,21 @@ void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOn
 				}
 			}
 
-			Content.HSplitTop(LineHeight, &Row, &Content);
-			DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, "qmclient-community-developers-names", &Row, "栖梦(璇梦),夏日,DYL", BodySize, TEXTALIGN_ML, {}, (int)Row.w);
+			static constexpr std::array<std::pair<const char *, const char *>, 3> s_aAuthors = {{
+				{"qmclient-community-author-xuanmeng", "璇梦"},
+				{"qmclient-community-author-dyl", "DYL"},
+				{"qmclient-community-author-xiari", "夏日"},
+			}};
+			const float AuthorTeeSize = std::max(LineHeight * 2.0f, 50.0f * UiScale);
+			for(size_t Index = 0; Index < s_aAuthors.size(); ++Index)
+			{
+				CUIRect AuthorRow, TeeRect, Label;
+				Content.HSplitTop(AuthorTeeSize + LineSpacing, &AuthorRow, &Content);
+				AuthorRow.VSplitLeft(AuthorTeeSize + LineSpacing, &TeeRect, &Label);
+				TeeRect.w = AuthorTeeSize;
+				RenderDevSkin(TeeRect.Center(), AuthorTeeSize, "default", "default", false, 0, 0, 0, false, true);
+				DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, s_aAuthors[Index].first, &Label, s_aAuthors[Index].second, BodySize, TEXTALIGN_ML, {}, (int)Label.w);
+			}
 			Content.HSplitTop(LineSpacing, nullptr, &Content);
 			Content.HSplitTop(LineHeight, &Row, &Content);
 			CUIRect RefreshRect;

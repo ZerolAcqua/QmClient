@@ -1,7 +1,16 @@
 // 请抬头享受阳光｜日子很好 我很我---------致咩子
 #define CONF_TEST 1
+#include <engine/client/font_size_cache.h>
 #include <engine/client/game_ping.h>
+#include <engine/client/glyph_atlas.h>
+#include <engine/client/glyph_atlas_image.h>
+#include <engine/client/glyph_lookup_cache.h>
+#include <engine/client/glyph_outline.h>
 #include <engine/client/gpu_upload_limiter.h>
+#include <engine/client/rounded_rect_directions.h>
+#include <engine/client/text_layout_string.h>
+#include <engine/client/text_word_cursor.h>
+#include <engine/shared/config.h>
 #include <engine/textrender.h>
 
 #include <game/client/QmUi/QmCardRegistry.h>
@@ -10,13 +19,18 @@
 #include <game/client/components/qmclient/friend_online_tracker.h>
 #include <game/client/components/qmclient/monitoring/monitoring.h>
 #include <game/client/components/qmclient/music_app_watcher.h>
+#include <game/client/components/qmclient/nameplate_text_cache.h>
 #include <game/client/components/qmclient/perf_diagnostics.h>
 #include <game/client/components/qmclient/perf_logging.h>
+#include <game/client/components/qmclient/prepared_media_art.h>
 #include <game/client/components/qmclient/qm_map_upload.h>
 #include <game/client/components/qmclient/qm_music_hook_registry.h>
+#include <game/client/components/qmclient/route_visited.h>
 #include <game/client/components/qmclient/settings_perf_windows.h>
 #include <game/client/components/qmclient/settings_resource_preview.h>
 #include <game/client/components/qmclient/stutter_diagnostics.h>
+#include <game/client/components/qmclient/trail_band_geometry.h>
+#include <game/client/components/qmclient/trail_band_section.h>
 #include <game/client/components/settings_resource_jobs.h>
 #include <game/client/components/tclient/trails.h>
 #include <game/client/frame_scheduler.h>
@@ -662,18 +676,13 @@ TEST(QmMonitoringHelpers, AutomaticAndManualPingPathsCoordinateWithExplicitLegac
 	EXPECT_EQ(Client.find("m_PingStartTime"), std::string::npos);
 }
 
-TEST(QmMonitoringHelpers, LegacyPingAndRespawnCancelPathsRemainPresent)
+TEST(QmMonitoringHelpers, LegacyPingPathRemainsPresent)
 {
 	const std::string Client = ReadRepoFile("src/engine/client/client.cpp");
-	const std::string Controls = ReadRepoFile("src/game/client/components/controls.cpp");
 	const std::string AutomaticPing = ExtractSourceFunctionBody(Client, "void CClient::UpdateGamePing()");
-	const std::string Respawn = ExtractSourceFunctionBody(Controls, "void CControls::OnRender()");
 	ASSERT_FALSE(AutomaticPing.empty());
-	ASSERT_FALSE(Respawn.empty());
 	EXPECT_NE(AutomaticPing.find("BeginLegacy"), std::string::npos);
 	EXPECT_NE(AutomaticPing.find("NETMSG_PING, true"), std::string::npos);
-	EXPECT_NE(Respawn.find("用户主动选择了其他武器"), std::string::npos);
-	EXPECT_NE(Respawn.find("else"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, ManualPingTimeoutIsCheckedBeforeKcpEarlyContinue)
@@ -1316,6 +1325,9 @@ TEST(QmMonitoringHelpers, DevicePerfSnapshotCacheReturnsConsistentVersionedSnaps
 	Second.m_GpuDedicatedVramBudgetMb = 4096.0f;
 	Second.m_GpuSharedVramMb = 17.0f;
 	Second.m_DiskReadMbPerSec = 3.5f;
+	Second.m_CpuUsagePct = 12.5f;
+	Second.m_TotalCpuUsagePct = 34.0f;
+	Second.m_MemoryUsageMb = 456.0f;
 	Second.m_Available = true;
 	const SQmDevicePerfSnapshot Published = Cache.Publish(Second);
 
@@ -1327,6 +1339,9 @@ TEST(QmMonitoringHelpers, DevicePerfSnapshotCacheReturnsConsistentVersionedSnaps
 	EXPECT_FLOAT_EQ(Read.m_Sample.m_GpuDedicatedVramBudgetMb, Second.m_GpuDedicatedVramBudgetMb);
 	EXPECT_FLOAT_EQ(Read.m_Sample.m_GpuSharedVramMb, Second.m_GpuSharedVramMb);
 	EXPECT_FLOAT_EQ(Read.m_Sample.m_DiskReadMbPerSec, Second.m_DiskReadMbPerSec);
+	EXPECT_FLOAT_EQ(Read.m_Sample.m_CpuUsagePct, Second.m_CpuUsagePct);
+	EXPECT_FLOAT_EQ(Read.m_Sample.m_TotalCpuUsagePct, Second.m_TotalCpuUsagePct);
+	EXPECT_FLOAT_EQ(Read.m_Sample.m_MemoryUsageMb, Second.m_MemoryUsageMb);
 	EXPECT_EQ(Read.m_Sample.m_Available, Second.m_Available);
 }
 
@@ -1341,6 +1356,9 @@ TEST(QmMonitoringHelpers, DevicePerfSnapshotCacheKeepsSampleAndVersionConsistent
 		{
 			SQmDevicePerfSample Sample;
 			Sample.m_GpuUtilPct = (float)Version;
+			Sample.m_CpuUsagePct = (float)Version * 3.0f;
+			Sample.m_TotalCpuUsagePct = (float)Version * 5.0f;
+			Sample.m_MemoryUsageMb = (float)Version * 7.0f;
 			Sample.m_GpuDedicatedVramMb = (float)Version * 2.0f;
 			Sample.m_GpuDedicatedVramBudgetMb = (float)Version * 4.0f;
 			Sample.m_Available = true;
@@ -1356,6 +1374,9 @@ TEST(QmMonitoringHelpers, DevicePerfSnapshotCacheKeepsSampleAndVersionConsistent
 			if(Snapshot.m_Version == 0)
 				continue;
 			if(Snapshot.m_Sample.m_GpuUtilPct != (float)Snapshot.m_Version ||
+				Snapshot.m_Sample.m_CpuUsagePct != (float)Snapshot.m_Version * 3.0f ||
+				Snapshot.m_Sample.m_TotalCpuUsagePct != (float)Snapshot.m_Version * 5.0f ||
+				Snapshot.m_Sample.m_MemoryUsageMb != (float)Snapshot.m_Version * 7.0f ||
 				Snapshot.m_Sample.m_GpuDedicatedVramMb != (float)Snapshot.m_Version * 2.0f ||
 				Snapshot.m_Sample.m_GpuDedicatedVramBudgetMb != (float)Snapshot.m_Version * 4.0f)
 			{
@@ -1369,7 +1390,7 @@ TEST(QmMonitoringHelpers, DevicePerfSnapshotCacheKeepsSampleAndVersionConsistent
 	EXPECT_EQ(MismatchCount.load(std::memory_order_relaxed), 0);
 }
 
-TEST(QmMonitoringHelpers, DevicePerfSamplerStateStopsWorkerOnDisableAndCanRestart)
+TEST(QmMonitoringHelpers, DevicePerfSamplerStatePausesOnDisableAndCanRestart)
 {
 	std::atomic<int> SampleCalls{0};
 	auto SampleFn = [&SampleCalls]() {
@@ -1390,7 +1411,8 @@ TEST(QmMonitoringHelpers, DevicePerfSamplerStateStopsWorkerOnDisableAndCanRestar
 	QmUpdateDevicePerfSamplerState(Sampler, false);
 	const int CallsAfterDisable = SampleCalls.load(std::memory_order_relaxed);
 	std::this_thread::sleep_for(std::chrono::milliseconds(30));
-	EXPECT_EQ(SampleCalls.load(std::memory_order_relaxed), CallsAfterDisable);
+	// 关闭前已派发的单次查询可以结束，但不能继续周期采样。
+	EXPECT_LE(SampleCalls.load(std::memory_order_relaxed), CallsAfterDisable + 1);
 	const SQmDevicePerfSnapshot ClearedSnapshot = Sampler.Snapshot();
 	EXPECT_EQ(ClearedSnapshot.m_Version, 0u);
 	EXPECT_FALSE(ClearedSnapshot.m_Sample.m_Available);
@@ -1399,6 +1421,64 @@ TEST(QmMonitoringHelpers, DevicePerfSamplerStateStopsWorkerOnDisableAndCanRestar
 	QmUpdateDevicePerfSamplerState(Sampler, true);
 	ASSERT_TRUE(WaitUntil([&]() { return SampleCalls.load(std::memory_order_relaxed) > CallsAfterDisable; }));
 	Sampler.Stop();
+}
+
+TEST(QmMonitoringHelpers, DisablingDeviceSamplerDoesNotWaitOrPublishPreviousSession)
+{
+	std::atomic<int> Calls{0};
+	std::atomic<bool> Disabled{false};
+	std::mutex ReleaseMutex;
+	std::condition_variable ReleaseCv;
+	int ReleasedCalls = 0;
+	CQmAsyncDevicePerfSampler Sampler([&]() {
+		const int Call = Calls.fetch_add(1) + 1;
+		std::unique_lock<std::mutex> Lock(ReleaseMutex);
+		ReleaseCv.wait(Lock, [&]() { return ReleasedCalls >= Call; });
+		SQmDevicePerfSample Sample;
+		Sample.m_GpuUtilPct = float(Call);
+		Sample.m_Available = true;
+		return Sample;
+	},
+		std::chrono::milliseconds(5));
+	const auto Release = [&](int Count) {
+		{
+			std::lock_guard<std::mutex> Lock(ReleaseMutex);
+			ReleasedCalls = Count;
+		}
+		ReleaseCv.notify_all();
+	};
+
+	QmUpdateDevicePerfSamplerState(Sampler, true);
+	EXPECT_TRUE(WaitUntil([&]() { return Calls.load() == 1; }));
+	// 用控制线程验证非阻塞关闭，旧实现失败时仍能释放查询并正常收尾。
+	std::thread DisableThread([&]() {
+		QmUpdateDevicePerfSamplerState(Sampler, false);
+		Disabled.store(true);
+	});
+	const bool ReturnedBeforeQuery = WaitUntil([&]() { return Disabled.load(); }, std::chrono::milliseconds(1000));
+	EXPECT_TRUE(ReturnedBeforeQuery);
+	if(!ReturnedBeforeQuery)
+	{
+		Release(std::numeric_limits<int>::max());
+		DisableThread.join();
+		Sampler.Stop();
+		return;
+	}
+	DisableThread.join();
+	EXPECT_EQ(Sampler.Snapshot().m_Version, 0u);
+	EXPECT_FALSE(Sampler.Snapshot().m_Sample.m_Available);
+
+	QmUpdateDevicePerfSamplerState(Sampler, true);
+	Release(1);
+	EXPECT_TRUE(WaitUntil([&]() { return Calls.load() >= 2; }));
+	// 重新开启后的查询仍未完成，旧会话结果必须保持不可见。
+	EXPECT_EQ(Sampler.Snapshot().m_Version, 0u);
+	EXPECT_FALSE(Sampler.Snapshot().m_Sample.m_Available);
+	Release(std::numeric_limits<int>::max());
+	EXPECT_TRUE(WaitUntil([&]() { return Sampler.Snapshot().m_Version != 0; }));
+	EXPECT_GE(Sampler.Snapshot().m_Sample.m_GpuUtilPct, 2.0f);
+	Sampler.Stop();
+	EXPECT_EQ(Sampler.Snapshot().m_Version, 0u);
 }
 
 TEST(QmMonitoringHelpers, DiskReadRateUsesMegabytesPerSecond)
@@ -4607,7 +4687,7 @@ TEST(QmMonitoringHelpers, NumericFieldSharesScrollbarStyleAndReservesInfiniteEnd
 
 TEST(QmMonitoringHelpers, SkinTransitionDurationLabelUsesSingleLineShrink)
 {
-	const std::string Source = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string Source = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogSkin.cpp");
 	const std::string Body = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmVisualSkinTransitionContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
 	ASSERT_FALSE(Body.empty());
 
@@ -5477,43 +5557,57 @@ TEST(QmMonitoringHelpers, ClientRenderLoopUsesGameClientIdleThrottleWithOneFrame
 	EXPECT_EQ(ClientSource.find("time_freq() / (int64_t)g_Config.m_GfxRefreshRate"), std::string::npos);
 }
 
-TEST(QmMonitoringHelpers, RenderGateWaitReplacesBusyWaitWithoutChangingGate)
+TEST(QmMonitoringHelpers, DefaultFrameRatesRemainUnlimitedWithVsyncOff)
+{
+	EXPECT_EQ(DefaultConfig::GfxVsync, 0);
+	EXPECT_EQ(DefaultConfig::GfxRefreshRate, 0);
+	EXPECT_EQ(DefaultConfig::ClRefreshRate, 0);
+}
+
+TEST(QmMonitoringHelpers, UnlimitedRenderingDoesNotFallBackToDisplayRefreshRate)
 {
 	const std::string ClientSource = ReadRepoFile("src/engine/client/client.cpp");
 	const std::string ConfigSource = ReadRepoFile("src/engine/shared/config_variables_qmclient.h");
+	const std::string RunBody = ExtractSourceFunctionBody(ClientSource, "void CClient::Run()");
+	ASSERT_FALSE(RunBody.empty());
+	ASSERT_FALSE(ConfigSource.empty());
 
-	// 门控速率只在确实渲染时生效；窗口失活、录制等情形保持原有循环行为。
-	EXPECT_NE(ClientSource.find("int RenderGateRate = 0;"), std::string::npos);
-	EXPECT_NE(ClientSource.find("if(IsRenderActive && GfxRefreshRate > 0)"), std::string::npos);
-	EXPECT_NE(ClientSource.find("RenderGateRate = GfxRefreshRate;"), std::string::npos);
+	// 不限帧时只允许沿用菜单空闲策略，不按显示器刷新率偷偷设置上限。
+	EXPECT_EQ(ConfigSource.find("qm_present_align"), std::string::npos);
+	EXPECT_EQ(RunBody.find("m_GfxScreenRefreshRate"), std::string::npos);
+	EXPECT_NE(RunBody.find("int GfxRefreshRate = g_Config.m_GfxRefreshRate;"), std::string::npos);
+	const std::string ThrottleBody = ExtractSourceFunctionBody(RunBody, "if(g_Config.m_GfxVsync == 0 && GfxRefreshRate == 0)");
+	ASSERT_FALSE(ThrottleBody.empty());
+	EXPECT_NE(ThrottleBody.find("RequestedRenderThrottleRate = GameClient()->RenderThrottleRefreshRate();"), std::string::npos);
+	EXPECT_NE(ThrottleBody.find("if(RequestedRenderThrottleRate > 0)"), std::string::npos);
+	EXPECT_EQ(ThrottleBody.find("else"), std::string::npos);
 
-	// 新等待分支必须排在空闲节流分支之后，并复用同一套等待与时间补偿语义。
-	const size_t IdleBranch = ClientSource.find("else if(IdleRenderThrottleRate > 0)");
-	const size_t GateBranch = ClientSource.find("else if(RenderGateRate > 0)");
-	ASSERT_NE(IdleBranch, std::string::npos);
-	ASSERT_NE(GateBranch, std::string::npos);
-	EXPECT_LT(IdleBranch, GateBranch);
-	const size_t GateSlept = ClientSource.find("Slept = true;", GateBranch);
-	ASSERT_NE(GateSlept, std::string::npos);
-	const std::string GateBody = ClientSource.substr(GateBranch, GateSlept - GateBranch);
-	EXPECT_NE(GateBody.find("SleepTimeInNanoSeconds = (std::chrono::nanoseconds(1s) / (int64_t)RenderGateRate) - (Now - LastTime);"), std::string::npos);
-	EXPECT_NE(GateBody.find("WaitWithNetwork(SleepTimeInNanoSeconds);"), std::string::npos);
+	// 录制仍解除渲染限帧与菜单空闲节流。
+	const std::string RecordingBody = ExtractSourceFunctionBody(RunBody, "if(IVideo::Current())");
+	ASSERT_FALSE(RecordingBody.empty());
+	EXPECT_NE(RecordingBody.find("GfxRefreshRate = 0;"), std::string::npos);
+	EXPECT_NE(RecordingBody.find("IdleRenderThrottleRate = 0;"), std::string::npos);
+}
 
-	// 门控判据本身不得被改动：渲染时机、丢帧补偿与帧率判定保持原样。
-	EXPECT_NE(ClientSource.find("(!GfxRefreshRate || RenderFrameTicks <= Now - LastRenderTime)"), std::string::npos);
-	EXPECT_NE(ClientSource.find("int64_t AdditionalTime = GfxRefreshRate ? ((Now - LastRenderTime) - RenderFrameTicks) : 0;"), std::string::npos);
+TEST(QmMonitoringHelpers, RenderFrameLimitDoesNotAddMainLoopWait)
+{
+	const std::string ClientSource = ReadRepoFile("src/engine/client/client.cpp");
+	const std::string RunBody = ExtractSourceFunctionBody(ClientSource, "void CClient::Run()");
+	ASSERT_FALSE(RunBody.empty());
+	const std::string WaitBody = ExtractSourceBlock(RunBody, "// beNice", "if(Slept)");
+	ASSERT_FALSE(WaitBody.empty());
 
-	// 呈现对齐：默认开启、可关闭，且只在"关垂直同步 + 未设上限"时接入。
-	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmPresentAlign, qm_present_align, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE,"), std::string::npos);
-	const size_t AlignGuard = ClientSource.find("else if(g_Config.m_QmPresentAlign != 0 && g_Config.m_GfxScreenRefreshRate > 0)");
-	ASSERT_NE(AlignGuard, std::string::npos);
-	const size_t AlignRate = ClientSource.find("GfxRefreshRate = std::clamp(g_Config.m_GfxScreenRefreshRate, 10, 10000);", AlignGuard);
-	ASSERT_NE(AlignRate, std::string::npos);
-	// 对齐分支必须位于空闲节流判定之内，且不得覆盖显式上限或录制路径。
-	const size_t ThrottleGuard = ClientSource.find("if(g_Config.m_GfxVsync == 0 && GfxRefreshRate == 0)");
-	ASSERT_NE(ThrottleGuard, std::string::npos);
-	EXPECT_LT(ThrottleGuard, AlignGuard);
-	EXPECT_LT(AlignRate, ClientSource.find("if(IVideo::Current())"));
+	// 渲染限帧只能控制绘制，不能把下一轮输入和客户端更新一起延后。
+	EXPECT_EQ(RunBody.find("RenderGateRate"), std::string::npos);
+	EXPECT_EQ(WaitBody.find("GfxRefreshRate"), std::string::npos);
+	EXPECT_EQ(WaitBody.find("RenderFrameTicks"), std::string::npos);
+	EXPECT_NE(RunBody.find("(!GfxRefreshRate || RenderFrameTicks <= Now - LastRenderTime)"), std::string::npos);
+
+	// 保留用户显式配置的更新限速、后台节流与菜单空闲等待。
+	EXPECT_NE(WaitBody.find("if(g_Config.m_ClRefreshRateInactive && !m_pGraphics->WindowActive())"), std::string::npos);
+	EXPECT_NE(WaitBody.find("else if(g_Config.m_ClRefreshRate)"), std::string::npos);
+	EXPECT_NE(WaitBody.find("else if(IdleRenderThrottleRate > 0)"), std::string::npos);
+	EXPECT_NE(WaitBody.find("WaitWithNetwork(SleepTimeInNanoSeconds);"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, TextRuntimePerfSamplingRunsOnlyWhenDiagnosticsAreEnabled)
@@ -6886,16 +6980,21 @@ TEST(QmMonitoringHelpers, GlobalSearchUsesDedicatedSettingsPage)
 	EXPECT_NE(SearchContentBody.find("ui_widget::InputField(InputCtx, &m_GlobalCardSearchInput, Row, BodySize"), std::string::npos);
 	EXPECT_EQ(SearchContentBody.find("Ui()->DoEditBox_Search(&ModuleSearchInput"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("InputCard.m_Spec = {\"deck:global-search-input\""), std::string::npos);
-	EXPECT_NE(SearchContentBody.find("ResultsCard.m_Spec = {\"deck:global-search-results\""), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("EmptyCard.m_Spec = {\"deck:global-search-empty\""), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("EmptyCard.m_IsVisible = [SearchMatchedGlobalCardCount]"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("DoSettingsMenuLabel(SETTINGS_SEARCH, -1, -1, \"qmclient-search-no-matching-features\""), std::string::npos);
 	EXPECT_EQ(SearchContentBody.find("DoSettingsMenuLabel(SETTINGS_QMCLIENT"), std::string::npos);
-	EXPECT_NE(SearchContentBody.find("CollectGlobalSearchResults(pModuleSearch, s_GlobalSearchCache.m_Sixup, CardOrderModel, s_GlobalSearchCache.m_Results);"), std::string::npos);
+	// 命中的卡片直接按 stableId 从卡片目录构造本体（就地渲染，不再是跳转链接）。
+	EXPECT_NE(SearchContentBody.find("if(!qm_card_catalog::BuildCard(SearchCardBuild, MatchedCard.m_pStableId, Definition))"), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("Definition.m_HeaderAction = BuildGlobalSearchLocateHeaderAction(MatchedCard, ReadOnly, SmallSize);"), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("s_GlobalSearchCache.m_vResults = qm_card_catalog::SearchResultEntries(pModuleSearch, CardOrderModel);"), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("s_GlobalSearchCache.m_vModelEntries = qm_card_catalog::BuildSearchModelEntries(s_GlobalSearchCache.m_vResults);"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("CardDeck.RenderCached(SearchCtx, Page, \"global-search\""), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("static CScrollRegion s_GlobalSearchScrollRegion;"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("const bool ReadOnly = PrewarmOnly || Ui()->RenderOnly();"), std::string::npos);
-	EXPECT_NE(SearchContentBody.find("s_GlobalSearchPrewarmOrderModel.LoadMerged(g_Config.m_QmGlobalCardOrder, qm_card_registry::BuildDefaultEntries());"), std::string::npos);
-	EXPECT_NE(SearchContentBody.find("ReadOnly ? s_GlobalSearchPrewarmOrderModel : SettingsCardOrderModel();"), std::string::npos);
-	const size_t ReadOnlyOrderSelection = SearchContentBody.find("qm_card_order::CModel &CardOrderModel = ReadOnly ?");
+	EXPECT_NE(SearchContentBody.find("s_GlobalSearchPrewarmOrderModel.LoadMerged(\"\", qm_card_registry::BuildDefaultEntries());"), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("qm_card_order::CModel &DeckOrderModel = ReadOnly ? s_GlobalSearchPrewarmOrderModel : s_GlobalSearchCache.m_Model;"), std::string::npos);
+	const size_t ReadOnlyOrderSelection = SearchContentBody.find("qm_card_order::CModel &DeckOrderModel = ReadOnly ?");
 	const size_t SearchLayoutRevision = SearchContentBody.find("const uint64_t LayoutRevision = CardOrderModel.LayoutRevision();");
 	ASSERT_NE(ReadOnlyOrderSelection, std::string::npos);
 	ASSERT_NE(SearchLayoutRevision, std::string::npos);
@@ -6906,7 +7005,13 @@ TEST(QmMonitoringHelpers, GlobalSearchUsesDedicatedSettingsPage)
 	EXPECT_NE(SearchContentBody.find("if(ReadOnly)\n\t{\n\t\tSearchCtx.m_pAnim = nullptr;"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("InputState.m_pScrollParams = ReadOnly ? nullptr : &ScrollParams;"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("ReadOnly ? nullptr : &s_GlobalSearchScrollRegion"), std::string::npos);
-	EXPECT_NE(SearchContentBody.find("const bool Clicked = !ReadOnly && Ui()->DoButtonLogic"), std::string::npos);
+	// 「定位」入口是卡片标题动作（BuildGlobalSearchLocateHeaderAction）：命中卡片在搜索页就地可改，
+	// 这个入口只负责跳回它所属的分类页；点击判定仍受 ReadOnly 门控。
+	const std::string LocateActionBody = ExtractSourceFunctionBody(QmClient, "FSettingsCardHeaderAction CMenus::BuildGlobalSearchLocateHeaderAction(");
+	ASSERT_FALSE(LocateActionBody.empty());
+	EXPECT_NE(LocateActionBody.find("if(ReadOnly)\n\t\t\treturn;"), std::string::npos);
+	EXPECT_NE(LocateActionBody.find("QmCardRenderHook::DoButtonLogic(this, Card.m_pStableId, 0, &LocateButton, BUTTONFLAG_LEFT)"), std::string::npos);
+	EXPECT_NE(LocateActionBody.find("NavigateToGlobalSearchCard(Card);"), std::string::npos);
 	EXPECT_EQ(SearchContentBody.find("BeginSettingsQmScrollContainer"), std::string::npos);
 	EXPECT_EQ(SearchContentBody.find("RenderQmSettingsGlassCard"), std::string::npos);
 	EXPECT_EQ(SharedBody.find("GlobalSearchPage"), std::string::npos);
@@ -6915,7 +7020,7 @@ TEST(QmMonitoringHelpers, GlobalSearchUsesDedicatedSettingsPage)
 	EXPECT_EQ(SearchContentBody.find("const std::vector<const SQmGlobalSearchCard *> &SearchVisibleGlobalCards = GlobalSearchResults.m_vVisibleCards;"), std::string::npos);
 	EXPECT_EQ(SharedBody.find("SearchVisibleGlobalCards"), std::string::npos);
 	EXPECT_EQ(SharedBody.find("SearchVisibleExternalCards"), std::string::npos);
-	EXPECT_NE(SearchContentBody.find("const std::vector<SQmGlobalSearchCard> &SearchVisibleGlobalCards = s_GlobalSearchCache.m_Results.m_vAllVisibleCards;"), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("const std::vector<SQmGlobalSearchCard> &SearchVisibleGlobalCards = s_GlobalSearchCache.m_vResults;"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("Localize(\"Found %d global cards\")"), std::string::npos);
 	EXPECT_EQ(SharedBody.find("g_Config.m_UiSettingsPage == SETTINGS_SEARCH"), std::string::npos);
 	EXPECT_EQ(QmMainBody.find("m_aQmClientModuleSearchInputs["), std::string::npos);
@@ -6925,21 +7030,27 @@ TEST(QmMonitoringHelpers, GlobalSearchUsesDedicatedSettingsPage)
 TEST(QmMonitoringHelpers, QmClientSearchTabUsesGlobalCardRegistry)
 {
 	const std::string QmClient = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string CardCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
 	const std::string SharedBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnly)");
 	ASSERT_FALSE(SharedBody.empty());
+	ASSERT_FALSE(CardCatalog.empty());
 
 	EXPECT_NE(QmClient.find("#include <game/client/QmUi/QmCardRegistry.h>"), std::string::npos);
-	EXPECT_NE(QmClient.find("using SQmGlobalSearchCard = qm_card_registry::SCardSearchResult;"), std::string::npos);
-	EXPECT_NE(QmClient.find("struct SQmGlobalSearchNavigation"), std::string::npos);
+	// 搜索结果条目由卡片目录提供（stableId + 当前分类 + 标题/描述），菜单层不再自带一份别名结构。
+	EXPECT_NE(QmClient.find("using SQmGlobalSearchCard = qm_card_catalog::SQmSearchResultEntry;"), std::string::npos);
+	EXPECT_EQ(QmClient.find("struct SQmGlobalSearchNavigation"), std::string::npos);
+	EXPECT_NE(QmClient.find("qm_card_registry::SCardNavigationTarget ResolveGlobalSearchNavigation(const SQmGlobalSearchCard &Card, const qm_card_order::CModel &Model)"), std::string::npos);
 	EXPECT_EQ(QmClient.find("BuildGlobalSearchCards("), std::string::npos);
-	EXPECT_NE(QmClient.find("qm_card_registry::SearchCards(pSearch, Model)"), std::string::npos);
-	EXPECT_NE(QmClient.find("CollectGlobalSearchResults("), std::string::npos);
+	EXPECT_NE(CardCatalog.find("vMatches = qm_card_registry::SearchCards(pQuery, Model);"), std::string::npos);
+	EXPECT_EQ(QmClient.find("CollectGlobalSearchResults("), std::string::npos);
 	EXPECT_NE(QmClient.find("ResolveGlobalSearchNavigation("), std::string::npos);
-	EXPECT_NE(QmClient.find("Card.m_Target = qm_card_registry::ResolveCardNavigationTarget(Default, Model);"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("Match.m_Target = qm_card_registry::ResolveCardNavigationTarget(Default, Model);"), std::string::npos);
 	EXPECT_NE(SharedBody.find("struct SGlobalSearchCache"), std::string::npos);
-	EXPECT_NE(SharedBody.find("CollectGlobalSearchResults(pModuleSearch, s_GlobalSearchCache.m_Sixup, CardOrderModel, s_GlobalSearchCache.m_Results);"), std::string::npos);
-	EXPECT_NE(SharedBody.find("s_GlobalSearchCache.m_Results.m_vAllVisibleCards"), std::string::npos);
-	EXPECT_NE(QmClient.find("for(const qm_card_registry::SCardDefault &Default : qm_card_registry::Defaults())"), std::string::npos);
+	EXPECT_NE(SharedBody.find("qm_card_catalog::SearchResultEntries(pModuleSearch, CardOrderModel)"), std::string::npos);
+	EXPECT_NE(SharedBody.find("s_GlobalSearchCache.m_vResults"), std::string::npos);
+	EXPECT_EQ(SharedBody.find("m_vAllVisibleCards"), std::string::npos);
+	EXPECT_EQ(SharedBody.find("CollectGlobalSearchResults("), std::string::npos);
+	EXPECT_NE(CardCatalog.find("for(const qm_card_registry::SCardDefault &Default : qm_card_registry::Defaults())"), std::string::npos);
 	EXPECT_EQ(SharedBody.find("qm_card_registry::Defaults()"), std::string::npos);
 	EXPECT_EQ(SharedBody.find("EQmModuleId::Info"), std::string::npos);
 }
@@ -6966,24 +7077,32 @@ TEST(QmMonitoringHelpers, QmClientMainPageRemovesLegacyModuleSearchPipeline)
 TEST(QmMonitoringHelpers, P6GlobalSearchUsesPublicDeckOnly)
 {
 	const std::string QmClient = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string CardCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
 	const std::string SharedBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnly)");
 	ASSERT_FALSE(SharedBody.empty());
+	ASSERT_FALSE(CardCatalog.empty());
 
 	EXPECT_EQ(QmClient.find("std::vector<SQmGlobalSearchCard> m_vCards;"), std::string::npos);
-	EXPECT_NE(QmClient.find("using SQmGlobalSearchCard = qm_card_registry::SCardSearchResult;"), std::string::npos);
-	EXPECT_NE(QmClient.find("std::vector<SQmGlobalSearchCard> m_vAllVisibleCards;"), std::string::npos);
-	EXPECT_NE(QmClient.find("vCards = qm_card_registry::SearchCards(pSearch, Model);"), std::string::npos);
-	EXPECT_NE(QmClient.find("Card.m_Target = qm_card_registry::ResolveCardNavigationTarget(Default, Model);"), std::string::npos);
-	EXPECT_NE(SharedBody.find("const std::vector<SQmGlobalSearchCard> &SearchVisibleGlobalCards = s_GlobalSearchCache.m_Results.m_vAllVisibleCards;"), std::string::npos);
-	EXPECT_NE(QmClient.find("Out.m_vAllVisibleCards.push_back(std::move(Card));"), std::string::npos);
-	EXPECT_NE(SharedBody.find("ResultsCard.m_MeasureRevision = SearchMatchedGlobalCardCount;"), std::string::npos);
-	EXPECT_NE(SharedBody.find("ResolveGlobalSearchNavigation(Card)"), std::string::npos);
-	EXPECT_NE(SharedBody.find("Ui()->DoButtonLogic(Card.m_pStableId, 0, &ResultRect, BUTTONFLAG_LEFT)"), std::string::npos);
-	EXPECT_NE(SharedBody.find("GlobalSearchNavigationLabel(Navigation)"), std::string::npos);
-	EXPECT_NE(SharedBody.find("NavigateToSettingsCard(Card.m_Target);"), std::string::npos);
-	EXPECT_NE(QmClient.find("CollectGlobalSearchResults(const char *pSearch, bool Sixup, const qm_card_order::CModel &Model"), std::string::npos);
-	EXPECT_NE(QmClient.find("Sixup && str_comp(pTab, \"tee\") == 0"), std::string::npos);
-	EXPECT_NE(QmClient.find("!Sixup && str_comp(pTab, \"tee7\") == 0"), std::string::npos);
+	EXPECT_NE(QmClient.find("using SQmGlobalSearchCard = qm_card_catalog::SQmSearchResultEntry;"), std::string::npos);
+	EXPECT_NE(QmClient.find("std::vector<SQmGlobalSearchCard> m_vResults;"), std::string::npos);
+	EXPECT_EQ(QmClient.find("m_vAllVisibleCards"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("vMatches = qm_card_registry::SearchCards(pQuery, Model);"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("Match.m_Target = qm_card_registry::ResolveCardNavigationTarget(Default, Model);"), std::string::npos);
+	EXPECT_NE(SharedBody.find("const std::vector<SQmGlobalSearchCard> &SearchVisibleGlobalCards = s_GlobalSearchCache.m_vResults;"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("vEntries.push_back(std::move(Entry));"), std::string::npos);
+	// 命中数量只作为搜索输入卡的提示行（Found %d global cards），不再伪装成结果卡的重测版本。
+	EXPECT_NE(SharedBody.find("str_format(aSearchHint, sizeof(aSearchHint), Localize(\"Found %d global cards\"), SearchMatchedGlobalCardCount);"), std::string::npos);
+	EXPECT_EQ(SharedBody.find("ResultsCard.m_MeasureRevision = SearchMatchedGlobalCardCount;"), std::string::npos);
+	// 结果就是卡片本体：目的地由卡片目录/布局模型解析，菜单层不再有链接式渲染、跳转标签或 sixup 特判。
+	EXPECT_NE(QmClient.find("ResolveGlobalSearchNavigation(Card, SettingsCardOrderModel())"), std::string::npos);
+	EXPECT_EQ(SharedBody.find("ResolveGlobalSearchNavigation(Card)"), std::string::npos);
+	EXPECT_NE(QmClient.find("QmCardRenderHook::DoButtonLogic(this, Card.m_pStableId, 0, &LocateButton, BUTTONFLAG_LEFT)"), std::string::npos);
+	EXPECT_EQ(QmClient.find("GlobalSearchNavigationLabel(Navigation)"), std::string::npos);
+	EXPECT_NE(QmClient.find("NavigateToSettingsCard(Target);"), std::string::npos);
+	EXPECT_EQ(QmClient.find("NavigateToSettingsCard(Card.m_Target);"), std::string::npos);
+	EXPECT_EQ(QmClient.find("CollectGlobalSearchResults("), std::string::npos);
+	EXPECT_EQ(QmClient.find("Sixup && str_comp(pTab, \"tee\") == 0"), std::string::npos);
+	EXPECT_EQ(QmClient.find("!Sixup && str_comp(pTab, \"tee7\") == 0"), std::string::npos);
 	EXPECT_EQ(QmClient.find("void CMenus::RenderGlobalSearchResultCard("), std::string::npos);
 	EXPECT_EQ(QmClient.find("void CMenus::RenderGlobalSearchResults("), std::string::npos);
 	EXPECT_EQ(QmClient.find("s_GlobalSearchCardButtonIndex"), std::string::npos);
@@ -6993,51 +7112,63 @@ TEST(QmMonitoringHelpers, QmClientSearchNavigationTargetsSettingsPages)
 {
 	const std::string QmClient = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
 	const std::string MenusHeader = ReadRepoFile("src/game/client/components/menus.h");
-	const size_t NavigationPos = QmClient.find("SQmGlobalSearchNavigation ResolveGlobalSearchNavigation");
-	ASSERT_NE(NavigationPos, std::string::npos);
-	const std::string NavigationBody = QmClient.substr(NavigationPos, 4200);
+	const std::string NavigationBody = ExtractSourceFunctionBody(QmClient, "qm_card_registry::SCardNavigationTarget ResolveGlobalSearchNavigation(const SQmGlobalSearchCard &Card, const qm_card_order::CModel &Model)");
+	const std::string NavigateBody = ExtractSourceFunctionBody(QmClient, "void CMenus::NavigateToGlobalSearchCard(const qm_card_catalog::SQmSearchResultEntry &Card)");
 	const std::string CardBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnly)");
+	ASSERT_FALSE(NavigationBody.empty());
+	ASSERT_FALSE(NavigateBody.empty());
 	ASSERT_FALSE(CardBody.empty());
 
-	EXPECT_NE(NavigationBody.find("str_startswith(pStableId, \"qm:\")"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("Navigation.m_SettingsPage = CMenus::SETTINGS_QMCLIENT;"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("Navigation.m_QmClientTab = CMenus::QMCLIENT_SETTINGS_TAB_FUNCTION;"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("Navigation.m_QmClientTab = CMenus::QMCLIENT_SETTINGS_TAB_HUD;"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("Navigation.m_SettingsPage = CMenus::SETTINGS_TCLIENT;"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("Navigation.m_TClientTab = 0;"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("Navigation.m_SettingsPage = Route.m_SettingsPage;"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("Navigation.m_TClientTab = Route.m_TClientTab;"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("Navigation.m_AppearanceTab = Route.m_AppearanceTab;"), std::string::npos);
-	EXPECT_NE(CardBody.find("NavigateToSettingsCard(Card.m_Target);"), std::string::npos);
+	// 目的地不再来自菜单层的路由表/导航结构，而是布局模型里这张卡当前所属的分类；
+	// 模型未收录时回落到卡片自带的 tab（由卡片注册表解析），没有目的地就什么也不跳。
+	EXPECT_NE(NavigationBody.find("if(Card.m_pStableId == nullptr || Card.m_pStableId[0] == '\\0')"), std::string::npos);
+	EXPECT_NE(NavigationBody.find("const int StateIndex = Model.FindByStableId(Card.m_pStableId);"), std::string::npos);
+	EXPECT_NE(NavigationBody.find("const char *pTab = StateIndex >= 0 ? Model.Entry(StateIndex).m_pDefaultTab : nullptr;"), std::string::npos);
+	EXPECT_NE(NavigationBody.find("pTab = Card.m_pTab;"), std::string::npos);
+	EXPECT_NE(NavigationBody.find("return {pTab, Card.m_pStableId};"), std::string::npos);
+	// tab → 设置页的落地映射由 CMenus::SetSettingsPageFromCardTab 统一负责（见 RegistryNavigationBridgeOwnsSettingsTarget）。
+	EXPECT_NE(NavigateBody.find("const qm_card_registry::SCardNavigationTarget Target = ResolveGlobalSearchNavigation(Card, SettingsCardOrderModel());"), std::string::npos);
+	EXPECT_NE(NavigateBody.find("NavigateToSettingsCard(Target);"), std::string::npos);
+	EXPECT_NE(NavigateBody.find("Ui()->ReleaseActiveTextInput(&m_GlobalCardSearchInput);"), std::string::npos);
+	// 命中的卡片在搜索页就地渲染成卡片本体，标题上的「定位」入口只负责回到它所属的分类页。
+	EXPECT_NE(CardBody.find("Definition.m_HeaderAction = BuildGlobalSearchLocateHeaderAction(MatchedCard, ReadOnly, SmallSize);"), std::string::npos);
 	EXPECT_NE(MenusHeader.find("std::string m_SettingsCardFocusStableId;"), std::string::npos);
 	EXPECT_NE(MenusHeader.find("int m_AppearanceSettingsTab = APPEARANCE_TAB_HUD;"), std::string::npos);
 }
 
-TEST(QmMonitoringHelpers, QmClientSearchNavigationUsesTabRouteTable)
+TEST(QmMonitoringHelpers, QmClientSearchNavigationResolvesDestinationFromCardModel)
 {
 	const std::string QmClient = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
-	const size_t NavigationPos = QmClient.find("SQmGlobalSearchNavigation ResolveGlobalSearchNavigation");
-	ASSERT_NE(NavigationPos, std::string::npos);
-	const std::string NavigationBody = QmClient.substr(NavigationPos, 3600);
+	const std::string CardCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
+	const std::string NavigationBody = ExtractSourceFunctionBody(QmClient, "qm_card_registry::SCardNavigationTarget ResolveGlobalSearchNavigation(");
+	ASSERT_FALSE(NavigationBody.empty());
+	ASSERT_FALSE(CardCatalog.empty());
 
-	EXPECT_NE(QmClient.find("struct SQmGlobalSearchTabRoute"), std::string::npos);
-	EXPECT_NE(QmClient.find("s_aGlobalSearchTabRoutes[]"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"graphics\", CMenus::SETTINGS_GRAPHICS"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"sound\", CMenus::SETTINGS_SOUND"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"ddnet\", CMenus::SETTINGS_DDNET"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"tclient-bind-wheel\", CMenus::SETTINGS_TCLIENT"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"tclient-chat-binds\", CMenus::SETTINGS_TCLIENT"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"tclient-status-bar\", CMenus::SETTINGS_TCLIENT"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"tclient-info\", CMenus::SETTINGS_TCLIENT"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"tclient-profiles\", CMenus::SETTINGS_PROFILES"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"tclient-configs\", CMenus::SETTINGS_QMCLIENT, -1, -1, CMenus::QMCLIENT_SETTINGS_TAB_CONFIG}"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"appearance-hud\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"appearance-chat\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"appearance-name-plate\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"appearance-hook-collision\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"appearance-info-messages\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
-	EXPECT_NE(QmClient.find("{\"appearance-laser\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
-	EXPECT_NE(NavigationBody.find("for(const SQmGlobalSearchTabRoute &Route : s_aGlobalSearchTabRoutes)"), std::string::npos);
+	// 旧的手写 tab→设置页路由表已删除：目的地改由卡片目录从注册表/布局模型解析，
+	// 菜单文件里不得再留第二份会漂移的 tab 列表。
+	EXPECT_EQ(QmClient.find("struct SQmGlobalSearchTabRoute"), std::string::npos);
+	EXPECT_EQ(QmClient.find("s_aGlobalSearchTabRoutes"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"graphics\", CMenus::SETTINGS_GRAPHICS"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"sound\", CMenus::SETTINGS_SOUND"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"ddnet\", CMenus::SETTINGS_DDNET"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"tclient-bind-wheel\", CMenus::SETTINGS_TCLIENT"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"tclient-chat-binds\", CMenus::SETTINGS_TCLIENT"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"tclient-status-bar\", CMenus::SETTINGS_TCLIENT"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"tclient-info\", CMenus::SETTINGS_TCLIENT"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"tclient-profiles\", CMenus::SETTINGS_PROFILES"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"tclient-configs\", CMenus::SETTINGS_QMCLIENT, -1, -1, CMenus::QMCLIENT_SETTINGS_TAB_CONFIG}"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"appearance-hud\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"appearance-chat\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"appearance-name-plate\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"appearance-hook-collision\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"appearance-info-messages\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
+	EXPECT_EQ(QmClient.find("{\"appearance-laser\", CMenus::SETTINGS_APPEARANCE"), std::string::npos);
+	EXPECT_EQ(QmClient.find("for(const SQmGlobalSearchTabRoute &Route : s_aGlobalSearchTabRoutes)"), std::string::npos);
+	// 目的地来自布局模型（当前分类）或卡片自带的注册表 tab，导航函数里不得再出现按 tab 字符串分派的硬编码。
+	EXPECT_NE(NavigationBody.find("Model.Entry(StateIndex).m_pDefaultTab"), std::string::npos);
+	EXPECT_NE(NavigationBody.find("pTab = Card.m_pTab;"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("Match.m_Target = qm_card_registry::ResolveCardNavigationTarget(Default, Model);"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("Entry.m_pTab = pTab;"), std::string::npos);
 	EXPECT_EQ(NavigationBody.find("str_comp(pTab, \"graphics\")"), std::string::npos);
 	EXPECT_EQ(NavigationBody.find("str_comp(pTab, \"sound\")"), std::string::npos);
 	EXPECT_EQ(NavigationBody.find("str_comp(pTab, \"ddnet\")"), std::string::npos);
@@ -7046,14 +7177,21 @@ TEST(QmMonitoringHelpers, QmClientSearchNavigationUsesTabRouteTable)
 	EXPECT_EQ(NavigationBody.find("str_comp(pTab, \"appearance-"), std::string::npos);
 }
 
-TEST(QmMonitoringHelpers, QmClientSearchNavigationRouteTableCoversRegistryDeckTabs)
+TEST(QmMonitoringHelpers, QmClientSearchNavigationCoversRegistryDeckTabsWithoutRouteTable)
 {
 	const std::string QmClient = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
-	const size_t RouteTablePos = QmClient.find("static constexpr SQmGlobalSearchTabRoute s_aGlobalSearchTabRoutes[]");
-	ASSERT_NE(RouteTablePos, std::string::npos);
-	const size_t RouteTableEnd = QmClient.find("};", RouteTablePos);
-	ASSERT_NE(RouteTableEnd, std::string::npos);
-	const std::string RouteTable = QmClient.substr(RouteTablePos, RouteTableEnd - RouteTablePos);
+	const std::string CardCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
+	ASSERT_FALSE(CardCatalog.empty());
+
+	// 路由表已删除：每个 deck tab 的目的地直接来自注册表/布局模型里的 tab，
+	// 因此搜索页天然覆盖注册表里的每个 deck，新增 deck 不再需要同步维护一张菜单层路由表。
+	EXPECT_EQ(QmClient.find("s_aGlobalSearchTabRoutes"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("vMatches = qm_card_registry::SearchCards(pQuery, Model);"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("Match.m_Target = qm_card_registry::ResolveCardNavigationTarget(Default, Model);"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("Entry.m_pTab = pTab;"), std::string::npos);
+	// 唯一被搜索页排除的是搜索页自己的 deck；其余 deck（含 contributors）由卡片目录照常给出 tab。
+	EXPECT_NE(CardCatalog.find("if(pTab != nullptr && str_comp(pTab, \"global-search\") == 0)"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("if(!HasCardModule(Match.m_pStableId))"), std::string::npos);
 
 	std::set<std::string> DeckTabs;
 	for(const qm_card_registry::SCardDefault &Default : qm_card_registry::Defaults())
@@ -7067,15 +7205,9 @@ TEST(QmMonitoringHelpers, QmClientSearchNavigationRouteTableCoversRegistryDeckTa
 	ASSERT_FALSE(DeckTabs.empty());
 	for(const std::string &Tab : DeckTabs)
 	{
-		if(Tab == "qmclient-contributors")
-		{
-			EXPECT_NE(QmClient.find("if(str_comp(pTab, \"qmclient-contributors\") == 0)"), std::string::npos);
-			continue;
-		}
-		if(Tab == "global-search")
-			continue;
-		const std::string Needle = "{\"" + Tab + "\",";
-		EXPECT_NE(RouteTable.find(Needle), std::string::npos) << Tab;
+		EXPECT_FALSE(Tab.empty()) << Tab;
+		// 菜单层不得再为任何 deck tab 保留手写路由条目。
+		EXPECT_EQ(QmClient.find("{\"" + Tab + "\", CMenus::SETTINGS"), std::string::npos) << Tab;
 	}
 }
 
@@ -7235,9 +7367,16 @@ TEST(QmMonitoringHelpers, NeteaseLyricsSettingsAreIntegratedWithSystemMediaContr
 	const std::string Source = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
 	const std::string Body = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmHudSystemMediaControlsContent");
 	ASSERT_FALSE(Body.empty());
-	EXPECT_NE(Body.find("g_Config.m_QmLyrics"), std::string::npos);
-	EXPECT_NE(Body.find("g_Config.m_QmLyricsInMediaIsland"), std::string::npos);
-	EXPECT_EQ(Source.find("RenderQmHudLyricsContent"), std::string::npos);
+	// 歌词开关已从 SMTC 卡里拆出来成为独立卡片（qm:lyrics）：SMTC 卡不得再内联歌词设置。
+	EXPECT_EQ(Body.find("g_Config.m_QmLyrics"), std::string::npos);
+	const std::string LyricsBody = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmHudLyricsContent");
+	ASSERT_FALSE(LyricsBody.empty());
+	EXPECT_NE(LyricsBody.find("g_Config.m_QmLyrics"), std::string::npos);
+	EXPECT_NE(LyricsBody.find("g_Config.m_QmLyricsInMediaIsland"), std::string::npos);
+	// 歌词来源开关来自音乐 Hook 注册表（含网易云），渲染与卡片测量共用同一份。
+	const std::string HookRegistry = ReadRepoFile("src/game/client/components/qmclient/qm_music_hook_registry.h");
+	EXPECT_NE(HookRegistry.find("g_Config.m_QmNeteaseHookEnable"), std::string::npos);
+	EXPECT_NE(LyricsBody.find("QmMusicHookRegistry(&HookCount)"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, SettingsRenderOnlyTraversalHasNoInputAnimationDeviceOrConfigSideEffects)
@@ -7520,7 +7659,10 @@ TEST(QmMonitoringHelpers, SettingsCardShellConsumesCanonicalVisualContract)
 	EXPECT_NE(MenusSource.find("Options.m_SurfaceColor = CardColor.WithAlpha(std::clamp(g_Config.m_QmUiCardOpacity / 100.0f"), std::string::npos);
 	EXPECT_EQ(MenusSource.find("Options.m_SurfaceColor = CardColor.WithAlpha(std::clamp(g_Config.m_QmUiOpacity / 100.0f"), std::string::npos);
 	EXPECT_EQ(MenusSource.find("Options.m_RainbowTitles = g_Config.m_QmUiCardRainbowTitles != 0 &&"), std::string::npos);
-	EXPECT_NE(QmClientSource.find("RenderSettingsCardCollapseButton(CardCtx, Frame.m_HandleRect, Collapsed)"), std::string::npos);
+	// 卡片折叠按钮的绘制随卡片装配搬进了卡片目录（MakeModuleCard），页面只传容器与回调。
+	const std::string CardCatalogSource = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
+	ASSERT_FALSE(CardCatalogSource.empty());
+	EXPECT_NE(CardCatalogSource.find("RenderSettingsCardCollapseButton(CardCtx, Frame.m_HandleRect, Collapsed)"), std::string::npos);
 	EXPECT_EQ(QmClientSource.find("Collapsed ? \"+\" : \"-\""), std::string::npos);
 }
 
@@ -7589,10 +7731,10 @@ TEST(QmMonitoringHelpers, MigratedQmClientCardTitlesRemainLocalized)
 	const std::string Language = ReadRepoFile("data/languages/simplified_chinese.txt");
 
 	EXPECT_NE(Language.find("Weapon animation\n== 武器动画"), std::string::npos);
-	EXPECT_NE(Language.find("Hitbox mode\n== 碰撞箱模式"), std::string::npos);
-	EXPECT_NE(Language.find("Chat Bubble\n== 消息气泡"), std::string::npos);
-	EXPECT_NE(Language.find("Streamer Mode\n== 主播模式"), std::string::npos);
-	EXPECT_NE(Language.find("Camera & FOV\n== 镜头与视野"), std::string::npos);
+	EXPECT_NE(Language.find("Collision hitbox\n== 碰撞箱"), std::string::npos);
+	EXPECT_NE(Language.find("Chat bubble\n== 聊天气泡"), std::string::npos);
+	EXPECT_NE(Language.find("Streamer mode\n== 主播模式"), std::string::npos);
+	EXPECT_NE(Language.find("Camera view\n== 镜头与视野"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, GlobalSearchTargetsGraphicsCanonicalCard)
@@ -7605,7 +7747,10 @@ TEST(QmMonitoringHelpers, GlobalSearchTargetsGraphicsCanonicalCard)
 	ASSERT_FALSE(SearchCardBody.empty());
 	ASSERT_FALSE(GraphicsBody.empty());
 
-	EXPECT_NE(SearchCardBody.find("NavigateToSettingsCard(Card.m_Target);"), std::string::npos);
+	// 命中的卡片就是卡片本体：结果卡只挂一个「定位」标题动作，点击走 NavigateToGlobalSearchCard → NavigateToSettingsCard。
+	EXPECT_NE(SearchCardBody.find("Definition.m_HeaderAction = BuildGlobalSearchLocateHeaderAction(MatchedCard, ReadOnly, SmallSize);"), std::string::npos);
+	EXPECT_NE(SearchSource.find("void CMenus::NavigateToGlobalSearchCard(const qm_card_catalog::SQmSearchResultEntry &Card)"), std::string::npos);
+	EXPECT_NE(SearchSource.find("NavigateToSettingsCard(Target);"), std::string::npos);
 	EXPECT_NE(GraphicsBody.find("m_SettingsCardDeck.RequestReveal(m_SettingsCardFocusStableId.c_str());"), std::string::npos);
 	EXPECT_NE(GraphicsBody.find("SettingsCardDeckForRenderPass().RenderCached("), std::string::npos);
 	EXPECT_NE(RegistrySource.find("graphics visual rendering card appearance settings card border corner segments rainbow title"), std::string::npos);
@@ -7726,7 +7871,8 @@ TEST(QmMonitoringHelpers, P6VisualContentOwnersRemainShellFree)
 	const std::string CollisionHitboxBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualCollisionHitboxContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
 	const std::string WeaponAnimationBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualWeaponAnimationContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, float ContentGap, bool PrewarmOnly)");
 	const std::string ChatBubbleBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualChatBubbleContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
-	const std::string SkinTransitionBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualSkinTransitionContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
+	const std::string SkinSource = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogSkin.cpp");
+	const std::string SkinTransitionBody = ExtractSourceFunctionBody(SkinSource, "void CMenus::RenderQmVisualSkinTransitionContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
 	const std::string CameraViewBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmVisualCameraViewContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
 	ASSERT_FALSE(StreamerBody.empty());
 	ASSERT_FALSE(TranslateUiBody.empty());
@@ -7828,10 +7974,13 @@ TEST(QmMonitoringHelpers, P6FunctionKeywordReplyContentExtractionKeepsRuleRowsAn
 TEST(QmMonitoringHelpers, P6HudPlayerStatsContentExtractionKeepsProgressBranchesMeasured)
 {
 	const std::string QmClient = ReadRepoFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string HudCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogHud.cpp");
 	const std::string PlayerStatsBody = ExtractSourceFunctionBody(QmClient, "void CMenus::RenderQmHudPlayerStatsContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)");
-	const size_t CaseStart = QmClient.rfind("case EQmModuleId::PlayerStats:");
-	const size_t CaseEnd = QmClient.find("case EQmModuleId::CollisionHitbox:", CaseStart);
-	const std::string DeckCase = CaseStart != std::string::npos && CaseEnd != std::string::npos ? QmClient.substr(CaseStart, CaseEnd - CaseStart) : "";
+	// 卡片构造分派已迁到全局卡片目录：取该模块里最后一段 PlayerStats case（卡片工厂），
+	// 前面的测量/预布局 switch 也含有同名 case。
+	const size_t CaseStart = HudCatalog.rfind("case EQmModuleId::PlayerStats:");
+	const size_t CaseEnd = HudCatalog.find("case EQmModuleId::DebugGraph:", CaseStart);
+	const std::string DeckCase = CaseStart != std::string::npos && CaseEnd != std::string::npos ? HudCatalog.substr(CaseStart, CaseEnd - CaseStart) : "";
 	ASSERT_FALSE(PlayerStatsBody.empty());
 	ASSERT_FALSE(DeckCase.empty());
 
@@ -7841,7 +7990,7 @@ TEST(QmMonitoringHelpers, P6HudPlayerStatsContentExtractionKeepsProgressBranches
 	EXPECT_NE(PlayerStatsBody.find("RenderQmSettingsSliderWithValueInput"), std::string::npos);
 	EXPECT_EQ(PlayerStatsBody.find("RegisterModuleCard"), std::string::npos);
 	EXPECT_EQ(PlayerStatsBody.find("HandleModuleDragState"), std::string::npos);
-	EXPECT_NE(DeckCase.find("RenderQmHudPlayerStatsContent"), std::string::npos);
+	EXPECT_NE(DeckCase.find("QmCardRenderHook::RenderQmHudPlayerStatsContent"), std::string::npos);
 	EXPECT_EQ(DeckCase.find("RenderSliderWithValueInput"), std::string::npos);
 }
 
@@ -7860,6 +8009,13 @@ TEST(QmMonitoringHelpers, QmClientContentOwnersPreserveInteractiveContracts)
 	const std::string NotificationsAdvanced = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmHudNotificationsAdvancedContent(");
 	const std::string FunctionDeck = ExtractSourceFunctionBody(Source, "void CMenus::RenderSettingsQmClientFunctionDeck(");
 	const std::string HudDeck = ExtractSourceFunctionBody(Source, "void CMenus::RenderSettingsQmClientHudDeck(");
+	// 卡片分支（测量 + 内容渲染接线）都已搬进卡片目录，薄壳只声明清单。
+	const std::string FunctionCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogFunction.cpp");
+	const std::string HudCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogHud.cpp");
+	const std::string FunctionMeasure = ExtractSourceFunctionBody(FunctionCatalog, "float MeasureFunctionCardHeight(");
+	ASSERT_FALSE(FunctionCatalog.empty());
+	ASSERT_FALSE(HudCatalog.empty());
+	ASSERT_FALSE(FunctionMeasure.empty());
 	ASSERT_FALSE(ControlsInit.empty());
 	ASSERT_FALSE(KeyBinds.empty());
 	ASSERT_FALSE(FriendNotify.empty());
@@ -7876,7 +8032,7 @@ TEST(QmMonitoringHelpers, QmClientContentOwnersPreserveInteractiveContracts)
 	EXPECT_NE(KeyBinds.find("+toggle cl_dummy_hammer 1 0"), std::string::npos);
 	EXPECT_EQ(KeyBinds.find("qm_timeout_disconnect"), std::string::npos);
 	EXPECT_NE(ControlsInit.find("{EBindOptionGroup::MISCELLANEOUS, Localizable(\"Active disconnect\"), \"qm_timeout_disconnect\"}"), std::string::npos);
-	EXPECT_NE(FunctionDeck.find("case EQmModuleId::KeyBinds: return Rows(7.0f);"), std::string::npos);
+	EXPECT_NE(FunctionMeasure.find("case EQmModuleId::KeyBinds: return Rows(6.0f);"), std::string::npos);
 	EXPECT_NE(FriendNotify.find("ui_widget::InputField"), std::string::npos);
 	EXPECT_NE(FriendNotify.find("m_QmFriendOnlineAutoRefresh"), std::string::npos);
 	EXPECT_NE(FriendNotify.find("m_QmFriendEnterAutoGreet"), std::string::npos);
@@ -7890,13 +8046,13 @@ TEST(QmMonitoringHelpers, QmClientContentOwnersPreserveInteractiveContracts)
 	EXPECT_NE(NotificationsBasic.find("m_QmHudNotificationsShowAdvanced"), std::string::npos);
 	EXPECT_NE(NotificationsAdvanced.find("m_QmHudNotificationsUseCategoryFilters"), std::string::npos);
 	EXPECT_NE(NotificationsAdvanced.find("RenderQmSettingsSliderWithValueInput"), std::string::npos);
-	EXPECT_NE(FunctionDeck.find("RenderQmFunctionKeyBindsContent"), std::string::npos);
-	EXPECT_NE(FunctionDeck.find("RenderQmFunctionFriendNotifyContent"), std::string::npos);
-	EXPECT_NE(FunctionDeck.find("RenderQmFunctionFavoriteMapsContent"), std::string::npos);
-	EXPECT_NE(FunctionDeck.find("RenderQmFunctionPieMenuContent"), std::string::npos);
-	EXPECT_NE(FunctionDeck.find("RenderQmFunctionTranslateContent"), std::string::npos);
-	EXPECT_NE(HudDeck.find("RenderQmHudNotificationsBasicContent"), std::string::npos);
-	EXPECT_NE(HudDeck.find("RenderQmHudNotificationsAdvancedContent"), std::string::npos);
+	EXPECT_NE(FunctionCatalog.find("RenderQmFunctionKeyBindsContent"), std::string::npos);
+	EXPECT_NE(FunctionCatalog.find("RenderQmFunctionFriendNotifyContent"), std::string::npos);
+	EXPECT_NE(FunctionCatalog.find("RenderQmFunctionFavoriteMapsContent"), std::string::npos);
+	EXPECT_NE(FunctionCatalog.find("RenderQmFunctionPieMenuContent"), std::string::npos);
+	EXPECT_NE(FunctionCatalog.find("RenderQmFunctionTranslateContent"), std::string::npos);
+	EXPECT_NE(HudCatalog.find("RenderQmHudNotificationsBasicContent"), std::string::npos);
+	EXPECT_NE(HudCatalog.find("RenderQmHudNotificationsAdvancedContent"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, TimeoutDisconnectReconnectAdvertisesDDNetVersionBeforeSystemInfo)
@@ -7927,12 +8083,25 @@ TEST(QmMonitoringHelpers, QmClientDeckMeasureRevisionsDoNotPreMeasureContent)
 	const std::string HudDeck = ExtractSourceFunctionBody(Source, "void CMenus::RenderSettingsQmClientHudDeck(");
 	const std::string FunctionDeck = ExtractSourceFunctionBody(Source, "void CMenus::RenderSettingsQmClientFunctionDeck(");
 	const std::string VisualDeck = ExtractSourceFunctionBody(Source, "void CMenus::RenderSettingsQmClientVisualDeck(");
+	// 测量与重测版本都已随卡片搬到卡片目录；菜单层只剩刷新布局缓存与聚合版本的薄壳。
+	const std::string HudCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogHud.cpp");
+	const std::string FunctionCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogFunction.cpp");
+	const std::string VisualCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogVisual.cpp");
+	const std::string CardCatalog = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
+	const std::string RefreshLayout = ExtractSourceFunctionBody(Source, "void RefreshFunctionCardLayoutState(CMenus *pMenus)");
+	const std::string FunctionLayoutState = ExtractSourceFunctionBody(Source, "qm_card_catalog::SQmFunctionCardLayoutState ResolveFunctionCardLayoutState()");
 	const std::string BlockWords = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmFunctionBlockWordsContent(");
 	const std::string KeywordReply = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmFunctionKeywordReplyContent(");
 	const std::string FavoriteMaps = ExtractSourceFunctionBody(Source, "void CMenus::RenderQmFunctionFavoriteMapsContent(");
 	ASSERT_FALSE(HudDeck.empty());
 	ASSERT_FALSE(FunctionDeck.empty());
 	ASSERT_FALSE(VisualDeck.empty());
+	ASSERT_FALSE(HudCatalog.empty());
+	ASSERT_FALSE(FunctionCatalog.empty());
+	ASSERT_FALSE(VisualCatalog.empty());
+	ASSERT_FALSE(CardCatalog.empty());
+	ASSERT_FALSE(RefreshLayout.empty());
+	ASSERT_FALSE(FunctionLayoutState.empty());
 	ASSERT_FALSE(BlockWords.empty());
 	ASSERT_FALSE(KeywordReply.empty());
 	ASSERT_FALSE(FavoriteMaps.empty());
@@ -7943,42 +8112,58 @@ TEST(QmMonitoringHelpers, QmClientDeckMeasureRevisionsDoNotPreMeasureContent)
 	EXPECT_EQ(HudDeck.find("EstimateContentHeight(Id)) * 1000.0f"), std::string::npos);
 	EXPECT_EQ(FunctionDeck.find("MeasureContentHeight(Id, Page.m_ContentViewport.w)"), std::string::npos);
 	EXPECT_EQ(VisualDeck.find("EstimateContentHeight(Id)) * 1000.0f"), std::string::npos);
-	EXPECT_NE(HudDeck.find("MeasureContentRevision"), std::string::npos);
-	EXPECT_NE(FunctionDeck.find("MeasureContentRevision"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("MeasureContentRevision"), std::string::npos);
+	// 每张卡的重测版本由卡片目录自己给出（Measure*CardRevision），菜单层只读取聚合值。
+	EXPECT_NE(HudCatalog.find("MeasureHudCardRevision("), std::string::npos);
+	EXPECT_NE(FunctionCatalog.find("MeasureFunctionCardRevision("), std::string::npos);
+	EXPECT_NE(VisualCatalog.find("MeasureVisualCardRevision("), std::string::npos);
+	EXPECT_NE(CardCatalog.find("uint64_t MeasureContentRevision()"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("Out.m_MeasureRevision = MeasureRevision;"), std::string::npos);
 	for(const std::string *pDeck : {&HudDeck, &FunctionDeck, &VisualDeck})
 	{
 		EXPECT_NE(pDeck->find("auto BuildDefinitions ="), std::string::npos);
 		EXPECT_NE(pDeck->find("ResolveSettingsCardDefinitionsRevision("), std::string::npos);
 		EXPECT_NE(pDeck->find("CardDeck.RenderCached("), std::string::npos);
-		EXPECT_NE(pDeck->find("Definition.m_MeasureRevision = MeasureContentRevision(Id);"), std::string::npos);
+		EXPECT_EQ(pDeck->find("Definition.m_MeasureRevision = MeasureContentRevision(Id);"), std::string::npos);
+		// 页面只把目录聚合出的重测版本折进 DefinitionsRevision。
+		EXPECT_NE(pDeck->find("ResolveModuleCardMeasureRevision()"), std::string::npos);
 	}
+	// 词条过滤/关键词回复/收藏地图的布局缓存刷新在分类页里先跑，再构造卡片定义。
+	const size_t FunctionDeckRefresh = FunctionDeck.find("RefreshFunctionCardLayoutState(this);");
 	const size_t FunctionDeckDefinitions = FunctionDeck.find("auto BuildDefinitions =");
-	const size_t FunctionDeckMeasure = FunctionDeck.find("auto MeasureContentHeight");
+	ASSERT_NE(FunctionDeckRefresh, std::string::npos);
 	ASSERT_NE(FunctionDeckDefinitions, std::string::npos);
-	ASSERT_NE(FunctionDeckMeasure, std::string::npos);
+	EXPECT_LT(FunctionDeckRefresh, FunctionDeckDefinitions);
 	for(const char *pSync : {"str_comp(s_aBlockWordsLayoutConfigCache, g_Config.m_QmBlockWordsList)", "QmKeywordReplyRules::DecodeFromConfig", "UpdateKeywordRulesLayoutState(CountAutoReplyRules(aDecodedRules), false)", "s_FavoriteMapsLayoutCount != FavoriteMapCount"})
-	{
-		const size_t SyncPosition = FunctionDeck.find(pSync);
-		ASSERT_NE(SyncPosition, std::string::npos) << pSync;
-		EXPECT_LT(SyncPosition, FunctionDeckDefinitions) << pSync;
-	}
-	EXPECT_EQ(FunctionDeck.find("QmKeywordReplyRules::DecodeFromConfig", FunctionDeckMeasure + 1), std::string::npos);
+		EXPECT_NE(RefreshLayout.find(pSync), std::string::npos) << pSync;
+	// 解码只做一次，测量路径里不得再重复解码。
+	const size_t RefreshDecode = RefreshLayout.find("QmKeywordReplyRules::DecodeFromConfig");
+	ASSERT_NE(RefreshDecode, std::string::npos);
+	EXPECT_EQ(RefreshLayout.find("QmKeywordReplyRules::DecodeFromConfig", RefreshDecode + 1), std::string::npos);
+	EXPECT_EQ(FunctionCatalog.find("QmKeywordReplyRules::DecodeFromConfig"), std::string::npos);
+	EXPECT_NE(FunctionCatalog.find("Ctx.m_pFunctionLayout"), std::string::npos);
 
-	for(const char *pState : {"DummyMiniViewExpanded", "g_Config.m_QmPlayerStatsMapProgress", "g_Config.m_QmInputOverlay", "g_Config.m_QmHudNotificationsShowAdvanced", "g_Config.m_QmHudNotificationsUseCategoryFilters", "g_Config.m_QmVoiceEnable", "g_Config.m_QmVoiceShowAdvanced", "DynamicIslandOriginalStyle", "g_Config.m_QmSmtcEnable", "g_Config.m_QmNeteaseHookEnable", "g_Config.m_Qm3DParticles"})
-		EXPECT_NE(HudDeck.find(pState), std::string::npos) << pState;
-	for(const char *pState : {"g_Config.m_TcFreezeChatEnabled", "g_Config.m_TcFreezeChatEmoticon", "g_Config.m_QmAxiomAutoLogin", "g_Config.m_QmGores", "g_Config.m_QmGoresAutoEnable", "g_Config.m_QmWeaponTrajectory", "g_Config.m_QmFriendOnlineAutoRefresh", "g_Config.m_QmFriendEnterBroadcast", "g_Config.m_QmFriendEnterAutoGreet", "s_BlockWordsLayoutRevision", "g_Config.m_QmTranslateBackend", "g_Config.m_QmTranslateLlmEnableThinking", "g_Config.m_QmTranslateLlmProvider", "s_KeywordRulesLayoutRevision", "g_Config.m_QmPieMenuEnabled", "s_FavoriteMapsLayoutRevision", "g_Config.m_QmAutoTeamLock"})
-		EXPECT_NE(FunctionDeck.find(pState), std::string::npos) << pState;
+	for(const char *pState : {"DummyMiniViewExpanded", "g_Config.m_QmPlayerStatsMapProgress", "g_Config.m_QmInputOverlay", "g_Config.m_QmHudNotificationsShowAdvanced", "g_Config.m_QmHudNotificationsUseCategoryFilters", "g_Config.m_QmVoiceEnable", "g_Config.m_QmVoiceShowAdvanced", "DynamicIslandOriginalStyle", "g_Config.m_QmSmtcEnable", "g_Config.m_Qm3DParticles"})
+		EXPECT_NE(HudCatalog.find(pState), std::string::npos) << pState;
+	// 歌词来源（含网易云）由音乐 Hook 注册表提供，卡片只在测量/预布局里遍历注册表。
+	EXPECT_NE(HudCatalog.find("QmMusicHookRegistry(&HookCount)"), std::string::npos);
+	EXPECT_NE(ReadRepoFile("src/game/client/components/qmclient/qm_music_hook_registry.h").find("g_Config.m_QmNeteaseHookEnable"), std::string::npos);
+	for(const char *pState : {"g_Config.m_TcFreezeChatEnabled", "g_Config.m_TcFreezeChatEmoticon", "g_Config.m_QmAxiomAutoLogin", "g_Config.m_QmGores", "g_Config.m_QmGoresAutoEnable", "g_Config.m_QmWeaponTrajectory", "g_Config.m_QmFriendOnlineAutoRefresh", "g_Config.m_QmFriendEnterBroadcast", "g_Config.m_QmFriendEnterAutoGreet", "g_Config.m_QmTranslateBackend", "g_Config.m_QmTranslateLlmEnableThinking", "g_Config.m_QmTranslateLlmProvider", "g_Config.m_QmPieMenuEnabled", "g_Config.m_QmAutoTeamLock"})
+		EXPECT_NE(FunctionCatalog.find(pState), std::string::npos) << pState;
+	// 三个布局缓存版本仍归菜单层持有（卡片模块只读 SQmFunctionCardLayoutState）。
+	for(const char *pState : {"s_BlockWordsLayoutRevision", "s_KeywordRulesLayoutRevision", "s_FavoriteMapsLayoutRevision"})
+		EXPECT_NE(FunctionLayoutState.find(pState), std::string::npos) << pState;
 	for(const char *pState : {"g_Config.m_QmChatBubble", "g_Config.m_QmCameraDrift", "g_Config.m_QmDynamicFov", "g_Config.m_QmAspectPreset", "g_Config.m_QmSkinChangeTransition", "g_Config.m_QmWeaponSwitchAnim", "g_Config.m_QmHitboxMode", "g_Config.m_QmShowCollisionHitbox"})
-		EXPECT_NE(VisualDeck.find(pState), std::string::npos) << pState;
+		EXPECT_NE(VisualCatalog.find(pState), std::string::npos) << pState;
 	for(const char *pState : {"g_Config.m_QmHitboxShowMap", "g_Config.m_QmHitboxShowTeeCollision", "g_Config.m_QmHitboxShowTeeFreeze", "g_Config.m_QmHitboxShowTeeDeath", "g_Config.m_QmHitboxShowHammer", "g_Config.m_QmHitboxShowProjectiles", "g_Config.m_QmHitboxShowLasers", "g_Config.m_QmHitboxShowFreezeLasers", "g_Config.m_QmHitboxShowHook"})
-		EXPECT_NE(VisualDeck.find(pState), std::string::npos) << pState;
+		EXPECT_NE(VisualCatalog.find(pState), std::string::npos) << pState;
 
-	EXPECT_NE(BlockWords.find("str_copy(s_aBlockWordsLayoutConfigCache"), std::string::npos);
-	EXPECT_NE(BlockWords.find("++s_BlockWordsLayoutRevision"), std::string::npos);
+	// 布局缓存刷新的口径只有一处（RefreshFunctionCardLayoutState），渲染路径不得再各自复制一份。
+	EXPECT_NE(BlockWords.find("RefreshFunctionCardLayoutState(this);"), std::string::npos);
+	EXPECT_EQ(BlockWords.find("str_copy(s_aBlockWordsLayoutConfigCache"), std::string::npos);
 	EXPECT_NE(KeywordReply.find("UpdateKeywordRulesLayoutState"), std::string::npos);
 	EXPECT_NE(KeywordReply.find("s_aKeywordRulesConfigCache"), std::string::npos);
-	EXPECT_NE(FavoriteMaps.find("++s_FavoriteMapsLayoutRevision"), std::string::npos);
+	EXPECT_NE(FavoriteMaps.find("RefreshFunctionCardLayoutState(this);"), std::string::npos);
+	EXPECT_EQ(FavoriteMaps.find("++s_FavoriteMapsLayoutRevision"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, PublicSettingsCardDeckCoordinatesCanonicalDefinitions)
@@ -10433,6 +10618,8 @@ TEST(QmMonitoringHelpers, MenuPerfEventsExposePageAttributionFields)
 		EXPECT_NE(Source.find("QmPerfShouldLogDuration(ListFrameDurationMs, false)"), std::string::npos);
 		EXPECT_NE(Source.find("const bool PerfListFrameEnabled = QmPerfEnabled();"), std::string::npos);
 		EXPECT_NE(Source.find("RowsIterated += PerfListFrameEnabled ? 1 : 0;"), std::string::npos);
+		EXPECT_NE(Source.find("const int NumPlayers = ServerBrowser()->NumSortedPlayers();"), std::string::npos);
+		EXPECT_EQ(Source.find("NumPlayers += ServerBrowser()->SortedGet(i)->m_NumFilteredPlayers;"), std::string::npos);
 	}
 	{
 		std::ifstream File(TestSourcePath("src/game/client/components/menus_settings.cpp"));
@@ -11823,4 +12010,743 @@ TEST(QmFriendOnlineTracker, NewSameNameWithUnmatchedClanDoesNotNotify)
 	const qm_friend_notify::CFriend Unmatched{"Alice\tOther", "Alice", "Map", "server", false};
 	Tracker.Update({}, {"server"});
 	EXPECT_TRUE(Tracker.Update({Unmatched}, {"server"}).empty());
+}
+
+TEST(QmMonitoringHelpers, PerfJsonFieldPreservesNumbersEscapesAndExistingPrefix)
+{
+	char aJson[512] = "{\"existing\":1";
+	bool First = false;
+	QmPerfAppendJsonField(aJson, sizeof(aJson), First, "duration_ms", "12.345");
+	QmPerfAppendJsonField(aJson, sizeof(aJson), First, "text", "line\npath\\name\t");
+	QmPerfAppendJsonField(aJson, sizeof(aJson), First, "empty", "");
+	str_append(aJson, "}", sizeof(aJson));
+	EXPECT_STREQ(aJson, "{\"existing\":1,\"duration_ms\":12.345,\"text\":\"line\\npath\\\\name\\t\",\"empty\":\"\"}");
+}
+
+TEST(QmMonitoringHelpers, PerfJsonFieldTruncatesAtEveryCapacityWithoutOverwritingTail)
+{
+	char aFull[256] = "{";
+	bool First = true;
+	QmPerfAppendJsonField(aFull, sizeof(aFull), First, "text", "中文内容");
+	for(int Capacity = 2; Capacity <= (int)str_length(aFull) + 2; ++Capacity)
+	{
+		char aBuffer[256];
+		std::fill(aBuffer, aBuffer + sizeof(aBuffer), '#');
+		aBuffer[0] = '{';
+		aBuffer[1] = 0;
+		bool FirstField = true;
+		QmPerfAppendJsonField(aBuffer, Capacity, FirstField, "text", "中文内容");
+		EXPECT_LT(str_length(aBuffer), Capacity);
+		EXPECT_TRUE(str_utf8_check(aBuffer));
+		for(size_t i = Capacity; i < sizeof(aBuffer); ++i)
+			EXPECT_EQ(aBuffer[i], '#');
+	}
+}
+
+TEST(QmNameplateTextCache, HiddenAndEmptyRowsDoNotRebuildEveryFrame)
+{
+	CQmNameplateTextCache Cache;
+	int Builds = 0;
+	const auto Frame = [&](bool Visible, bool Changed) {
+		if(Cache.NeedsUpdate(Visible, Changed))
+		{
+			++Builds;
+			// 即使空文字没有生成容器，这次布局尝试也已完成。
+			Cache.OnUpdate();
+		}
+	};
+	for(int FrameIndex = 0; FrameIndex < 128; ++FrameIndex)
+		Frame(false, true);
+	EXPECT_EQ(Builds, 0);
+	Frame(true, true);
+	for(int FrameIndex = 0; FrameIndex < 128; ++FrameIndex)
+		Frame(true, false);
+	EXPECT_EQ(Builds, 1);
+	Frame(false, false);
+	Frame(true, false);
+	EXPECT_EQ(Builds, 1);
+	// 文字/字号变化和窗口容器失效都必须重建，不把空结果永久缓存。
+	Frame(true, true);
+	EXPECT_EQ(Builds, 2);
+	Cache.Reset();
+	Frame(false, false);
+	Frame(true, false);
+	EXPECT_EQ(Builds, 3);
+}
+
+TEST(QmNameplateTextCache, CoordinateUpdatesReuseContainerAndRecreateAfterInvalidation)
+{
+	struct CTextRecorder
+	{
+		int m_Creates = 0;
+		int m_Rewrites = 0;
+		std::string m_Text;
+		void CreateOrAppendTextContainer(STextContainerIndex &Index, CTextCursor *, const char *pText)
+		{
+			EXPECT_FALSE(Index.Valid());
+			Index.m_Index = 7;
+			++m_Creates;
+			m_Text = pText;
+		}
+		void RecreateTextContainerSoft(STextContainerIndex &Index, CTextCursor *, const char *pText)
+		{
+			EXPECT_EQ(Index.m_Index, 7);
+			++m_Rewrites;
+			m_Text = pText;
+		}
+	} Renderer;
+	STextContainerIndex Index;
+	CTextCursor Cursor;
+	QmUpdateNameplateTextContainer(&Renderer, Index, &Cursor, "X:99.99");
+	QmUpdateNameplateTextContainer(&Renderer, Index, &Cursor, "X:100.00");
+	QmUpdateNameplateTextContainer(&Renderer, Index, &Cursor, "X:-0.01");
+	EXPECT_EQ(Renderer.m_Creates, 1);
+	EXPECT_EQ(Renderer.m_Rewrites, 2);
+	EXPECT_EQ(Renderer.m_Text, "X:-0.01");
+	Index.Reset();
+	QmUpdateNameplateTextContainer(&Renderer, Index, &Cursor, "X:0.00");
+	EXPECT_EQ(Renderer.m_Creates, 2);
+	EXPECT_EQ(Renderer.m_Rewrites, 2);
+}
+
+TEST(QmRouteVisited, LoopsRemainDetectedAndSeparateFramesDoNotShareMarks)
+{
+	CQmRouteVisited Visited;
+	for(int Frame = 0; Frame < 128; ++Frame)
+	{
+		Visited.Begin(1024 * 1024);
+		for(size_t Tile : {size_t(0), size_t(63), size_t(64), size_t(511), size_t(1024 * 1024 - 1)})
+		{
+			EXPECT_TRUE(Visited.Visit(Tile));
+			EXPECT_FALSE(Visited.Visit(Tile));
+		}
+	}
+	// 相同字数但尺寸变化、缩小地图、清空地图都不能保留上一条路径的标记。
+	Visited.Begin(65);
+	EXPECT_TRUE(Visited.Visit(64));
+	Visited.Begin(66);
+	EXPECT_TRUE(Visited.Visit(64));
+	Visited.Begin(1);
+	EXPECT_TRUE(Visited.Visit(0));
+	Visited.Reset();
+	Visited.Begin(1);
+	EXPECT_TRUE(Visited.Visit(0));
+	Visited.Begin(0);
+	Visited.Begin(1024 * 1024);
+	EXPECT_TRUE(Visited.Visit(1024 * 1024 - 1));
+}
+
+TEST(QmTeeTrailBand, ReusedEdgesMatchOriginalNormalsAndCornerWidths)
+{
+	struct SPoint
+	{
+		vec2 m_Pos;
+		float m_Left;
+		float m_Right;
+	};
+	const auto Unit = [](vec2 V, vec2 Fallback = vec2(1, 0)) {
+		const float Len = length(V);
+		return Len > 0.0001f ? V / Len : Fallback;
+	};
+	std::vector<std::vector<vec2>> vPaths = {
+		{vec2(0, 0), vec2(6, 0)},
+		{vec2(-6, 0), vec2(0, 0), vec2(6, 0), vec2(12, 0)},
+		{vec2(0, 0), vec2(6, 0), vec2(6, 6), vec2(0, 6)},
+		{vec2(0, 0), vec2(6, 0), vec2(0, 0), vec2(6, 0)},
+		{vec2(3, 4), vec2(3, 4), vec2(3, 4), vec2(3, 4)},
+		{vec2(0, 0), vec2(6, 0), vec2(6, 0), vec2(6, 0), vec2(8, 3)},
+		{vec2(0, 0), vec2(0.00001f, 0), vec2(0.0001f, 0), vec2(0.01f, 0.005f)},
+		{vec2(17191.32f, -100.17f), vec2(17197.56f, -101.83f), vec2(17201.21f, -97.16f)},
+	};
+	vPaths.emplace_back();
+	for(size_t i = 0; i < qm_tee_trail::MAX_RENDER_POINTS; ++i)
+		vPaths.back().emplace_back(float(i) * 1.71f, std::sin(float(i) * 0.17f) * 43.0f);
+	for(const auto &vPath : vPaths)
+	{
+		for(const float Width : {0.0f, 0.02f, 5.0f, 100.0f})
+		{
+			std::vector<SPoint> vPoints;
+			for(size_t i = 0; i < vPath.size(); ++i)
+				vPoints.push_back({vPath[i], Width * float(i + 1), Width * 0.73f});
+			std::vector<vec2> vNormals(vPath.size());
+			QmPrepareTrailBandJoins(vPoints.data(), vPoints.size(), vNormals.data());
+			for(size_t i = 0; i < vPath.size(); ++i)
+			{
+				// 以优化前的逐截面公式核对重复点、折返及端点的回退方向。
+				const vec2 Prev = i > 0 ? vPath[i - 1] : vPath[i] * 2 - vPath[i + 1];
+				const vec2 Next = i + 1 < vPath.size() ? vPath[i + 1] : vPath[i] * 2 - Prev;
+				const vec2 Before = Unit(vPath[i] - Prev);
+				const vec2 After = Unit(Next - vPath[i], Before);
+				const vec2 Tangent = Unit(Before + After, After);
+				const float Turn = std::sqrt(std::max(0.000001f, 2 - 2 * dot(Before, After)));
+				const float Radius = std::min(distance(Prev, vPath[i]), distance(Next, vPath[i])) / Turn;
+				const float Miter = 1 / std::max(0.7f, dot(Before, Tangent));
+				EXPECT_EQ(vNormals[i], vec2(-Tangent.y, Tangent.x));
+				EXPECT_EQ(vPoints[i].m_Left, std::min(Width * float(i + 1) * Miter, Radius * 0.8f));
+				EXPECT_EQ(vPoints[i].m_Right, std::min(Width * 0.73f * Miter, Radius * 0.8f));
+				EXPECT_EQ(vPoints[i].m_Pos, vPath[i]);
+			}
+		}
+	}
+}
+
+TEST(QmMonitoringHelpers, StutterPercentilesMatchSortedNearestRankAfterRepeatedQueries)
+{
+	CQmStutterSampleSeries Samples;
+	std::vector<double> vSorted;
+	for(size_t i = 0; i < 4096; ++i)
+	{
+		const double Value = (double)((i * 137) % 997) / 8.0;
+		Samples.Record(Value, i + 1);
+		vSorted.push_back(Value);
+	}
+	std::sort(vSorted.begin(), vSorted.end());
+	const double Total = Samples.Total();
+	const uint64_t MaxFrame = Samples.MaxFrame();
+	for(const double Percent : {99.0, 95.0, 0.0, 50.0, 100.0, -1.0, 101.0, 0.01, 95.0, 99.0})
+	{
+		const size_t Rank = (size_t)std::ceil(std::clamp(Percent, 0.0, 100.0) / 100.0 * vSorted.size());
+		const size_t Index = std::min(vSorted.size() - 1, Rank > 0 ? Rank - 1 : (size_t)0);
+		EXPECT_DOUBLE_EQ(Samples.Percentile(Percent), vSorted[Index]);
+	}
+	EXPECT_EQ(Samples.Count(), vSorted.size());
+	EXPECT_DOUBLE_EQ(Samples.Total(), Total);
+	EXPECT_DOUBLE_EQ(Samples.Average(), Total / vSorted.size());
+	EXPECT_DOUBLE_EQ(Samples.Max(), vSorted.back());
+	EXPECT_EQ(Samples.MaxFrame(), MaxFrame);
+}
+
+TEST(QmMonitoringHelpers, StutterPercentileQueriesAllowFurtherRecordingAndReset)
+{
+	CQmStutterSampleSeries Samples;
+	EXPECT_DOUBLE_EQ(Samples.Percentile(95.0), 0.0);
+	Samples.Record(10.0, 7);
+	Samples.Record(1.0, 8);
+	EXPECT_DOUBLE_EQ(Samples.Percentile(50.0), 1.0);
+	Samples.Record(10.0, 9);
+	Samples.Record(0.0, 10);
+	Samples.Record(-1.0, 11);
+	Samples.Record(std::numeric_limits<double>::infinity(), 12);
+	Samples.Record(std::numeric_limits<double>::quiet_NaN(), 13);
+	EXPECT_EQ(Samples.Count(), 4u);
+	EXPECT_DOUBLE_EQ(Samples.Percentile(50.0), 1.0);
+	EXPECT_DOUBLE_EQ(Samples.Percentile(95.0), 10.0);
+	EXPECT_DOUBLE_EQ(Samples.Total(), 21.0);
+	EXPECT_EQ(Samples.MaxFrame(), 7u);
+
+	Samples.Reset();
+	EXPECT_TRUE(Samples.Empty());
+	EXPECT_DOUBLE_EQ(Samples.Total(), 0.0);
+	EXPECT_DOUBLE_EQ(Samples.Average(), 0.0);
+	EXPECT_DOUBLE_EQ(Samples.Max(), 0.0);
+	EXPECT_EQ(Samples.MaxFrame(), 0u);
+	EXPECT_DOUBLE_EQ(Samples.Percentile(99.0), 0.0);
+	Samples.Record(2.0, 20);
+	EXPECT_DOUBLE_EQ(Samples.Percentile(0.0), 2.0);
+	EXPECT_DOUBLE_EQ(Samples.Percentile(100.0), 2.0);
+	EXPECT_EQ(Samples.MaxFrame(), 20u);
+}
+
+TEST(QmTeeTrailBand, PreparedSoftSectionsMatchOriginalStripVerticesAndColors)
+{
+	const vec2 Position(31.25f, -72.5f);
+	const ColorRGBA Color(0.2f, 0.7f, 1.0f, 0.63f);
+	for(const vec2 Normal : {vec2(0, 1), vec2(-1, 0), vec2(0.6f, -0.8f)})
+		for(const float Left : {0.0f, 0.01f, 1.0f, 100.0f})
+			for(const float Right : {0.0f, 0.03f, 2.0f, 80.0f})
+				for(const float Softness : {0.0f, 0.06f, 0.22f, 0.65f, 0.85f, 1.0f})
+					for(const float PixelSize : {0.025f, 1.0f, 8.0f})
+					{
+						const auto Section = QmPrepareTrailBandSection(Position, Left, Right, Color, Normal, Softness, PixelSize);
+						const float Width = std::max(Left, Right);
+						const float Feather = std::clamp(std::max(Softness, PixelSize / std::max(Width, PixelSize)), 0.02f, 1.0f);
+						const float aOffsets[] = {-Left, -Left * (1 - Feather), Right * (1 - Feather), Right};
+						const float aAlphas[] = {0, 1, 1, 0};
+						for(int Strip = 0; Strip < 3; ++Strip)
+							for(const int Edge : {Strip, Strip + 1})
+							{
+								EXPECT_EQ(Section.m_aPos[Edge], Position + Normal * aOffsets[Edge]);
+								const ColorRGBA Expected = Color.WithMultipliedAlpha(aAlphas[Edge]);
+								EXPECT_EQ(Section.m_aColor[Edge], Expected);
+							}
+					}
+}
+
+TEST(QmTextLayout, ExplicitByteLengthKeepsPrefixAndNullTerminationSemantics)
+{
+	for(const char *pText : {"", "hello world", "多行文字\n测试", "emoji: \xF0\x9F\x98\x80 suffix"})
+	{
+		const int FullLength = str_length(pText);
+		for(int Limit = -2; Limit <= FullLength + 2; ++Limit)
+			EXPECT_EQ(QmTextLayoutByteLength(pText, Limit), Limit < 0 ? FullLength : std::min(Limit, FullLength));
+	}
+	const char aEmbeddedNull[] = {'a', '\0', 'b', '\0'};
+	EXPECT_EQ(QmTextLayoutByteLength(aEmbeddedNull, 3), 1);
+	// 显式字节上限可以落在 UTF-8 编码中间，不能偷偷改成码点计数。
+	EXPECT_EQ(QmTextLayoutByteLength("中文", 2), 2);
+}
+
+TEST(QmTextLayout, ExplicitLengthDoesNotNeedToInspectTheRemainingParagraph)
+{
+	// 没有终止符的精确大小前缀，限制读取范围；仅验证长度助手，不改变渲染接口契约。
+	const auto pPrefix = std::make_unique<char[]>(3);
+	pPrefix[0] = 'a';
+	pPrefix[1] = 'b';
+	pPrefix[2] = 'c';
+	EXPECT_EQ(QmTextLayoutByteLength(pPrefix.get(), 0), 0);
+	EXPECT_EQ(QmTextLayoutByteLength(pPrefix.get(), 3), 3);
+
+	const std::string Source = ReadRepoFile("src/engine/client/text.cpp");
+	const std::string Body = ExtractSourceFunctionBody(Source, "void AppendTextContainerImpl(");
+	EXPECT_NE(Body.find("Length = QmTextLayoutByteLength(pText, Length);"), std::string::npos);
+	EXPECT_EQ(Body.find("str_length(pText)"), std::string::npos);
+	EXPECT_NE(Body.find("TextEx(&Compare, pCurrent, Wlen);"), std::string::npos);
+	EXPECT_NE(Body.find("TextEx(&Cutter, pCurrent, Wlen);"), std::string::npos);
+}
+
+TEST(QmGlyphOutline, PreparedWeightsMatchOriginalPixelsAtAllSupportedRadii)
+{
+	for(const ivec2 Size : {ivec2(1, 1), ivec2(2, 7), ivec2(13, 3), ivec2(37, 41), ivec2(138, 138)})
+		for(const int Radius : {0, 1, 2, 3, 4})
+			for(int Pattern = 0; Pattern < 4; ++Pattern)
+			{
+				std::vector<unsigned char> vInput(Size.x * Size.y);
+				for(size_t i = 0; i < vInput.size(); ++i)
+				{
+					if(Pattern == 0)
+						vInput[i] = 0;
+					else if(Pattern == 1)
+						vInput[i] = 255;
+					else if(Pattern == 2)
+						vInput[i] = i == vInput.size() / 2 ? 255 : 0;
+					else
+						vInput[i] = (i * 73 + i / Size.x * 19) % 256;
+				}
+				std::vector<unsigned char> vExpected(vInput.size());
+				for(int y = 0; y < Size.y; ++y)
+					for(int x = 0; x < Size.x; ++x)
+					{
+						int Value = vInput[y * Size.x + x];
+						for(int dy = -Radius; dy <= Radius; ++dy)
+							for(int dx = -Radius; dx <= Radius; ++dx)
+								if(x + dx >= 0 && x + dx < Size.x && y + dy >= 0 && y + dy < Size.y)
+								{
+									const float Mask = 1.f - std::clamp(length(vec2(dx, dy)) - Radius, 0.f, 1.f);
+									Value = std::max(Value, int(vInput[(y + dy) * Size.x + x + dx] * Mask));
+								}
+						vExpected[y * Size.x + x] = Value;
+					}
+				std::vector<unsigned char> vActual(vInput.size(), 17);
+				QmGrowGlyphOutline(vInput.data(), vActual.data(), Size.x, Size.y, Radius);
+				EXPECT_EQ(vActual, vExpected) << "radius=" << Radius << " size=" << Size.x << "x" << Size.y << " pattern=" << Pattern;
+			}
+}
+
+TEST(QmTextRender, PixelSizeChangesAreCentralizedAndInvalidateCachedFaceSize)
+{
+	const std::string Source = ReadRepoFile("src/engine/client/text.cpp");
+	const size_t GlyphMapEnd = Source.find("class CTextRender");
+	ASSERT_NE(GlyphMapEnd, std::string::npos);
+	const std::string GlyphMap = Source.substr(0, GlyphMapEnd);
+	EXPECT_EQ(GlyphMap.find("FT_Set_Pixel_Sizes(Glyph.m_Face"), std::string::npos);
+	EXPECT_EQ(GlyphMap.find("FT_Set_Pixel_Sizes(pLeft->m_Face"), std::string::npos);
+	EXPECT_EQ(GlyphMap.find("FT_Set_Pixel_Sizes(Face, FontSize"), std::string::npos);
+	EXPECT_NE(GlyphMap.find("void EnsureFacePixelSize(FT_Face Face, int FontSize)"), std::string::npos);
+	EXPECT_NE(GlyphMap.find("void InvalidateFacePixelSizeCache()"), std::string::npos);
+	const std::string TextRender = Source.substr(GlyphMapEnd);
+	EXPECT_NE(TextRender.find("FT_Set_Pixel_Sizes(m_pGlyphMap->DefaultFace(), 0, FontSize);\n\t\tm_pGlyphMap->InvalidateFacePixelSizeCache();"), std::string::npos);
+	EXPECT_NE(TextRender.find("FT_Set_Pixel_Sizes(m_pGlyphMap->DefaultFace(), FontWidth, FontHeight);\n\t\tm_pGlyphMap->InvalidateFacePixelSizeCache();"), std::string::npos);
+}
+
+TEST(QmTextRender, FontSizeCacheSkipsOnlyRepeatedSuccessfulSettings)
+{
+	CQmFontSizeCache Cache;
+	int FaceA = 0, FaceB = 0;
+	int Calls = 0;
+	const auto SetSize = [&]() { ++Calls; return 0; };
+	Cache.Ensure(&FaceA, 12, SetSize);
+	for(int i = 0; i < 100; ++i)
+		Cache.Ensure(&FaceA, 12, SetSize);
+	EXPECT_EQ(Calls, 1);
+	Cache.Ensure(&FaceA, 18, SetSize);
+	Cache.Ensure(&FaceB, 18, SetSize);
+	Cache.Ensure(&FaceA, 18, SetSize);
+	EXPECT_EQ(Calls, 4);
+	Cache.Reset();
+	Cache.Ensure(&FaceA, 18, SetSize);
+	EXPECT_EQ(Calls, 5);
+	Cache.Ensure(nullptr, 18, SetSize);
+	EXPECT_EQ(Calls, 5);
+}
+
+TEST(QmTextRender, FailedFontSizeChangesRetryAndInvalidatePreviousSize)
+{
+	CQmFontSizeCache Cache;
+	int Face = 0;
+	int Calls = 0;
+	const auto Success = [&]() { ++Calls; return 0; };
+	const auto Failure = [&]() { ++Calls; return 1; };
+	Cache.Ensure(&Face, 12, Success);
+	Cache.Ensure(&Face, 18, Failure);
+	Cache.Ensure(&Face, 18, Failure);
+	EXPECT_EQ(Calls, 3);
+	Cache.Ensure(&Face, 12, Success);
+	EXPECT_EQ(Calls, 4);
+	Cache.Ensure(&Face, 18, Success);
+	Cache.Ensure(&Face, 18, Success);
+	EXPECT_EQ(Calls, 5);
+}
+
+TEST(QmRoundedRect, CachedDirectionsPreserveOriginalAnglesForEveryQuality)
+{
+	CQmRoundedRectDirections Cache;
+	for(int Segments = 8; Segments <= 48; Segments += 2)
+	{
+		const vec2 *pDirections = Cache.Get(Segments);
+		const float Step = pi / 2 / Segments;
+		for(int i = 0; i <= Segments; ++i)
+		{
+			const float Angle = i * Step;
+			EXPECT_EQ(pDirections[i].x, std::cos(Angle));
+			EXPECT_EQ(pDirections[i].y, std::sin(Angle));
+			// 同时覆盖抗锯齿内外边、四角方向和非整数半径，保留运算顺序。
+			for(const float Radius : {0.0f, 0.125f, 16.75f, 321.0f})
+				for(const float Direction : {-1.0f, 1.0f})
+				{
+					EXPECT_EQ(13.25f + Direction * pDirections[i].x * Radius, 13.25f + Direction * std::cos(Angle) * Radius);
+					EXPECT_EQ(-7.5f + Direction * pDirections[i].y * Radius, -7.5f + Direction * std::sin(Angle) * Radius);
+				}
+		}
+	}
+}
+
+TEST(QmRoundedRect, QualitySwitchesKeepPreviouslyPreparedDirectionsStable)
+{
+	CQmRoundedRectDirections Cache;
+	std::array<const vec2 *, 21> apDirections;
+	std::array<std::vector<vec2>, 21> avSnapshots;
+	for(int Segments = 8; Segments <= 48; Segments += 2)
+	{
+		const int Index = (Segments - 8) / 2;
+		apDirections[Index] = Cache.Get(Segments);
+		avSnapshots[Index].assign(apDirections[Index], apDirections[Index] + Segments + 1);
+	}
+	// 固定 48 段的渲染目标圆角与可配置的普通圆角交替绘制时，不相互覆盖。
+	for(int Segments = 48; Segments >= 8; Segments -= 2)
+	{
+		const int Index = (Segments - 8) / 2;
+		EXPECT_EQ(Cache.Get(Segments), apDirections[Index]);
+		for(int i = 0; i <= Segments; ++i)
+			EXPECT_EQ(apDirections[Index][i], avSnapshots[Index][i]);
+	}
+}
+
+TEST(QmGlyphAtlas, SmallSlotsKeepExactWidthAndHeightSearchOrder)
+{
+	CAtlas Atlas;
+	Atlas.Clear(128);
+	const auto ExpectPlacement = [&](size_t Width, size_t Height, int ExpectedX, int ExpectedY) {
+		int X = -1, Y = -1;
+		ASSERT_TRUE(Atlas.Add(Width, Height, X, Y));
+		EXPECT_EQ(X, ExpectedX);
+		EXPECT_EQ(Y, ExpectedY);
+	};
+	// 大区切分后留下小区：依次覆盖精确尺寸、同宽增高和同高增宽查询。
+	ExpectPlacement(64, 64, 0, 0);
+	ExpectPlacement(64, 64, 64, 0);
+	ExpectPlacement(16, 16, 0, 64);
+	ExpectPlacement(16, 32, 0, 80);
+	ExpectPlacement(16, 16, 0, 112);
+	ExpectPlacement(32, 16, 16, 64);
+	ExpectPlacement(16, 48, 16, 80);
+}
+
+TEST(QmGlyphAtlas, FailedSearchAndGrowthPreserveExistingSlots)
+{
+	CAtlas Atlas;
+	Atlas.Clear(128);
+	int X = -1, Y = -1;
+	ASSERT_TRUE(Atlas.Add(64, 64, X, Y));
+	ASSERT_TRUE(Atlas.Add(64, 64, X, Y));
+	ASSERT_TRUE(Atlas.Add(16, 16, X, Y));
+	X = -1;
+	Y = -1;
+	EXPECT_FALSE(Atlas.Add(129, 16, X, Y));
+	EXPECT_EQ(X, -1);
+	EXPECT_EQ(Y, -1);
+	Atlas.IncreaseDimension(256);
+	// 扩容后仍优先复用原来留下的 16 × 48 小区。
+	ASSERT_TRUE(Atlas.Add(16, 32, X, Y));
+	EXPECT_EQ(X, 0);
+	EXPECT_EQ(Y, 80);
+	// 旧大区高度不足时，再使用新增加的区域。
+	ASSERT_TRUE(Atlas.Add(32, 96, X, Y));
+	EXPECT_EQ(X, 0);
+	EXPECT_EQ(Y, 128);
+	Atlas.Clear(128);
+	ASSERT_TRUE(Atlas.Add(128, 128, X, Y));
+	EXPECT_EQ(X, 0);
+	EXPECT_EQ(Y, 0);
+	EXPECT_FALSE(Atlas.Add(16, 16, X, Y));
+}
+
+TEST(QmTeeTrailStyles, OriginalKeepsInputColorWithoutPresetOrSeedEffects)
+{
+	const auto vTrail = MakeStyleTestTrail();
+	for(const bool Taper : {false, true})
+		for(const bool Fade : {false, true})
+			for(const float Width : {0.0f, 15.0f})
+			{
+				std::vector<qm_tee_trail::SQuad> vExpected, vActual;
+				qm_tee_trail::BuildEffect(vTrail, qm_tee_trail::STYLE_ORIGINAL, false, 100.5, Width, 1, vExpected, 0.125f, Taper, Fade);
+				ASSERT_FALSE(vExpected.empty());
+				for(const int Style : {int(qm_tee_trail::STYLE_ORIGINAL), -1, 999})
+				{
+					qm_tee_trail::BuildEffect(vTrail, Style, true, 100.5, Width, 917, vActual, 0.125f, Taper, Fade);
+					ASSERT_EQ(vActual.size(), vExpected.size());
+					for(size_t i = 0; i < vExpected.size(); ++i)
+					{
+						EXPECT_FALSE(vActual[i].m_Additive);
+						for(int Vertex = 0; Vertex < 4; ++Vertex)
+						{
+							EXPECT_EQ(vActual[i].m_aPos[Vertex], vExpected[i].m_aPos[Vertex]);
+							EXPECT_EQ(vActual[i].m_aColor[Vertex], vExpected[i].m_aColor[Vertex]);
+							EXPECT_FLOAT_EQ(vActual[i].m_aColor[Vertex].r, vTrail[0].m_Col.r);
+							EXPECT_FLOAT_EQ(vActual[i].m_aColor[Vertex].g, vTrail[0].m_Col.g);
+							EXPECT_FLOAT_EQ(vActual[i].m_aColor[Vertex].b, vTrail[0].m_Col.b);
+							EXPECT_GE(vActual[i].m_aColor[Vertex].a, 0.0f);
+							EXPECT_LE(vActual[i].m_aColor[Vertex].a, vTrail[0].m_Col.a);
+						}
+					}
+				}
+			}
+}
+
+TEST(QmMonitoringHelpers, ProcessMetricsStayReadableWhileSystemQueryIsInFlight)
+{
+	std::atomic<bool> Sampling{false};
+	std::atomic<bool> SampledOnWorker{false};
+	std::mutex ReleaseMutex;
+	std::condition_variable ReleaseCv;
+	bool Release = false;
+	const auto CallerThread = std::this_thread::get_id();
+	CQmAsyncDevicePerfSampler Sampler([&]() {
+		SampledOnWorker.store(std::this_thread::get_id() != CallerThread);
+		Sampling.store(true);
+		std::unique_lock<std::mutex> Lock(ReleaseMutex);
+		ReleaseCv.wait(Lock, [&]() { return Release; });
+		SQmDevicePerfSample Sample;
+		Sample.m_CpuUsagePct = 12.0f;
+		Sample.m_TotalCpuUsagePct = 24.0f;
+		Sample.m_MemoryUsageMb = 512.0f;
+		Sample.m_Available = true;
+		return Sample;
+	},
+		std::chrono::milliseconds(50));
+	QmUpdateDevicePerfSamplerState(Sampler, true);
+	// 释放采样器前不使用致命断言，确保失败路径也会唤醒工作线程。
+	EXPECT_TRUE(WaitUntil([&]() { return Sampling.load(); }));
+	// 正在采样时仍可读到完整旧快照，不等待查询完成或读到部分更新。
+	const auto Before = Sampler.Snapshot();
+	EXPECT_EQ(Before.m_Version, 0u);
+	EXPECT_FLOAT_EQ(Before.m_Sample.m_CpuUsagePct, -1.0f);
+	EXPECT_FLOAT_EQ(Before.m_Sample.m_MemoryUsageMb, -1.0f);
+	EXPECT_TRUE(SampledOnWorker.load());
+	{
+		std::lock_guard<std::mutex> Lock(ReleaseMutex);
+		Release = true;
+	}
+	ReleaseCv.notify_all();
+	ASSERT_TRUE(WaitUntil([&]() { return Sampler.Snapshot().m_Version > 0; }));
+	const auto After = Sampler.Snapshot();
+	EXPECT_FLOAT_EQ(After.m_Sample.m_CpuUsagePct, 12.0f);
+	EXPECT_FLOAT_EQ(After.m_Sample.m_TotalCpuUsagePct, 24.0f);
+	EXPECT_FLOAT_EQ(After.m_Sample.m_MemoryUsageMb, 512.0f);
+	Sampler.Stop();
+	EXPECT_EQ(Sampler.Snapshot().m_Version, 0u);
+}
+
+TEST(QmTextWordCursor, DecoratedParagraphDoesNotCopyPerCharacterStorage)
+{
+	CTextCursor Source;
+	Source.m_Flags = TEXTFLAG_RENDER;
+	Source.m_CalculateSelectionMode = TEXT_CURSOR_SELECTION_MODE_CALCULATE;
+	Source.m_CursorMode = TEXT_CURSOR_CURSOR_MODE_CALCULATE;
+	for(int Index = 0; Index < 4096; ++Index)
+	{
+		Source.m_vColorSplits.emplace_back(Index, 1, ColorRGBA(1.0f, 0.5f, 0.0f, 1.0f));
+		Source.m_vCharOffsets.emplace_back(Index, 2.0f, -3.0f);
+	}
+	Source.m_vSelectionQuads.emplace_back(1.0f, 2.0f, 3.0f, 4.0f);
+
+	const CTextCursor Measure = QmTextWordMeasureCursor(Source, 12.0f, 20.0f);
+	EXPECT_EQ(Measure.m_vColorSplits.capacity(), 0u);
+	EXPECT_EQ(Measure.m_vCharOffsets.capacity(), 0u);
+	EXPECT_EQ(Measure.m_vSelectionQuads.capacity(), 0u);
+	EXPECT_EQ(Measure.m_CalculateSelectionMode, TEXT_CURSOR_SELECTION_MODE_NONE);
+	EXPECT_EQ(Measure.m_CursorMode, TEXT_CURSOR_CURSOR_MODE_NONE);
+	EXPECT_EQ(Measure.m_Flags, TEXTFLAG_DISALLOW_NEWLINE);
+	// 临时测量不转移或修改真正绘制所需的整段装饰数据。
+	EXPECT_EQ(Source.m_vColorSplits.size(), 4096u);
+	EXPECT_EQ(Source.m_vCharOffsets.size(), 4096u);
+	EXPECT_EQ(Source.m_vSelectionQuads.size(), 1u);
+	EXPECT_EQ(Source.m_Flags, TEXTFLAG_RENDER);
+	EXPECT_EQ(Source.m_CalculateSelectionMode, TEXT_CURSOR_SELECTION_MODE_CALCULATE);
+}
+
+TEST(QmTextWordCursor, AppendedWordKeepsLineOriginAndCharacterProgress)
+{
+	CTextCursor Source;
+	Source.m_Flags = TEXTFLAG_RENDER | TEXTFLAG_STOP_AT_END;
+	Source.m_StartX = 10.0f;
+	Source.m_StartY = 15.0f;
+	Source.m_X = 10.0f;
+	Source.m_Y = 15.0f;
+	Source.m_LineWidth = 90.0f;
+	Source.m_FontSize = 13.5f;
+	Source.m_LineSpacing = 2.5f;
+	Source.m_LineCount = 3;
+	Source.m_MaxLines = 4;
+	Source.m_GlyphCount = 5;
+	Source.m_CharCount = 9;
+
+	const CTextCursor Measure = QmTextWordMeasureCursor(Source, 42.0f, 47.0f);
+	// 测量从当前绘制位置开始，但截断仍相对于原行起点；保留首字形判定。
+	EXPECT_FLOAT_EQ(Measure.m_X, 42.0f);
+	EXPECT_FLOAT_EQ(Measure.m_Y, 47.0f);
+	EXPECT_FLOAT_EQ(Measure.m_StartX, 10.0f);
+	EXPECT_FLOAT_EQ(Measure.m_StartY, 15.0f);
+	EXPECT_FLOAT_EQ(Measure.m_LineWidth, 90.0f);
+	EXPECT_FLOAT_EQ(Measure.m_FontSize, 13.5f);
+	EXPECT_FLOAT_EQ(Measure.m_LineSpacing, 2.5f);
+	EXPECT_EQ(Measure.m_LineCount, 3);
+	EXPECT_EQ(Measure.m_MaxLines, 4);
+	EXPECT_EQ(Measure.m_GlyphCount, 5);
+	EXPECT_EQ(Measure.m_CharCount, 9);
+	EXPECT_EQ(Measure.m_Flags, TEXTFLAG_STOP_AT_END | TEXTFLAG_DISALLOW_NEWLINE);
+	EXPECT_FLOAT_EQ(Source.m_X, 10.0f);
+}
+
+TEST(QmGlyphLookupCache, FontSelectionSizeAndCharacterRemainDistinct)
+{
+	CQmGlyphLookupCache<int> Cache;
+	int FaceA = 0, FaceB = 0;
+	int GlyphA = 1, GlyphB = 2, GlyphC = 3;
+	Cache.Store(&FaceA, 65, 12, &GlyphA);
+	EXPECT_EQ(Cache.Find(&FaceA, 65, 12), &GlyphA);
+	EXPECT_EQ(Cache.Find(&FaceB, 65, 12), nullptr);
+	EXPECT_EQ(Cache.Find(&FaceA, 65, 18), nullptr);
+	EXPECT_EQ(Cache.Find(&FaceA, 66, 12), nullptr);
+	Cache.Store(&FaceB, 65, 12, &GlyphB);
+	EXPECT_EQ(Cache.Find(&FaceB, 65, 12), &GlyphB);
+	EXPECT_EQ(Cache.Find(&FaceA, 65, 12), nullptr);
+	// 默认字体预设用空选择指针，同样是有效上下文。
+	Cache.Store(nullptr, 0x4e2d, 18, &GlyphC);
+	EXPECT_EQ(Cache.Find(nullptr, 0x4e2d, 18), &GlyphC);
+}
+
+TEST(QmGlyphLookupCache, CollisionsOnlyEvictAndResetDropsBorrowedPointers)
+{
+	CQmGlyphLookupCache<int> Cache;
+	int GlyphA = 1, GlyphB = 2;
+	Cache.Store(nullptr, 65, 12, &GlyphA);
+	Cache.Store(nullptr, 65 + 256, 12, &GlyphB);
+	EXPECT_EQ(Cache.Find(nullptr, 65, 12), nullptr);
+	EXPECT_EQ(Cache.Find(nullptr, 65 + 256, 12), &GlyphB);
+	// 图集清空或字体链改变后，旧指针必须无法命中。
+	Cache.Reset();
+	EXPECT_EQ(Cache.Find(nullptr, 65 + 256, 12), nullptr);
+	Cache.Store(nullptr, 65, 12, &GlyphB);
+	EXPECT_EQ(Cache.Find(nullptr, 65, 12), &GlyphB);
+}
+
+TEST(QmGlyphLookupCache, MissingGlyphCanReuseReplacementWithoutOwningIt)
+{
+	CQmGlyphLookupCache<int> Cache;
+	int Replacement = 7;
+	Cache.Store(nullptr, 0x25a1, 14, &Replacement);
+	Cache.Store(nullptr, 0x10ffff, 14, &Replacement);
+	EXPECT_EQ(Cache.Find(nullptr, 0x10ffff, 14), &Replacement);
+	Replacement = 9;
+	EXPECT_EQ(*Cache.Find(nullptr, 0x10ffff, 14), 9);
+	Cache.Store(nullptr, 42, 14, nullptr);
+	EXPECT_EQ(Cache.Find(nullptr, 42, 14), nullptr);
+}
+
+TEST(QmGlyphAtlasImage, GrowthPreservesPixelsAndClearsOnlyNewArea)
+{
+	for(const size_t OldDimension : {1u, 2u, 7u, 16u, 65u})
+	{
+		const size_t NewDimension = OldDimension * 2;
+		std::vector<uint8_t> vSource(OldDimension * OldDimension);
+		for(size_t Index = 0; Index < vSource.size(); ++Index)
+			vSource[Index] = static_cast<uint8_t>((Index * 37 + 19) % 256);
+		// 目标预填非零值，并在两端留哨兵，避免依赖新分配内存恰好为零。
+		std::vector<uint8_t> vDestination(NewDimension * NewDimension + 2, 0xcd);
+		QmCopyExpandedGlyphAtlas(vDestination.data() + 1, vSource.data(), OldDimension, NewDimension);
+		EXPECT_EQ(vDestination.front(), 0xcd);
+		EXPECT_EQ(vDestination.back(), 0xcd);
+		for(size_t Y = 0; Y < NewDimension; ++Y)
+			for(size_t X = 0; X < NewDimension; ++X)
+				EXPECT_EQ(vDestination[1 + Y * NewDimension + X], X < OldDimension && Y < OldDimension ? vSource[Y * OldDimension + X] : 0);
+	}
+}
+
+TEST(QmGlyphAtlasImage, RepeatedGrowthRetainsPreviouslyAddedGlyphs)
+{
+	const std::array<uint8_t, 4> aSource = {1, 2, 3, 4};
+	std::array<uint8_t, 16> aIntermediate;
+	QmCopyExpandedGlyphAtlas(aIntermediate.data(), aSource.data(), 2, 4);
+	// 第一次扩容后，新增区域也可能已经写入字形。
+	aIntermediate[3] = 91;
+	aIntermediate[15] = 127;
+	std::array<uint8_t, 64> aDestination;
+	aDestination.fill(0xff);
+	QmCopyExpandedGlyphAtlas(aDestination.data(), aIntermediate.data(), 4, 8);
+	for(size_t Y = 0; Y < 8; ++Y)
+		for(size_t X = 0; X < 8; ++X)
+			EXPECT_EQ(aDestination[Y * 8 + X], X < 4 && Y < 4 ? aIntermediate[Y * 4 + X] : 0);
+}
+
+TEST(QmPreparedMediaArt, CopiesBothMaskedImagesBeforePublication)
+{
+	std::vector<uint8_t> vOriginal = {1, 2, 3, 4, 5, 6, 7, 8};
+	std::vector<uint8_t> vCircular = {1, 2, 3, 0, 5, 6, 7, 31};
+	CQmPreparedMediaArt Prepared(vOriginal, vCircular, 2, 1);
+	ASSERT_NE(Prepared.m_Original.m_pData, nullptr);
+	ASSERT_NE(Prepared.m_Circular.m_pData, nullptr);
+	EXPECT_EQ(mem_comp(Prepared.m_Original.m_pData, vOriginal.data(), vOriginal.size()), 0);
+	EXPECT_EQ(mem_comp(Prepared.m_Circular.m_pData, vCircular.data(), vCircular.size()), 0);
+	EXPECT_EQ(Prepared.m_Original.m_Format, CImageInfo::FORMAT_RGBA);
+	EXPECT_EQ(Prepared.m_Original.m_Width, 2u);
+	EXPECT_EQ(Prepared.m_Original.m_Height, 1u);
+	vOriginal[3] = 99;
+	vCircular[3] = 99;
+	EXPECT_EQ(Prepared.m_Original.m_pData[3], 4);
+	EXPECT_EQ(Prepared.m_Circular.m_pData[3], 0);
+}
+
+TEST(QmPreparedMediaArt, MovedImageSurvivesPendingPacketDestruction)
+{
+	CImageInfo Transferred;
+	const std::vector<uint8_t> vPixels = {11, 22, 33, 44};
+	{
+		CQmPreparedMediaArt Prepared(vPixels, vPixels, 1, 1);
+		Transferred = std::move(Prepared.m_Original);
+		EXPECT_EQ(Prepared.m_Original.m_pData, nullptr);
+	}
+	ASSERT_NE(Transferred.m_pData, nullptr);
+	EXPECT_EQ(mem_comp(Transferred.m_pData, vPixels.data(), vPixels.size()), 0);
+	Transferred.Free();
+}
+
+TEST(QmPreparedMediaArt, InvalidCircularImageDoesNotDiscardOriginal)
+{
+	const std::vector<uint8_t> vPixels = {11, 22, 33, 44};
+	CQmPreparedMediaArt Partial(vPixels, {}, 1, 1);
+	EXPECT_NE(Partial.m_Original.m_pData, nullptr);
+	EXPECT_EQ(Partial.m_Circular.m_pData, nullptr);
+	CQmPreparedMediaArt Invalid(vPixels, vPixels, 0, 1);
+	EXPECT_EQ(Invalid.m_Original.m_pData, nullptr);
+	EXPECT_EQ(Invalid.m_Circular.m_pData, nullptr);
 }

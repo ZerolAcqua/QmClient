@@ -7,6 +7,7 @@
 #include <generated/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/components/qmclient/qm_hook_coll_visibility.h>
 #include <game/client/components/qmclient/weapon_animation.h>
 #include <game/client/render.h>
 
@@ -75,6 +76,7 @@ class CPlayers : public CComponent
 	bool ShouldRenderWeaponAnimation(int ClientId) const;
 
 	SQmHookCollLineScratch m_HookCollLineScratch;
+	CQmHookCollVisibility m_HookCollVisibility;
 	int m_WeaponEmoteQuadContainerIndex;
 	int m_aWeaponSpriteMuzzleQuadContainerIndex[NUM_WEAPONS];
 	int m_aWeaponSwitchLastWeapons[MAX_CLIENTS];
@@ -95,6 +97,7 @@ public:
 		float Intra = 0.0f);
 
 	int Sizeof() const override { return sizeof(*this); }
+	void OnMapLoad() override;
 	void OnReset() override;
 	void OnInit() override;
 	void OnRender() override;

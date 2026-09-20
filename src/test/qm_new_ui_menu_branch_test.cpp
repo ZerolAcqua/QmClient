@@ -152,15 +152,8 @@ TEST(TClientStatusBarScore, FormatsPlayerPointsStates)
 	EXPECT_FALSE(tclient_statusbar::FormatPlayerPoints(aBuf, 0, EPointsStatus::READY, 0));
 }
 
-TEST(QmNewUiMenuBranches, RespawnWeaponAndCallvoteFiltersUseSharedBoundedSemantics)
+TEST(QmNewUiMenuBranches, CallvoteFiltersUseSharedBoundedSemantics)
 {
-	EXPECT_EQ(QmRespawnDefaultWantedWeapon(-1), 0);
-	EXPECT_EQ(QmRespawnDefaultWantedWeapon(0), 0);
-	EXPECT_EQ(QmRespawnDefaultWantedWeapon(WEAPON_HAMMER + 1), WEAPON_HAMMER + 1);
-	EXPECT_EQ(QmRespawnDefaultWantedWeapon(WEAPON_GUN + 1), WEAPON_GUN + 1);
-	EXPECT_EQ(QmRespawnDefaultWantedWeapon(WEAPON_LASER + 1), WEAPON_LASER + 1);
-	EXPECT_EQ(QmRespawnDefaultWantedWeapon(WEAPON_LASER + 2), WEAPON_LASER + 1);
-
 	EXPECT_TRUE(QmTextMatchesIncludeExcludeFilter("Deep Freeze", "deep", ""));
 	EXPECT_TRUE(QmTextMatchesIncludeExcludeFilter("Deep Freeze", "", "race"));
 	EXPECT_FALSE(QmTextMatchesIncludeExcludeFilter("Deep Freeze", "race", ""));
@@ -397,7 +390,8 @@ TEST(QmNewUiMenuBranches, P6QmClientContributorsUsesCanonicalDeck)
 	const std::string Dispatch = FunctionBody(Source, "void CMenus::RenderSettingsQmClientContent(CUIRect MainView, bool ContributorsPage, bool PrewarmOnly)");
 	ASSERT_FALSE(Dispatch.empty());
 	EXPECT_NE(Dispatch.find("RenderSettingsQmClientContributors(MainView, PrewarmOnly)"), std::string::npos);
-	EXPECT_NE(Source.find("str_comp(pTab, \"qmclient-contributors\") == 0"), std::string::npos);
+	// 搜索页的 tab 路由表已删除：contributors 的落地页只由 SetSettingsPageFromCardTab 解析（见下），菜单文件不得再留一份。
+	EXPECT_EQ(Source.find("str_comp(pTab, \"qmclient-contributors\") == 0"), std::string::npos);
 	const std::string MenusSource = ReadTextFile("src/game/client/components/menus.cpp");
 	const std::string SetPageBody = FunctionBody(MenusSource, "bool CMenus::SetSettingsPageFromCardTab(const char *pTab)");
 	EXPECT_NE(SetPageBody.find("str_comp(pTab, \"qmclient-contributors\") == 0"), std::string::npos);
@@ -1107,16 +1101,15 @@ TEST(QmNewUiMenuBranches, SettingsChoiceSegmentsUseCapsuleTabBar)
 	EXPECT_LT(Source.find("SegmentsRemainder.VSplitLeft(SegmentsRemainder.w / (SegmentCount - i), &aSegmentSlots[i], &SegmentsRemainder);"), ChromePos);
 	// 旧 UI 的贴边分段外观仍在。
 	EXPECT_NE(Source.find("const int Corners = i == 0 ? IGraphics::CORNER_L : (i == Count - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);"), std::string::npos);
-	// 另一处 ProcessChoiceRow（走 DoButtonLogic 的分段行）同样先画胶囊。
-	const size_t ProcessPos = Source.find("const auto ProcessChoiceRow = [this, &Changed](CUIRect Row");
-	ASSERT_NE(ProcessPos, std::string::npos);
-	const size_t ProcessChrome = Source.find("ui_widget::CapsuleTabBarChrome(TabBarUiContext(), SegmentGroup, aSegmentSlots, SegmentCount, Current, SettingsCapsuleTabBarStyle());", ProcessPos);
-	const size_t ProcessDraw = Source.find("if(Ui()->DoButtonLogic(&pButtons[i], Current == i, &aSegmentSlots[i], BUTTONFLAG_LEFT))", ProcessPos);
-	ASSERT_NE(ProcessChrome, std::string::npos);
-	ASSERT_NE(ProcessDraw, std::string::npos);
-	EXPECT_LT(ProcessChrome, ProcessDraw);
-	EXPECT_LT(Source.find("SegmentsRemainder.VSplitLeft(SegmentsRemainder.w / (SegmentCount - i), &aSegmentSlots[i], &SegmentsRemainder);", ProcessPos), ProcessChrome);
-	EXPECT_NE(Source.find("if(Ui()->DoButtonLogic(&pButtons[i], Current == i, &Segment, BUTTONFLAG_LEFT))"), std::string::npos);
+	// 预布局会被任意位置的鼠标按下触发，只处理命中与配置更新，不能重复绘制半透明背景。
+	const std::string ProcessChoice = FunctionBody(Source, "const auto ProcessChoiceRow = [this, &Changed](CUIRect Row");
+	ASSERT_FALSE(ProcessChoice.empty());
+	EXPECT_EQ(ProcessChoice.find("CapsuleTabBarChrome("), std::string::npos);
+	EXPECT_EQ(ProcessChoice.find("DoButton_MenuTab("), std::string::npos);
+	EXPECT_NE(ProcessChoice.find("SegmentsRemainder.VSplitLeft(SegmentsRemainder.w / (SegmentCount - i), &aSegmentSlots[i], &SegmentsRemainder);"), std::string::npos);
+	EXPECT_NE(ProcessChoice.find("if(Ui()->DoButtonLogic(&pButtons[i], Current == i, &aSegmentSlots[i], BUTTONFLAG_LEFT))"), std::string::npos);
+	EXPECT_NE(ProcessChoice.find("if(Ui()->DoButtonLogic(&pButtons[i], Current == i, &Segment, BUTTONFLAG_LEFT))"), std::string::npos);
+	EXPECT_NE(ProcessChoice.find("OnChanged(i);"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, IngameGameButtonBarRoundsAllCornersOnlyInNewUi)
@@ -1188,12 +1181,17 @@ TEST(QmCameraEffectsSource, CameraViewCardHeightTracksRowCount)
 {
 	const std::string QmMenusSource = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
 	const std::string CameraView = FunctionBody(QmMenusSource, "void CMenus::RenderQmVisualCameraViewContent(");
+	// 卡片高度测量已搬到视觉卡片目录（MeasureVisualCardHeight）。
+	const std::string VisualCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogVisual.cpp");
+	const std::string VisualMeasure = FunctionBody(VisualCatalog, "float MeasureVisualCardHeight(");
+	ASSERT_FALSE(VisualMeasure.empty());
 
 	// 「反向缩放立即生效」已连同 qm_zoom_instant_reverse 一起移除，渲染与预布局输入不得再残留该行
 	EXPECT_EQ(CameraView.find("m_QmZoomInstantReverse"), std::string::npos);
 	EXPECT_EQ(QmMenusSource.find("m_QmZoomInstantReverse"), std::string::npos);
-	// EstimateContentHeight 的基础行数去掉该行后为 5；行数与渲染行数不一致会让卡片高度错位
-	EXPECT_NE(QmMenusSource.find("return Rows(5.0f + (g_Config.m_QmCameraDrift ? 3.0f : 0.0f) + (g_Config.m_QmDynamicFov ? 2.0f : 0.0f) + (g_Config.m_QmAspectPreset == 6 ? 1.0f : 0.0f)) + Metrics.m_BodySize;"), std::string::npos);
+	EXPECT_EQ(VisualCatalog.find("m_QmZoomInstantReverse"), std::string::npos);
+	// 基础行数去掉该行后为 5；行数与渲染行数不一致会让卡片高度错位
+	EXPECT_NE(VisualMeasure.find("return Rows(5.0f + (g_Config.m_QmCameraDrift ? 3.0f : 0.0f) + (g_Config.m_QmDynamicFov ? 2.0f : 0.0f) + (g_Config.m_QmAspectPreset == 6 ? 1.0f : 0.0f)) + Metrics.m_BodySize;"), std::string::npos);
 }
 
 TEST(QmStoragePath, BuildsCandidatesRelativeToExecutable)
@@ -1611,6 +1609,22 @@ TEST(QmNewUiMenuBranches, BrowserServerListDimsScrollbarRailWithCardSurface)
 	EXPECT_NE(Source.find("static constexpr float SERVER_LIST_SCROLLBAR_RAIL_ALPHA_SCALE = 0.28f;"), std::string::npos);
 }
 
+TEST(QmNewUiMenuBranches, BrowserServerListRevealSelectionDoesNotFightUserScroll)
+{
+	const std::string Source = ReadTextFile("src/game/client/components/menus_browser.cpp");
+	const std::string ListBody = FunctionBody(Source, "void CMenus::RenderServerbrowserServerList(");
+	ASSERT_FALSE(ListBody.empty());
+
+	// 列表只渲染可见区内的行（SkipItems 虚拟化），选中行滚出可见区后渲染循环不会再碰到它。
+	// 因此「选中项」必须取自排序后的真实选中服务器：一旦用本帧渲染结果预置（= -1），
+	// NewSelected != m_SelectedIndex 会每帧成立，于是每帧 ScrollToSelected() 把选中行拉回视野，
+	// 用户永远无法把选中行滚出列表。
+	EXPECT_NE(ListBody.find("m_SelectedIndex = SelectedServerIndex;"), std::string::npos);
+	EXPECT_NE(ListBody.find("if(NewSelected != m_SelectedIndex)"), std::string::npos);
+	EXPECT_EQ(ListBody.find("m_SelectedIndex = -1;"), std::string::npos);
+	EXPECT_EQ(ListBody.find("m_SelectedIndex = i;"), std::string::npos);
+}
+
 TEST(QmNewUiMenuBranches, BrowserSortedHeaderIndicatorStaysVisibleOnSingleSurface)
 {
 	const std::string Source = ReadTextFile("src/game/client/components/menus.cpp");
@@ -1947,21 +1961,28 @@ TEST(QmNewUiMenuBranches, GaussianBlurSettingReplacesBetterScoreboardAndIsVersio
 	const std::string ConfigSource = ReadTextFile("src/engine/shared/config_variables_qmclient.h");
 	const std::string MenusSource = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
 	const std::string MiniFeaturesContent = FunctionBody(MenusSource, "void CMenus::RenderQmFunctionMiniFeaturesContent(");
+	// 普通开关行表与「梦境特性」的行数口径都搬到了卡片目录的 FunctionMetrics 头文件，
+	// 卡片模块（QmCardCatalogFunction.cpp）与渲染函数共用同一份表。
+	const std::string FunctionMetrics = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogFunctionMetrics.h");
+	const std::string FunctionCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogFunction.cpp");
 	const std::string MenusToml = ReadTextFile("qmclient_scripts/languages_qmclient/translations/i18n/menus.toml");
 	const std::string VersionSource = ReadTextFile("src/game/version.h");
 
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmBetterScoreboard, qm_better_scoreboard, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE"), std::string::npos);
-	EXPECT_NE(MiniFeaturesContent.find("{&g_Config.m_QmBetterScoreboard, \"Better scoreboard\", &g_Config.m_QmBetterScoreboard},"), std::string::npos);
+	EXPECT_NE(FunctionMetrics.find("{&g_Config.m_QmBetterScoreboard, Localizable(\"Better scoreboard\"), &g_Config.m_QmBetterScoreboard},"), std::string::npos);
 	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(Feature.m_pId, Feature.m_pTextId, Localize(Feature.m_pTextId), Feature.m_pValue, &Row, PrewarmOnly);"), std::string::npos);
 	// 卡片高度必须等于真实渲染行数，否则会在卡片末尾留下空白行。
-	// 普通行来自 s_aQmMiniFeatureRows，另加「新版 IME」与「赞助提醒」两个特殊行。
-	const size_t MiniFeatureTableRows = CountOccurrences(MenusSource, "{&g_Config.m_Qm");
-	const size_t MiniFeatureRenderedRows =
-		CountOccurrences(MiniFeaturesContent, "RenderQmFunctionCheckbox(&g_Config.m_Qm") +
-		CountOccurrences(MiniFeaturesContent, "RenderQmFunctionCheckbox(Feature.m_pId");
+	// 普通行是一张 16 行的表（渲染侧 s_aQmMiniFeatureRows 与卡片目录 QmMiniFeatureRows() 各一份，
+	// 两份必须同长，否则高度又会对不上），另加「新版 IME」与「赞助提醒」两个特殊行 = 18 行。
+	const size_t MiniFeatureTableRows = CountOccurrences(FunctionMetrics, "{&g_Config.m_Qm");
+	const size_t MiniFeatureRenderTableRows = CountOccurrences(MenusSource, "{&g_Config.m_Qm");
 	EXPECT_EQ(MiniFeatureTableRows, 16u);
-	EXPECT_EQ(MiniFeatureRenderedRows, 18u);
-	EXPECT_NE(MenusSource.find("case EQmModuleId::MiniFeatures: return Rows(static_cast<float>(s_aQmMiniFeatureRows.size() + QmMiniFeatureSpecialRowCount));"), std::string::npos);
+	EXPECT_EQ(MiniFeatureRenderTableRows, 16u);
+	EXPECT_EQ(MiniFeatureTableRows + 2u, 18u);
+	EXPECT_NE(MiniFeaturesContent.find("for(const SQmMiniFeatureRow &Feature : s_aQmMiniFeatureRows)"), std::string::npos);
+	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(&g_Config.m_QmNewIme, \"New IME\""), std::string::npos);
+	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(&g_Config.m_QmSponsorNudge, \"Sponsor reminder\""), std::string::npos);
+	EXPECT_NE(FunctionCatalog.find("case EQmModuleId::MiniFeatures: return Rows(static_cast<float>(QmMiniFeatureRows().size() + QmMiniFeatureSpecialRowCount));"), std::string::npos);
 
 	// 删除实时通道开关后，卡片高度仍须容纳末尾的赞助提醒。
 	EXPECT_NE(MiniFeaturesContent.find("RenderQmFunctionCheckbox(&g_Config.m_QmSponsorNudge, \"Sponsor reminder\""), std::string::npos);
@@ -2099,7 +2120,9 @@ TEST(QmNewUiMenuBranches, DynamicIslandOwnsHookCountdownToggleNextToSwitchCountd
 	const std::string Source = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
 	const std::string Config = ReadTextFile("src/engine/shared/config_variables_qmclient.h");
 	const std::string Body = FunctionBody(Source, "void CMenus::RenderQmHudDynamicIslandContent(");
-	const std::string PreLayout = FunctionBody(Source, "void CMenus::RenderSettingsQmClientHudDeck(");
+	// 预布局输入（命中判定）已搬到卡片目录的 HUD 卡片模块 BuildHudPreLayoutInput。
+	const std::string HudCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogHud.cpp");
+	const std::string PreLayout = FunctionBody(HudCatalog, "FSettingsCardPreLayoutInput BuildHudPreLayoutInput(");
 	ASSERT_FALSE(Body.empty());
 	ASSERT_FALSE(PreLayout.empty());
 
@@ -2116,7 +2139,8 @@ TEST(QmNewUiMenuBranches, DynamicIslandOwnsHookCountdownToggleNextToSwitchCountd
 	EXPECT_NE(Body.find("if(!g_Config.m_QmSwitchCountdown)\n\t\treturn;"), std::string::npos);
 
 	// 预布局命中判定必须与渲染路径同序，否则点击会落到错位的行上。
-	EXPECT_NE(PreLayout.find("HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmHookCountdown, &g_Config.m_QmHookCountdown)"), std::string::npos);
+	// 卡片目录里的桥接调用多带一个 pMenus（卡片模块不持有 CMenus 成员）。
+	EXPECT_NE(PreLayout.find("HandleQmHudCheckboxInput(pMenus, Content, LineHeight, LineSpacing, &g_Config.m_QmHookCountdown, &g_Config.m_QmHookCountdown)"), std::string::npos);
 	const size_t HookInput = PreLayout.find("&g_Config.m_QmHookCountdown, &g_Config.m_QmHookCountdown");
 	const size_t SwitchInput = PreLayout.find("&g_Config.m_QmSwitchCountdown, &g_Config.m_QmSwitchCountdown");
 	ASSERT_NE(SwitchInput, std::string::npos);
@@ -2136,8 +2160,8 @@ TEST(QmNewUiMenuBranches, DynamicIslandOwnsSwitchCountdownLocationChooser)
 	// 总开关与两个位置开关成组；移除位置标题，关闭总开关时位置开关整组消失。
 	EXPECT_NE(Body.find("RenderQmHudCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmSwitchCountdown, \"Enable switch countdown\", Localize(\"Enable switch countdown\"), &g_Config.m_QmSwitchCountdown)"), std::string::npos);
 	EXPECT_EQ(Body.find("qmclient-switch-countdown-location-label"), std::string::npos);
-	EXPECT_NE(Body.find("RenderQmHudCheckbox(Content, LineHeight, LineSpacing, &s_SwitchCountdownFollowTeeId, \"qmclient-switch-countdown-follow-tee\", Localize(\"Follow Tee\"), &FollowTee)"), std::string::npos);
-	EXPECT_NE(Body.find("RenderQmHudCheckbox(Content, LineHeight, LineSpacing, &s_SwitchCountdownMediaIslandId, \"qmclient-switch-countdown-media-island\", Localize(\"Show in Dynamic Island\"), &MediaIsland)"), std::string::npos);
+	EXPECT_NE(Body.find("RenderQmHudCheckbox(Content, LineHeight, LineSpacing, qm_card_catalog::SwitchCountdownFollowTeeId(), \"qmclient-switch-countdown-follow-tee\", Localize(\"Follow Tee\"), &FollowTee)"), std::string::npos);
+	EXPECT_NE(Body.find("RenderQmHudCheckbox(Content, LineHeight, LineSpacing, qm_card_catalog::SwitchCountdownMediaIslandId(), \"qmclient-switch-countdown-media-island\", Localize(\"Show in Dynamic Island\"), &MediaIsland)"), std::string::npos);
 	EXPECT_NE(Body.find("if(!g_Config.m_QmSwitchCountdown)\n\t\treturn;"), std::string::npos);
 	// 两个位置都不勾时回落到关闭总开关，不留下界面与渲染互相打架的非法组合。
 	EXPECT_NE(Body.find("if(FollowTee == 0 && MediaIsland == 0)"), std::string::npos);
@@ -2326,8 +2350,8 @@ TEST(QmNewUiMenuBranches, ConsoleRestoresCompleteTextRenderState)
 
 TEST(QmNewUiMenuBranches, DynamicIslandPreLayoutConsumesTheSameConditionalRows)
 {
-	const std::string Source = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
-	const size_t FactoryPos = Source.find("const auto BuildHudPreLayoutInput");
+	const std::string Source = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogHud.cpp");
+	const size_t FactoryPos = Source.find("FSettingsCardPreLayoutInput BuildHudPreLayoutInput(");
 	ASSERT_NE(FactoryPos, std::string::npos);
 	const std::string PreLayoutSource = Source.substr(FactoryPos);
 	const size_t DynamicIslandPos = PreLayoutSource.find("case EQmModuleId::DynamicIsland:");
@@ -2344,7 +2368,9 @@ TEST(QmNewUiMenuBranches, DynamicIslandPreLayoutConsumesTheSameConditionalRows)
 	// 开关倒计时总开关关闭时不再消耗位置行，与 ResolveQmHudDynamicIslandHeight 的行数保持一致。
 	EXPECT_NE(DynamicIsland.find("&g_Config.m_QmSwitchCountdown, &g_Config.m_QmSwitchCountdown"), std::string::npos);
 	EXPECT_NE(DynamicIsland.find("if(!g_Config.m_QmSwitchCountdown)"), std::string::npos);
-	EXPECT_NE(DynamicIsland.find("ConsumeQmHudRow(Content); // display location label"), std::string::npos);
+	// 位置开关的行消耗与渲染路径共用卡片目录权威定义的同一组复选框 id（原先的独立位置标题行已移除）。
+	EXPECT_NE(DynamicIsland.find("ToggleQmHudCountdownLocation(pMenus, Content, LineHeight, LineSpacing, SwitchCountdownFollowTeeId(), &FollowTee)"), std::string::npos);
+	EXPECT_NE(DynamicIsland.find("ToggleQmHudCountdownLocation(pMenus, Content, LineHeight, LineSpacing, SwitchCountdownMediaIslandId(), &MediaIsland)"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, GeneralSettingsListsShareSelectedAndHoveredBackgroundTokens)
@@ -2455,15 +2481,17 @@ TEST(QmNewUiMenuBranches, WeaponTrajectoryExposesDefaultOnPistolGuideToggle)
 	const std::string MenusSource = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
 	const std::string CardRegistrySource = ReadTextFile("src/game/client/QmUi/QmCardRegistry.cpp");
 	const std::string WeaponTrajectoryBody = FunctionBody(MenusSource, "void CMenus::RenderQmFunctionWeaponTrajectoryContent(");
-	const std::string FunctionDeck = FunctionBody(MenusSource, "void CMenus::RenderSettingsQmClientFunctionDeck(");
+	// 卡片高度测量已搬到功能卡片目录的 MeasureFunctionCardHeight。
+	const std::string FunctionCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogFunction.cpp");
+	const std::string FunctionMeasure = FunctionBody(FunctionCatalog, "float MeasureFunctionCardHeight(");
 
 	ASSERT_FALSE(WeaponTrajectoryBody.empty());
-	ASSERT_FALSE(FunctionDeck.empty());
+	ASSERT_FALSE(FunctionMeasure.empty());
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmWeaponTrajectoryGun, qm_weapon_trajectory_gun, 1, 0, 1"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmWeaponTrajectoryNinja, qm_weapon_trajectory_ninja, 0, 0, 1"), std::string::npos);
 	EXPECT_NE(WeaponTrajectoryBody.find("RenderQmFunctionCheckbox(&g_Config.m_QmWeaponTrajectoryGun, \"qmclient-weapon-trajectory-gun\", Localize(\"Pistol guide line\")"), std::string::npos);
 	EXPECT_NE(WeaponTrajectoryBody.find("RenderQmFunctionCheckbox(&g_Config.m_QmWeaponTrajectoryNinja, \"qmclient-weapon-trajectory-ninja\", Localize(\"Predict ninja path\")"), std::string::npos);
-	EXPECT_NE(FunctionDeck.find("case EQmModuleId::WeaponTrajectory: return g_Config.m_QmWeaponTrajectory == 0 ? Row() : Row() * 6.0f;"), std::string::npos);
+	EXPECT_NE(FunctionMeasure.find("case EQmModuleId::WeaponTrajectory: return g_Config.m_QmWeaponTrajectory == 0 ? Row() : Row() * 6.0f;"), std::string::npos);
 	EXPECT_NE(CardRegistrySource.find("手枪辅助线 shouqiang fuzhuxian pistol guide line"), std::string::npos);
 	EXPECT_NE(CardRegistrySource.find("预测忍者路径 yuce renzhe lujing predict ninja path"), std::string::npos);
 }
@@ -2496,30 +2524,35 @@ TEST(QmNewUiMenuBranches, SkinTransitionAnimationToggleOwnsAdvancedControls)
 	const std::string PlayersSource = ReadTextFile("src/game/client/components/players.cpp");
 	const std::string SettingsSource = ReadTextFile("src/game/client/components/menus_settings.cpp");
 	const std::string LanguageSource = ReadTextFile("data/languages/simplified_chinese.txt");
-	const std::string SkinTransitionContent = FunctionBody(MenusSource, "void CMenus::RenderQmVisualSkinTransitionContent(");
+	const std::string SkinSource = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogSkin.cpp");
+	const std::string AppearanceContent = FunctionBody(SkinSource, "void CMenus::RenderQmVisualSkinAppearanceContent(");
+	const std::string SkinTransitionContent = FunctionBody(SkinSource, "void CMenus::RenderQmVisualSkinTransitionContent(");
 
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmSkinChangeTransition, qm_skin_change_transition, 1, 0, 1"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmSkinChangeTransitionScope, qm_skin_change_transition_scope, 1, 0, 2"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmSkinChangeTransitionEasing, qm_skin_change_transition_easing"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmSkinChangeTransitionIntensity, qm_skin_change_transition_intensity"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmCycleTeeHueDummy, qm_cycle_tee_hue_dummy, 0, 0, 1"), std::string::npos);
-	EXPECT_NE(MenusSource.find("pSkinTransitionAnimationFeatureId = \"qm_2_72_0_skin_transition_animation_toggle\""), std::string::npos);
-	EXPECT_NE(MenusSource.find("pSkinTransitionAnimationFeatureId,\n						\"qm_2_62_8_weapon_animation\""), std::string::npos);
-	EXPECT_NE(CardRegistrySource.find("\"qm:skin_transition\", \"visual\", ECardColumn::Left, 1, \"Skin transition\", \"皮肤切换 pifu qiehuan skin transition"), std::string::npos);
-	EXPECT_NE(SkinTransitionContent.find("RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmCycleTeeHueDummy, \"Also apply to dummy\""), std::string::npos);
+	EXPECT_NE(CardRegistrySource.find("\"qm:skin_transition\", \"visual\", ECardColumn::Left, 2, \"Skin transition animation\", \"皮肤切换 pifu qiehuan skin transition"), std::string::npos);
+	EXPECT_NE(AppearanceContent.find("RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmCycleTeeHueDummy, \"Also apply to dummy\""), std::string::npos);
 	EXPECT_NE(PlayersSource.find("LocalDummy == 0 || g_Config.m_QmCycleTeeHueDummy != 0"), std::string::npos);
 	EXPECT_NE(PlayersSource.find("LocalDummy != 0 ? g_Config.m_ClDummyUseCustomColor != 0 : g_Config.m_ClPlayerUseCustomColor != 0"), std::string::npos);
 
+	ASSERT_FALSE(AppearanceContent.empty());
+	ASSERT_FALSE(SkinTransitionContent.empty());
+	EXPECT_EQ(MenusSource.find("void CMenus::RenderQmVisualSkinTransitionContent("), std::string::npos);
+	EXPECT_EQ(AppearanceContent.find("m_QmSkinChangeTransition"), std::string::npos);
+	EXPECT_EQ(SkinTransitionContent.find("m_QmSkinOutline"), std::string::npos);
 	EXPECT_EQ(SkinTransitionContent.find("RenderSkinQueueRotationRow"), std::string::npos);
 	EXPECT_NE(SkinTransitionContent.find("m_QmSkinChangeTransition"), std::string::npos);
 
 	const size_t Toggle = SkinTransitionContent.find("DoSettingsButton_CheckBox(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_VISUAL, QMCLIENT_SETTINGS_TAB_VISUAL, &g_Config.m_QmSkinChangeTransition");
 	ASSERT_NE(Toggle, std::string::npos);
 	const size_t AdvancedIf = SkinTransitionContent.find("if(!g_Config.m_QmSkinChangeTransition)\n\t\treturn;", Toggle);
-	const size_t TypeLabel = SkinTransitionContent.find("RenderDropDown(\"qmclient-skin-transition-type\", \"Skin transition type\"", Toggle);
-	const size_t ScopeLabel = SkinTransitionContent.find("RenderDropDown(\"qmclient-skin-transition-range\", \"Animation range\"", Toggle);
+	const size_t TypeLabel = SkinTransitionContent.find("RenderDropDown(\"qmclient-skin-transition-type\", Localize(\"Skin transition type\")", Toggle);
+	const size_t ScopeLabel = SkinTransitionContent.find("RenderDropDown(\"qmclient-skin-transition-range\", Localize(\"Animation range\")", Toggle);
 	const size_t DurationLabel = SkinTransitionContent.find("Localize(\"Skin transition duration\")", Toggle);
-	const size_t EasingLabel = SkinTransitionContent.find("RenderDropDown(\"qmclient-skin-transition-easing\", \"Skin transition easing\"", Toggle);
+	const size_t EasingLabel = SkinTransitionContent.find("RenderDropDown(\"qmclient-skin-transition-easing\", Localize(\"Skin transition easing\")", Toggle);
 	const size_t IntensityLabel = SkinTransitionContent.find("Localize(\"Skin transition intensity\")", Toggle);
 	ASSERT_NE(AdvancedIf, std::string::npos);
 	ASSERT_NE(TypeLabel, std::string::npos);
@@ -2534,7 +2567,7 @@ TEST(QmNewUiMenuBranches, SkinTransitionAnimationToggleOwnsAdvancedControls)
 	EXPECT_LT(DurationLabel, EasingLabel);
 	EXPECT_LT(EasingLabel, IntensityLabel);
 	EXPECT_NE(SkinTransitionContent.find("s_SkinTransitionScopeDropDownNames = {Localize(\"Self only\"), Localize(\"Local\"), Localize(\"All players\")};"), std::string::npos);
-	EXPECT_NE(SkinTransitionContent.find("RenderDropDown(\"qmclient-skin-transition-range\", \"Animation range\", &g_Config.m_QmSkinChangeTransitionScope, 2"), std::string::npos);
+	EXPECT_NE(SkinTransitionContent.find("RenderDropDown(\"qmclient-skin-transition-range\", Localize(\"Animation range\"), &g_Config.m_QmSkinChangeTransitionScope, 2"), std::string::npos);
 
 	EXPECT_NE(GameClientSource.find("QM_SKIN_CHANGE_TRANSITION_SCOPE_OWN"), std::string::npos);
 	EXPECT_NE(GameClientSource.find("bool CGameClient::ShouldRunSkinChangeTransition(int ClientId) const"), std::string::npos);
@@ -2585,10 +2618,18 @@ TEST(QmNewUiMenuBranches, WeaponAnimationAdvancedControlsAreConfigurable)
 	EXPECT_NE(WeaponAnimationContent.find("RenderValue(\"qmclient-weapon-switch-rotation\", \"Weapon switch rotation\"", SwitchControls), std::string::npos);
 	EXPECT_NE(WeaponAnimationContent.find("Localize(\"Weapon switch easing\")", SwitchControls), std::string::npos);
 
-	const std::string VisualDeck = FunctionBody(MenusSource, "void CMenus::RenderSettingsQmClientVisualDeck(");
-	EXPECT_NE(VisualDeck.find("ResolveQmVisualWeaponAnimationHeight(Metrics, g_Config.m_QmWeaponSwitchAnim != 0, g_Config.m_QmWeaponReloadAnim != 0)"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("(g_Config.m_QmWeaponReloadAnim ? 2u : 0u)"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmWeaponReloadAnim, &g_Config.m_QmWeaponReloadAnim)"), std::string::npos);
+	// 武器动画卡片的高度/重测版本/预布局输入都在视觉卡片目录里：
+	// 高度决定展开后的行数，重测版本里装填动画占 2u，预布局必须命中同一个装填动画开关。
+	const std::string VisualCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogVisual.cpp");
+	const std::string VisualMeasure = FunctionBody(VisualCatalog, "float MeasureVisualCardHeight(");
+	const std::string VisualRevision = FunctionBody(VisualCatalog, "uint64_t MeasureVisualCardRevision(");
+	const std::string VisualPreLayout = FunctionBody(VisualCatalog, "FSettingsCardPreLayoutInput BuildVisualPreLayoutInput(");
+	ASSERT_FALSE(VisualMeasure.empty());
+	ASSERT_FALSE(VisualRevision.empty());
+	ASSERT_FALSE(VisualPreLayout.empty());
+	EXPECT_NE(VisualMeasure.find("ResolveQmVisualWeaponAnimationHeight(Metrics, g_Config.m_QmWeaponSwitchAnim != 0, g_Config.m_QmWeaponReloadAnim != 0)"), std::string::npos);
+	EXPECT_NE(VisualRevision.find("(g_Config.m_QmWeaponReloadAnim ? 2u : 0u)"), std::string::npos);
+	EXPECT_NE(VisualPreLayout.find("HandleQmHudCheckboxInput(pMenus, Content, LineHeight, LineSpacing, &g_Config.m_QmWeaponReloadAnim, &g_Config.m_QmWeaponReloadAnim)"), std::string::npos);
 	EXPECT_NE(RegistrySource.find("装填动画 zhuangtian donghua reload animation"), std::string::npos);
 }
 
@@ -2635,7 +2676,6 @@ TEST(QmNewUiMenuBranches, EmoticonShadowHasConfigRenderPassAndVisualToggle)
 	const std::string RenderPlayerBody = FunctionBody(PlayersSource, "void CPlayers::RenderPlayer(");
 	const std::string EmoticonRenderBody = FunctionBody(EmoticonSource, "void CEmoticon::OnRender()");
 	const std::string EmoticonItemsBody = BlockBodyAfter(EmoticonRenderBody, "for(int Emote = 0; Emote < NUM_EMOTICONS; Emote++)");
-	const std::string MenusSource = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
 	const auto CountOccurrences = [](const std::string &Text, const char *pNeedle) {
 		int Count = 0;
 		size_t Pos = 0;
@@ -2668,9 +2708,10 @@ TEST(QmNewUiMenuBranches, EmoticonShadowHasConfigRenderPassAndVisualToggle)
 	ASSERT_NE(ShadowClear, std::string::npos);
 	ASSERT_NE(ShadowBegin, std::string::npos);
 	EXPECT_LT(ShadowClear, ShadowBegin);
-	const std::string SkinTransitionContent = FunctionBody(MenusSource, "void CMenus::RenderQmVisualSkinTransitionContent(");
-	EXPECT_NE(SkinTransitionContent.find("RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmEmoticonShadow"), std::string::npos);
-	EXPECT_NE(MenusSource.find("Localize(\"Emoticon shadow\")"), std::string::npos);
+	const std::string SkinSource = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogSkin.cpp");
+	const std::string AppearanceContent = FunctionBody(SkinSource, "void CMenus::RenderQmVisualSkinAppearanceContent(");
+	EXPECT_NE(AppearanceContent.find("RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmEmoticonShadow"), std::string::npos);
+	EXPECT_NE(SkinSource.find("Localize(\"Emoticon shadow\")"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, NameplateOthersModeSuppressesLocalIdentityRows)
@@ -3171,21 +3212,13 @@ TEST(QmNewUiMenuBranches, ScoreboardDdTeamLabelUsesUnifiedBelowRowLayout)
 	EXPECT_EQ(RenderScoreboard.find("Row.x + Row.w / 2.0f - TextRender()->TextWidth(TeamFontSize, aBuf) / 2.0f + 5.0f"), std::string::npos);
 }
 
-TEST(QmNewUiMenuBranches, ScoreboardMediaButtonSymbolsFollowContentAlpha)
+TEST(QmNewUiMenuBranches, ScoreboardMediaIsInformationOnly)
 {
 	const std::string Source = ReadTextFile("src/game/client/components/scoreboard.cpp");
-	const std::string Helper = FunctionBody(Source, "int DoScoreboardMediaIconButton(");
-
-	EXPECT_NE(Helper.find("const float IconAlpha = std::clamp(ContentAlpha"), std::string::npos);
-	EXPECT_NE(Helper.find("DefaultTextColor().WithMultipliedAlpha(IconAlpha)"), std::string::npos);
-	EXPECT_NE(Helper.find("ColorRGBA(1.0f, 0.0f, 0.0f, IconAlpha)"), std::string::npos);
-	EXPECT_NE(Helper.find("FontIcons::FONT_ICON_SLASH"), std::string::npos);
-	EXPECT_NE(Source.find("DoScoreboardMediaIconButton(Ui(), TextRender(), &s_SmtcPrevButton"), std::string::npos);
-	EXPECT_NE(Source.find("DoScoreboardMediaIconButton(Ui(), TextRender(), &s_SmtcPlayButton"), std::string::npos);
-	EXPECT_NE(Source.find("DoScoreboardMediaIconButton(Ui(), TextRender(), &s_SmtcNextButton"), std::string::npos);
-	EXPECT_EQ(Source.find("Ui()->DoButton_FontIcon(&s_SmtcPrevButton"), std::string::npos);
-	EXPECT_EQ(Source.find("Ui()->DoButton_FontIcon(&s_SmtcPlayButton"), std::string::npos);
-	EXPECT_EQ(Source.find("Ui()->DoButton_FontIcon(&s_SmtcNextButton"), std::string::npos);
+	EXPECT_EQ(Source.find("DoScoreboardMediaIconButton"), std::string::npos);
+	EXPECT_EQ(Source.find("m_SystemMediaControls.Previous()"), std::string::npos);
+	EXPECT_EQ(Source.find("m_SystemMediaControls.PlayPause()"), std::string::npos);
+	EXPECT_EQ(Source.find("m_SystemMediaControls.Next()"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, ScoreboardUsesOneRowPlanAndDenseTeeLod)
@@ -3793,8 +3826,35 @@ TEST(QmNewUiMenuBranches, ServerBrowserQmClientColumnUsesDistributionCount)
 	EXPECT_NE(BrowserServerList.find("net_addr_str(&pInfo->m_aAddresses[0], aAddress, sizeof(aAddress), true);"), std::string::npos);
 	// 没有梦客户端的服务器留空，不写 0。
 	EXPECT_NE(BrowserServerList.find("if(QmClients > 0)"), std::string::npos);
-	// 本地拿不到排序键，所以该列表头不带排序；列头是品牌字，直接显示不走 Localize。
+	// 排序键由 CQmClient 推给引擎（SORT_QM_CLIENTS），表头可点出正/倒序；列头是品牌字，直接显示不走 Localize。
+	EXPECT_NE(Source.find("{COL_QM_CLIENTS, IServerBrowser::SORT_QM_CLIENTS, \"梦\", 1, 24.0f, {0}},"), std::string::npos);
 	EXPECT_NE(Source.find("if(DoButton_GridHeader(&Col.m_Id, Col.m_Id == COL_QM_CLIENTS ? Col.m_pCaption : Localize(Col.m_pCaption), Checked, &Col.m_Rect))"), std::string::npos);
+}
+
+// 意图：「梦」列排序键来自 CQmClient 推送的中心服在线分布；
+// 引擎保存最近一次推送，并在按该列排序前重新物化（服务器列表重载会清零 CServerInfo）。
+TEST(QmNewUiMenuBranches, ServerBrowserQmClientColumnSortKeyComesFromDistribution)
+{
+	const std::string EngineHeader = ReadTextFile("src/engine/serverbrowser.h");
+	const std::string EngineSource = ReadTextFile("src/engine/client/serverbrowser.cpp");
+	const std::string QmClientHeader = ReadTextFile("src/game/client/components/qmclient/qmclient.h");
+	const std::string QmClientSource = ReadTextFile("src/game/client/components/qmclient/qmclient.cpp");
+
+	EXPECT_NE(EngineHeader.find("SORT_QM_CLIENTS,"), std::string::npos);
+	EXPECT_NE(EngineHeader.find("int m_QmClientCount;"), std::string::npos);
+	EXPECT_NE(EngineHeader.find("virtual void SetQmClientServerCounts(const std::unordered_map<std::string, int> &Counts) = 0;"), std::string::npos);
+	EXPECT_NE(EngineSource.find("bool CServerBrowser::SortCompareQmClients(int Index1, int Index2) const"), std::string::npos);
+	EXPECT_NE(EngineSource.find("void CServerBrowser::UpdateQmClientServerCounts()"), std::string::npos);
+	EXPECT_NE(EngineSource.find("UpdateQmClientServerCounts();"), std::string::npos);
+	EXPECT_NE(EngineSource.find("CSortWrap(this, &CServerBrowser::SortCompareQmClients)"), std::string::npos);
+
+	EXPECT_NE(QmClientHeader.find("void PushQmClientServerCounts();"), std::string::npos);
+	const std::string PushBody = FunctionBody(QmClientSource, "void CQmClient::PushQmClientServerCounts()");
+	ASSERT_FALSE(PushBody.empty());
+	EXPECT_NE(PushBody.find("pServerBrowser->SetQmClientServerCounts(Counts);"), std::string::npos);
+	const std::string FinishBody = FunctionBody(QmClientSource, "void CQmClient::FinishQmClientUsers()");
+	ASSERT_FALSE(FinishBody.empty());
+	EXPECT_NE(FinishBody.find("PushQmClientServerCounts();"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, ServerBrowserColumnsStayVisibleAndSizedToContent)
@@ -4305,6 +4365,15 @@ TEST(QmNewUiMenuBranches, QmLaserSettingsMovedToAppearanceLaserTab)
 	ASSERT_FALSE(VisualDeck.empty());
 	EXPECT_EQ(VisualDeck.find("qm:laser"), std::string::npos);
 	EXPECT_EQ(VisualDeck.find("qm:nameplate_text"), std::string::npos);
+	// 薄壳只声明清单，卡片本体在卡片目录：目录清单与视觉卡片模块都不得收录这两个设置。
+	const std::string VisualCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogVisual.cpp");
+	const std::string CardCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
+	ASSERT_FALSE(VisualCatalog.empty());
+	ASSERT_FALSE(CardCatalog.empty());
+	EXPECT_EQ(VisualCatalog.find("qm:laser"), std::string::npos);
+	EXPECT_EQ(VisualCatalog.find("qm:nameplate_text"), std::string::npos);
+	EXPECT_EQ(CardCatalog.find("qm:laser"), std::string::npos);
+	EXPECT_EQ(CardCatalog.find("qm:nameplate_text"), std::string::npos);
 
 	const std::string SettingsSource = ReadTextFile("src/game/client/components/menus_settings.cpp");
 	const std::string LaserBranch = BlockBodyAfter(SettingsSource, "else if(m_AppearanceSettingsTab == APPEARANCE_TAB_LASER)");
@@ -4368,33 +4437,54 @@ TEST(QmNewUiMenuBranches, QmSettingsCardsUseSharedStyleHelpers)
 	ASSERT_FALSE(VisualDeck.empty());
 	ASSERT_FALSE(FunctionDeck.empty());
 	ASSERT_FALSE(HudDeck.empty());
-	EXPECT_NE(HudDeck.find("const bool DummyMiniViewExpanded = g_Config.m_QmDummyMiniView != 0;"), std::string::npos);
-	EXPECT_NE(HudDeck.find("ResolveQmHudDummyMiniViewHeight(Metrics, DummyMiniViewExpanded)"), std::string::npos);
-	EXPECT_NE(HudDeck.find("case EQmModuleId::Coords: return ResolveQmHudCoordsHeight(Metrics);"), std::string::npos);
-	EXPECT_NE(HudDeck.find("ResolveQmHudNotificationsHeight(Metrics, g_Config.m_QmHudNotificationsShowAdvanced != 0, g_Config.m_QmHudNotificationsUseCategoryFilters != 0)"), std::string::npos);
-	EXPECT_EQ(HudDeck.find("case EQmModuleId::Coords: return Rows(8.0f) + LineHeight;"), std::string::npos);
-	EXPECT_EQ(HudDeck.find("case EQmModuleId::HudNotifications: return g_Config.m_QmHudNotificationsShowAdvanced ? Rows(15.0f) + LineHeight * 3.0f : Rows(4.0f);"), std::string::npos);
-	EXPECT_NE(HudDeck.find("const bool DynamicIslandOriginalStyle = g_Config.m_QmHudIslandUseOriginalStyle != 0;"), std::string::npos);
-	EXPECT_NE(HudDeck.find("ResolveQmHudDynamicIslandHeight(Metrics, DynamicIslandOriginalStyle, g_Config.m_QmSwitchCountdown != 0, ContentWidth)"), std::string::npos);
-	EXPECT_NE(HudDeck.find("RenderQmHudDummyMiniViewContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, DummyMiniViewExpanded, ReadOnly)"), std::string::npos);
-	EXPECT_NE(HudDeck.find("RenderQmHudDynamicIslandContent(Content, LineHeight, LineSpacing, DynamicIslandOriginalStyle)"), std::string::npos);
-	EXPECT_NE(HudDeck.find("BuildHudPreLayoutInput"), std::string::npos);
-	EXPECT_NE(HudDeck.find("Definition.m_PreLayoutInput = BuildHudPreLayoutInput(Id);"), std::string::npos);
-	EXPECT_NE(HudDeck.find("HandleQmHudCheckboxInput(Content"), std::string::npos);
-	EXPECT_NE(HudDeck.find("case EQmModuleId::DebugGraph:"), std::string::npos);
-	EXPECT_NE(HudDeck.find("case EQmModuleId::SystemMediaControls:"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("BuildVisualPreLayoutInput"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("Definition.m_PreLayoutInput = BuildVisualPreLayoutInput(Id);"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("case EQmModuleId::ChatBubble:"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("case EQmModuleId::CameraView:"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("case EQmModuleId::SkinTransition:"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("case EQmModuleId::WeaponAnimation:"), std::string::npos);
-	EXPECT_NE(VisualDeck.find("case EQmModuleId::CollisionHitbox:"), std::string::npos);
-	EXPECT_NE(HudDeck.find("ConsumeQmHudRow(Content); // push radius"), std::string::npos);
-	EXPECT_NE(HudDeck.find("ResolveSettingsRadioRowLayout(Content, 2, Metrics)"), std::string::npos);
+	// 卡片的高度测量、预布局输入与构造都搬到了卡片目录：薄壳只声明「这一页有哪些卡片」。
+	const std::string HudCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogHud.cpp");
+	const std::string VisualCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogVisual.cpp");
+	const std::string CardCatalog = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
+	ASSERT_FALSE(HudCatalog.empty());
+	ASSERT_FALSE(VisualCatalog.empty());
+	ASSERT_FALSE(CardCatalog.empty());
+	const std::string HudMeasure = FunctionBody(HudCatalog, "float MeasureHudCardHeight(");
+	const std::string HudPreLayout = FunctionBody(HudCatalog, "FSettingsCardPreLayoutInput BuildHudPreLayoutInput(");
+	const std::string HudCard = FunctionBody(HudCatalog, "bool BuildHudCard(");
+	const std::string VisualPreLayout = FunctionBody(VisualCatalog, "FSettingsCardPreLayoutInput BuildVisualPreLayoutInput(");
+	const std::string VisualCard = FunctionBody(VisualCatalog, "bool BuildVisualCard(");
+	ASSERT_FALSE(HudMeasure.empty());
+	ASSERT_FALSE(HudPreLayout.empty());
+	ASSERT_FALSE(HudCard.empty());
+	ASSERT_FALSE(VisualPreLayout.empty());
+	ASSERT_FALSE(VisualCard.empty());
+	EXPECT_NE(HudMeasure.find("const bool DummyMiniViewExpanded = g_Config.m_QmDummyMiniView != 0;"), std::string::npos);
+	EXPECT_NE(HudMeasure.find("ResolveQmHudDummyMiniViewHeight(Metrics, DummyMiniViewExpanded)"), std::string::npos);
+	EXPECT_NE(HudMeasure.find("case EQmModuleId::Coords: return ResolveQmHudCoordsHeight(Metrics);"), std::string::npos);
+	EXPECT_NE(HudMeasure.find("ResolveQmHudNotificationsHeight(Metrics, g_Config.m_QmHudNotificationsShowAdvanced != 0, g_Config.m_QmHudNotificationsUseCategoryFilters != 0)"), std::string::npos);
+	EXPECT_EQ(HudMeasure.find("case EQmModuleId::Coords: return Rows(8.0f) + LineHeight;"), std::string::npos);
+	EXPECT_EQ(HudMeasure.find("case EQmModuleId::HudNotifications: return g_Config.m_QmHudNotificationsShowAdvanced ? Rows(15.0f) + LineHeight * 3.0f : Rows(4.0f);"), std::string::npos);
+	EXPECT_NE(HudMeasure.find("const bool DynamicIslandOriginalStyle = g_Config.m_QmHudIslandUseOriginalStyle != 0;"), std::string::npos);
+	EXPECT_NE(HudMeasure.find("ResolveQmHudDynamicIslandHeight(Metrics, DynamicIslandOriginalStyle, g_Config.m_QmSwitchCountdown != 0, ContentWidth)"), std::string::npos);
+	EXPECT_NE(HudCard.find("QmCardRenderHook::RenderQmHudDummyMiniViewContent(pMenus, Content, LineHeight, BodySize, LineSpacing, LabelWidth, g_Config.m_QmDummyMiniView != 0, ReadOnly);"), std::string::npos);
+	EXPECT_NE(HudCard.find("QmCardRenderHook::RenderQmHudDynamicIslandContent(pMenus, Content, LineHeight, LineSpacing, g_Config.m_QmHudIslandUseOriginalStyle != 0);"), std::string::npos);
+	EXPECT_NE(HudPreLayout.find("HandleQmHudCheckboxInput(pMenus, Content"), std::string::npos);
+	EXPECT_NE(HudMeasure.find("case EQmModuleId::DebugGraph:"), std::string::npos);
+	EXPECT_NE(HudMeasure.find("case EQmModuleId::SystemMediaControls:"), std::string::npos);
+	// 调试模式卡只渲染一个复选框行，测量必须同为一行；按 5 行预留会在卡片底部留出约 4 行空白。
+	EXPECT_NE(HudMeasure.find("case EQmModuleId::DebugMode: return Rows(1.0f);"), std::string::npos);
+	EXPECT_EQ(HudMeasure.find("case EQmModuleId::DebugMode: return Rows(5.0f);"), std::string::npos);
+	EXPECT_NE(VisualCard.find("BuildVisualPreLayoutInput(Ctx, ModuleId),"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("Out.m_PreLayoutInput = std::move(PreLayoutInput);"), std::string::npos);
+	EXPECT_NE(VisualCard.find("case EQmModuleId::ChatBubble:"), std::string::npos);
+	EXPECT_NE(VisualCard.find("case EQmModuleId::CameraView:"), std::string::npos);
+	EXPECT_NE(VisualCard.find("case EQmModuleId::SkinTransition:"), std::string::npos);
+	EXPECT_NE(VisualCard.find("case EQmModuleId::WeaponAnimation:"), std::string::npos);
+	EXPECT_NE(VisualCard.find("case EQmModuleId::CollisionHitbox:"), std::string::npos);
+	EXPECT_NE(HudPreLayout.find("ConsumeQmHudRow(Content, Metrics); // push radius"), std::string::npos);
+	EXPECT_NE(HudPreLayout.find("ResolveSettingsRadioRowLayout(Content, 2, Metrics)"), std::string::npos);
 	EXPECT_NE(QmSource.find("const int NoiseSuppressModeForLayout = std::clamp(g_Config.m_QmVoiceNoiseSuppressEnable, 0, 2);"), std::string::npos);
 	EXPECT_NE(QmSource.find("g_Config.m_QmLyricsInMediaIsland"), std::string::npos);
-	EXPECT_EQ(QmSource.find("EQmModuleId::Lyrics"), std::string::npos);
+	// 分类页不再构造 Lyrics 卡（原来的 AddCard(EQmModuleId::Lyrics, ...) 分支），它只在卡片目录的 HUD 模块里。
+	EXPECT_EQ(HudDeck.find("case EQmModuleId::Lyrics:"), std::string::npos);
+	EXPECT_EQ(QmSource.find("AddCard(EQmModuleId::Lyrics"), std::string::npos);
+	EXPECT_NE(HudCard.find("case EQmModuleId::Lyrics:"), std::string::npos);
 	EXPECT_NE(QmSource.find("if(!PrewarmOnly && !Ui()->RenderOnly())"), std::string::npos);
 
 	const std::string SettingsSource = ReadTextFile("src/game/client/components/menus_settings.cpp");
@@ -4426,11 +4516,17 @@ TEST(QmNewUiMenuBranches, QmSettingsCardsUseSharedStyleHelpers)
 		EXPECT_NE(pDeck->find("CardDeck.RenderCached("), std::string::npos);
 		EXPECT_NE(pDeck->find("ResolveSettingsCardDefinitionsRevision("), std::string::npos);
 		EXPECT_NE(pDeck->find("static std::array<CButtonContainer, QmModuleCount> s_aCollapseButtons;"), std::string::npos);
-		EXPECT_NE(pDeck->find("Ui()->DoButtonLogic(&CollapseButtons[Index]"), std::string::npos);
-		EXPECT_NE(pDeck->find("RenderSettingsCardCollapseButton(CardCtx, Frame.m_HandleRect, Collapsed)"), std::string::npos);
 		EXPECT_EQ(pDeck->find("Ui()->DoButtonLogic(&Collapsed[Index]"), std::string::npos);
 		EXPECT_EQ(pDeck->find("BeginSettingsQmScrollContainer("), std::string::npos);
 		EXPECT_EQ(pDeck->find("s_GlassCards"), std::string::npos);
+	}
+	// 折叠按钮的命中判定与绘制随卡片装配一起搬进了卡片目录（MakeModuleCard），页面只提供容器与回调。
+	EXPECT_NE(CardCatalog.find("QmCardRenderHook::DoButtonLogic(Ctx.m_pMenus, &pCollapseButtons[Index], IsCollapsed, &Frame.m_HandleRect, BUTTONFLAG_LEFT)"), std::string::npos);
+	EXPECT_NE(CardCatalog.find("RenderSettingsCardCollapseButton(CardCtx, Frame.m_HandleRect, Collapsed)"), std::string::npos);
+	for(const std::string *pDeck : {&VisualDeck, &FunctionDeck, &HudDeck})
+	{
+		EXPECT_NE(pDeck->find("m_pCollapseButtons = s_aCollapseButtons.data();"), std::string::npos);
+		EXPECT_NE(pDeck->find("m_pToggleCollapsed = ToggleQmSidebarCardCollapsed;"), std::string::npos);
 	}
 }
 
@@ -6198,7 +6294,8 @@ TEST(QmNewUiMenuBranches, SettingsCardContentHeightsExcludeSharedHeaderChrome)
 TEST(QmNewUiMenuBranches, PlayerStandardPageUsesUnifiedSettingsStack)
 {
 	const std::string Source = ReadTextFile("src/game/client/components/menus_settings.cpp");
-	const std::string Navigation = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	// 搜索页的 tab 路由表已删除：卡片 tab → 标准设置页的落地映射由 SetSettingsPageFromCardTab 统一拥有。
+	const std::string Navigation = ReadTextFile("src/game/client/components/menus.cpp");
 	const std::string Identity = FunctionBody(Source, "void CMenus::RenderSettingsTeeIdentity(CUIRect MainView, CUIRect *pFlagButton, float BodySize)");
 	const std::string Player = FunctionBody(Source, "void CMenus::RenderSettingsPlayer(CUIRect MainView)");
 	ASSERT_FALSE(Identity.empty());
@@ -6221,7 +6318,7 @@ TEST(QmNewUiMenuBranches, PlayerStandardPageUsesUnifiedSettingsStack)
 	EXPECT_NE(ListBox.find("m_WheelOwnerPriority = EUiWheelOwnerPriority::PAGE;"), std::string::npos);
 	EXPECT_NE(Player.find("deck:player-identity"), std::string::npos);
 	EXPECT_NE(Player.find("deck:player-country"), std::string::npos);
-	EXPECT_NE(Navigation.find("{\"player\", CMenus::SETTINGS_PLAYER}"), std::string::npos);
+	EXPECT_NE(FunctionBody(Navigation, "bool CMenus::SetSettingsPageFromCardTab(const char *pTab)").find("str_comp(pTab, \"player\") == 0)\n\t\tg_Config.m_UiSettingsPage = SETTINGS_PLAYER;"), std::string::npos);
 	EXPECT_EQ(Player.find("BeginSettingsCardDeck("), std::string::npos);
 	EXPECT_EQ(Player.find("ui_widget::TextField("), std::string::npos);
 	EXPECT_EQ(Player.find("ui_widget::SearchField("), std::string::npos);
@@ -6233,7 +6330,8 @@ TEST(QmNewUiMenuBranches, TeeStandardPageUsesUnifiedSettingsStack)
 {
 	const std::string Source = ReadTextFile("src/game/client/components/menus_settings.cpp");
 	const std::string DeckSource = ReadTextFile("src/game/client/QmUi/SettingsCardDeck.cpp");
-	const std::string Navigation = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	// 搜索页的 tab 路由表已删除：卡片 tab → 标准设置页的落地映射由 SetSettingsPageFromCardTab 统一拥有。
+	const std::string Navigation = ReadTextFile("src/game/client/components/menus.cpp");
 	const std::string Tee = FunctionBody(Source, "void CMenus::RenderSettingsTee(CUIRect MainView)");
 	ASSERT_FALSE(Tee.empty());
 	EXPECT_NE(Tee.find("SettingsPageLayout("), std::string::npos);
@@ -6311,7 +6409,7 @@ TEST(QmNewUiMenuBranches, TeeStandardPageUsesUnifiedSettingsStack)
 	EXPECT_NE(Tee.find("deck:tee-identity"), std::string::npos);
 	EXPECT_NE(Tee.find("deck:tee-skin-options"), std::string::npos);
 	EXPECT_NE(Tee.find("deck:tee-skin-list"), std::string::npos);
-	EXPECT_NE(Navigation.find("{\"tee\", CMenus::SETTINGS_TEE}"), std::string::npos);
+	EXPECT_NE(FunctionBody(Navigation, "bool CMenus::SetSettingsPageFromCardTab(const char *pTab)").find("str_comp(pTab, \"tee\") == 0)\n\t\tg_Config.m_UiSettingsPage = SETTINGS_TEE;"), std::string::npos);
 	EXPECT_EQ(Tee.find("BeginSettingsCardDeck("), std::string::npos);
 	EXPECT_EQ(Tee.find("DoSettingsScrollbarOption("), std::string::npos);
 	EXPECT_NE(Tee.find("ui_widget::InputField(ColorCodeInputCtx, &ColorCodeInput, ColorCodeEditBox, ColorCodeInputOptions).m_Changed"), std::string::npos);
@@ -6578,7 +6676,8 @@ TEST(QmNewUiMenuBranches, ControlsStandardPageUsesUnifiedSettingsStack)
 {
 	const std::string Source = ReadTextFile("src/game/client/components/menus_settings_controls.cpp");
 	const std::string Header = ReadTextFile("src/game/client/components/menus_settings_controls.h");
-	const std::string Navigation = ReadTextFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	// 搜索页的 tab 路由表已删除：卡片 tab → 标准设置页的落地映射由 SetSettingsPageFromCardTab 统一拥有。
+	const std::string Navigation = ReadTextFile("src/game/client/components/menus.cpp");
 	EXPECT_NE(Source.find("SettingsPageLayout("), std::string::npos);
 	EXPECT_NE(Source.find("SSettingsCardDefinition"), std::string::npos);
 	EXPECT_NE(Source.find("SettingsCardDeckForRenderPass().RenderCached("), std::string::npos);
@@ -6600,7 +6699,7 @@ TEST(QmNewUiMenuBranches, ControlsStandardPageUsesUnifiedSettingsStack)
 	EXPECT_EQ(Header.find("DoSettingsControlsScrollbarOption"), std::string::npos);
 	EXPECT_NE(Source.find("deck:controls-mouse"), std::string::npos);
 	EXPECT_NE(Source.find("deck:controls-custom"), std::string::npos);
-	EXPECT_NE(Navigation.find("{\"controls\", CMenus::SETTINGS_CONTROLS}"), std::string::npos);
+	EXPECT_NE(Navigation.find("str_comp(pTab, \"controls\") == 0)\n\t\tg_Config.m_UiSettingsPage = SETTINGS_CONTROLS;"), std::string::npos);
 	const std::string Menus = ReadTextFile("src/game/client/components/menus.cpp");
 	EXPECT_NE(Menus.find("str_comp(pTab, \"controls\")"), std::string::npos);
 }

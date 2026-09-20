@@ -205,9 +205,6 @@
 3 stars
 == 3 étoiles
 
-3D Background
-== Arrière-plan 3D
-
 3D background
 == Arrière-plan 3D
 
@@ -730,24 +727,6 @@ API key
 
 Appearance
 == Apparence
-
-Appearance / Chat
-== Apparence / Chat
-
-Appearance / Hook Collision
-== Apparence / Collision du grappin
-
-Appearance / HUD
-== Apparence / HUD
-
-Appearance / Info Messages
-== Apparence / Messages d'info
-
-Appearance / Laser
-== Apparence / Laser
-
-Appearance / Name Plate
-== Apparence / Panneau de nom
 
 Append to log file instead of overwriting
 == Ajouter au fichier journal au lieu de l'écraser
@@ -1526,9 +1505,6 @@ Call vote
 Camera
 == Caméra
 
-Camera & FOV
-== Caméra et champ de vision
-
 Camera drift intensity (0-200)
 == Intensité du décalage de la caméra (0-200)
 
@@ -1654,9 +1630,6 @@ Chat Binds
 
 Chat box width
 == Largeur de la boîte de chat
-
-Chat Bubble
-== Bulle de chat
 
 Chat bubble
 == Bulle de chat
@@ -2103,7 +2076,7 @@ Configure display and rendering
 == Configurer l'affichage et le rendu
 
 Configure Dream-only convenience features
-== Configure Dream-only convenience features
+== Configurer les fonctions pratiques propres à Qm
 
 Configure game and client preferences
 == Configurer les préférences du jeu et du client
@@ -2153,8 +2126,8 @@ Configure QmClient HUD elements
 Configure remaining DDNet client preferences
 == Configure remaining DDNet client preferences
 
-Configure skin downloads, prefix, and default eyes
-== Configurer les téléchargements de skins, le préfixe et les yeux par défaut
+Configure skin colors, eyes, and filters
+== Configure skin colors, eyes, and filters
 
 Configure sound and audio packs
 == Configurer le son et les packs audio
@@ -2747,9 +2720,6 @@ Default output open failed
 Default preset
 == Préréglage par défaut
 
-Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)
-== Arme demandée par défaut après la réapparition (0=désactivé, 1=marteau, 2=pistolet, 3=fusil à pompe, 4=lance-grenades, 5=laser)
-
 Default zoom
 == Zoom par défaut
 
@@ -3155,9 +3125,6 @@ Draw where mouse is
 Draw!
 == Match nul !
 
-Dream Features
-== Fonctionnalités de rêve
-
 Drift direction
 == Direction de la dérive
 
@@ -3284,9 +3251,6 @@ Dummy skin queue max length
 Dummy skin queue switch interval (ms)
 == Intervalle de changement de la file d'attente des skins du Dummy (ms)
 
-Dummy Window
-== Fenêtre du Dummy
-
 Dummy window size
 == Taille de la fenêtre du Dummy
 
@@ -3337,9 +3301,6 @@ Dynamic FOV smoothness
 
 Dynamic FOV smoothness (0=instant, 100=smoothest)
 == Lissage dynamique de la vue (0 = instantané, 100 = le plus lisse)
-
-Dynamic Island
-== Île dynamique
 
 Dynamic island
 == Île dynamique
@@ -3866,9 +3827,6 @@ Entity assets
 Entity Background Image
 == Image de fond des entités
 
-Entity Layer Colors
-== Couleurs des couches d'entités
-
 Entity overlay
 == Superposition d’entités
 
@@ -4376,9 +4334,6 @@ Friend note
 Friend notification refresh interval (sec)
 == Intervalle de rafraîchissement des notifications d'ami (sec)
 
-Friend Notifications
-== Notifications d'ami
-
 Friend notify
 == Notification d’ami
 
@@ -4553,9 +4508,6 @@ Gives you infinite jump
 Glitch
 == Glitch
 
-Global card
-== Carte globale
-
 Global card ordering (format: stableId|tab|col|order; semicolon-separated)
 == Ordre des cartes globales (format stableId|tab|col|order; séparé par des points-virgules)
 
@@ -4606,9 +4558,6 @@ Go forward the specified duration
 
 Gores
 == Gores
-
-Gores Actor
-== Acteur Gores
 
 Gores actor
 == Acteur Gores
@@ -4672,9 +4621,6 @@ GUI cursor assets
 
 Guide line color
 == Couleur de la ligne de guidage
-
-Gun
-== Pistolet
 
 Hammer
 == Marteau
@@ -4805,9 +4751,6 @@ Highlighted message
 Highlighted message color
 == Couleur du message en surbrillance
 
-Hitbox mode
-== Mode hitbox
-
 Hitbox Mode Freeze Border Color
 == Couleur des limites Freeze en mode Hitbox
 
@@ -4825,9 +4768,6 @@ Hitbox Mode Tee Collision Color
 
 Hitbox Mode Weapon Interaction Color
 == Couleur des interactions avec les armes en mode Hitbox
-
-HJ Assist
-== Aide HJ
 
 HJ assist
 == Aide HJ
@@ -4946,9 +4886,6 @@ HUD editor layout
 HUD editor preview
 == Aperçu de l'éditeur HUD
 
-HUD island appearance settings
-== Paramètres d'apparence des îlots HUD
-
 HUD notifications
 == Notifications HUD
 
@@ -4963,9 +4900,6 @@ Hue speed
 
 i = Receive rate
 == i = Taux de réception
-
-I am a robot
-== Je suis un robot
 
 I am away from the game window
 == Je suis loin de la fenêtre du jeu
@@ -5140,9 +5074,6 @@ Input device open failed, try reconnecting headset/mic or reselecting input devi
 
 Input overlay
 == Superposition de saisie
-
-Input overlay display
-== Affichage de la superposition de saisie
 
 Input overlay keyboard scale (percent)
 == Échelle du clavier dans la superposition des entrées (pourcentage)
@@ -5345,9 +5276,6 @@ Keep unsent message on chat close
 Keep vote window open after voting
 == Garder la fenêtre de vote ouverte après avoir voté
 
-Key Bindings
-== Raccourcis clavier
-
 Key binds
 == Touches de raccourci
 
@@ -5374,9 +5302,6 @@ Keyboard focus ring color
 
 Keyboard size
 == Taille du clavier
-
-Keyword Reply
-== Réponse par mot-clé
 
 Keyword reply
 == Réponse par mot-clé
@@ -5453,11 +5378,8 @@ Language
 Language file to use
 == Fichier de langue à utiliser
 
-Large emoticons and launch mode
-== Large emoticons and launch mode
-
 Large emoticons and launched emoticons
-== Large emoticons and launched emoticons
+== Grandes émoticônes et émoticônes lancées
 
 Large text announcement for friend joining
 == Annonce en gros texte pour l'arrivée d'un ami
@@ -5512,6 +5434,12 @@ Latency Jitter
 
 Launch count threshold for the next sponsor reminder
 == Seuil de lancements avant le prochain rappel
+
+Launch emote
+== Lancer une émoticône
+
+Launch emote key
+== Touche de lancer d’émoticône
 
 Layout
 == Disposition
@@ -5762,6 +5690,9 @@ Local Time
 Local-only
 == Local uniquement
 
+Locate
+== Localiser
+
 Lock delay
 == Délai de verrouillage
 
@@ -5794,9 +5725,6 @@ Low to high
 
 Lyrics
 == Paroles
-
-Lyrics sources and display
-== Sources de paroles et affichage
 
 Main Asset
 == Élément principal
@@ -6115,6 +6043,9 @@ Menu option - normal
 
 Menu option - selected
 == Option de menu - sélectionné
+
+Merge consecutive identical echo messages within this window in milliseconds (0 disables merging)
+== Fusionner les messages Echo identiques consécutifs dans cette fenêtre en millisecondes (0 = désactivé)
 
 Merge consecutive identical player messages within 2 seconds
 == Fusionner les messages identiques consécutifs d'un joueur dans un délai de 2 secondes
@@ -6854,9 +6785,6 @@ Notification hold time
 Notification text size
 == Taille du texte de notification
 
-Notifications
-== Notifications
-
 Notify when friends come online
 == Notifier quand des amis se connectent
 
@@ -6946,9 +6874,6 @@ Only show when the other Tee is not on screen
 
 Only show with this nickname
 == Afficher uniquement avec ce pseudo
-
-Only what you can't imagine, nothing Dream can't do
-== Seul ce que vous ne pouvez pas imaginer, rien que Dream ne puisse faire
 
 Opacity
 == Opacité
@@ -7298,9 +7223,6 @@ Pick result: %s
 Pickup range
 == Portée de ramassage
 
-Pie Menu
-== Menu circulaire
-
 Pie menu
 == Menu circulaire
 
@@ -7372,9 +7294,6 @@ Player country filter in server browser (ISO 3166-1 numeric)
 
 Player country:
 == Pays du joueur :
-
-Player data
-== Données du joueur
 
 Player decoration color
 == Couleur de la décoration du joueur
@@ -7691,8 +7610,8 @@ Preview import file
 Preview laser bodies, outlines, and impacts
 == Preview laser bodies, outlines, and impacts
 
-Preview player and dummy appearance and colors
-== Aperçu de l'apparence et des couleurs du joueur et du dummy
+Preview player and dummy appearance
+== Preview player and dummy appearance
 
 Preview player and dummy nameplates
 == Preview player and dummy nameplates
@@ -7867,15 +7786,6 @@ qm_profile_queue: index must be between 1 and %d
 
 QmClient
 == QmClient
-
-QmClient / Function
-== QmClient / Fonction
-
-QmClient / HUD
-== QmClient / HUD
-
-QmClient / Visual
-== QmClient / Visuel
 
 QmClient chat log
 == Journal de chat QmClient
@@ -8501,9 +8411,6 @@ Resource preview VRAM budget override (MB, 0=auto)
 Resource preview VRAM budget percentage (based on device local VRAM budget)
 == Budget mémoire vidéo pour l'aperçu des ressources (pourcentage du budget local)
 
-Respawn default weapon (when owned)
-== Arme par défaut à la réapparition (si possédée)
-
 Restart
 == Redémarrer
 
@@ -8867,20 +8774,26 @@ Search
 Search and navigate settings
 == Rechercher et parcourir les paramètres
 
-Search and pick skins and manage the skin queue
-== Rechercher et choisir des skins, et gérer la file de rotation
-
 Search donor asset
 == Rechercher un élément donneur
 
 Search main asset
 == Rechercher un élément principal
 
+Search maps and downloadedmaps, including subfolders
+== Rechercher dans maps et downloadedmaps, sous-dossiers inclus
+
 Search settings by title, feature, or keyword
 == Search settings by title, feature, or keyword
 
+Search skins and manage the skin queue
+== Search skins and manage the skin queue
+
 Searching
 == Recherche
+
+Searching all map folders...
+== Recherche dans tous les dossiers de cartes…
 
 Sec-WebSocket-Protocol sent during the realtime handshake
 == Sec-WebSocket-Protocol envoyé lors de la poignée de main temps réel
@@ -9203,6 +9116,9 @@ Severe
 Shape
 == Forme
 
+Share of the server browser name/map split given to the name column (per mille)
+== Part du partage nom/carte du navigateur de serveurs attribuée à la colonne des noms (pour mille)
+
 Shimmer speed (polished)
 == Vitesse du reflet (poli)
 
@@ -9349,9 +9265,6 @@ Show compact vote HUD
 
 Show configurable outlines around map tiles
 == Show configurable outlines around map tiles
-
-Show Coordinates
-== Afficher les coordonnées
 
 Show coordinates above players
 == Afficher les coordonnées au-dessus des joueurs
@@ -9535,9 +9448,6 @@ Show important messages when rendering video
 
 Show important server prompts
 == Afficher les messages serveur importants
-
-Show important server prompts and Echo messages as popups
-== Afficher les messages serveur importants et Echo en popups
 
 Show important server prompts as notifications
 == Afficher les messages serveur importants comme notifications
@@ -9762,10 +9672,10 @@ Show other players' hook collision lines when rendering video
 == Afficher les lignes de collision de crochet des autres joueurs lors du rendu vidéo
 
 Show other players' large emoticons
-== Show other players' large emoticons
+== Afficher les grandes émoticônes des autres joueurs
 
 Show other players' launched emoticons
-== Show other players' launched emoticons
+== Afficher les émoticônes lancées par les autres joueurs
 
 Show other team players (2=own team only)
 == Afficher les joueurs des autres équipes (2 = équipe uniquement)
@@ -10232,9 +10142,6 @@ Skin switch animation range: 0=Self, 1=Local+Dummy, 2=All players
 Skin switch animation type (0=Ghost pop, 1=Soft fade, 2=Slide left, 3=Rotate pop, 4=Light dark switch, 5=Glitch shake, 6=Elastic scale)
 == Type d'animation de changement de skin (0=Apparition avec traînée, 1=Fondu doux, 2=Glissement vers la gauche, 3=Apparition rotative, 4=Alternance clair/sombre, 5=Secousse de glitch, 6=Zoom élastique)
 
-Skin transition
-== Transition de skin
-
 Skin transition animation
 == Animation de transition de skin
 
@@ -10309,9 +10216,6 @@ Smooth zoom animation time in editor (in ms, 0=off)
 
 Smoothness of multi-view zoom (in ms, higher = slower)
 == Fluidité du zoom multi-vues (en ms, plus élevé = plus lent)
-
-SMTC
-== SMTC
 
 Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
 == Aligner le décalage de l'oscillation sur des pixels entiers (glyphes plus nets, mouvement plus saccadé)
@@ -10631,9 +10535,6 @@ Stop server
 Stop the current demo
 == Arrêter la démo actuelle
 
-Streamer Mode
-== Mode streamer
-
 Streamer mode
 == Mode streamer
 
@@ -10787,9 +10688,6 @@ System
 System default
 == Par défaut du système
 
-System media control
-== Contrôle multimédia système
-
 System media controls
 == Contrôles média système
 
@@ -10826,14 +10724,11 @@ Target language code (e.g. zh, en, ja, zh-TW)
 Target language ratio
 == Ratio de langue cible
 
+Target server: %s
+== Serveur de destination : %s
+
 TClient
 == TClient
-
-TClient / Bind Wheel
-== TClient / Molette de liaison
-
-TClient / Status Bar
-== TClient / Barre d'état
 
 TClient Developers
 == Développeurs TClient
@@ -11391,7 +11286,7 @@ Toggle dyncam
 == Basculer dyncam
 
 Toggle emote launcher
-== Toggle emote launcher
+== Basculer le lanceur d’émoticônes
 
 Toggle fast practice mode
 == Activer/désactiver le mode pratique rapide
@@ -11521,9 +11416,6 @@ Trail width
 
 Translate
 == Traduire
-
-Translate button
-== Bouton de traduction
 
 Translate ID:
 == ID de traduction :
@@ -11973,7 +11865,7 @@ Use k key to kill (restart), q to pause and watch other players. See settings fo
 == Utilisez la touche K pour vous tuer (redémarrer), Q pour faire une pause et regarder les autres joueurs. Consultez les paramètres pour les autres touches.
 
 Use large emote
-== Use large emote
+== Utiliser une grande émoticône
 
 Use mouse sensitivity when dynamic camera is on
 == Utiliser la sensibilité de la souris lorsque la caméra dynamique est activée
@@ -12389,9 +12281,6 @@ Weapon switch easing
 Weapon switch rotation
 == Rotation du changement d'arme
 
-Weapon Trajectory
-== Trajectoire des armes
-
 Weapon trajectory
 == Trajectoire d'arme
 
@@ -12418,9 +12307,6 @@ Welcome to DDNet
 
 What level DDRace binding is set to (automatic, you don't need to use it).
 == Niveau auquel la liaison DDRace est définie (automatique, vous n'avez pas besoin de l'utiliser).
-
-What's done is done, no use saying more
-== Ce qui est fait est fait, inutile d'en dire plus
 
 Wheel animate
 == Animation de la roue
@@ -12530,14 +12416,14 @@ Width of friends column in server browser
 Width of latency column in server browser
 == Largeur de la colonne de latence dans le navigateur de serveurs
 
-Width of map column in server browser
-== Largeur de la colonne Carte dans le navigateur de serveurs
-
 Width of others' hook collision line
 == Largeur de la ligne de collision du grappin des autres
 
 Width of players column in server browser
 == Largeur de la colonne Joueurs dans le navigateur de serveurs
+
+Width of Qm clients column in server browser
+== Largeur de la colonne des clients Qm dans le navigateur de serveurs
 
 Width of type column in server browser
 == Largeur de la colonne Type dans le navigateur de serveurs
@@ -12922,15 +12808,6 @@ Zoom to current mouse target
 
 ⚠️ Tencent Cloud API not configured
 == ⚠️ API Tencent Cloud non configurée
-
-发射表情按键
-== 发射表情按键
-
-显示他人发射表情
-== 显示他人发射表情
-
-显示他人大表情
-== 显示他人大表情
 
 [Assets editor blend mode]
 Color

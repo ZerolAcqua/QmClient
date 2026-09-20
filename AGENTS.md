@@ -50,6 +50,12 @@ QmClient（Q1menG Client）是基于 DDNet / TaterClient 的第三方定制客�
 - 无明确批准：不改协议、demo/skin 格式、物理、预测、碰撞、地图行为、rank 可达性、既有玩法语义。
 - 补丁聚焦；不重写无关上游；小改不动大抽象。
 - QmClient 特有工作优先落在 `src/game/client/components/qmclient/`、`src/game/client/QmUi/`、Qm 配置头、翻译、文档、metadata、`qmclient_scripts/`。
+- 设置卡片一律走全局卡片目录（`src/game/client/QmUi/cards/`）：
+  - 新功能的 UI 配置项做成卡片模块，落在 `QmCardCatalog{Visual,Function,Hud}.cpp` 或新增模块文件里，登记 stableId + 标题/测量/重测版本/预布局输入/内容渲染；
+  - 页面（`menus_qmclient.cpp` 的分类页、搜索页）只声明「这一页有哪些卡片」（`qm_card_catalog::BuildCards(..., XxxCardStableIds(), ...)`），不写卡片实现；
+  - 禁止把新的卡片构造/渲染代码继续堆进 `menus_qmclient.cpp`；该文件只保留页面骨架与卡片内容渲染函数（`CMenus::RenderQm*Content`）。
+  - 新增卡片源文件要同步登记到根 `CMakeLists.txt` 的 `GAME_CLIENT` 列表（`QmUi/cards/...`）。
+  - 卡片模块不能直接调用 `CMenus` 的私有内容函数，统一走 `qm_card_catalog::QmCardRenderHook` 桥接。
 - 超出范围需批准：引擎核心、服务端玩法、地图编辑器、第三方库、CI release、协议字段、snapshot/输入/时序/回放语义等。
 - 默认不改根 `CMakeLists.txt`、协议字段、序列化布局、文件格式定义（任务明确要求除外）。
 - 配置项前缀 `qm_` / `Qm`，不用 `cl_`。

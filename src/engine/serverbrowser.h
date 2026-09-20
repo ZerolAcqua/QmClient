@@ -15,6 +15,8 @@
 #include <generated/protocol7.h>
 
 #include <optional>
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -125,6 +127,8 @@ public:
 	CClient m_aClients[SERVERINFO_MAX_CLIENTS];
 	int m_NumFilteredPlayers;
 	bool m_RequiresLogin;
+	// 游戏层推送的该服在线梦客户端人数（含 Arg）；引擎只在排序时用它，见 SetQmClientServerCounts。
+	int m_QmClientCount;
 
 	static int EstimateLatency(int Loc1, int Loc2);
 	static bool ParseLocation(int *pResult, const char *pString);
@@ -284,6 +288,7 @@ public:
 		SORT_NUMPLAYERS - Sort after how many players there are on the server.
 		SORT_NUMFRIENDS - Sort after how many friends there are on the server.
 		SORT_FAVORITES - Sort by favorite status, number of players and then ping.
+		SORT_QM_CLIENTS - Sort after how many Qm clients are online on the server (pushed by the game layer).
 	*/
 	enum
 	{
@@ -294,6 +299,7 @@ public:
 		SORT_NUMPLAYERS,
 		SORT_NUMFRIENDS,
 		SORT_FAVORITES,
+		SORT_QM_CLIENTS,
 	};
 
 	enum
@@ -328,6 +334,9 @@ public:
 		int64_t m_RequestTime;
 		bool m_RequestIgnoreInfo;
 		int m_GotInfo;
+		bool m_FriendStateValid;
+		uint64_t m_FriendStateRevision;
+		bool m_FriendStateIgnoreClan;
 		CServerInfo m_Info;
 
 		CServerEntry *m_pPrevReq; // request list
@@ -354,6 +363,8 @@ public:
 	virtual bool IsServerlistError() const = 0;
 	virtual int LoadingProgression() const = 0;
 
+	// 好友行复制的数据变化或条目地址失效时递增；延迟等字段由行持有的条目直接读取。
+	virtual uint64_t FriendListRevision() const = 0;
 	virtual int NumServers() const = 0;
 	virtual const CServerInfo *Get(int Index) const = 0;
 	virtual int NumHttpServers() const = 0;
@@ -365,6 +376,10 @@ public:
 	virtual int NumSortedServers() const = 0;
 	virtual int NumSortedPlayers() const = 0;
 	virtual const CServerInfo *SortedGet(int Index) const = 0;
+
+	// 中心服下发的在线梦客户端分布（"ip:port" → 人数），游戏层在分布更新时推送。
+	// 引擎保存最近一次推送，并在按 SORT_QM_CLIENTS 排序前物化到 CServerInfo::m_QmClientCount。
+	virtual void SetQmClientServerCounts(const std::unordered_map<std::string, int> &Counts) = 0;
 
 	virtual const std::vector<CCommunity> &Communities() const = 0;
 	virtual const CCommunity *Community(const char *pCommunityId) const = 0;

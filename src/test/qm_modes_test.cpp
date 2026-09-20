@@ -5,22 +5,30 @@
 #include <engine/console.h>
 #include <engine/kernel.h>
 #include <engine/shared/config.h>
+#include <engine/shared/json.h>
 #include <engine/storage.h>
 
 #include <generated/protocol.h>
 
 #include <game/client/components/emoticon.h>
 #include <game/client/components/jump_hint_utils.h>
+#include <game/client/components/qmclient/emoticon_commands.h>
 #include <game/client/components/qmclient/emoticon_projectile.h>
 #include <game/client/components/qmclient/friend_enter_tracker.h>
 #include <game/client/components/qmclient/map_progress.h>
+#include <game/client/components/qmclient/markdown_cache_writer.h>
 #include <game/client/components/qmclient/modes.h>
+#include <game/client/components/qmclient/route_start_index.h>
 #include <game/client/components/qmclient/translate/translate_ui_settings.h>
+#include <game/gamecore.h>
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <limits>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -924,6 +932,140 @@ TEST(QmJumpHint, CompletedMigrationPreservesSubsequentUserChoices)
 	EXPECT_STREQ(aText, UserText.c_str());
 }
 
+namespace
+{
+	class CQmEmoteCommandsTest : public ::testing::Test
+	{
+	protected:
+		struct SRequest
+		{
+			int m_Emoticon;
+			bool m_ForceLaunch;
+		};
+		struct SReceiver
+		{
+			std::vector<SRequest> m_vRequests;
+
+			// 记录公共 Emote 入口的调用，不替代控制台解析或表情校验。
+			void Emote(int Emoticon, bool ForceLaunch = false)
+			{
+				m_vRequests.push_back({Emoticon, ForceLaunch});
+			}
+		} m_Receiver;
+		std::unique_ptr<IConsole> m_pConsole = CreateConsole(CFGFLAG_CLIENT);
+
+		void SetUp() override
+		{
+			QmEmoticon::RegisterCommands(m_pConsole.get(), &m_Receiver);
+		}
+	};
+}
+
+TEST_F(CQmEmoteCommandsTest, RegistersClientConsoleCommandWithExistingEmoteSyntax)
+{
+	const auto *pEmote = m_pConsole->GetCommandInfo("emote", CFGFLAG_CLIENT, false);
+	const auto *pShotEmote = m_pConsole->GetCommandInfo("shot_emote", CFGFLAG_CLIENT, false);
+	ASSERT_NE(pEmote, nullptr);
+	ASSERT_NE(pShotEmote, nullptr);
+	EXPECT_STREQ(pShotEmote->Params(), pEmote->Params());
+	EXPECT_STREQ(pShotEmote->Params(), "i[emote-id]");
+	EXPECT_EQ(pShotEmote->Flags(), CFGFLAG_CLIENT);
+	EXPECT_EQ(m_pConsole->GetCommandInfo("shot_emote", CFGFLAG_CHAT, false), nullptr);
+}
+
+TEST_F(CQmEmoteCommandsTest, ShotEmoteForwardsEveryExistingIdOnceToEmote)
+{
+	for(int Emoticon = 0; Emoticon < NUM_EMOTICONS; ++Emoticon)
+	{
+		SCOPED_TRACE(Emoticon);
+		m_Receiver.m_vRequests.clear();
+		const std::string Command = "shot_emote " + std::to_string(Emoticon);
+		m_pConsole->ExecuteLine(Command.c_str());
+		ASSERT_EQ(m_Receiver.m_vRequests.size(), 1u);
+		EXPECT_EQ(m_Receiver.m_vRequests[0].m_Emoticon, Emoticon);
+		EXPECT_TRUE(m_Receiver.m_vRequests[0].m_ForceLaunch);
+	}
+}
+
+TEST_F(CQmEmoteCommandsTest, PreservesExistingIntegerParsing)
+{
+	struct SCase
+	{
+		const char *m_pArguments;
+		bool m_Dispatched;
+		int m_Emoticon;
+	};
+	const SCase aCases[] = {
+		{"", false, 0},
+		{"invalid", false, 0},
+		{"2147483647", false, 0},
+		{"-2147483648", false, 0},
+		{"99999999999999999999", false, 0},
+		{"-1", true, -1},
+		{"16", true, 16},
+		{"+7", true, 7},
+		{"\"7\"", true, 7},
+		{"7 extra", true, 7},
+		// 引号参数沿用现有控制台语义，无法转为整数时 GetInteger 返回 0。
+		{"\"invalid\"", true, 0},
+	};
+	for(const auto &Case : aCases)
+	{
+		SCOPED_TRACE(Case.m_pArguments);
+		for(const char *pCommandName : {"emote", "shot_emote"})
+		{
+			SCOPED_TRACE(pCommandName);
+			m_Receiver.m_vRequests.clear();
+			const std::string Command = std::string(pCommandName) + " " + Case.m_pArguments;
+			EXPECT_EQ(m_pConsole->LineIsValid(Command.c_str()), Case.m_Dispatched);
+			m_pConsole->ExecuteLine(Command.c_str());
+			ASSERT_EQ(m_Receiver.m_vRequests.size(), Case.m_Dispatched ? 1u : 0u);
+			if(Case.m_Dispatched)
+				EXPECT_EQ(m_Receiver.m_vRequests[0].m_Emoticon, Case.m_Emoticon);
+		}
+	}
+}
+
+TEST_F(CQmEmoteCommandsTest, ShotEmoteDoesNotForceSubsequentEmote)
+{
+	m_pConsole->ExecuteLine("shot_emote 2; emote 3");
+	ASSERT_EQ(m_Receiver.m_vRequests.size(), 2u);
+	EXPECT_EQ(m_Receiver.m_vRequests[0].m_Emoticon, 2);
+	EXPECT_TRUE(m_Receiver.m_vRequests[0].m_ForceLaunch);
+	EXPECT_EQ(m_Receiver.m_vRequests[1].m_Emoticon, 3);
+	EXPECT_FALSE(m_Receiver.m_vRequests[1].m_ForceLaunch);
+}
+
+TEST(QmEmoticon, ForcedLaunchPreservesWheelModeAndExistingSuperConsumption)
+{
+	for(int Emoticon = 0; Emoticon < NUM_EMOTICONS; ++Emoticon)
+	{
+		for(const bool LaunchMode : {false, true})
+		{
+			for(const bool Super : {false, true})
+			{
+				bool SuperPending = Super;
+				EXPECT_EQ(QmEmoticon::ConsumeEffect(Emoticon, LaunchMode, SuperPending, true), Super ? QmEmoticon::EEffect::SUPER_PROJECTILE : QmEmoticon::EEffect::PROJECTILE);
+				EXPECT_FALSE(SuperPending);
+				EXPECT_EQ(QmEmoticon::ConsumeEffect(Emoticon, LaunchMode, SuperPending), LaunchMode ? QmEmoticon::EEffect::PROJECTILE : QmEmoticon::EEffect::NONE);
+			}
+		}
+	}
+}
+
+TEST(QmEmoticon, ForcedLaunchUsesExistingIdValidation)
+{
+	for(const int Emoticon : {-1, static_cast<int>(NUM_EMOTICONS), std::numeric_limits<int>::min(), std::numeric_limits<int>::max()})
+	{
+		for(const bool LaunchMode : {false, true})
+		{
+			bool SuperPending = true;
+			EXPECT_EQ(QmEmoticon::ConsumeEffect(Emoticon, LaunchMode, SuperPending, true), QmEmoticon::EEffect::INVALID);
+			EXPECT_FALSE(SuperPending);
+		}
+	}
+}
+
 TEST(QmEmoticon, InvalidRequestsConsumePendingSuperEmote)
 {
 	for(const int Emoticon : {-1, static_cast<int>(NUM_EMOTICONS), std::numeric_limits<int>::min(), std::numeric_limits<int>::max()})
@@ -1204,4 +1346,202 @@ TEST(QmEmoticonProjectile, FadeGrowthCannotForceImageThroughNarrowCorridor)
 	EXPECT_TRUE(Projectile.m_Active);
 	EXPECT_FLOAT_EQ(Projectile.Size(), 64);
 	EXPECT_FALSE(Mask.Overlaps(Projectile.m_Pos, Projectile.Size(), Projectile.m_Angle, Corridor));
+}
+
+// 表情与 Tee 的身体盒碰撞：撞到不动的玩家要反弹，而不是穿过去。
+TEST(QmEmoticonProjectile, PlayerBoxReboundsProjectile)
+{
+	const unsigned char aPixel[] = {255, 255, 255, 255};
+	QmEmoticon::CAlphaMask Mask;
+	Mask.Build(aPixel, 1, 1);
+	CEmoticonProjectile Projectile;
+	Projectile.Init(vec2(-100, 16), vec2(1200, 0), 0, 1.0f, 0);
+	Projectile.m_AngVel = 0;
+	const auto Air = [](int, int) { return false; };
+	const QmEmoticon::SPlayerBox aBoxes[] = {{1, vec2(0, 16), CCharacterCore::PhysicalSize() * 0.5f}};
+	Projectile.Update(0.2f, Mask, Air, aBoxes, 1);
+	// 表情半宽 32、玩家半宽 14，中心最远只能推进到 -46。
+	EXPECT_LT(Projectile.m_Pos.x, -45.9f);
+	EXPECT_LT(Projectile.m_Vel.x, 0);
+}
+
+// 发射者自身不算障碍，否则弹道会在出生点被自己的身体挡住。
+TEST(QmEmoticonProjectile, OwnerIsExcludedFromPlayerCollision)
+{
+	const unsigned char aPixel[] = {255, 255, 255, 255};
+	QmEmoticon::CAlphaMask Mask;
+	Mask.Build(aPixel, 1, 1);
+	CEmoticonProjectile Projectile;
+	Projectile.Init(vec2(0, 0), vec2(1200, 0), 0, 1.0f, 7);
+	Projectile.m_AngVel = 0;
+	const auto Air = [](int, int) { return false; };
+	const QmEmoticon::SPlayerBox aBoxes[] = {{7, vec2(0, 0), CCharacterCore::PhysicalSize() * 0.5f}};
+	Projectile.Update(0.05f, Mask, Air, aBoxes, 1);
+	EXPECT_GT(Projectile.m_Pos.x, 50.0f);
+}
+
+// 贴墙时消失动画的膨胀只能冻结尺寸，不能像脱困逻辑那样把表情挪到墙的另一侧。
+TEST(QmEmoticonProjectile, GrowthNeverTeleportsProjectileAcrossWall)
+{
+	const unsigned char aPixel[] = {255, 255, 255, 255};
+	QmEmoticon::CAlphaMask Mask;
+	Mask.Build(aPixel, 1, 1);
+	CEmoticonProjectile Projectile;
+	Projectile.Init(vec2(-32, 16), vec2(0, 0), 0);
+	Projectile.m_AngVel = 0;
+	Projectile.m_LifeTime = 0.6f;
+	const auto Wall = [](int X, int) { return X >= 0; };
+	for(int I = 0; I < 40; ++I)
+	{
+		Projectile.Update(1.0f / 60, Mask, Wall);
+		if(!Projectile.m_Active)
+			break;
+		EXPECT_FLOAT_EQ(Projectile.m_Pos.x, -32.0f);
+		EXPECT_LE(Projectile.m_Pos.x + Projectile.Size() / 2, 0.0001f);
+	}
+}
+
+// 与 Tee 的碰撞同样遵守贴图透明区域，空心表情不会凭空挡住玩家。
+TEST(QmEmoticonProjectile, TransparentPixelsDoNotBlockPlayerBox)
+{
+	unsigned char aPixels[4 * 4 * 4] = {};
+	for(int Y = 0; Y < 4; ++Y)
+		aPixels[(Y * 4 + 3) * 4 + 3] = 255;
+	QmEmoticon::CAlphaMask Mask;
+	Mask.Build(aPixels, 4, 4);
+	// 不透明像素集中在图片右侧，玩家盒压在左侧透明区时不算碰撞。
+	EXPECT_FALSE(Mask.OverlapsBox(vec2(64, 16), 32, 0, vec2(54, 16), vec2(14, 14)));
+	EXPECT_TRUE(Mask.OverlapsBox(vec2(64, 16), 32, 0, vec2(72, 16), vec2(14, 14)));
+}
+
+TEST(QmRouteStartIndex, MatchesFullMapScanForGameAndFrontStarts)
+{
+	const int Width = 128;
+	const int MapSize = Width * 128;
+	std::vector<int> vGame(MapSize, TILE_AIR), vFront(MapSize, TILE_AIR);
+	std::vector<bool> vReachable(MapSize, true);
+	vGame[0] = TILE_START;
+	vGame[74] = TILE_START;
+	vFront[120] = TILE_START;
+	vGame[MapSize - 1] = TILE_START;
+	vFront[MapSize - 1] = TILE_START;
+	vReachable[74] = false;
+	CQmRouteStartIndex Starts;
+	for(int Index = 0; Index < MapSize; ++Index)
+		Starts.AddTile(Index, vGame[Index], vFront[Index]);
+	const auto IsStart = [&](int Index) { return vGame[Index] == TILE_START || vFront[Index] == TILE_START; };
+	const auto PositionOf = [&](int Index) { return vec2((Index % Width) * 32.0f + 16.0f, (Index / Width) * 32.0f + 16.0f); };
+	for(const vec2 Position : {vec2(-100, -100), vec2(2000, 16), vec2(9000, 9000), vec2(128, 128)})
+	{
+		int Expected = -1;
+		float BestDistance = std::numeric_limits<float>::max();
+		for(int Index = 0; Index < MapSize; ++Index)
+		{
+			if(!vReachable[Index] || !IsStart(Index))
+				continue;
+			const float Distance = length_squared(Position - PositionOf(Index));
+			if(Distance < BestDistance)
+			{
+				BestDistance = Distance;
+				Expected = Index;
+			}
+		}
+		EXPECT_EQ(Starts.FindClosest(Position, -1, [&](int Index) { return vReachable[Index] && IsStart(Index); }, PositionOf), Expected);
+	}
+	// 与查询时当前格子一致；旧起点被清除时不能再选中它。
+	vGame[0] = TILE_AIR;
+	EXPECT_EQ(Starts.FindClosest(vec2(16, 16), -1, [&](int Index) { return vReachable[Index] && IsStart(Index); }, PositionOf), 120);
+}
+
+TEST(QmRouteStartIndex, QueriesOnlyStartTilesAndPreservesTiesAndFallback)
+{
+	CQmRouteStartIndex Starts;
+	const int MapSize = 1024 * 1024;
+	for(int Index = 0; Index < MapSize; ++Index)
+		Starts.AddTile(Index, Index == 7 || Index == 19 ? TILE_START : TILE_AIR, Index == 33 ? TILE_START : TILE_AIR);
+	int Checks = 0;
+	const auto Eligible = [&](int) { ++Checks; return true; };
+	const auto PositionOf = [](int Index) { return vec2(Index == 7 ? -10.0f : 10.0f, 0); };
+	for(int Frame = 0; Frame < 128; ++Frame)
+		EXPECT_EQ(Starts.FindClosest(vec2(0, 0), -1, Eligible, PositionOf), 7);
+	EXPECT_EQ(Checks, 3 * 128);
+	EXPECT_EQ(Starts.FindClosest(vec2(0, 0), 999, [](int) { return false; }, PositionOf), 999);
+	Starts.Reset();
+	EXPECT_EQ(Starts.FindClosest(vec2(0, 0), -1, Eligible, PositionOf), -1);
+	EXPECT_EQ(Checks, 3 * 128);
+	EXPECT_FALSE(Starts.AddTile(0, TILE_AIR, TILE_AIR));
+	EXPECT_TRUE(Starts.AddTile(1, TILE_AIR, TILE_START));
+	EXPECT_EQ(Starts.FindClosest(vec2(0, 0), -1, [](int) { return true; }, PositionOf), 1);
+}
+
+TEST(QmMarkdownCache, WritingIsDeferredAndNewestSnapshotSurvivesOwner)
+{
+	CTestInfo Info;
+	auto pStorage = Info.CreateTestStorage();
+	ASSERT_NE(pStorage, nullptr);
+	char aPath[IO_MAX_PATH_LENGTH];
+	pStorage->GetCompletePath(IStorage::TYPE_SAVE, "qmclient/news_cache.json", aPath, sizeof(aPath));
+	const std::string Expected = "公告\n\"引号\" 与 \\ 路径";
+	std::shared_ptr<IJob> pJob;
+	{
+		CQmMarkdownCacheWriter Writer;
+		pJob = Writer.Enqueue(aPath, 1, 10, "old");
+		ASSERT_NE(pJob, nullptr);
+		EXPECT_FALSE(pJob->IsAbortable());
+		std::string Markdown = Expected;
+		EXPECT_EQ(Writer.Enqueue(aPath, 1, 11, Markdown), nullptr);
+		Markdown = "changed after enqueue";
+		EXPECT_FALSE(pStorage->FileExists("qmclient/news_cache.json", IStorage::TYPE_SAVE));
+	}
+	CJobPool Pool;
+	Pool.Init(1);
+	Pool.Add(pJob);
+	Pool.Shutdown();
+	void *pData = nullptr;
+	unsigned Size = 0;
+	ASSERT_TRUE(pStorage->ReadFile("qmclient/news_cache.json", IStorage::TYPE_SAVE, &pData, &Size));
+	json_value *pRoot = json_parse(static_cast<const char *>(pData), Size);
+	free(pData);
+	ASSERT_NE(pRoot, nullptr);
+	EXPECT_EQ(pRoot->type, json_object);
+	EXPECT_EQ(pRoot->u.object.length, 3u);
+	EXPECT_EQ(json_int_get(json_object_get(pRoot, "cache_version")), 1);
+	EXPECT_EQ(json_int_get(json_object_get(pRoot, "version")), 11);
+	EXPECT_STREQ(json_string_get(json_object_get(pRoot, "markdown")), Expected.c_str());
+	json_value_free(pRoot);
+}
+
+TEST(QmMarkdownCache, FinishedOrFailedWriteAllowsNextRequest)
+{
+	CTestInfo Info;
+	auto pStorage = Info.CreateTestStorage();
+	ASSERT_NE(pStorage, nullptr);
+	char aPath[IO_MAX_PATH_LENGTH];
+	pStorage->GetCompletePath(IStorage::TYPE_SAVE, "qmclient/sponsors_cache.json", aPath, sizeof(aPath));
+	CQmMarkdownCacheWriter Writer;
+	CJobPool Pool;
+	// 目录不能当文件打开；失败后仍可派发下一次写入。
+	char aDirectory[IO_MAX_PATH_LENGTH];
+	pStorage->GetCompletePath(IStorage::TYPE_SAVE, "", aDirectory, sizeof(aDirectory));
+	auto pJob = Writer.Enqueue(aDirectory, 1, 2, "unwritable");
+	Pool.Init(1);
+	Pool.Add(pJob);
+	Pool.Shutdown();
+	for(int Version : {3, 4})
+	{
+		pJob = Writer.Enqueue(aPath, 1, Version, "");
+		ASSERT_NE(pJob, nullptr);
+		Pool.Init(1);
+		Pool.Add(pJob);
+		Pool.Shutdown();
+		void *pData = nullptr;
+		unsigned Size = 0;
+		ASSERT_TRUE(pStorage->ReadFile("qmclient/sponsors_cache.json", IStorage::TYPE_SAVE, &pData, &Size));
+		json_value *pRoot = json_parse(static_cast<const char *>(pData), Size);
+		free(pData);
+		ASSERT_NE(pRoot, nullptr);
+		EXPECT_EQ(json_int_get(json_object_get(pRoot, "version")), Version);
+		EXPECT_STREQ(json_string_get(json_object_get(pRoot, "markdown")), "");
+		json_value_free(pRoot);
+	}
 }

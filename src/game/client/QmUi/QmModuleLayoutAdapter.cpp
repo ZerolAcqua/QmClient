@@ -93,6 +93,7 @@ namespace qm_module
 		case EQmModuleId::KeyBinds: return "qm:key_binds";
 		case EQmModuleId::MiniFeatures: return "qm:mini_features";
 		case EQmModuleId::JumpHint: return "qm:jump_hint";
+		case EQmModuleId::SkinAppearance: return "qm:skin_appearance";
 		case EQmModuleId::SkinTransition: return "qm:skin_transition";
 		case EQmModuleId::CameraView: return "qm:camera_view";
 		case EQmModuleId::DummyMiniView: return "qm:dummy_miniview";

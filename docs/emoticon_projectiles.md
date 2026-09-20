@@ -13,6 +13,24 @@
 
 继续发送 `emoticon`、`player_id`、`launch_mode`、`super_launch`，接收现有广播格式。远端依据事件到达时的人物位置和方向播放，不承诺双方轨迹一致；能否收到其他人的事件取决于现有服务器是否转发表情消息。
 
+## 指定 ID 发射命令
+
+- F1/控制台输入 `shot_emote <ID>`，立即朝当前瞄准方向发射该 ID 的表情；例如 `shot_emote 2` 发射爱心。可用 `bind x "shot_emote 2"` 绑定按键。没有新增聊天命令。
+- ID 沿用 `datasrc/network.py` 中的 `Emoticons` 顺序，范围为 `0` 至 `NUM_EMOTICONS - 1`（当前为 `0–15`），不做重新映射。
+- 两个命令共用 `i[emote-id]` 参数定义和控制台解析器。缺参和未加引号的非法整数沿用现有报错；整数越界由公共 `ResolveEffect()` 静默忽略。引号、额外参数等输入也完整沿用 `emote` 的现有解析语义。
+- `src/game/client/components/qmclient/emoticon_commands.h` 集中注册 `emote` 与 `shot_emote`；后者调用 `CEmoticon::Emote(ID, true)`。强制发射仅作用于本次请求，不修改轮盘的发射开关，也不改变现有蓄力状态的消费规则。
+- “发射表情按键”仍绑定 `toggle_emote_launcher`，轮盘释放仍调用 `Emote(ID)`。两条路径共用 ID 校验、`SpawnProjectile()`、`CNetMsg_Cl_Emoticon`、分身复制与 Qm 同步发送；同步的 `launch_mode` 使用本次实际效果。
+- 在 `src/test/qm_modes_test.cpp` 先补充 6 个聚焦测试，再实现命令，覆盖控制台注册、全部合法 ID、参数解析、公共入口调用、后续普通表情与越界处理。测试使用实际控制台解析器；不编译或运行测试，因此没有执行红/绿阶段。
+- 版本由工作区现有的 `3.9.10` 递增为 `3.9.11`。本次不新增 UI 卡片或配置项。
+
+### 命令审查与验证
+
+- Findings：只读审查未发现本次命令改动的阻断问题。现有轮盘与命令均进入公共发送路径，强制发射不写入持久模式，越界 ID 在本地效果与消息发送之前返回。
+- `python qmclient_scripts/gate/check_gate.py --mode quick --report-json-path tmp/shot_emote_gate.json`：11 项通过，0 警告，0 失败。
+- 新命令模块的首次 `clang-format --dry-run --Werror src/game/client/components/qmclient/emoticon_commands.h` 检出 lambda 排版差异，已按仓库格式修正；后续 quick 的格式检查通过。
+- `git diff --check`：通过。
+- 未执行游戏编译或 C++ 测试；F1 输入、原按键、分身复制与远端同步尚未实机验证。
+
 ## 审查与验证
 
 - 只读审查发现并修正：轮盘鼠标坐标缺少初始化；零长度发射方向先归一化；满池丢弃新发射；输入释放依赖渲染帧；贴墙膨胀无法容纳时重复搜索。最终审查未发现其他阻断项。

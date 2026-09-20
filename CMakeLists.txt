@@ -2888,6 +2888,8 @@ if(CLIENT)
     warning.cpp
   )
   set_src(GAME_CLIENT GLOB_RECURSE src/game/client
+    QmUi/QmAnimationBackend.cpp
+    QmUi/QmAnimationBackend.h
     QmUi/QmAnim.cpp
     QmUi/QmAnim.h
     QmUi/QmUiPerf.cpp
@@ -2945,6 +2947,18 @@ if(CLIENT)
     QmUi/QmModuleLayoutAdapter.cpp
     QmUi/QmModuleLayoutAdapter.h
     QmUi/QmModuleTypes.h
+    QmUi/cards/QmCardCatalog.cpp
+    QmUi/cards/QmCardCatalog.h
+    QmUi/cards/QmCardCatalogFunction.cpp
+    QmUi/cards/QmCardCatalogFunctionMetrics.h
+    QmUi/cards/QmCardCatalogHud.cpp
+    QmUi/cards/QmCardCatalogInternal.h
+    QmUi/cards/QmCardCatalogSkin.cpp
+    QmUi/cards/QmCardCatalogSkinMetrics.h
+    QmUi/cards/QmCardCatalogVisual.cpp
+    QmUi/cards/QmCardRenderBridge.cpp
+    QmUi/cards/QmMapUpload.cpp
+    QmUi/cards/QmMapUploadSearch.h
     animstate.cpp
     animstate.h
     component.cpp
@@ -4013,6 +4027,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     qmclient_update_version_test.cpp
     qmclient_update_manifest_test.cpp
     QmUiTokensTest.cpp
+    qm_map_upload_search.cpp
     qmclient_monitoring_test.cpp
     race_test.cpp
     score_test.cpp
@@ -4072,6 +4087,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/game/client/QmUi/UiSurface.cpp
     src/test/ui_rect_test_helpers.cpp
     src/game/client/QmUi/QmAnim.cpp
+    src/game/client/QmUi/QmAnimationBackend.cpp
     src/game/client/QmUi/QmAnimResolve.cpp
     src/game/client/QmUi/QmLayout.cpp
     src/game/client/QmUi/UiFormLogic.cpp
@@ -4124,6 +4140,8 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/game/client/components/qmclient/voice/voice_utils.cpp
     src/game/client/components/qmclient/qm_bind_status_hud.cpp
     src/game/client/frame_scheduler.cpp
+    src/engine/client/friends.cpp
+    src/engine/client/friends.h
     src/engine/client/blocklist_driver.cpp
     src/engine/client/blocklist_driver.h
     src/engine/client/serverbrowser.cpp

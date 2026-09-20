@@ -67,7 +67,6 @@
 1 star
 2 stars
 3 stars
-3D Background
 3D background
 4 stars
 45° Aim
@@ -242,12 +241,6 @@ AntiPing: predict other players
 AntiPing: predict weapons
 API key
 Appearance
-Appearance / Chat
-Appearance / Hook Collision
-Appearance / HUD
-Appearance / Info Messages
-Appearance / Laser
-Appearance / Name Plate
 Append to log file instead of overwriting
 Applied to %d same-family part(s).
 Apply
@@ -507,7 +500,6 @@ c = Player position
 Calculate unfinished maps for player in certain mode
 Call vote
 Camera
-Camera & FOV
 Camera drift intensity (0-200)
 Camera drift smoothness (0=instant, 100=smoothest)
 Camera follow cursor dead zone
@@ -550,7 +542,6 @@ Chat background color
 Chat beep volume
 Chat Binds
 Chat box width
-Chat Bubble
 Chat bubble
 Chat bubble background color
 Chat bubble disappear animation (0=Fade, 1=Shrink, 2=Slide up)
@@ -716,7 +707,7 @@ Configure player identity and country
 Configure QmClient gameplay helpers
 Configure QmClient HUD elements
 Configure remaining DDNet client preferences
-Configure skin downloads, prefix, and default eyes
+Configure skin colors, eyes, and filters
 Configure sound and audio packs
 Configure TClient tools and profiles
 Configure Tee appearance and skins
@@ -914,7 +905,6 @@ Default input open failed
 Default length
 Default output open failed
 Default preset
-Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)
 Default zoom
 Default zoom level
 Define automatic chat reply rules
@@ -1050,7 +1040,6 @@ Draw shadow behind emote
 Draw tile layers when using custom background (solid)
 Draw where mouse is
 Draw!
-Dream Features
 Drift direction
 Drift intensity
 Drift smoothness
@@ -1093,7 +1082,6 @@ Dummy skin marking
 Dummy skin queue current position
 Dummy skin queue max length
 Dummy skin queue switch interval (ms)
-Dummy Window
 Dummy window size
 Dummy window zoom
 Dump the current savestring
@@ -1111,7 +1099,6 @@ Dynamic FOV intensity
 Dynamic FOV intensity (0-200)
 Dynamic FOV smoothness
 Dynamic FOV smoothness (0=instant, 100=smoothest)
-Dynamic Island
 Dynamic island
 Dynamic Island background alpha
 Dynamic Island background color
@@ -1287,7 +1274,6 @@ Entities
 Entities background color
 Entity assets
 Entity Background Image
-Entity Layer Colors
 Entity overlay
 Entity Preview
 Entity wall outline opacity
@@ -1457,7 +1443,6 @@ Friend message heart color
 Friend message text gradient color
 Friend note
 Friend notification refresh interval (sec)
-Friend Notifications
 Friend notify
 Friend online and join notifications
 Friend online notification
@@ -1516,7 +1501,6 @@ Gives you as many jumps as you specify
 Gives you endless hook
 Gives you infinite jump
 Glitch
-Global card
 Global card ordering (format: stableId|tab|col|order; semicolon-separated)
 Global card ordering old config migration completed flag
 Global toggle key
@@ -1534,7 +1518,6 @@ Go forward one marker
 Go forward one tick
 Go forward the specified duration
 Gores
-Gores Actor
 Gores actor
 Gores auto weapon switch
 Gores Mode
@@ -1556,7 +1539,6 @@ Grenade
 Group name
 GUI cursor assets
 Guide line color
-Gun
 Hammer
 Hammer interaction
 Hammer Mode:
@@ -1600,14 +1582,12 @@ Highlight ping value
 Highlight selected players in the game world
 Highlighted message
 Highlighted message color
-Hitbox mode
 Hitbox Mode Freeze Border Color
 Hitbox Mode Global Opacity
 Hitbox Mode Override
 Hitbox Mode Player Scope: 0=local, 1=local+clone, 2=all
 Hitbox Mode Tee Collision Color
 Hitbox Mode Weapon Interaction Color
-HJ Assist
 HJ assist
 Hold gun higher like TW 0.6.1 and earlier
 Hold left click for free camera
@@ -1647,13 +1627,11 @@ HUD animation speed (percent)
 HUD assets
 HUD editor layout
 HUD editor preview
-HUD island appearance settings
 HUD notifications
 HUD rainbow colors
 Hue
 Hue speed
 i = Receive rate
-I am a robot
 I am away from the game window
 I muted you
 Icon and number
@@ -1712,7 +1690,6 @@ Input device not found
 Input device open failed
 Input device open failed, try reconnecting headset/mic or reselecting input device
 Input overlay
-Input overlay display
 Input overlay keyboard scale (percent)
 Input overlay mouse scale (percent)
 Input overlay opacity (percent)
@@ -1780,7 +1757,6 @@ Kaomoji
 Keep hook when teleporting
 Keep unsent message on chat close
 Keep vote window open after voting
-Key Bindings
 Key binds
 Key press icon size
 Key Presses
@@ -1790,7 +1766,6 @@ Key Sticking: On
 Key Sticking: Reset Self
 Keyboard focus ring color
 Keyboard size
-Keyword Reply
 Keyword reply
 Keyword reply rules (each line: [rename] [regex] keyword=>reply)
 Keyword reply use Dummy
@@ -1816,7 +1791,6 @@ Label type
 LAN
 Language
 Language file to use
-Large emoticons and launch mode
 Large emoticons and launched emoticons
 Large text announcement for friend joining
 Large text content
@@ -1836,6 +1810,8 @@ Last page in console
 Latency
 Latency Jitter
 Launch count threshold for the next sponsor reminder
+Launch emote
+Launch emote key
 Layout
 Leak IP
 Leaks your IP address to all servers by pinging each of them, also acquiring the latency in the process
@@ -1919,6 +1895,7 @@ Local test mode
 Local test mode, no server needed
 Local Time
 Local-only
+Locate
 Lock delay
 Lock team
 Locked
@@ -1930,7 +1907,6 @@ Logout of rcon
 Lose weapons when teleporting (useful for race maps)
 Low to high
 Lyrics
-Lyrics sources and display
 Main Asset
 Main menu
 Make frozen players look more like volleyballs (0=Disabled, 1=Only volleyball maps, 2=Always)
@@ -2037,6 +2013,7 @@ Menu opacity (0-100)
 Menu opened. Press Esc key again to close menu.
 Menu option - normal
 Menu option - selected
+Merge consecutive identical echo messages within this window in milliseconds (0 disables merging)
 Merge consecutive identical player messages within 2 seconds
 Message color
 Message displayed to players on join.
@@ -2283,7 +2260,6 @@ Notification display duration (ms)
 Notification echo overlay text color
 Notification hold time
 Notification text size
-Notifications
 Notify when friends come online
 Notify when only one tee is still alive:
 Notify when someone highlights you
@@ -2314,7 +2290,6 @@ Only show outlines in the entities layer
 Only show skins available in Vanilla Teeworlds
 Only show when the other Tee is not on screen
 Only show with this nickname
-Only what you can't imagine, nothing Dream can't do
 Opacity
 Opacity of freeze bars inside freeze
 Open a matching settings card directly
@@ -2431,7 +2406,6 @@ Pet skin
 Pet Skin:
 Pick result: %s
 Pickup range
-Pie Menu
 Pie menu
 Pie menu rename list (separate with |, e.g., name1|name2)
 Ping
@@ -2456,7 +2430,6 @@ Player clan
 Player country (ISO 3166-1 numeric code)
 Player country filter in server browser (ISO 3166-1 numeric)
 Player country:
-Player data
 Player decoration color
 Player eyes color
 Player eyes on join. 0 = normal, 1 = pain, 2 = happy, 3 = surprised, 4 = angry, 5 = blink
@@ -2562,7 +2535,7 @@ Preview dummy nameplate
 Preview hook collision colors and line styles
 Preview import file
 Preview laser bodies, outlines, and impacts
-Preview player and dummy appearance and colors
+Preview player and dummy appearance
 Preview player and dummy nameplates
 Preview player nameplate
 Preview selected file
@@ -2621,9 +2594,6 @@ Qm UI icon color: 1=White, 2=Black, 3=Custom, 4=Rainbow
 Qm UI icon weight: 0=Regular, 1=Bold, 2=Thin, 3=Fill
 qm_profile_queue: index must be between 1 and %d
 QmClient
-QmClient / Function
-QmClient / HUD
-QmClient / Visual
 QmClient chat log
 QmClient Community
 QmClient community and project information
@@ -2832,7 +2802,6 @@ Reset weapons when passing start tile
 Reset zone tuning in zone x or in all zones
 Resource preview VRAM budget override (MB, 0=auto)
 Resource preview VRAM budget percentage (based on device local VRAM budget)
-Respawn default weapon (when owned)
 Restart
 Restart in x seconds (0 = abort)
 Restart the client
@@ -2954,11 +2923,13 @@ Screenshots
 Screenshots directory
 Search
 Search and navigate settings
-Search and pick skins and manage the skin queue
 Search donor asset
 Search main asset
+Search maps and downloadedmaps, including subfolders
 Search settings by title, feature, or keyword
+Search skins and manage the skin queue
 Searching
+Searching all map folders...
 Sec-WebSocket-Protocol sent during the realtime handshake
 Secondary
 Seconds to wait before reconnecting (0=off, when server is full)
@@ -3066,6 +3037,7 @@ Settings file
 Settings page right panel opacity
 Severe
 Shape
+Share of the server browser name/map split given to the name column (per mille)
 Shimmer speed (polished)
 Short server names
 Shotgun
@@ -3115,7 +3087,6 @@ Show colors in spectator selection
 Show combo hint when hooking or hammering player within 2 seconds
 Show compact vote HUD
 Show configurable outlines around map tiles
-Show Coordinates
 Show coordinates above players
 Show country flags in nameplates
 Show current Netease lyric in Media Island
@@ -3177,7 +3148,6 @@ Show how weapons, shields, hearts, and flags appear in game
 Show HUD
 Show important messages when rendering video
 Show important server prompts
-Show important server prompts and Echo messages as popups
 Show important server prompts as notifications
 Show in Dynamic Island
 Show in-game FPS
@@ -3409,7 +3379,6 @@ Skin switch animation easing mode
 Skin switch animation intensity percentage
 Skin switch animation range: 0=Self, 1=Local+Dummy, 2=All players
 Skin switch animation type (0=Ghost pop, 1=Soft fade, 2=Slide left, 3=Rotate pop, 4=Light dark switch, 5=Glitch shake, 6=Elastic scale)
-Skin transition
 Skin transition animation
 Skin transition duration
 Skin transition easing
@@ -3435,7 +3404,6 @@ Smooth prediction margin (weakens ping jitter correction, restores old behavior)
 Smooth scroll animation duration in menu/editor (ms, 0=off)
 Smooth zoom animation time in editor (in ms, 0=off)
 Smoothness of multi-view zoom (in ms, higher = slower)
-SMTC
 Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
 Snap wave to pixels
 Snapshot Age
@@ -3542,7 +3510,6 @@ Stop recording a video
 Stop rendering text overlays in editor or with entities: higher = less detail = faster
 Stop server
 Stop the current demo
-Streamer Mode
 Streamer mode
 Strength icons assets
 Stress system (debug builds only).
@@ -3594,7 +3561,6 @@ Switching back to default output
 Sync Workshop Assets
 System
 System default
-System media control
 System media controls
 System message
 System message color
@@ -3607,9 +3573,8 @@ Taper trail width
 Target language
 Target language code (e.g. zh, en, ja, zh-TW)
 Target language ratio
+Target server: %s
 TClient
-TClient / Bind Wheel
-TClient / Status Bar
 TClient Developers
 TClient Links
 Tclient settings card ordering (format: id:col:order; semicolon-separated)
@@ -3839,7 +3804,6 @@ Trail length
 Trail opacity
 Trail width
 Translate
-Translate button
 Translate ID:
 Translate keys before interpreting them, respect keyboard layout
 Translate last message (of a given name)
@@ -4128,7 +4092,6 @@ Weapon switch distance
 Weapon switch duration
 Weapon switch easing
 Weapon switch rotation
-Weapon Trajectory
 Weapon trajectory
 Weapon trajectory helper alpha
 Weapon trajectory helper color
@@ -4138,7 +4101,6 @@ Weapons
 Website
 Welcome to DDNet
 What level DDRace binding is set to (automatic, you don't need to use it).
-What's done is done, no use saying more
 Wheel animate
 When TClient rainbow Tee is enabled, this feature has no effect.
 When you cross the start line, show a ghost tee replicating the movements of your best time
@@ -4175,9 +4137,9 @@ Width
 Width and height are required to be within the range from %d to %d.
 Width of friends column in server browser
 Width of latency column in server browser
-Width of map column in server browser
 Width of others' hook collision line
 Width of players column in server browser
+Width of Qm clients column in server browser
 Width of type column in server browser
 Width of your own hook collision line
 Window and monitor
@@ -4306,9 +4268,6 @@ Zoom to current mouse target
 ⚠️ LibreTranslate API Key not set
 ⚠️ LLM API Key not configured
 ⚠️ Tencent Cloud API not configured
-发射表情按键
-显示他人发射表情
-显示他人大表情
 [Assets editor blend mode]	Color
 [Assets editor blend mode]	Color Burn
 [Assets editor blend mode]	Color Dodge

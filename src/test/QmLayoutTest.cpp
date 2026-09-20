@@ -4,6 +4,8 @@
 #include <game/client/QmUi/QmLayout.h>
 #include <game/client/components/qmclient/afk_presentation.h>
 #include <game/client/components/qmclient/input_overlay.h>
+#include <game/client/components/qmclient/score_hud_layout.h>
+#include <game/client/components/qmclient/scoreboard_footer.h>
 #include <game/client/components/qmclient/scoreboard_skin.h>
 #include <game/client/components/qmclient/scoreboard_team_modes.h>
 #include <game/client/components/qmclient/tee_skin_apply.h>
@@ -562,4 +564,81 @@ TEST(QmTeeSkinApply, EntryWithoutColorKeyKeepsExistingColorsAndTogglesOff)
 	EXPECT_EQ(pConfig->m_ClDummyUseCustomColor, 0);
 	EXPECT_EQ(pConfig->m_ClDummyColorBody, 22u);
 	EXPECT_EQ(pConfig->m_ClDummyColorFeet, 44u);
+}
+
+TEST(QmScoreboardFooter, EmptyFooterDoesNotReservePanels)
+{
+	const auto Layout = QmScoreboardFooterLayout({20.0f, 465.0f, 850.0f, 100.0f}, false, 0);
+	EXPECT_FLOAT_EQ(Layout.m_Media.h, 0.0f);
+	EXPECT_FLOAT_EQ(Layout.m_Spectators.h, 0.0f);
+}
+
+TEST(QmScoreboardFooter, MediaUsesOneFullWidthBar)
+{
+	const auto Layout = QmScoreboardFooterLayout({20.0f, 465.0f, 850.0f, 100.0f}, true, 0);
+	EXPECT_FLOAT_EQ(Layout.m_Media.x, 20.0f);
+	EXPECT_FLOAT_EQ(Layout.m_Media.y, 465.0f);
+	EXPECT_FLOAT_EQ(Layout.m_Media.w, 850.0f);
+	EXPECT_FLOAT_EQ(Layout.m_Media.h, 25.0f);
+	EXPECT_FLOAT_EQ(Layout.m_Spectators.h, 0.0f);
+}
+
+TEST(QmScoreboardFooter, SpectatorsFollowMediaWithinAvailableHeight)
+{
+	for(const float Width : {450.0f, 850.0f})
+	{
+		for(const float Height : {70.0f, 100.0f})
+		{
+			const auto Layout = QmScoreboardFooterLayout({20.0f, 465.0f, Width, Height}, true, 128);
+			EXPECT_FLOAT_EQ(Layout.m_Spectators.x, Layout.m_Media.x);
+			EXPECT_FLOAT_EQ(Layout.m_Spectators.w, Width);
+			EXPECT_FLOAT_EQ(Layout.m_Spectators.y, Layout.m_Media.y + Layout.m_Media.h + 5.0f);
+			EXPECT_FLOAT_EQ(Layout.m_Spectators.y + Layout.m_Spectators.h, 465.0f + Height);
+		}
+	}
+}
+
+TEST(QmScoreboardFooter, SpectatorsStartImmediatelyWhenMediaIsHidden)
+{
+	const auto Layout = QmScoreboardFooterLayout({20.0f, 465.0f, 450.0f, 70.0f}, false, 1);
+	EXPECT_FLOAT_EQ(Layout.m_Media.h, 0.0f);
+	EXPECT_FLOAT_EQ(Layout.m_Spectators.y, 465.0f);
+	EXPECT_FLOAT_EQ(Layout.m_Spectators.w, 450.0f);
+	EXPECT_FLOAT_EQ(Layout.m_Spectators.h, 70.0f);
+}
+
+TEST(QmScoreHudLayout, ShortRankKeepsOriginalFootprint)
+{
+	const auto Layout = QmScoreHudLayout(300.0f, 14.0f, 7.0f, 18.0f);
+	EXPECT_FLOAT_EQ(Layout.m_BoxLeft, 248.0f);
+	EXPECT_FLOAT_EQ(Layout.m_BoxWidth, 52.0f);
+	EXPECT_FLOAT_EQ(Layout.m_RankX, 251.0f);
+	EXPECT_FLOAT_EQ(Layout.m_TeeX, 274.0f);
+}
+
+TEST(QmScoreHudLayout, MeasuredRanksLeaveSpaceBeforeTee)
+{
+	// 宽度由渲染器测量，包含名次末尾的句点，覆盖短名次到三位数名次。
+	for(const float RankTextWidth : {7.0f, 12.0f, 14.0f, 19.0f, 21.0f, 24.0f})
+	{
+		for(const float ScoreWidth : {14.0f, 70.0f})
+		{
+			const auto Layout = QmScoreHudLayout(300.0f, ScoreWidth, RankTextWidth, 18.0f);
+			const float RankRight = Layout.m_RankX + RankTextWidth;
+			const float TeeLeft = Layout.m_TeeX - 9.0f;
+			EXPECT_GE(TeeLeft - RankRight, 3.0f);
+			EXPECT_FLOAT_EQ(Layout.m_RankX - Layout.m_BoxLeft, 3.0f);
+			EXPECT_FLOAT_EQ(Layout.m_BoxLeft + Layout.m_BoxWidth, 300.0f);
+		}
+	}
+}
+
+TEST(QmScoreHudLayout, WiderRankExpandsOnlyToTheLeft)
+{
+	const auto TwoDigits = QmScoreHudLayout(300.0f, 14.0f, 14.0f, 18.0f);
+	const auto ThreeDigits = QmScoreHudLayout(300.0f, 14.0f, 21.0f, 18.0f);
+	EXPECT_FLOAT_EQ(ThreeDigits.m_TeeX, TwoDigits.m_TeeX);
+	EXPECT_FLOAT_EQ(ThreeDigits.m_BoxLeft, TwoDigits.m_BoxLeft - 7.0f);
+	EXPECT_FLOAT_EQ(ThreeDigits.m_BoxWidth, TwoDigits.m_BoxWidth + 7.0f);
+	EXPECT_FLOAT_EQ(ThreeDigits.m_RankX, TwoDigits.m_RankX - 7.0f);
 }

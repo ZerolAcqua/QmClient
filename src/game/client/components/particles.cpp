@@ -297,6 +297,7 @@ void CParticles::RenderGroup(int Group)
 	else
 	{
 		int i = m_aFirstPart[Group];
+		int LastSprite = -1;
 
 		Graphics()->WrapClamp();
 
@@ -314,8 +315,15 @@ void CParticles::RenderGroup(int Group)
 			// the current position, respecting the size, is inside the viewport, render it, else ignore
 			if(ParticleIsVisibleOnScreen(p, Size))
 			{
-				Graphics()->TextureSet(aParticles[m_aParticles[i].m_Spr - FirstParticleOffset]);
-				Graphics()->QuadsBegin();
+				// 仅合并相邻同贴图粒子，保留透明混合顺序和每个顶点的颜色。
+				if(LastSprite != m_aParticles[i].m_Spr)
+				{
+					if(LastSprite != -1)
+						Graphics()->QuadsEnd();
+					LastSprite = m_aParticles[i].m_Spr;
+					Graphics()->TextureSet(aParticles[LastSprite - FirstParticleOffset]);
+					Graphics()->QuadsBegin();
+				}
 
 				Graphics()->QuadsSetRotation(m_aParticles[i].m_Rot);
 
@@ -327,11 +335,12 @@ void CParticles::RenderGroup(int Group)
 
 				IGraphics::CQuadItem QuadItem(p.x, p.y, Size, Size);
 				Graphics()->QuadsDraw(&QuadItem, 1);
-				Graphics()->QuadsEnd();
 			}
 
 			i = m_aParticles[i].m_NextPart;
 		}
+		if(LastSprite != -1)
+			Graphics()->QuadsEnd();
 		Graphics()->WrapNormal();
 	}
 }

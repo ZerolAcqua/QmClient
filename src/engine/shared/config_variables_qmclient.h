@@ -16,7 +16,6 @@ MACRO_CONFIG_INT(QmPerfDebug, qm_perf_debug, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_S
 MACRO_CONFIG_INT(QmMacosGraphicsDiagnostics, qm_macos_graphics_diagnostics, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable macOS graphics diagnostics and Instruments signposts")
 MACRO_CONFIG_INT(QmVulkanApiVersion, qm_vulkan_api_version, 11, 11, 14, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Vulkan API version: 11=1.1 compatibility, 14=1.4 strict")
 MACRO_CONFIG_INT(QmProcessHighPriority, qm_process_high_priority, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Toggle client process normal/high priority on Windows")
-MACRO_CONFIG_INT(QmPresentAlign, qm_present_align, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Align render rate to the display refresh rate when vsync is off and no frame limit is set")
 MACRO_CONFIG_INT(QmNetQos, qm_net_qos, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Prioritize outgoing game traffic on Windows (best effort)")
 MACRO_CONFIG_INT(QmAssetsPreviewBudgetMbOverride, qm_assets_preview_budget_mb_override, 0, 0, 16384, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Resource preview VRAM budget override (MB, 0=auto)")
 MACRO_CONFIG_INT(QmAssetsPreviewBudgetPercent, qm_assets_preview_budget_percent, 8, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Resource preview VRAM budget percentage (based on device local VRAM budget)")
@@ -218,7 +217,6 @@ MACRO_CONFIG_INT(QmWeaponSwitchAnimRotation, qm_weapon_switch_anim_rotation, 360
 MACRO_CONFIG_INT(QmWeaponSwitchAnimEasing, qm_weapon_switch_anim_easing, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Weapon switch animation easing mode")
 MACRO_CONFIG_INT(QmWeaponReloadAnim, qm_weapon_reload_anim, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Play a flip animation while reloading weapons")
 MACRO_CONFIG_INT(QmWeaponReloadAnimProbability, qm_weapon_reload_anim_probability, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Weapon reload animation probability")
-MACRO_CONFIG_INT(QmRespawnDefaultWeapon, qm_respawn_default_weapon, 0, 0, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)")
 MACRO_CONFIG_INT(QmDeepflyMode, qm_deepfly_mode, 0, 0, 3, CFGFLAG_CLIENT, "Deepfly mode (0=Normal, 1=DF, 2=HDF, 3=Custom)")
 
 // Auto Unspec on Unfreeze / 解冻自动取消旁观

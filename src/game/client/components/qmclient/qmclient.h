@@ -2,6 +2,7 @@
 #ifndef GAME_CLIENT_COMPONENTS_QMCLIENT_QMCLIENT_H
 #define GAME_CLIENT_COMPONENTS_QMCLIENT_QMCLIENT_H
 
+#include "markdown_cache_writer.h"
 #include "qm_realtime.h"
 #include "qmclient_utils.h"
 
@@ -92,6 +93,7 @@ private:
 	char m_aQmDeveloperSessionId[33] = "";
 
 	// 「新功能」广播：远端 Markdown + 本地缓存 + 开发者草稿。
+	CQmMarkdownCacheWriter m_QmNewsCacheWriter;
 	std::string m_QmNewsMarkdown;
 	std::string m_QmNewsDraft;
 	EQmNewsStatus m_QmNewsStatus = EQmNewsStatus::IDLE;
@@ -105,6 +107,7 @@ private:
 	void FinishQmNewsPublish();
 
 	// 赞助名单使用独立草稿与缓存；展示姓名和人数取自同一份 Markdown。
+	CQmMarkdownCacheWriter m_QmSponsorsCacheWriter;
 	std::string m_QmSponsorsMarkdown;
 	std::string m_QmSponsorsDraft;
 	std::vector<std::string> m_vQmSponsorNames;
@@ -194,6 +197,8 @@ private:
 
 	void UpdateQmClientRecognition();
 	void FinishQmClientUsers();
+	// 把在线分布推给服务器浏览器，用作「梦」列的排序键。
+	void PushQmClientServerCounts();
 	bool EnsureQmClientMachineHash();
 	void InitQmDeveloperAuthentication();
 	void ApplyQmRealtimeDevelopers(const json_value *pPayload);

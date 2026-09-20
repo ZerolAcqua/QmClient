@@ -1,0 +1,109 @@
+/* 仅在增强脚本就绪时启用，脚本失败时内容仍然可见。 */
+@keyframes enter {
+  from {
+    opacity:0;
+    transform:translateY(22px);
+    filter:blur(5px);
+  }
+  to {
+    opacity:1;
+    transform:none;
+    filter:blur(0);
+  }
+}
+@keyframes equalize {
+  0% {
+    transform:scaleY(.4);
+  }
+  45% {
+    transform:scaleY(1);
+  }
+  100% {
+    transform:scaleY(.65);
+  }
+}
+@keyframes float-note {
+  0%,100% {
+    transform:translateY(0) rotate(5deg);
+  }
+  50% {
+    transform:translateY(-7px) rotate(3deg);
+  }
+}
+@keyframes star-turn {
+  to {
+    transform:rotate(360deg);
+  }
+}
+@keyframes tee-bob {
+  0%,100% {
+    transform:translateY(0);
+  }
+  50% {
+    transform:translateY(-5px);
+  }
+}
+.motion-ready[data-motion=on] .hero-enter {
+  animation:enter .95s var(--ease) both;
+}
+.motion-ready[data-motion=on] h1.hero-enter {
+  animation-delay:.08s;
+}
+.motion-ready[data-motion=on] .hero-description {
+  animation-delay:.15s;
+}
+.motion-ready[data-motion=on] .hero-actions {
+  animation-delay:.22s;
+}
+.motion-ready[data-motion=on] .platform-note {
+  animation-delay:.28s;
+}
+.motion-ready[data-motion=on] .hero-art {
+  animation-delay:.25s;
+  animation-duration:1.1s;
+}
+.motion-ready[data-motion=on] .reveal-pending {
+  opacity:0;
+  transform:translateY(25px);
+}
+.reveal {
+  transition:opacity .85s var(--ease),transform .85s var(--ease);
+}
+.motion-ready[data-motion=on] .tee-character {
+  animation:tee-bob 4s ease-in-out infinite;
+}
+.motion-ready[data-motion=on] .little-tee {
+  animation:tee-bob 4s ease-in-out -1.4s infinite;
+}
+[data-motion=off] {
+  scroll-behavior:auto;
+}
+[data-motion=off] *,[data-motion=off] *::before,[data-motion=off] *::after {
+  animation:none!important;
+  transition:none!important;
+  scroll-behavior:auto!important;
+}
+[data-motion=off] .reveal-pending {
+  opacity:1;
+  transform:none;
+}
+[data-motion=off] .magnetic {
+  transform:none!important;
+}
+@media(prefers-reduced-motion:reduce) {
+  html {
+    scroll-behavior:auto;
+  }
+  *,*::before,*::after {
+    animation:none!important;
+    transition:none!important;
+    scroll-behavior:auto!important;
+  }
+  .reveal-pending {
+    opacity:1!important;
+    transform:none!important;
+  }
+  .magnetic {
+    transform:none!important;
+  }
+}

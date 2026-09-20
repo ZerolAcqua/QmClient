@@ -36,6 +36,7 @@
 #include "components/qmclient/jelly_tee.h"
 #include "components/qmclient/modes.h"
 #include "components/qmclient/perf_logging.h"
+#include "components/qmclient/qm_hook_coll_intersection.h"
 #include "components/qmclient/qmclient_utils.h"
 #include "components/qmclient/translate/translate_ui_settings.h"
 #include "components/race_demo.h"
@@ -2117,7 +2118,7 @@ void CGameClient::FlushQmStutterWindow(const SQmStutterFrameDecision &Decision, 
 
 	for(size_t i = 0; i < m_vQmStutterComponentSamples.size(); ++i)
 	{
-		const auto LogSamples = [&](const char *pCallback, const CQmStutterSampleSeries &Samples) {
+		const auto LogSamples = [&](const char *pCallback, CQmStutterSampleSeries &Samples) {
 			if(Samples.Empty())
 				return;
 			char aComponentPayload[512];
@@ -6283,6 +6284,7 @@ IGameClient *CreateGameClient()
 void CGameClient::UpdateHookCollTargets()
 {
 	m_HookCollCandidates.Reset();
+	m_HookCollSpatialIndex.Reset();
 	// 每渲染帧刷新一次：这些取值在两次 OnRender 之间不会变化，而模拟循环会重复读取上万次。
 	const float Intra = Client()->IntraGameTick(g_Config.m_ClDummy);
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -6301,9 +6303,6 @@ void CGameClient::UpdateHookCollTargets()
 
 int CGameClient::IntersectCharacter(vec2 HookPos, vec2 NewPos, vec2 &NewPos2, int OwnId, vec2 *pPlayerPosition)
 {
-	float Distance = 0.0f;
-	int ClosestId = -1;
-
 	const SHookCollTarget &OwnTarget = m_aHookCollTargets[OwnId];
 
 	const auto &vCandidates = m_HookCollCandidates.Get(OwnId, [&](int Id) {
@@ -6314,28 +6313,11 @@ int CGameClient::IntersectCharacter(vec2 HookPos, vec2 NewPos, vec2 &NewPos2, in
 		const bool IsOneSolo = Target.m_Solo || OwnTarget.m_Solo;
 		return IsOneSuper || (m_Teams.SameTeam(Id, OwnId) && !IsOneSolo && !OwnTarget.m_HookHitDisabled);
 	});
-	for(const int i : vCandidates)
-	{
-		const vec2 Position = m_aHookCollTargets[i].m_Pos;
-
-		vec2 ClosestPoint;
-		if(closest_point_on_line(HookPos, NewPos, Position, ClosestPoint))
-		{
-			if(distance(Position, ClosestPoint) < CCharacterCore::PhysicalSize() + 2.0f)
-			{
-				if(ClosestId == -1 || distance(HookPos, Position) < Distance)
-				{
-					NewPos2 = ClosestPoint;
-					ClosestId = i;
-					Distance = distance(HookPos, Position);
-					if(pPlayerPosition)
-						*pPlayerPosition = Position;
-				}
-			}
-		}
-	}
-
-	return ClosestId;
+	const float Radius = CCharacterCore::PhysicalSize() + 2.0f;
+	const auto PositionOf = [&](int Id) { return m_aHookCollTargets[Id].m_Pos; };
+	const SQmHookCollSegment Segment(HookPos, NewPos, Radius);
+	const auto &vNearby = m_HookCollSpatialIndex.GetCandidates(Segment, vCandidates, PositionOf, [&](int Id) { return m_aHookCollTargets[Id].m_Valid; });
+	return QmIntersectHookCollTargets(Segment, NewPos2, vNearby, PositionOf, Radius, pPlayerPosition);
 }
 
 ColorRGBA CalculateNameColor(ColorHSLA TextColorHSL)
@@ -8208,46 +8190,19 @@ void CGameClient::SnapCollectEntities()
 {
 	int NumSnapItems = Client()->SnapNumItems(IClient::SNAP_CURRENT);
 
-	std::vector<CSnapEntities> vItemData;
-	std::vector<CSnapEntities> vItemEx;
+	m_vSnapEntities.clear();
+	m_vSnapEntityExtensionsScratch.clear();
 
 	for(int Index = 0; Index < NumSnapItems; Index++)
 	{
 		const IClient::CSnapItem Item = Client()->SnapGetItem(IClient::SNAP_CURRENT, Index);
 		if(Item.m_Type == NETOBJTYPE_ENTITYEX)
-			vItemEx.push_back({Item, nullptr});
+			m_vSnapEntityExtensionsScratch.push_back({Item, nullptr});
 		else if(Item.m_Type == NETOBJTYPE_PICKUP || Item.m_Type == NETOBJTYPE_DDNETPICKUP || Item.m_Type == NETOBJTYPE_LASER || Item.m_Type == NETOBJTYPE_DDNETLASER || Item.m_Type == NETOBJTYPE_PROJECTILE || Item.m_Type == NETOBJTYPE_DDRACEPROJECTILE || Item.m_Type == NETOBJTYPE_DDNETPROJECTILE)
-			vItemData.push_back({Item, nullptr});
+			m_vSnapEntities.push_back({Item, nullptr});
 	}
 
-	// sort by id
-	class CEntComparer
-	{
-	public:
-		bool operator()(const CSnapEntities &Lhs, const CSnapEntities &Rhs) const
-		{
-			return Lhs.m_Item.m_Id < Rhs.m_Item.m_Id;
-		}
-	};
-
-	std::sort(vItemData.begin(), vItemData.end(), CEntComparer());
-	std::sort(vItemEx.begin(), vItemEx.end(), CEntComparer());
-
-	// merge extended items with items they belong to
-	m_vSnapEntities.clear();
-
-	size_t IndexEx = 0;
-	for(const CSnapEntities &Ent : vItemData)
-	{
-		while(IndexEx < vItemEx.size() && vItemEx[IndexEx].m_Item.m_Id < Ent.m_Item.m_Id)
-			IndexEx++;
-
-		const CNetObj_EntityEx *pDataEx = nullptr;
-		if(IndexEx < vItemEx.size() && vItemEx[IndexEx].m_Item.m_Id == Ent.m_Item.m_Id)
-			pDataEx = (const CNetObj_EntityEx *)vItemEx[IndexEx].m_Item.m_pData;
-
-		m_vSnapEntities.push_back({Ent.m_Item, pDataEx});
-	}
+	QmAttachSnapshotEntityExtensions(m_vSnapEntities, m_vSnapEntityExtensionsScratch);
 }
 
 void CGameClient::HandleMultiView()

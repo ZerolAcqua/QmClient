@@ -5506,6 +5506,7 @@ void CMenus::OnReset()
 
 void CMenus::OnShutdown()
 {
+	m_LocalSaveDisplay.Reset();
 	ClearQmTitlePreviewContainers();
 	m_QmMapUpload.Cancel();
 	if(m_SettingsPerfWindowTracker.HasActiveWindow())

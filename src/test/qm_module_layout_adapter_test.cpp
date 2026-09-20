@@ -61,7 +61,8 @@ static std::vector<SQmModuleEntry> MakeAllDefaults()
 	return {
 		{EQmModuleId::Info, EQmModuleColumn::Full, 0, "info"},
 		{EQmModuleId::ChatBubble, EQmModuleColumn::Left, 0, "chat_bubble"},
-		{EQmModuleId::SkinTransition, EQmModuleColumn::Left, 1, "skin_transition"},
+		{EQmModuleId::SkinAppearance, EQmModuleColumn::Left, 1, "skin_appearance"},
+		{EQmModuleId::SkinTransition, EQmModuleColumn::Left, 2, "skin_transition"},
 		{EQmModuleId::GoresActor, EQmModuleColumn::Left, 3, "gores_actor"},
 		{EQmModuleId::Gores, EQmModuleColumn::Left, 4, "gores"},
 		{EQmModuleId::KeyBinds, EQmModuleColumn::Left, 5, "key_binds"},
@@ -721,4 +722,42 @@ TEST(QmModuleLayoutAdapter, MigrateGlobalCardOrderIsIdempotent)
 
 	EXPECT_EQ(g_Config.m_QmCardOrderMigrated, 1);
 	EXPECT_STREQ(g_Config.m_QmGlobalCardOrder, "qm:chat_bubble|search|1|0;");
+}
+
+// 意图：保留旧换皮卡的布局和折叠 key，新外观卡可独立折叠、保存和恢复。
+TEST(QmModuleLayoutAdapter, SplitSkinCardsKeepIndependentPersistentState)
+{
+	const auto Defaults = MakeAllDefaults();
+	std::array<bool, QmModuleCount> aCollapsed = {};
+	ASSERT_TRUE(ParseLegacyQmCollapsed("skin_transition", Defaults, aCollapsed));
+	EXPECT_TRUE(aCollapsed[static_cast<size_t>(EQmModuleId::SkinTransition)]);
+	EXPECT_FALSE(aCollapsed[static_cast<size_t>(EQmModuleId::SkinAppearance)]);
+	EQmModuleId AppearanceId = EQmModuleId::Info;
+	ASSERT_TRUE(QmModuleIdFromStableId("qm:skin_appearance", &AppearanceId));
+	EXPECT_EQ(AppearanceId, EQmModuleId::SkinAppearance);
+	EXPECT_STREQ(QmModuleStableId(EQmModuleId::SkinTransition), "qm:skin_transition");
+
+	aCollapsed[static_cast<size_t>(EQmModuleId::SkinAppearance)] = true;
+	char aSerialized[256];
+	SerializeLegacyQmCollapsed(Defaults, aCollapsed, aSerialized, sizeof(aSerialized));
+	std::array<bool, QmModuleCount> aReloaded = {};
+	ASSERT_TRUE(ParseLegacyQmCollapsed(aSerialized, Defaults, aReloaded));
+	EXPECT_EQ(aCollapsed, aReloaded);
+	ASSERT_TRUE(ParseLegacyQmCollapsed("skin_appearance", Defaults, aReloaded));
+	EXPECT_TRUE(aReloaded[static_cast<size_t>(EQmModuleId::SkinAppearance)]);
+	EXPECT_FALSE(aReloaded[static_cast<size_t>(EQmModuleId::SkinTransition)]);
+
+	// 旧存档仅含换皮卡，合并默认卡片后仍保留用户移动过的位置。
+	qm_card_order::CModel OldModel;
+	OldModel.SetEntries({{"qm:skin_transition", "function", 2, 0}});
+	ASSERT_TRUE(OldModel.Serialize(aSerialized, sizeof(aSerialized)));
+	qm_card_order::CModel ReloadedModel;
+	ASSERT_TRUE(ReloadedModel.LoadMerged(aSerialized, qm_card_registry::BuildDefaultEntries()));
+	const int TransitionIndex = ReloadedModel.FindByStableId("qm:skin_transition");
+	const int AppearanceIndex = ReloadedModel.FindByStableId("qm:skin_appearance");
+	ASSERT_GE(TransitionIndex, 0);
+	ASSERT_GE(AppearanceIndex, 0);
+	EXPECT_STREQ(ReloadedModel.Entry(TransitionIndex).m_pDefaultTab, "function");
+	EXPECT_EQ(ReloadedModel.Entry(TransitionIndex).m_Column, 2);
+	EXPECT_STREQ(ReloadedModel.Entry(AppearanceIndex).m_pDefaultTab, "visual");
 }

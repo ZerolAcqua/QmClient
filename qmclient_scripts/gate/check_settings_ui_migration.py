@@ -73,6 +73,7 @@ PAGE_STABLE_IDS = {
 	"qmclient_visual": (
 		"qm:chat_bubble",
 		"qm:camera_view",
+		"qm:skin_appearance",
 		"qm:skin_transition",
 		"qm:weapon_animation",
 		"qm:entity_overlay",
@@ -303,6 +304,14 @@ _PAGE_SOURCE = {
 	"assets": Path("src/game/client/components/menus_settings_assets.cpp"),
 }
 _DEFAULT_SOURCE = Path("src/game/client/components/menus_settings.cpp")
+# 全局卡片目录：栖梦三个分类的卡片 stableId/构造入口登记在这里（页面只声明"这一页有哪些卡"）。
+_CARD_CATALOG_SOURCES = (
+	Path("src/game/client/QmUi/cards/QmCardCatalog.cpp"),
+	Path("src/game/client/QmUi/cards/QmCardCatalogVisual.cpp"),
+	Path("src/game/client/QmUi/cards/QmCardCatalogSkin.cpp"),
+	Path("src/game/client/QmUi/cards/QmCardCatalogFunction.cpp"),
+	Path("src/game/client/QmUi/cards/QmCardCatalogHud.cpp"),
+)
 _REGISTRY_SOURCE = Path("src/game/client/QmUi/QmCardRegistry.cpp")
 _NAVIGATION_SOURCE = Path("src/game/client/components/menus.cpp")
 _TYPOGRAPHY_SOURCES = (
@@ -618,13 +627,17 @@ def audit_page(repo_root: Path, page: str) -> list[str]:
 
 	registry = _read(repo_root, _REGISTRY_SOURCE)
 	navigation = _read(repo_root, _NAVIGATION_SOURCE)
+	# 卡片构造已迁入全局卡片目录：生产者条目既可能写在页面文件里，也可能登记在卡片目录模块里。
+	producer_source = page_source
+	for catalog_path in _CARD_CATALOG_SOURCES:
+		producer_source += "\n" + _read(repo_root, catalog_path)
 	for stable_id in PAGE_STABLE_IDS[page]:
 		if stable_id not in registry:
 			errors.append(f"{page}: {stable_id}: registry/navigation entry missing")
-		if page in PRODUCER_COMPLETE_PAGES and stable_id not in page_source and page not in PAGE_PRODUCER_REQUIRED:
+		if page in PRODUCER_COMPLETE_PAGES and stable_id not in producer_source and page not in PAGE_PRODUCER_REQUIRED:
 			errors.append(f"{page}: {stable_id}: page producer entry missing")
 	for token in PAGE_PRODUCER_REQUIRED.get(page, ()):
-		if token not in page_source:
+		if token not in producer_source:
 			errors.append(f"{page}: {token}: page producer entry missing")
 	for token in REGISTRY_FORBIDDEN.get(page, ()):
 		if token in registry:

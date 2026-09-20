@@ -904,13 +904,6 @@
   },
   {
     "header": "src/engine/shared/config_variables_qmclient.h",
-    "script_name": "qm_respawn_default_weapon",
-    "old": "重生后默认请求切换的武器（0=关闭，1=锤子，2=手枪，3=霰弹枪，4=榴弹枪，5=激光）",
-    "new": "Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)",
-    "method": "deepseek"
-  },
-  {
-    "header": "src/engine/shared/config_variables_qmclient.h",
     "script_name": "qm_deepfly_mode",
     "old": "Deepfly模式（0=正常，1=DF，2=HDF，3=自定义）",
     "new": "Deepfly mode (0=Normal, 1=DF, 2=HDF, 3=Custom)",

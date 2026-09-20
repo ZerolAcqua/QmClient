@@ -4,6 +4,13 @@
 #include <base/math.h>
 #include <base/system.h>
 
+#include <engine/client/font_size_cache.h>
+#include <engine/client/glyph_atlas.h>
+#include <engine/client/glyph_atlas_image.h>
+#include <engine/client/glyph_lookup_cache.h>
+#include <engine/client/glyph_outline.h>
+#include <engine/client/text_layout_string.h>
+#include <engine/client/text_word_cursor.h>
 #include <engine/console.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
@@ -20,6 +27,7 @@
 #include <chrono>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -92,201 +100,6 @@ struct SGlyphKeyEquals
 	}
 };
 
-class CAtlas
-{
-	struct SSectionKeyHash
-	{
-		size_t operator()(const std::tuple<size_t, size_t> &Key) const
-		{
-			// Width and height should never be above 2^16 so this hash should cause no collisions
-			return (std::get<0>(Key) << 16) ^ std::get<1>(Key);
-		}
-	};
-
-	struct SSectionKeyEquals
-	{
-		bool operator()(const std::tuple<size_t, size_t> &Lhs, const std::tuple<size_t, size_t> &Rhs) const
-		{
-			return std::get<0>(Lhs) == std::get<0>(Rhs) && std::get<1>(Lhs) == std::get<1>(Rhs);
-		}
-	};
-
-	struct SSection
-	{
-		size_t m_X;
-		size_t m_Y;
-		size_t m_W;
-		size_t m_H;
-
-		SSection() = default;
-
-		SSection(size_t X, size_t Y, size_t W, size_t H) :
-			m_X(X), m_Y(Y), m_W(W), m_H(H)
-		{
-		}
-	};
-
-	/**
-	 * Sections with a smaller width or height will not be created
-	 * when cutting larger sections, to prevent collecting many
-	 * small, mostly unusable sections.
-	 */
-	static constexpr size_t MIN_SECTION_DIMENSION = 6;
-
-	/**
-	 * Sections with larger width or height will be stored in m_vSections.
-	 * Sections with width and height equal or smaller will be stored in m_SectionsMap.
-	 * This achieves a good balance between the size of the vector storing all large
-	 * sections and the map storing vectors of all sections with specific small sizes.
-	 * Lowering this value will result in the size of m_vSections becoming the bottleneck.
-	 * Increasing this value will result in the map becoming the bottleneck.
-	 */
-	static constexpr size_t MAX_SECTION_DIMENSION_MAPPED = 8 * MIN_SECTION_DIMENSION;
-
-	size_t m_TextureDimension;
-	std::vector<SSection> m_vSections;
-	std::unordered_map<std::tuple<size_t, size_t>, std::vector<SSection>, SSectionKeyHash, SSectionKeyEquals> m_SectionsMap;
-
-	void AddSection(size_t X, size_t Y, size_t W, size_t H)
-	{
-		std::vector<SSection> &vSections = W <= MAX_SECTION_DIMENSION_MAPPED && H <= MAX_SECTION_DIMENSION_MAPPED ? m_SectionsMap[std::make_tuple(W, H)] : m_vSections;
-		vSections.emplace_back(X, Y, W, H);
-	}
-
-	void UseSection(const SSection &Section, size_t Width, size_t Height, int &PosX, int &PosY)
-	{
-		PosX = Section.m_X;
-		PosY = Section.m_Y;
-
-		// Create cut sections
-		const size_t CutW = Section.m_W - Width;
-		const size_t CutH = Section.m_H - Height;
-		if(CutW == 0)
-		{
-			if(CutH >= MIN_SECTION_DIMENSION)
-				AddSection(Section.m_X, Section.m_Y + Height, Section.m_W, CutH);
-		}
-		else if(CutH == 0)
-		{
-			if(CutW >= MIN_SECTION_DIMENSION)
-				AddSection(Section.m_X + Width, Section.m_Y, CutW, Section.m_H);
-		}
-		else if(CutW > CutH)
-		{
-			if(CutW >= MIN_SECTION_DIMENSION)
-				AddSection(Section.m_X + Width, Section.m_Y, CutW, Section.m_H);
-			if(CutH >= MIN_SECTION_DIMENSION)
-				AddSection(Section.m_X, Section.m_Y + Height, Width, CutH);
-		}
-		else
-		{
-			if(CutH >= MIN_SECTION_DIMENSION)
-				AddSection(Section.m_X, Section.m_Y + Height, Section.m_W, CutH);
-			if(CutW >= MIN_SECTION_DIMENSION)
-				AddSection(Section.m_X + Width, Section.m_Y, CutW, Height);
-		}
-	}
-
-public:
-	void Clear(size_t TextureDimension)
-	{
-		m_TextureDimension = TextureDimension;
-		m_vSections.clear();
-		m_vSections.emplace_back(0, 0, m_TextureDimension, m_TextureDimension);
-		m_SectionsMap.clear();
-	}
-
-	void IncreaseDimension(size_t NewTextureDimension)
-	{
-		dbg_assert(NewTextureDimension == m_TextureDimension * 2, "New atlas dimension must be twice the old one");
-		// Create 3 square sections to cover the new area, add the sections
-		// to the beginning of the vector so they are considered last.
-		m_vSections.emplace_back(m_TextureDimension, m_TextureDimension, m_TextureDimension, m_TextureDimension);
-		m_vSections.emplace_back(m_TextureDimension, 0, m_TextureDimension, m_TextureDimension);
-		m_vSections.emplace_back(0, m_TextureDimension, m_TextureDimension, m_TextureDimension);
-		std::rotate(m_vSections.rbegin(), m_vSections.rbegin() + 3, m_vSections.rend());
-		m_TextureDimension = NewTextureDimension;
-	}
-
-	bool Add(size_t Width, size_t Height, int &PosX, int &PosY)
-	{
-		if(m_vSections.empty() || m_TextureDimension < Width || m_TextureDimension < Height)
-			return false;
-
-		// Find small section more efficiently by using maps
-		if(Width <= MAX_SECTION_DIMENSION_MAPPED && Height <= MAX_SECTION_DIMENSION_MAPPED)
-		{
-			const auto UseSectionFromVector = [&](std::vector<SSection> &vSections) {
-				if(!vSections.empty())
-				{
-					const SSection Section = vSections.back();
-					vSections.pop_back();
-					UseSection(Section, Width, Height, PosX, PosY);
-					return true;
-				}
-				return false;
-			};
-
-			if(UseSectionFromVector(m_SectionsMap[std::make_tuple(Width, Height)]))
-				return true;
-
-			for(size_t CheckWidth = Width + 1; CheckWidth <= MAX_SECTION_DIMENSION_MAPPED; ++CheckWidth)
-			{
-				if(UseSectionFromVector(m_SectionsMap[std::make_tuple(CheckWidth, Height)]))
-					return true;
-			}
-
-			for(size_t CheckHeight = Height + 1; CheckHeight <= MAX_SECTION_DIMENSION_MAPPED; ++CheckHeight)
-			{
-				if(UseSectionFromVector(m_SectionsMap[std::make_tuple(Width, CheckHeight)]))
-					return true;
-			}
-
-			// We don't iterate sections in the map with increasing width and height at the same time,
-			// because it's slower and doesn't noticeable increase the atlas utilization.
-		}
-
-		// Check vector for larger section
-		size_t SmallestLossValue = std::numeric_limits<size_t>::max();
-		size_t SmallestLossIndex = m_vSections.size();
-		size_t SectionIndex = m_vSections.size();
-		do
-		{
-			--SectionIndex;
-			const SSection &Section = m_vSections[SectionIndex];
-			if(Section.m_W < Width || Section.m_H < Height)
-				continue;
-
-			const size_t LossW = Section.m_W - Width;
-			const size_t LossH = Section.m_H - Height;
-
-			size_t Loss;
-			if(LossW == 0)
-				Loss = LossH;
-			else if(LossH == 0)
-				Loss = LossW;
-			else
-				Loss = LossW * LossH;
-
-			if(Loss < SmallestLossValue)
-			{
-				SmallestLossValue = Loss;
-				SmallestLossIndex = SectionIndex;
-				if(SmallestLossValue == 0)
-					break;
-			}
-		} while(SectionIndex > 0);
-		if(SmallestLossIndex == m_vSections.size())
-			return false; // No usable section found in vector
-
-		// Use the section with the smallest loss
-		const SSection Section = m_vSections[SmallestLossIndex];
-		m_vSections.erase(m_vSections.begin() + SmallestLossIndex);
-		UseSection(Section, Width, Height, PosX, PosY);
-		return true;
-	}
-};
-
 class CGlyphMap
 {
 public:
@@ -343,6 +156,7 @@ private:
 	uint8_t *m_apTextureData[NUM_FONT_TEXTURES];
 	CAtlas m_TextureAtlas;
 	std::unordered_map<std::tuple<FT_Face, int, int>, SGlyph, SGlyphKeyHash, SGlyphKeyEquals> m_Glyphs;
+	CQmGlyphLookupCache<SGlyph> m_GlyphLookupCache;
 
 	// Font faces
 	FT_Face m_DefaultFace = nullptr;
@@ -355,6 +169,7 @@ private:
 	std::vector<FT_Face> m_vFtFaces;
 	int m_QmPerfGlyphNew = 0;
 	int m_QmPerfGlyphUploads = 0;
+	mutable CQmFontSizeCache m_FacePixelSizeCache;
 	double m_QmPerfGlyphRasterizeMs = 0.0;
 	double m_QmPerfGlyphUploadMs = 0.0;
 
@@ -407,11 +222,7 @@ private:
 		for(auto &pTextureData : m_apTextureData)
 		{
 			uint8_t *pTmpTexBuffer = new uint8_t[NewTextureDimension * NewTextureDimension];
-			mem_zero(pTmpTexBuffer, NewTextureDimension * NewTextureDimension * sizeof(uint8_t));
-			for(size_t y = 0; y < m_TextureDimension; ++y)
-			{
-				mem_copy(&pTmpTexBuffer[y * NewTextureDimension], &pTextureData[y * m_TextureDimension], m_TextureDimension);
-			}
+			QmCopyExpandedGlyphAtlas(pTmpTexBuffer, pTextureData, m_TextureDimension, NewTextureDimension);
 			delete[] pTextureData;
 			pTextureData = pTmpTexBuffer;
 		}
@@ -492,32 +303,9 @@ private:
 		return GlyphIndex;
 	}
 
-	void Grow(const unsigned char *pIn, unsigned char *pOut, int w, int h, int OutlineCount) const
+	void EnsureFacePixelSize(FT_Face Face, int FontSize) const
 	{
-		for(int y = 0; y < h; y++)
-		{
-			for(int x = 0; x < w; x++)
-			{
-				int c = pIn[y * w + x];
-
-				for(int sy = -OutlineCount; sy <= OutlineCount; sy++)
-				{
-					for(int sx = -OutlineCount; sx <= OutlineCount; sx++)
-					{
-						int GetX = x + sx;
-						int GetY = y + sy;
-						if(GetX >= 0 && GetY >= 0 && GetX < w && GetY < h)
-						{
-							int Index = GetY * w + GetX;
-							float Mask = 1.f - std::clamp(length(vec2(sx, sy)) - OutlineCount, 0.f, 1.f);
-							c = maximum(c, int(pIn[Index] * Mask));
-						}
-					}
-				}
-
-				pOut[y * w + x] = c;
-			}
-		}
+		m_FacePixelSizeCache.Ensure(Face, FontSize, [&]() { return FT_Set_Pixel_Sizes(Face, 0, FontSize); });
 	}
 
 	int AdjustOutlineThicknessToFontSize(int OutlineThickness, int FontSize) const
@@ -552,7 +340,7 @@ private:
 	bool RenderGlyph(SGlyph &Glyph)
 	{
 		const auto RasterizeStart = QmPerfEnabled() ? time_get_nanoseconds() : std::chrono::nanoseconds(0);
-		FT_Set_Pixel_Sizes(Glyph.m_Face, 0, Glyph.m_FontSize);
+		EnsureFacePixelSize(Glyph.m_Face, Glyph.m_FontSize);
 
 		if(FT_Load_Glyph(Glyph.m_Face, Glyph.m_GlyphIndex, FT_LOAD_RENDER | FT_LOAD_NO_BITMAP))
 		{
@@ -615,7 +403,7 @@ private:
 			{
 				mem_copy(&pGlyphDataFill[(py + y) * Width + x], &pBitmap->buffer[py * pBitmap->width], pBitmap->width);
 			}
-			Grow(pGlyphDataFill, pGlyphDataOutline, Width, Height, OutlineThickness);
+			QmGrowGlyphOutline(pGlyphDataFill, pGlyphDataOutline, Width, Height, OutlineThickness);
 
 			// upload the glyph
 			UploadGlyph(FONT_TEXTURE_FILL, X, Y, Width, Height, pGlyphDataFill);
@@ -697,6 +485,7 @@ public:
 
 	bool SetDefaultFaceByName(const char *pFamilyName)
 	{
+		m_GlyphLookupCache.Reset();
 		m_DefaultFace = GetFaceByName(pFamilyName);
 		if(!m_DefaultFace)
 		{
@@ -748,6 +537,7 @@ public:
 			log_warn("textrender", "The fallback font face '%s' was specified multiple times", pFamilyName);
 			return true;
 		}
+		m_GlyphLookupCache.Reset();
 		m_vFallbackFaces.push_back(Face);
 		return true;
 	}
@@ -796,6 +586,8 @@ public:
 
 	void Clear()
 	{
+		m_GlyphLookupCache.Reset();
+		InvalidateFacePixelSizeCache();
 		for(size_t TextureIndex = 0; TextureIndex < NUM_FONT_TEXTURES; ++TextureIndex)
 		{
 			mem_zero(m_apTextureData[TextureIndex], m_TextureDimension * m_TextureDimension * sizeof(uint8_t));
@@ -809,6 +601,12 @@ public:
 	const SGlyph *GetGlyph(int Chr, int FontSize)
 	{
 		FontSize = std::clamp(FontSize, MIN_FONT_SIZE, MAX_FONT_SIZE);
+		if(const SGlyph *pCached = m_GlyphLookupCache.Find(m_SelectedFace, Chr, FontSize))
+			return pCached;
+		const auto RememberGlyph = [&](const SGlyph *pGlyph) {
+			m_GlyphLookupCache.Store(m_SelectedFace, Chr, FontSize, pGlyph);
+			return pGlyph;
+		};
 
 		// Find glyph index and most appropriate font face.
 		FT_Face Face;
@@ -817,13 +615,13 @@ public:
 		{
 			// Use replacement character if glyph could not be found,
 			// also retrieve replacement character from the atlas.
-			return Chr == REPLACEMENT_CHARACTER ? nullptr : GetGlyph(REPLACEMENT_CHARACTER, FontSize);
+			return RememberGlyph(Chr == REPLACEMENT_CHARACTER ? nullptr : GetGlyph(REPLACEMENT_CHARACTER, FontSize));
 		}
 
 		// Check if glyph for this (font face, character, font size)-combination was already rendered.
 		SGlyph &Glyph = m_Glyphs[std::make_tuple(Face, Chr, FontSize)];
 		if(Glyph.m_State == SGlyph::EState::RENDERED)
-			return &Glyph;
+			return RememberGlyph(&Glyph);
 		else if(Glyph.m_State == SGlyph::EState::ERROR)
 			return nullptr;
 
@@ -833,7 +631,7 @@ public:
 		Glyph.m_Chr = Chr;
 		Glyph.m_GlyphIndex = GlyphIndex;
 		if(RenderGlyph(Glyph))
-			return &Glyph;
+			return RememberGlyph(&Glyph);
 
 		// Use replacement character if the glyph could not be rendered,
 		// also retrieve replacement character from the atlas.
@@ -841,7 +639,7 @@ public:
 		if(pReplacementCharacter)
 		{
 			Glyph = *pReplacementCharacter;
-			return &Glyph;
+			return RememberGlyph(&Glyph);
 		}
 
 		// Keep failed glyph in the cache so we don't attempt to render it again,
@@ -850,12 +648,17 @@ public:
 		return nullptr;
 	}
 
+	void InvalidateFacePixelSizeCache()
+	{
+		m_FacePixelSizeCache.Reset();
+	}
+
 	vec2 Kerning(const SGlyph *pLeft, const SGlyph *pRight) const
 	{
 		if(pLeft != nullptr && pRight != nullptr && pLeft->m_Face == pRight->m_Face && pLeft->m_FontSize == pRight->m_FontSize)
 		{
 			FT_Vector Kerning = {0, 0};
-			FT_Set_Pixel_Sizes(pLeft->m_Face, 0, pLeft->m_FontSize);
+			EnsureFacePixelSize(pLeft->m_Face, pLeft->m_FontSize);
 			FT_Get_Kerning(pLeft->m_Face, pLeft->m_Chr, pRight->m_Chr, FT_KERNING_DEFAULT, &Kerning);
 			return vec2(Kerning.x >> 6, Kerning.y >> 6);
 		}
@@ -887,7 +690,7 @@ public:
 					continue;
 				}
 
-				FT_Set_Pixel_Sizes(Face, 0, FontSize);
+				EnsureFacePixelSize(Face, FontSize);
 				if(FT_Load_Char(Face, NextCharacter, FT_LOAD_RENDER | FT_LOAD_NO_BITMAP))
 				{
 					log_debug("textrender", "Error loading glyph. Chr=%d GlyphIndex=%u", NextCharacter, GlyphIndex);
@@ -1010,7 +813,8 @@ struct STextContainer
 	// prefix of the container's text stored for debugging purposes
 	char m_aDebugText[32];
 
-	STextContainerIndex m_ContainerIndex;
+	// 仅绘制容器借用外部索引的引用计数；临时测量和空闲容器不创建计数对象。
+	std::shared_ptr<STextContainerUsages> m_pContainerUseCount;
 
 	void Reset()
 	{
@@ -1034,7 +838,7 @@ struct STextContainer
 
 		m_aDebugText[0] = '\0';
 
-		m_ContainerIndex = STextContainerIndex{};
+		m_pContainerUseCount.reset();
 	}
 };
 
@@ -1225,9 +1029,9 @@ class CTextRender : public IEngineTextRender
 				m_vpTextContainers.push_back(new STextContainer());
 		}
 
-		if(m_vpTextContainers[Index.m_Index]->m_ContainerIndex.m_UseCount.get() != Index.m_UseCount.get())
+		if(m_vpTextContainers[Index.m_Index]->m_pContainerUseCount.get() != Index.m_UseCount.get())
 		{
-			m_vpTextContainers[Index.m_Index]->m_ContainerIndex = Index;
+			m_vpTextContainers[Index.m_Index]->m_pContainerUseCount = Index.m_UseCount;
 		}
 		return *m_vpTextContainers[Index.m_Index];
 	}
@@ -1878,11 +1682,7 @@ public:
 		pCursor->m_AlignedFontSize = ActualSize / FakeToScreen.y;
 		pCursor->m_AlignedLineSpacing = round_truncate(pCursor->m_LineSpacing * FakeToScreen.y) / FakeToScreen.y;
 
-		// string length
-		if(Length < 0)
-			Length = str_length(pText);
-		else
-			Length = minimum(Length, str_length(pText));
+		Length = QmTextLayoutByteLength(pText, Length);
 
 		const char *pCurrent = pText;
 		const char *pEnd = pCurrent + Length;
@@ -2088,28 +1888,17 @@ public:
 			if(pCursor->m_LineWidth > 0.0f && !(pCursor->m_Flags & TEXTFLAG_STOP_AT_END) && !(pCursor->m_Flags & TEXTFLAG_ELLIPSIS_AT_END))
 			{
 				int Wlen = minimum(WordLength(pCurrent), (int)(pEnd - pCurrent));
-				CTextCursor Compare = *pCursor;
-				Compare.m_CalculateSelectionMode = TEXT_CURSOR_SELECTION_MODE_NONE;
-				Compare.m_CursorMode = TEXT_CURSOR_CURSOR_MODE_NONE;
-				Compare.m_X = DrawX;
-				Compare.m_Y = DrawY;
-				Compare.m_Flags &= ~TEXTFLAG_RENDER;
-				Compare.m_Flags |= TEXTFLAG_DISALLOW_NEWLINE;
+				CTextCursor Compare = QmTextWordMeasureCursor(*pCursor, DrawX, DrawY);
 				Compare.m_LineWidth = -1.0f;
 				TextEx(&Compare, pCurrent, Wlen);
 
 				if(Compare.m_X - DrawX > pCursor->m_LineWidth)
 				{
 					// word can't be fitted in one line, cut it
-					CTextCursor Cutter = *pCursor;
-					Cutter.m_CalculateSelectionMode = TEXT_CURSOR_SELECTION_MODE_NONE;
-					Cutter.m_CursorMode = TEXT_CURSOR_CURSOR_MODE_NONE;
+					CTextCursor Cutter = QmTextWordMeasureCursor(*pCursor, DrawX, DrawY);
 					Cutter.m_GlyphCount = 0;
 					Cutter.m_CharCount = 0;
-					Cutter.m_X = DrawX;
-					Cutter.m_Y = DrawY;
-					Cutter.m_Flags &= ~TEXTFLAG_RENDER;
-					Cutter.m_Flags |= TEXTFLAG_STOP_AT_END | TEXTFLAG_DISALLOW_NEWLINE;
+					Cutter.m_Flags |= TEXTFLAG_STOP_AT_END;
 
 					TextEx(&Cutter, pCurrent, Wlen);
 					Wlen = str_utf8_rewind(pCurrent, Cutter.m_CharCount); // rewind once to skip the last character that did not fit
@@ -2710,6 +2499,7 @@ public:
 			return -1.0f;
 
 		FT_Set_Pixel_Sizes(m_pGlyphMap->DefaultFace(), 0, FontSize);
+		m_pGlyphMap->InvalidateFacePixelSizeCache();
 		const char *pTmp = &TextCharacter;
 		const int NextCharacter = str_utf8_decode(&pTmp);
 
@@ -2741,6 +2531,7 @@ public:
 
 		int WidthOfText = 0;
 		FT_Set_Pixel_Sizes(m_pGlyphMap->DefaultFace(), FontWidth, FontHeight);
+		m_pGlyphMap->InvalidateFacePixelSizeCache();
 		while(pCurrent < pEnd)
 		{
 			const char *pTmp = pCurrent;
@@ -2771,7 +2562,7 @@ public:
 	{
 		for(auto *pTextContainer : m_vpTextContainers)
 		{
-			if(pTextContainer->m_ContainerIndex.Valid() && pTextContainer->m_ContainerIndex.m_UseCount.use_count() <= 1)
+			if(pTextContainer->m_pContainerUseCount != nullptr && pTextContainer->m_pContainerUseCount.use_count() <= 1)
 			{
 				log_error("textrender", "Found non empty text container with index %d with %" PRIzu " quads '%s'", pTextContainer->m_StringInfo.m_QuadBufferContainerIndex, pTextContainer->m_StringInfo.m_vCharacterQuads.size(), pTextContainer->m_aDebugText);
 				dbg_assert_failed("Text container was forgotten by the implementation (the index was overwritten).");
@@ -2794,7 +2585,7 @@ public:
 			if(pTextContainer->m_StringInfo.m_QuadBufferContainerIndex != -1)
 			{
 				log_error("textrender", "Found non empty text container with index %d with %" PRIzu " quads '%s'", pTextContainer->m_StringInfo.m_QuadBufferContainerIndex, pTextContainer->m_StringInfo.m_vCharacterQuads.size(), pTextContainer->m_aDebugText);
-				log_error("textrender", "The text container index was in use by %d ", (int)pTextContainer->m_ContainerIndex.m_UseCount.use_count());
+				log_error("textrender", "The text container index was in use by %d ", (int)pTextContainer->m_pContainerUseCount.use_count());
 				HasNonEmptyTextContainer = true;
 			}
 		}

@@ -22,6 +22,8 @@
 #include <game/client/components/qmclient/map_progress.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/red_packet_auto_claim.h>
+#include <game/client/components/qmclient/route_start_index.h>
+#include <game/client/components/qmclient/route_visited.h>
 #include <game/client/components/qmclient/update_manifest.h>
 #include <game/client/components/tclient/map_history.h>
 #include <game/client/components/tclient/swap_countdown_message.h>
@@ -253,6 +255,8 @@ class CTClient : public CComponent
 	std::vector<unsigned char> m_vGoresCMap; // 0=normal 1=blocked 2=tele 3=penalty 4=reward
 	std::vector<std::vector<int>> m_vvGoresDirectTeleOuts;
 	std::vector<int> m_vGoresDistanceToFinish;
+	CQmRouteStartIndex m_GoresRouteStartIndex;
+	mutable CQmRouteVisited m_GoresDebugRouteVisited;
 	EGoresDistanceFieldBuildStage m_GoresDistanceFieldBuildStage = EGoresDistanceFieldBuildStage::IDLE;
 	int m_GoresDistanceFieldBuildMapSize = 0;
 	int m_GoresDistanceFieldBuildCursor = 0;

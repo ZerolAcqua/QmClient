@@ -1,6 +1,7 @@
 #ifndef GAME_CLIENT_QMUI_SETTINGSCARDDECKLOGIC_H
 #define GAME_CLIENT_QMUI_SETTINGSCARDDECKLOGIC_H
 
+#include <game/client/QmUi/QmAnimationBackend.h>
 #include <game/client/QmUi/QmCardOrderModel.h>
 #include <game/client/ui_rect.h>
 
@@ -12,7 +13,6 @@
 #include <unordered_map>
 #include <vector>
 
-class CUiV2AnimationRuntime;
 struct SCardMotionSpec;
 
 struct SSettingsCardDeckItemGeometry

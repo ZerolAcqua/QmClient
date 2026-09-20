@@ -835,6 +835,25 @@ TEST(UiV2Anim, ReplacePolicyReplacesCurrentTrack)
 	EXPECT_FALSE(Runtime.PollCompletedEvent(Event));
 }
 
+TEST(UiV2Anim, ImmediateInterruptDoesNotLeaveTheReplacedTrackActive)
+{
+	CUiV2AnimationRuntime Runtime;
+	Runtime.SetValue(2, EUiAnimProperty::POS_X, 0.0f);
+
+	ASSERT_TRUE(Runtime.RequestAnimation(MakeRequest(2, EUiAnimProperty::POS_X, 10.0f, 1.0f, 1, EUiAnimInterruptPolicy::REPLACE, 13)));
+	AdvanceFor(Runtime, 0.2f);
+	const float Current = Runtime.GetValue(2, EUiAnimProperty::POS_X);
+
+	SUiAnimRequest Immediate = MakeRequest(2, EUiAnimProperty::POS_X, Current, 0.4f, 2, EUiAnimInterruptPolicy::REPLACE, 14);
+	EXPECT_FALSE(Runtime.RequestAnimation(Immediate));
+	EXPECT_FALSE(Runtime.HasActiveAnimation(2, EUiAnimProperty::POS_X));
+	EXPECT_FLOAT_EQ(Runtime.GetValue(2, EUiAnimProperty::POS_X), Current);
+
+	SUiAnimCompleteEvent Event;
+	ASSERT_TRUE(Runtime.PollCompletedEvent(Event));
+	EXPECT_EQ(Event.m_TrackId, 14u);
+}
+
 TEST(UiV2Anim, QueuePolicyRunsInOrder)
 {
 	CUiV2AnimationRuntime Runtime;

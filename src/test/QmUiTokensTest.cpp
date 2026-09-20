@@ -1,6 +1,7 @@
 // 请抬头享受阳光｜日子很好 我很我---------致咩子
 #include "test.h"
 
+#include <game/client/QmUi/QmAnimationBackend.h>
 #include <game/client/QmUi/QmMotion.h>
 #include <game/client/QmUi/QmTheme.h>
 #include <game/client/QmUi/UiTokens.h>
@@ -257,4 +258,19 @@ TEST(QmUiTokens, QmMotionAppliesUserMotionLevel)
 	const SUiAnimTransition Full = qm_motion::ApplyMotionLevel(Transition, 2);
 	EXPECT_EQ(Full.m_DurationSec, Transition.m_DurationSec);
 	EXPECT_EQ(Full.m_DelaySec, Transition.m_DelaySec);
+}
+
+TEST(QmAnimationBackend, MotionPolicyIsCanonical)
+{
+	SUiAnimTransition Transition = ui_token::motion::MODAL_FADE_SCALE;
+	Transition.m_DelaySec = 0.20f;
+
+	const SUiAnimTransition Direct = qm_animation::ApplyMotionLevel(Transition, 1);
+	const SUiAnimTransition Compatibility = qm_motion::ApplyMotionLevel(Transition, 1);
+
+	EXPECT_FLOAT_EQ(Direct.m_DurationSec, Compatibility.m_DurationSec);
+	EXPECT_FLOAT_EQ(Direct.m_DelaySec, Compatibility.m_DelaySec);
+	EXPECT_FLOAT_EQ(Direct.m_Spring.m_Damping, Compatibility.m_Spring.m_Damping);
+	EXPECT_EQ(Direct.m_Driver, Compatibility.m_Driver);
+	EXPECT_EQ(Direct.m_Easing, Compatibility.m_Easing);
 }

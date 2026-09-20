@@ -325,7 +325,7 @@ inline float ResolveSettingsGeneralClientContentHeight(const SSettingsContentMet
 
 inline float ResolveSettingsGeneralGameContentHeight(const SSettingsContentMetrics &Metrics, const bool DynamicCameraExpanded)
 {
-	return ResolveSettingsRowsHeight(4 + (DynamicCameraExpanded ? 1 : 0), Metrics.m_LineHeight, Metrics.m_LineSpacing);
+	return ResolveSettingsRowsHeight(3 + (DynamicCameraExpanded ? 1 : 0), Metrics.m_LineHeight, Metrics.m_LineSpacing);
 }
 
 inline unsigned int PackSettingsAlphaColor(const unsigned int ColorValue, const int Opacity)
@@ -436,14 +436,6 @@ inline float ResolveSettingsTeeIdentityHeight(const SSettingsContentMetrics &Met
 {
 	// 名称/国旗、Tee 预览、标签和底部颜色按钮均需要自己的安全间距。
 	return Metrics.m_InputHeight + Metrics.m_LineSpacing + Metrics.m_LineHeight * 2.0f + Metrics.m_ButtonHeight * 4.0f;
-}
-
-inline float ResolveQmVisualSkinTransitionHeight(const SSettingsContentMetrics &Metrics, const bool Enabled)
-{
-	// 标题、开关、控件和说明均按 renderer 的实际顺序计数；每个可见行消费一次尾部间距。
-	const float StandardRow = Metrics.m_RowStep;
-	const float Notes = 2.0f * (Metrics.m_SmallSize + Metrics.m_LineSpacing);
-	return 12.0f * StandardRow + Notes + (Enabled ? 5.0f * StandardRow : 0.0f);
 }
 
 inline float ResolveQmVisualWeaponAnimationHeight(const SSettingsContentMetrics &Metrics, const bool SwitchEnabled, const bool ReloadEnabled)

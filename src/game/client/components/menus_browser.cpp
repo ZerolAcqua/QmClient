@@ -32,7 +32,6 @@
 #include <game/client/ui_listbox.h>
 #include <game/client/ui_scrollregion.h>
 #include <game/localization.h>
-#include <game/voting.h>
 
 #include <algorithm>
 #include <chrono>
@@ -157,133 +156,6 @@ static const char *FavoriteMapCategoryDisplayName(const char *pType)
 	if(str_comp_nocase(pType, "Event") == 0)
 		return Localize("Event");
 	return Localize("Unknown");
-}
-
-static bool TryParseVoteMapDifficulty(const char *pDescription, const char *pMapName, char *pOut, int OutSize)
-{
-	if(!pDescription || !pMapName || pMapName[0] == '\0')
-		return false;
-
-	const char *pBy = str_find_nocase(pDescription, " by ");
-	const char *pStars = str_find(pDescription, "/5");
-	if(!pBy || !pStars || pStars <= pDescription)
-		return false;
-
-	const int MapNameLength = (int)(pBy - pDescription);
-	if((int)str_length(pMapName) != MapNameLength || str_comp_nocase_num(pDescription, pMapName, MapNameLength) != 0)
-		return false;
-
-	const char *pStarNumber = pStars;
-	while(pStarNumber > pDescription && pStarNumber[-1] >= '0' && pStarNumber[-1] <= '9')
-		--pStarNumber;
-	if(pStarNumber == pStars)
-		return false;
-
-	char aStars[8];
-	const int StarNumberLength = minimum((int)(pStars - pStarNumber), (int)sizeof(aStars) - 1);
-	str_copy(aStars, pStarNumber, StarNumberLength + 1);
-	const int Stars = str_toint(aStars);
-	if(Stars < 0 || Stars > 5)
-		return false;
-
-	str_format(pOut, OutSize, "%d/5 ★", Stars);
-	return true;
-}
-
-// NOLINTNEXTLINE(misc-use-internal-linkage)
-struct SLocalSaveDisplayEntry
-{
-	std::string m_Time;
-	std::string m_Players;
-	std::string m_Map;
-	std::string m_Code;
-	std::string m_RawLine;
-};
-
-static void TrimDisplayField(std::string &Field)
-{
-	while(!Field.empty() && str_isspace(Field.front()))
-		Field.erase(Field.begin());
-	while(!Field.empty() && str_isspace(Field.back()))
-		Field.pop_back();
-}
-
-static std::array<std::string, 4> ParseSaveCsvFields(const char *pLine)
-{
-	std::array<std::string, 4> aFields;
-	int FieldIndex = 0;
-	bool InQuotes = false;
-
-	for(int CharIndex = 0; pLine[CharIndex] != '\0' && FieldIndex < (int)aFields.size(); ++CharIndex)
-	{
-		if(pLine[CharIndex] == '"')
-		{
-			if(InQuotes && pLine[CharIndex + 1] == '"')
-			{
-				aFields[FieldIndex].push_back('"');
-				++CharIndex;
-			}
-			else
-			{
-				InQuotes = !InQuotes;
-			}
-		}
-		else if(pLine[CharIndex] == ',' && !InQuotes)
-		{
-			++FieldIndex;
-		}
-		else
-		{
-			aFields[FieldIndex].push_back(pLine[CharIndex]);
-		}
-	}
-
-	for(std::string &Field : aFields)
-		TrimDisplayField(Field);
-	return aFields;
-}
-
-static std::vector<SLocalSaveDisplayEntry> LoadLocalSaveDisplayEntries(IStorage *pStorage, bool &FileExists)
-{
-	FileExists = false;
-	std::vector<SLocalSaveDisplayEntry> vEntries;
-	IOHANDLE File = pStorage->OpenFile(SAVES_FILE, IOFLAG_READ, IStorage::TYPE_SAVE);
-	if(!File)
-		return vEntries;
-	FileExists = true;
-
-	char *pFileContent = io_read_all_str(File);
-	io_close(File);
-	if(!pFileContent)
-		return vEntries;
-
-	const char *pCursor = pFileContent;
-	char aLine[2048];
-	bool FirstLine = true;
-	while((pCursor = str_next_token(pCursor, "\n", aLine, sizeof(aLine))))
-	{
-		str_utf8_trim_right(aLine);
-		if(aLine[0] == '\0')
-			continue;
-		if(FirstLine)
-		{
-			FirstLine = false;
-			if(str_startswith(aLine, "Time"))
-				continue;
-		}
-
-		std::array<std::string, 4> aFields = ParseSaveCsvFields(aLine);
-		SLocalSaveDisplayEntry Entry;
-		Entry.m_Time = aFields[0];
-		Entry.m_Players = aFields[1];
-		Entry.m_Map = aFields[2];
-		Entry.m_Code = aFields[3];
-		Entry.m_RawLine = aLine;
-		vEntries.push_back(std::move(Entry));
-	}
-
-	free(pFileContent);
-	return vEntries;
 }
 
 static bool IsClanMembersCategory(const char *pCategory)
@@ -456,8 +328,9 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		{COL_FRIENDS, IServerBrowser::SORT_NUMFRIENDS, "", 1, 14.0f, {0}},
 		{COL_PLAYERS, IServerBrowser::SORT_NUMPLAYERS, Localizable("Players"), 1, 40.0f, {0}},
 		// 「梦」列：统计该服在线梦客户端（含 Arg）人数。人数来自中心服下发的在线分布，
-		// 本地没有对应的 SORT_ 值；列头是品牌字，不走 Localize。
-		{COL_QM_CLIENTS, -1, "梦", 1, 24.0f, {0}},
+		// 排序键由 CQmClient 在分布更新时推给服务器浏览器（见 SetQmClientServerCounts）；
+		// 列头是品牌字，不走 Localize。
+		{COL_QM_CLIENTS, IServerBrowser::SORT_QM_CLIENTS, "梦", 1, 24.0f, {0}},
 		{-1, -1, "", 1, 4.0f, {0}},
 		{COL_PING, IServerBrowser::SORT_PING, Localizable("Ping"), 1, 30.0f, {0}},
 	};
@@ -726,27 +599,6 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 
 	const int NumServers = ServerBrowser()->NumSortedServers();
 
-	// 「梦」列：该服在线梦客户端（含 Arg）人数，按服务器地址查中心服下发的在线分布。
-	std::unordered_map<std::string, int> QmClientsByServer;
-	{
-		const std::vector<SQmClientServerDistribution> &vDistribution = GameClient()->m_QmClient.QmClientServerDistribution();
-		QmClientsByServer.reserve(vDistribution.size());
-		for(const SQmClientServerDistribution &Distribution : vDistribution)
-		{
-			const int Count = Distribution.m_UserCount + Distribution.m_DummyCount;
-			if(Count > 0 && !Distribution.m_ServerAddress.empty())
-				QmClientsByServer.emplace(Distribution.m_ServerAddress, Count);
-		}
-	}
-	const auto FindQmClientCount = [&QmClientsByServer](const CServerInfo *pInfo) {
-		if(QmClientsByServer.empty() || pInfo->m_NumAddresses <= 0)
-			return 0;
-		char aAddress[NETADDR_MAXSTRSIZE];
-		net_addr_str(&pInfo->m_aAddresses[0], aAddress, sizeof(aAddress), true);
-		const auto It = QmClientsByServer.find(aAddress);
-		return It == QmClientsByServer.end() ? 0 : It->second;
-	};
-
 	// display important messages in the middle of the screen so no
 	// users misses it
 	{
@@ -811,14 +663,28 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	s_ListBox.SetActive(!Ui()->IsPopupOpen());
 	const bool PerfListFrameEnabled = QmPerfEnabled();
 	const auto ListFrameStartTime = PerfListFrameEnabled ? time_get_nanoseconds() : std::chrono::nanoseconds::zero();
-	s_ListBox.DoStart(ms_ListheaderHeight, NumServers, 1, 3, -1, &View, false);
+	int SelectedServerIndex = -1;
+	for(int i = 0; i < NumServers; ++i)
+	{
+		const CServerInfo *pItem = ServerBrowser()->SortedGet(i);
+		if(pItem != nullptr && str_comp(pItem->m_aAddress, g_Config.m_UiServerAddress) == 0)
+		{
+			SelectedServerIndex = i;
+			break;
+		}
+	}
+	s_ListBox.DoStart(ms_ListheaderHeight, NumServers, 1, 3, SelectedServerIndex, &View, false);
 
 	if(m_ServerBrowserShouldRevealSelection)
 	{
 		s_ListBox.ScrollToSelected();
 		m_ServerBrowserShouldRevealSelection = false;
 	}
-	m_SelectedIndex = -1;
+	// 列表只渲染可见区内的行（下面用 SkipItems 虚拟化），选中行滚出可见区后渲染循环不会再碰到它。
+	// 所以「选中项」只能取自排序后的真实选中服务器，不能用本帧渲染结果：一旦这里预置成 -1，
+	// 下面 NewSelected != m_SelectedIndex 会每帧成立 → 每帧 ScrollToSelected()，
+	// 把列表钉死在选中行上，用户永远无法把选中行滚出视野。
+	m_SelectedIndex = SelectedServerIndex;
 
 	const auto &&RenderBrowserIcons = [this](CUIElement::SUIElementRect &UIRect, CUIRect *pRect, const ColorRGBA &TextColor, const ColorRGBA &TextOutlineColor, const char *pText, int TextAlign, bool SmallFont = false, EFontPreset FontPreset = EFontPreset::ICON_FONT) {
 		const float FontSize = SmallFont ? 6.0f : 14.0f;
@@ -836,11 +702,15 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	std::vector<CUIElement *> &vpServerBrowserUiElements = m_avpServerBrowserUiElements[ServerBrowser()->GetCurrentType()];
 	if(vpServerBrowserUiElements.size() < (size_t)NumServers)
 		vpServerBrowserUiElements.resize(NumServers, nullptr);
+	const SSettingsSkinListVisibleRange VisibleRange = SettingsSkinListVisibleRangeForScroll(
+		s_ListBox.ScrollOffsetY(), s_ListBox.ViewHeight(), ms_ListheaderHeight, 1, NumServers, 1);
+	if(VisibleRange.m_FirstItem > 0)
+		s_ListBox.SkipItems(VisibleRange.m_FirstItem);
 
 	int RowsVisible = 0;
 	int RowsRendered = 0;
 	int RowsIterated = 0;
-	for(int i = 0; i < NumServers; i++)
+	for(int i = VisibleRange.m_FirstItem; i < VisibleRange.m_EndItem; i++)
 	{
 		const CServerInfo *pItem = ServerBrowser()->SortedGet(i);
 		RowsIterated += PerfListFrameEnabled ? 1 : 0;
@@ -852,9 +722,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		}
 		CUIElement *pUiElement = vpServerBrowserUiElements[i];
 
-		const CListboxItem ListItem = s_ListBox.DoNextItem(pItem, str_comp(pItem->m_aAddress, g_Config.m_UiServerAddress) == 0);
-		if(ListItem.m_Selected)
-			m_SelectedIndex = i;
+		const CListboxItem ListItem = s_ListBox.DoNextItem(pItem, i == SelectedServerIndex);
 
 		if(!ListItem.m_Visible)
 		{
@@ -1026,7 +894,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			}
 			else if(Id == COL_QM_CLIENTS)
 			{
-				const int QmClients = FindQmClientCount(pItem);
+				const int QmClients = pItem->m_QmClientCount;
 				// 没有梦客户端的服务器留空，避免整列都是 0 的噪音。
 				if(QmClients > 0)
 				{
@@ -1050,6 +918,8 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			}
 		}
 	}
+	if(VisibleRange.m_EndItem < NumServers)
+		s_ListBox.SkipItems(NumServers - VisibleRange.m_EndItem);
 
 	const int NewSelected = s_ListBox.DoEnd();
 	const bool ListScrollActive = QmMenuUiScrollPerfActive(s_ListBox.WheelConsumedThisFrame(), s_ListBox.ScrollbarActive(), s_ListBox.ScrollbarAnimating());
@@ -1247,9 +1117,8 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 			str_format(aBuf, sizeof(aBuf), Localize("%d of %d server"), ServerBrowser()->NumSortedServers(), ServerBrowser()->NumServers());
 		Ui()->DoLabel(&ServersOnline, aBuf, 12.0f, TEXTALIGN_MR);
 
-		int NumPlayers = 0;
-		for(int i = 0; i < ServerBrowser()->NumSortedServers(); i++)
-			NumPlayers += ServerBrowser()->SortedGet(i)->m_NumFilteredPlayers;
+		// 过滤阶段已经维护了相同口径的总人数，避免每帧重新遍历全部服务器。
+		const int NumPlayers = ServerBrowser()->NumSortedPlayers();
 
 		if(NumPlayers != 1)
 			str_format(aBuf, sizeof(aBuf), Localize("%d players"), NumPlayers);
@@ -2148,65 +2017,11 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	FriendlistOnUpdate();
 	const int NumCategories = maximum(1, GameClient()->Friends()->NumCategories());
 
-	std::vector<std::vector<CFriendItem>> vvFriends(NumCategories);
-	const int OfflineCategoryIndex = maximum(0, GameClient()->Friends()->FindCategory(IFriends::OFFLINE_CATEGORY));
-
-	// calculate friends
+	m_BrowserFriendList.Update(*GameClient()->Friends(), *ServerBrowser(), g_Config.m_ClFriendsIgnoreClan != 0);
+	const auto &vvFriends = m_BrowserFriendList.Groups();
 	bool OpenRemovePopup = false;
 	static CScrollRegion s_FriendsMoveCategoryPopupScrollRegion;
 	static CScrollRegion s_FriendsActionPopupScrollRegion;
-	for(int FriendIndex = 0; FriendIndex < GameClient()->Friends()->NumFriends(); ++FriendIndex)
-	{
-		const CFriendInfo *pFriendInfo = GameClient()->Friends()->GetFriend(FriendIndex);
-		if(pFriendInfo->m_aName[0] == '\0')
-			continue;
-
-		vvFriends[OfflineCategoryIndex].emplace_back(pFriendInfo);
-	}
-
-	for(int ServerIndex = 0; ServerIndex < ServerBrowser()->NumServers(); ++ServerIndex)
-	{
-		const CServerInfo *pEntry = ServerBrowser()->Get(ServerIndex);
-		if(pEntry->m_FriendState == IFriends::FRIEND_NO)
-			continue;
-
-		for(int ClientIndex = 0; ClientIndex < pEntry->m_NumClients; ++ClientIndex)
-		{
-			const CServerInfo::CClient &CurrentClient = pEntry->m_aClients[ClientIndex];
-			if(CurrentClient.m_FriendState == IFriends::FRIEND_NO)
-				continue;
-
-			const bool ClanOnlyMatch = CurrentClient.m_FriendState == IFriends::FRIEND_CLAN;
-			const char *pCategory = ClanOnlyMatch ? IFriends::CLAN_MEMBERS_CATEGORY : GameClient()->Friends()->GetFriendCategory(CurrentClient.m_aName, CurrentClient.m_aClan);
-			if(!ClanOnlyMatch && IsOfflineFriendsCategory(pCategory))
-				pCategory = GameClient()->Friends()->DefaultCategory();
-
-			int CategoryIndex = GameClient()->Friends()->FindCategory(pCategory);
-			if(CategoryIndex < 0 || CategoryIndex >= NumCategories)
-				CategoryIndex = 0;
-
-			vvFriends[CategoryIndex].emplace_back(CurrentClient, pEntry, pCategory);
-
-			if(!ClanOnlyMatch)
-			{
-				auto &vOfflineFriends = vvFriends[OfflineCategoryIndex];
-				vOfflineFriends.erase(std::remove_if(vOfflineFriends.begin(), vOfflineFriends.end(), [&](const CFriendItem &Friend) {
-					return Friend.ServerInfo() == nullptr && Friend.Name()[0] != '\0' && str_comp(Friend.Name(), CurrentClient.m_aName) == 0 && (g_Config.m_ClFriendsIgnoreClan || str_comp(Friend.Clan(), CurrentClient.m_aClan) == 0);
-				}),
-					vOfflineFriends.end());
-			}
-		}
-	}
-	for(auto &vFriends : vvFriends)
-	{
-		std::sort(vFriends.begin(), vFriends.end(), [](const CFriendItem &Left, const CFriendItem &Right) {
-			const bool LeftOnline = Left.ServerInfo() != nullptr;
-			const bool RightOnline = Right.ServerInfo() != nullptr;
-			if(LeftOnline != RightOnline)
-				return LeftOnline;
-			return Left < Right;
-		});
-	}
 
 	bool FollowTargetOnline = false;
 	const char *pFollowTargetAddress = "";
@@ -2236,7 +2051,6 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	int TotalFriendItems = 0;
 	for(const auto &vFriends : vvFriends)
 		TotalFriendItems += (int)vFriends.size();
-	m_vFriendTooltipText.clear();
 	m_vFriendTooltipText.resize(TotalFriendItems);
 	int VisibleFriendItems = 0;
 
@@ -3439,18 +3253,12 @@ void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 	const QmMapHistoryUi::SWorkspaceMetrics Layout = QmMapHistoryUi::WorkspaceMetrics(View.h);
 	View.Margin(Layout.m_OuterMargin, &View);
 
-	static std::vector<SLocalSaveDisplayEntry> s_vSaveEntries;
-	static int64_t s_LastSaveReloadTick = 0;
-	static bool s_SaveFileExists = false;
-	const int64_t Now = time_get();
-	if(s_LastSaveReloadTick == 0 || Now - s_LastSaveReloadTick > time_freq() * 2)
-	{
-		s_vSaveEntries = LoadLocalSaveDisplayEntries(Storage(), s_SaveFileExists);
-		s_LastSaveReloadTick = Now;
-	}
-
 	char aSavesPath[IO_MAX_PATH_LENGTH];
 	Storage()->GetCompletePath(IStorage::TYPE_SAVE, SAVES_FILE, aSavesPath, sizeof(aSavesPath));
+	if(auto pJob = m_LocalSaveDisplay.Refresh(aSavesPath, time_get(), time_freq() * 2))
+		Engine()->AddJob(std::move(pJob));
+	const auto &vSaveEntries = m_LocalSaveDisplay.Entries();
+	const bool SaveFileExists = m_LocalSaveDisplay.FileExists();
 	const std::set<std::string> &FavoriteMaps = GameClient()->m_TClient.GetFavoriteMaps();
 	const std::vector<QmMapHistory::SMapHistoryRecord> &HistoryEntries = GameClient()->m_TClient.GetMapHistory().Entries();
 
@@ -3459,7 +3267,7 @@ void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 	char aaWorkspaceTabLabels[3][128];
 	str_format(aaWorkspaceTabLabels[0], sizeof(aaWorkspaceTabLabels[0]), "%s (%d)", Localize("Favorite map"), (int)FavoriteMaps.size());
 	str_format(aaWorkspaceTabLabels[1], sizeof(aaWorkspaceTabLabels[1]), "%s (%d)", Localize("Map play history"), (int)HistoryEntries.size());
-	str_format(aaWorkspaceTabLabels[2], sizeof(aaWorkspaceTabLabels[2]), "%s (%d)", Localize("Local saves"), (int)s_vSaveEntries.size());
+	str_format(aaWorkspaceTabLabels[2], sizeof(aaWorkspaceTabLabels[2]), "%s (%d)", Localize("Local saves"), (int)vSaveEntries.size());
 
 	CUIRect WorkspaceTabs;
 	View.HSplitTop(Layout.m_TabHeight, &WorkspaceTabs, &View);
@@ -3567,18 +3375,18 @@ void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 	};
 
 	auto GetFavoriteMapDifficulty = [&](const char *pMapName, char *pOut, int OutSize) {
-		for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext)
-		{
-			if(TryParseVoteMapDifficulty(pOption->m_aDescription, pMapName, pOut, OutSize))
-				return;
-		}
-		str_copy(pOut, Localize("Unknown"), OutSize);
+		const CVoting &Voting = GameClient()->m_Voting;
+		const int Stars = m_MapVoteDifficulty.Find(Voting.OptionsRevision(), Voting.FirstOption(), pMapName);
+		if(Stars >= 0)
+			str_format(pOut, OutSize, "%d/5 ★", Stars);
+		else
+			str_copy(pOut, Localize("Unknown"), OutSize);
 	};
 
 	auto HasLocalSaveForMap = [&](const char *pMapName) {
-		if(!s_SaveFileExists || !pMapName || pMapName[0] == '\0')
+		if(!SaveFileExists || !pMapName || pMapName[0] == '\0')
 			return false;
-		for(const SLocalSaveDisplayEntry &Entry : s_vSaveEntries)
+		for(const qm_local_saves::SLocalSaveDisplayEntry &Entry : vSaveEntries)
 		{
 			if(!Entry.m_Map.empty() && str_comp(Entry.m_Map.c_str(), pMapName) == 0)
 				return true;
@@ -3648,7 +3456,7 @@ void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 					char aDifficulty[32];
 					GetFavoriteMapDifficulty(MapName.c_str(), aDifficulty, sizeof(aDifficulty));
 					const char *pNote = GameClient()->m_TClient.GetMapNote(MapName.c_str());
-					const char *pSaved = HasLocalSaveForMap(MapName.c_str()) ? Localize("Yes") : Localize("No");
+					const char *pSaved = !m_LocalSaveDisplay.Ready() ? Localize("Loading") : (HasLocalSaveForMap(MapName.c_str()) ? Localize("Yes") : Localize("No"));
 
 					TextRender()->TextColor(1.0f, 0.85f, 0.0f, 1.0f);
 					DoFavoriteMapColumnLabel(MapColumn, MapName.c_str(), 12.0f);
@@ -3758,8 +3566,9 @@ void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 			Filter = QmMapHistory::EMapHistoryFilter::FINISHED;
 		else if(s_MapHistoryFilter == 2)
 			Filter = QmMapHistory::EMapHistoryFilter::RECENT;
-		const std::vector<QmMapHistory::SMapHistoryRecord> vRecords = GameClient()->m_TClient.GetMapHistoryRecords(Filter);
-		if(vRecords.empty())
+		static std::vector<size_t> s_vHistoryRecordIndices;
+		GameClient()->m_TClient.GetMapHistory().SortedIndices(Filter, s_vHistoryRecordIndices);
+		if(s_vHistoryRecordIndices.empty())
 		{
 			Ui()->DoLabel(&HistoryPanel, HistoryEntries.empty() ? Localize("No map play history yet") : Localize("No results"), 13.0f, TEXTALIGN_MC);
 		}
@@ -3768,12 +3577,12 @@ void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 			static CListBox s_MapHistoryListBox;
 			static std::vector<int> s_vMapHistoryItemIds;
 			static std::vector<CButtonContainer> s_vMapHistoryRemoveButtons;
-			s_vMapHistoryItemIds.resize(vRecords.size());
-			s_vMapHistoryRemoveButtons.resize(vRecords.size());
+			s_vMapHistoryItemIds.resize(s_vHistoryRecordIndices.size());
+			s_vMapHistoryRemoveButtons.resize(s_vHistoryRecordIndices.size());
 			const float CardRowHeight = QmMapHistoryUi::CardRowHeight(HistoryPanel.h);
 			const int HistoryGridColumns = QmMapHistoryUi::GridColumns(HistoryPanel.w - QmMapHistoryUi::LIST_SCROLLBAR_WIDTH, CardRowHeight);
 			s_MapHistoryListBox.SetScrollbarAlwaysReserved(true);
-			s_MapHistoryListBox.DoStart(CardRowHeight, (int)vRecords.size(), HistoryGridColumns, 1, -1, &HistoryPanel, false, IGraphics::CORNER_NONE);
+			s_MapHistoryListBox.DoStart(CardRowHeight, (int)s_vHistoryRecordIndices.size(), HistoryGridColumns, 1, -1, &HistoryPanel, false, IGraphics::CORNER_NONE);
 
 			auto DoHistoryCardLabel = [this](CUIRect Rect, const char *pText, float FontSize, int Align) {
 				SLabelProperties Props;
@@ -3784,9 +3593,9 @@ void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 			};
 
 			std::string RemoveMapId;
-			for(size_t HistoryIndex = 0; HistoryIndex < vRecords.size(); ++HistoryIndex)
+			for(size_t HistoryIndex = 0; HistoryIndex < s_vHistoryRecordIndices.size(); ++HistoryIndex)
 			{
-				const QmMapHistory::SMapHistoryRecord &Record = vRecords[HistoryIndex];
+				const QmMapHistory::SMapHistoryRecord &Record = HistoryEntries[s_vHistoryRecordIndices[HistoryIndex]];
 				const CListboxItem Item = s_MapHistoryListBox.DoNextItem(&s_vMapHistoryItemIds[HistoryIndex], false);
 				if(!Item.m_Visible)
 					continue;
@@ -3862,26 +3671,31 @@ void CMenus::RenderServerbrowserFavoriteMaps(CUIRect View)
 		return;
 	}
 
-	if(!s_SaveFileExists)
+	if(!m_LocalSaveDisplay.Ready())
+	{
+		Ui()->DoLabel(&SavesPanel, Localize("Loading"), 13.0f, TEXTALIGN_MC);
+		return;
+	}
+	if(!SaveFileExists)
 	{
 		Ui()->DoLabel(&SavesPanel, Localize("ddnet-saves.txt not found"), 13.0f, TEXTALIGN_MC);
 		return;
 	}
-	if(s_vSaveEntries.empty())
+	if(vSaveEntries.empty())
 	{
 		Ui()->DoLabel(&SavesPanel, Localize("ddnet-saves.txt is empty"), 13.0f, TEXTALIGN_MC);
 		return;
 	}
 
-	const int NumSaveEntries = (int)s_vSaveEntries.size();
+	const int NumSaveEntries = (int)vSaveEntries.size();
 	static CListBox s_SavesListBox;
 	static std::vector<int> s_vSaveItemIds;
 	s_vSaveItemIds.resize(NumSaveEntries);
 	s_SavesListBox.DoStart(42.0f, NumSaveEntries, 1, 3, -1, &SavesPanel, false, IGraphics::CORNER_NONE);
 
-	for(size_t SaveIndex = 0; SaveIndex < s_vSaveEntries.size(); ++SaveIndex)
+	for(size_t SaveIndex = 0; SaveIndex < vSaveEntries.size(); ++SaveIndex)
 	{
-		const SLocalSaveDisplayEntry &Entry = s_vSaveEntries[SaveIndex];
+		const qm_local_saves::SLocalSaveDisplayEntry &Entry = vSaveEntries[SaveIndex];
 		const CListboxItem Item = s_SavesListBox.DoNextItem(&s_vSaveItemIds[SaveIndex], false);
 		if(!Item.m_Visible)
 			continue;

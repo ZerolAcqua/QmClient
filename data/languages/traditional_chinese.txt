@@ -205,9 +205,6 @@
 3 stars
 == 3 星
 
-3D Background
-== 3D 背景
-
 3D background
 == 3D 背景
 
@@ -730,24 +727,6 @@ API key
 
 Appearance
 == 遊戲界面
-
-Appearance / Chat
-== 外觀/聊天
-
-Appearance / Hook Collision
-== 外觀 / 鉤子輔助線
-
-Appearance / HUD
-== 外觀 /HUD
-
-Appearance / Info Messages
-== 外觀/信息消息
-
-Appearance / Laser
-== 外觀/激光
-
-Appearance / Name Plate
-== 外觀/名牌
 
 Append to log file instead of overwriting
 == 追加到日誌文件而不是每次覆蓋
@@ -1526,9 +1505,6 @@ Call vote
 Camera
 == 鏡頭視野
 
-Camera & FOV
-== 鏡頭與視野
-
 Camera drift intensity (0-200)
 == 相機漂移強度（0-200）
 
@@ -1548,7 +1524,7 @@ Camera slowdown during fast cursor movement. High values may cause delayed camer
 == 光標快速移動期間相機減速的量。高值可能會導致相機移動延遲
 
 Camera view
-== 鏡頭視角
+== 鏡頭與視野
 
 Can only drop onto same-size parts.
 == 只能拖放到同尺寸部件上。
@@ -1654,9 +1630,6 @@ Chat Binds
 
 Chat box width
 == 聊天框寬度
-
-Chat Bubble
-== 消息氣泡
 
 Chat bubble
 == 聊天氣泡
@@ -2103,7 +2076,7 @@ Configure display and rendering
 == 設定顯示與渲染選項
 
 Configure Dream-only convenience features
-== Configure Dream-only convenience features
+== 設定棲夢專屬便利功能
 
 Configure game and client preferences
 == 設定遊戲與客戶端偏好
@@ -2153,8 +2126,8 @@ Configure QmClient HUD elements
 Configure remaining DDNet client preferences
 == Configure remaining DDNet client preferences
 
-Configure skin downloads, prefix, and default eyes
-== 設定外觀下載、外觀前綴和預設眼睛
+Configure skin colors, eyes, and filters
+== Configure skin colors, eyes, and filters
 
 Configure sound and audio packs
 == 設定音效與音效包
@@ -2747,9 +2720,6 @@ Default output open failed
 Default preset
 == 默認預設
 
-Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)
-== 重生後默認請求切換的武器（0=關閉，1=錘子，2=手槍，3=霰彈槍，4=榴彈槍，5=激光）
-
 Default zoom
 == 默認縮放
 
@@ -3155,9 +3125,6 @@ Draw where mouse is
 Draw!
 == 平局！
 
-Dream Features
-== 夢的小功能
-
 Drift direction
 == 漂移方向
 
@@ -3284,9 +3251,6 @@ Dummy skin queue max length
 Dummy skin queue switch interval (ms)
 == 分身皮膚佇列切換間隔（ms）
 
-Dummy Window
-== 分身小窗
-
 Dummy window size
 == 分身小窗大小
 
@@ -3338,11 +3302,8 @@ Dynamic FOV smoothness
 Dynamic FOV smoothness (0=instant, 100=smoothest)
 == 動態視野平滑度（0 = 瞬時，100 = 最平滑）
 
-Dynamic Island
-== 靈動島
-
 Dynamic island
-== 動態島
+== 靈動島
 
 Dynamic Island background alpha
 == 靈動島背景透明度
@@ -3866,9 +3827,6 @@ Entity assets
 Entity Background Image
 == 實體層背景圖
 
-Entity Layer Colors
-== 實體層顏色
-
 Entity overlay
 == 實體疊加
 
@@ -4376,9 +4334,6 @@ Friend note
 Friend notification refresh interval (sec)
 == 好友通知刷新間隔（秒）
 
-Friend Notifications
-== 好友通知
-
 Friend notify
 == 好友通知
 
@@ -4553,9 +4508,6 @@ Gives you infinite jump
 Glitch
 == 故障
 
-Global card
-== 全局卡片
-
 Global card ordering (format: stableId|tab|col|order; semicolon-separated)
 == 全局卡片排序（格式 stableId|tab|col|order; 分號分隔）
 
@@ -4605,13 +4557,10 @@ Go forward the specified duration
 == 快進指定時長
 
 Gores
-== 血腥模式
-
-Gores Actor
-== Gores 演員專用
+== Gores 模式
 
 Gores actor
-== Gores 演員
+== 演員模式
 
 Gores auto weapon switch
 == Gores 自動武器切換
@@ -4672,9 +4621,6 @@ GUI cursor assets
 
 Guide line color
 == 輔助線顏色
-
-Gun
-== 手槍
 
 Hammer
 == 錘子
@@ -4805,9 +4751,6 @@ Highlighted message
 Highlighted message color
 == 提及訊息顏色
 
-Hitbox mode
-== 碰撞箱模式
-
 Hitbox Mode Freeze Border Color
 == 碰撞箱模式凍結邊框顏色
 
@@ -4825,9 +4768,6 @@ Hitbox Mode Tee Collision Color
 
 Hitbox Mode Weapon Interaction Color
 == 碰撞箱模式武器交互顏色
-
-HJ Assist
-== HJ 輔助
 
 HJ assist
 == HJ 大佬輔助
@@ -4946,9 +4886,6 @@ HUD editor layout
 HUD editor preview
 == HUD 編輯器預覽
 
-HUD island appearance settings
-== HUD 島嶼外觀設定
-
 HUD notifications
 == HUD 通知
 
@@ -4963,9 +4900,6 @@ Hue speed
 
 i = Receive rate
 == i = 接收速率
-
-I am a robot
-== 我是機器人
 
 I am away from the game window
 == 我不在遊戲窗口前
@@ -5140,9 +5074,6 @@ Input device open failed, try reconnecting headset/mic or reselecting input devi
 
 Input overlay
 == 按鍵顯示
-
-Input overlay display
-== 按鍵顯示疊加
 
 Input overlay keyboard scale (percent)
 == 輸入覆蓋鍵盤比例（百分比）
@@ -5345,9 +5276,6 @@ Keep unsent message on chat close
 Keep vote window open after voting
 == 投票後不關閉投票窗口
 
-Key Bindings
-== 按鍵綁定
-
 Key binds
 == 按鍵綁定
 
@@ -5374,9 +5302,6 @@ Keyboard focus ring color
 
 Keyboard size
 == 鍵盤大小
-
-Keyword Reply
-== 關鍵詞回覆
 
 Keyword reply
 == 關鍵字回覆
@@ -5453,11 +5378,8 @@ Language
 Language file to use
 == 使用什麼語言文件
 
-Large emoticons and launch mode
-== Large emoticons and launch mode
-
 Large emoticons and launched emoticons
-== Large emoticons and launched emoticons
+== 大表情與發射表情
 
 Large text announcement for friend joining
 == 大字播報進服好友
@@ -5512,6 +5434,12 @@ Latency Jitter
 
 Launch count threshold for the next sponsor reminder
 == 下次贊助提醒的啟動次數閾值
+
+Launch emote
+== 發射表情
+
+Launch emote key
+== 發射表情按鍵
 
 Layout
 == 佈局
@@ -5762,6 +5690,9 @@ Local Time
 Local-only
 == 僅本地資源
 
+Locate
+== 定位
+
 Lock delay
 == 鎖隊延遲
 
@@ -5794,9 +5725,6 @@ Low to high
 
 Lyrics
 == 歌詞
-
-Lyrics sources and display
-== 歌詞來源與顯示
 
 Main Asset
 == 主材質
@@ -6116,6 +6044,9 @@ Menu option - normal
 Menu option - selected
 == 菜單選項 - 選中
 
+Merge consecutive identical echo messages within this window in milliseconds (0 disables merging)
+== 在該時間視窗（毫秒）內合併連續的相同 Echo 訊息（0 = 不合併）
+
 Merge consecutive identical player messages within 2 seconds
 == 合併 2 秒內連續出現的相同玩家訊息
 
@@ -6159,7 +6090,7 @@ Min size
 == 最小尺寸
 
 Mini features
-== 迷你功能
+== 夢の百寶箱
 
 Mini voting UI
 == 縮小投票界面
@@ -6854,9 +6785,6 @@ Notification hold time
 Notification text size
 == 通知文字大小
 
-Notifications
-== 通知欄
-
 Notify when friends come online
 == 好友上線提醒
 
@@ -6946,9 +6874,6 @@ Only show when the other Tee is not on screen
 
 Only show with this nickname
 == 僅在使用此暱稱時顯示
-
-Only what you can't imagine, nothing Dream can't do
-== 只有你想不到，沒有夢做不到
 
 Opacity
 == 不透明度
@@ -7298,9 +7223,6 @@ Pick result: %s
 Pickup range
 == 拾取物範圍
 
-Pie Menu
-== 餅菜單
-
 Pie menu
 == 餅菜單
 
@@ -7372,9 +7294,6 @@ Player country filter in server browser (ISO 3166-1 numeric)
 
 Player country:
 == 玩家國家/地區：
-
-Player data
-== 玩家數據
 
 Player decoration color
 == 玩家裝飾顏色
@@ -7691,8 +7610,8 @@ Preview import file
 Preview laser bodies, outlines, and impacts
 == Preview laser bodies, outlines, and impacts
 
-Preview player and dummy appearance and colors
-== 預覽本體與分身的外觀和顏色
+Preview player and dummy appearance
+== Preview player and dummy appearance
 
 Preview player and dummy nameplates
 == Preview player and dummy nameplates
@@ -7867,15 +7786,6 @@ qm_profile_queue: index must be between 1 and %d
 
 QmClient
 == 棲夢
-
-QmClient / Function
-== QmClient / 功能
-
-QmClient / HUD
-== QmClient / HUD
-
-QmClient / Visual
-== QmClient / 視覺
 
 QmClient chat log
 == QmClient 聊天記錄
@@ -8501,9 +8411,6 @@ Resource preview VRAM budget override (MB, 0=auto)
 Resource preview VRAM budget percentage (based on device local VRAM budget)
 == 資源預覽顯存預算百分比（基於設備本地顯存預算）
 
-Respawn default weapon (when owned)
-== 重生預設武器（僅限已擁有）
-
 Restart
 == 重新開始
 
@@ -8867,20 +8774,26 @@ Search
 Search and navigate settings
 == 搜尋並前往設定
 
-Search and pick skins and manage the skin queue
-== 搜尋並選擇外觀，同時管理外觀輪換佇列
-
 Search donor asset
 == 搜索來源材質
 
 Search main asset
 == 搜索主材質
 
+Search maps and downloadedmaps, including subfolders
+== 搜尋 maps 和 downloadedmaps（含全部子資料夾）
+
 Search settings by title, feature, or keyword
 == Search settings by title, feature, or keyword
 
+Search skins and manage the skin queue
+== Search skins and manage the skin queue
+
 Searching
 == 正在搜索
+
+Searching all map folders...
+== 正在搜尋全部地圖資料夾…
 
 Sec-WebSocket-Protocol sent during the realtime handshake
 == 即時握手時傳送的 Sec-WebSocket-Protocol
@@ -9203,6 +9116,9 @@ Severe
 Shape
 == 形狀
 
+Share of the server browser name/map split given to the name column (per mille)
+== 伺服器瀏覽器名稱/地圖分欄中名稱列所佔比例（千分比）
+
 Shimmer speed (polished)
 == 掠光速度（拋光檔）
 
@@ -9349,9 +9265,6 @@ Show compact vote HUD
 
 Show configurable outlines around map tiles
 == Show configurable outlines around map tiles
-
-Show Coordinates
-== 顯示座標
 
 Show coordinates above players
 == 在玩家頭頂顯示座標
@@ -9535,9 +9448,6 @@ Show important messages when rendering video
 
 Show important server prompts
 == 顯示重要伺服器提示
-
-Show important server prompts and Echo messages as popups
-== 把重要伺服器提示和 Echo 消息彈出顯示
 
 Show important server prompts as notifications
 == 重要伺服器提示改走通知欄
@@ -9762,10 +9672,10 @@ Show other players' hook collision lines when rendering video
 == 渲染視頻時顯示其他玩家的鉤子輔助線
 
 Show other players' large emoticons
-== Show other players' large emoticons
+== 顯示其他玩家的大表情
 
 Show other players' launched emoticons
-== Show other players' launched emoticons
+== 顯示其他玩家發射的表情
 
 Show other team players (2=own team only)
 == 顯示其他隊伍的玩家（2 只顯示自己隊伍）
@@ -10232,9 +10142,6 @@ Skin switch animation range: 0=Self, 1=Local+Dummy, 2=All players
 Skin switch animation type (0=Ghost pop, 1=Soft fade, 2=Slide left, 3=Rotate pop, 4=Light dark switch, 5=Glitch shake, 6=Elastic scale)
 == 皮膚切換動畫類型（0=殘影彈出 1=柔和淡變 2=向左滑切 3=旋轉彈出 4=明暗切換 5=故障抖動 6=彈性縮放）
 
-Skin transition
-== 皮膚切換
-
 Skin transition animation
 == 皮膚切換動畫
 
@@ -10309,9 +10216,6 @@ Smooth zoom animation time in editor (in ms, 0=off)
 
 Smoothness of multi-view zoom (in ms, higher = slower)
 == 設置多視圖縮放的平滑度（毫秒，較高=較慢）
-
-SMTC
-== 系統媒體控制
 
 Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
 == 浮動偏移吸附到整數像素（字體更銳利，但更頓挫）
@@ -10631,9 +10535,6 @@ Stop server
 Stop the current demo
 == 結束回放
 
-Streamer Mode
-== 主播模式
-
 Streamer mode
 == 直播模式
 
@@ -10787,9 +10688,6 @@ System
 System default
 == 系統默認
 
-System media control
-== 系統媒體控制
-
 System media controls
 == 系統媒體控制
 
@@ -10826,14 +10724,11 @@ Target language code (e.g. zh, en, ja, zh-TW)
 Target language ratio
 == 目標語言比例
 
+Target server: %s
+== 目標伺服器：%s
+
 TClient
 == TClient
-
-TClient / Bind Wheel
-== TClient / 綁定輪盤
-
-TClient / Status Bar
-== TClient / 狀態欄
 
 TClient Developers
 == TClient 開發人員
@@ -11391,7 +11286,7 @@ Toggle dyncam
 == 動態視野開關
 
 Toggle emote launcher
-== Toggle emote launcher
+== 切換表情發射器
 
 Toggle fast practice mode
 == 切換快速練習模式
@@ -11521,9 +11416,6 @@ Trail width
 
 Translate
 == 翻譯
-
-Translate button
-== 翻譯按鈕
 
 Translate ID:
 == 翻譯 ID：
@@ -11973,7 +11865,7 @@ Use k key to kill (restart), q to pause and watch other players. See settings fo
 == 使用 K 鍵自殺（重新開始），Q 鍵暫停並旁觀其他玩家。其他按鍵綁定可在設置中查看。
 
 Use large emote
-== Use large emote
+== 使用大表情
 
 Use mouse sensitivity when dynamic camera is on
 == 開啟動態攝像頭時使用鼠標感應
@@ -12389,9 +12281,6 @@ Weapon switch easing
 Weapon switch rotation
 == 武器切換旋轉
 
-Weapon Trajectory
-== 武器輔助線
-
 Weapon trajectory
 == 武器彈道輔助線
 
@@ -12418,9 +12307,6 @@ Welcome to DDNet
 
 What level DDRace binding is set to (automatic, you don't need to use it).
 == DDRace 綁定設置為什麼級別（這是自動的，你不需要使用它）
-
-What's done is done, no use saying more
-== 事已至此，多說無益
 
 Wheel animate
 == 滾輪動畫
@@ -12530,14 +12416,14 @@ Width of friends column in server browser
 Width of latency column in server browser
 == 伺服器瀏覽器中延遲列的寬度
 
-Width of map column in server browser
-== 伺服器瀏覽器中地圖列的寬度
-
 Width of others' hook collision line
 == 其他玩家的鉤子輔助線線寬度
 
 Width of players column in server browser
 == 伺服器瀏覽器中玩家列的寬度
+
+Width of Qm clients column in server browser
+== 伺服器瀏覽器中 Qm 客戶端欄寬度
 
 Width of type column in server browser
 == 伺服器瀏覽器中類型列的寬度
@@ -12922,15 +12808,6 @@ Zoom to current mouse target
 
 ⚠️ Tencent Cloud API not configured
 == ⚠️ 騰訊雲 API 密鑰未配置
-
-发射表情按键
-== 发射表情按键
-
-显示他人发射表情
-== 显示他人发射表情
-
-显示他人大表情
-== 显示他人大表情
 
 [Assets editor blend mode]
 Color

@@ -4624,22 +4624,6 @@ turkish = "Varsayılan çıkış açılamadı"
 polish = "Domyślne otwarcie wyjścia nie powiodło się"
 
 [[message]]
-key = "Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)"
-[message.translations]
-simplified_chinese = "重生后默认请求切换的武器（0=关闭，1=锤子，2=手枪，3=霰弹枪，4=榴弹枪，5=激光）"
-traditional_chinese = "重生後默認請求切換的武器（0=關閉，1=錘子，2=手槍，3=霰彈槍，4=榴彈槍，5=激光）"
-japanese = "リスポーン後にデフォルトでリクエストする武器（0=オフ、1=ハンマー、2=ピストル、3=ショットガン、4=グレネードランチャー、5=レーザー）"
-korean = "리스폰 후 기본 요청 무기 (0=비활성화, 1=망치, 2=권총, 3=산탄총, 4=유탄 발사기, 5=레이저)"
-russian = "Оружие для автоматического переключения после возрождения (0=выкл, 1=молот, 2=пистолет, 3=дробовик, 4=гранатомёт, 5=лазер)"
-german = "Standardmäßig nach Wiederbelebung angeforderte Waffe zum Wechseln (0=aus, 1=Hammer, 2=Pistole, 3=Schrotflinte, 4=Granatwerfer, 5=Laser)"
-spanish = "Arma solicitada por defecto al renacer (0=desactivado, 1=martillo, 2=pistola, 3=escopeta, 4=lanzagranadas, 5=láser)"
-french = "Arme demandée par défaut après la réapparition (0=désactivé, 1=marteau, 2=pistolet, 3=fusil à pompe, 4=lance-grenades, 5=laser)"
-brazilian_portuguese = "Arma solicitada por padrão ao renascer (0=desligado, 1=martelo, 2=pistola, 3=escopeta, 4=lançador de granadas, 5=laser)"
-portuguese = "Arma para solicitar troca automaticamente após renascer (0=desligado, 1=martelo, 2=pistola, 3=caçadeira, 4=lançador de granadas, 5=laser)"
-turkish = "Yeniden doğduktan sonra varsayılan olarak istenen silah (0=kapalı, 1=çekiç, 2=tabanca, 3=pompalı, 4=bomba atar, 5=lazer)"
-polish = "Domyślna broń do przełączenia po odrodzeniu (0=wyłączone, 1=młotek, 2=pistolet, 3=strzelba, 4=granatnik, 5=laser)"
-
-[[message]]
 key = "Demo effects"
 [message.translations]
 simplified_chinese = "Demo 特效"
@@ -7282,10 +7266,10 @@ polish = "Zasięg poświaty"
 [[message]]
 key = "Gores Actor"
 [message.translations]
-simplified_chinese = "Gores 演员专用"
-traditional_chinese = "Gores 演員專用"
-japanese = "Gores アクター専用"
-korean = "Gores 배우 전용"
+simplified_chinese = "演员模式"
+traditional_chinese = "演員模式"
+japanese = "Gores アクター"
+korean = "Gores 액터"
 russian = "Актёр Gores"
 german = "Gores-Schauspieler"
 spanish = "Actor de Gores"
@@ -22817,22 +22801,6 @@ turkish = "Gores modunda dummy çekiçlemeyi geçici olarak devre dışı bırak
 polish = "Tymczasowo wyłącz młotkowanie dummy w trybie Gores"
 
 [[message]]
-key = "Respawn default weapon (when owned)"
-[message.translations]
-simplified_chinese = "重生默认武器（仅限已拥有）"
-traditional_chinese = "重生預設武器（僅限已擁有）"
-japanese = "リスポーン時のデフォルト武器（所持時のみ）"
-korean = "리스폰 기본 무기 (보유한 경우)"
-russian = "Оружие по умолчанию после возрождения (если есть)"
-german = "Standardwaffe nach dem Respawn (wenn vorhanden)"
-spanish = "Arma predeterminada al reaparecer (si se posee)"
-french = "Arme par défaut à la réapparition (si possédée)"
-brazilian_portuguese = "Arma padrão ao renascer (quando possuída)"
-portuguese = "Arma predefinida ao renascer (quando possuída)"
-turkish = "Yeniden doğma varsayılan silahı (sahipse)"
-polish = "Domyślna broń po odrodzeniu (jeśli posiadana)"
-
-[[message]]
 key = "Displays estimated process UDP receive rate"
 [message.translations]
 simplified_chinese = "显示估算的进程 UDP 接收速率"
@@ -24257,22 +24225,6 @@ brazilian_portuguese = "Review and edit custom key bindings"
 portuguese = "Review and edit custom key bindings"
 turkish = "Review and edit custom key bindings"
 polish = "Review and edit custom key bindings"
-
-[[message]]
-key = "Configure Dream-only convenience features"
-[message.translations]
-simplified_chinese = "配置栖梦专属便利功能"
-traditional_chinese = "Configure Dream-only convenience features"
-japanese = "Configure Dream-only convenience features"
-korean = "Configure Dream-only convenience features"
-russian = "Configure Dream-only convenience features"
-german = "Configure Dream-only convenience features"
-spanish = "Configure Dream-only convenience features"
-french = "Configure Dream-only convenience features"
-brazilian_portuguese = "Configure Dream-only convenience features"
-portuguese = "Configure Dream-only convenience features"
-turkish = "Configure Dream-only convenience features"
-polish = "Configure Dream-only convenience features"
 
 [[message]]
 key = "Configure HJ unfreeze assistance"
@@ -27190,3 +27142,179 @@ brazilian_portuguese = "URL do servidor de voz (ws:// ou wss://)"
 portuguese = "URL do servidor de voz (ws:// ou wss://)"
 turkish = "Ses sunucusu URL’si (ws:// veya wss://)"
 polish = "URL serwera głosowego (ws:// lub wss://)"
+
+[[message]]
+key = "Large emoticons and launched emoticons"
+[message.translations]
+simplified_chinese = "大表情与发射表情"
+traditional_chinese = "大表情與發射表情"
+japanese = "大型絵文字と発射絵文字"
+korean = "대형 이모티콘 및 발사 이모티콘"
+russian = "Большие и запускаемые эмоции"
+german = "Große und abgeschossene Emoticons"
+spanish = "Emoticonos grandes y lanzados"
+french = "Grandes émoticônes et émoticônes lancées"
+brazilian_portuguese = "Emoticons grandes e lançados"
+portuguese = "Emoticons grandes e lançados"
+turkish = "Büyük ve fırlatılan emoticonlar"
+polish = "Duże i wystrzeliwane emotikony"
+
+[[message]]
+key = "Launch emote"
+[message.translations]
+simplified_chinese = "发射表情"
+traditional_chinese = "發射表情"
+japanese = "絵文字を発射"
+korean = "이모티콘 발사"
+russian = "Запустить эмоцию"
+german = "Emoticon abschießen"
+spanish = "Lanzar emoticono"
+french = "Lancer une émoticône"
+brazilian_portuguese = "Lançar emoticon"
+portuguese = "Lançar emoticon"
+turkish = "Emoticon fırlat"
+polish = "Wystrzel emotikonę"
+
+[[message]]
+key = "Merge consecutive identical echo messages within this window in milliseconds (0 disables merging)"
+[message.translations]
+simplified_chinese = "在该时间窗口（毫秒）内合并连续的相同 Echo 消息（0 = 不合并）"
+traditional_chinese = "在該時間視窗（毫秒）內合併連續的相同 Echo 訊息（0 = 不合併）"
+japanese = "この時間枠（ミリ秒）内の連続する同一 Echo メッセージを統合（0 で無効）"
+korean = "이 시간 창(밀리초) 내 연속된 동일 Echo 메시지 병합 (0=병합 안 함)"
+russian = "Объединять подряд идущие одинаковые сообщения Echo в этом окне (мс, 0 = не объединять)"
+german = "Aufeinanderfolgende identische Echo-Nachrichten in diesem Fenster (Millisekunden) zusammenfassen (0 = aus)"
+spanish = "Combinar mensajes Echo idénticos consecutivos en esta ventana en milisegundos (0 = no combinar)"
+french = "Fusionner les messages Echo identiques consécutifs dans cette fenêtre en millisecondes (0 = désactivé)"
+brazilian_portuguese = "Mesclar mensagens Echo idênticas consecutivas nesta janela em milissegundos (0 = desativado)"
+portuguese = "Juntar mensagens Echo idênticas consecutivas nesta janela em milissegundos (0 = desativado)"
+turkish = "Bu pencere içindeki (milisaniye) ardışık aynı Echo mesajlarını birleştir (0 = kapalı)"
+polish = "Scalaj kolejne identyczne wiadomości Echo w tym oknie (ms, 0 = wyłączone)"
+
+[[message]]
+key = "Share of the server browser name/map split given to the name column (per mille)"
+[message.translations]
+simplified_chinese = "服务器浏览器名称/地图分栏中名称列所占比例（千分比）"
+traditional_chinese = "伺服器瀏覽器名稱/地圖分欄中名稱列所佔比例（千分比）"
+japanese = "サーバーブラウザの名前/マップ分割のうち名前列に割り当てる割合（パーミル）"
+korean = "서버 브라우저 이름/맵 분할에서 이름 열에 할당할 비율 (천분율)"
+russian = "Доля ширины, отданная колонке названия в разбивке название/карта (промилле)"
+german = "Anteil der Name/Karte-Aufteilung im Serverbrowser für die Namensspalte (Promille)"
+spanish = "Proporción del reparto nombre/mapa del navegador de servidores para la columna de nombre (por mil)"
+french = "Part du partage nom/carte du navigateur de serveurs attribuée à la colonne des noms (pour mille)"
+brazilian_portuguese = "Parte da divisão nome/mapa do navegador de servidores dada à coluna de nome (por mil)"
+portuguese = "Parte da divisão nome/mapa do navegador de servidores dada à coluna de nome (por mil)"
+turkish = "Sunucu tarayıcısı isim/harita bölünmesinden isim sütununa ayrılan pay (binde)"
+polish = "Udział podziału nazwa/mapa w przeglądarce serwerów przypadający kolumnie nazw (na tysiąc)"
+
+[[message]]
+key = "Show other players' large emoticons"
+[message.translations]
+simplified_chinese = "显示其他玩家的大表情"
+traditional_chinese = "顯示其他玩家的大表情"
+japanese = "他プレイヤーの大型絵文字を表示"
+korean = "다른 플레이어의 대형 이모티콘 표시"
+russian = "Показывать большие эмоции других игроков"
+german = "Große Emoticons anderer Spieler anzeigen"
+spanish = "Mostrar los emoticonos grandes de otros jugadores"
+french = "Afficher les grandes émoticônes des autres joueurs"
+brazilian_portuguese = "Mostrar emoticons grandes de outros jogadores"
+portuguese = "Mostrar emoticons grandes de outros jogadores"
+turkish = "Diğer oyuncuların büyük emoticonlarını göster"
+polish = "Pokaż duże emotikony innych graczy"
+
+[[message]]
+key = "Show other players' launched emoticons"
+[message.translations]
+simplified_chinese = "显示其他玩家发射的表情"
+traditional_chinese = "顯示其他玩家發射的表情"
+japanese = "他プレイヤーが発射した絵文字を表示"
+korean = "다른 플레이어가 발사한 이모티콘 표시"
+russian = "Показывать запускаемые эмоции других игроков"
+german = "Abgeschossene Emoticons anderer Spieler anzeigen"
+spanish = "Mostrar los emoticonos lanzados por otros jugadores"
+french = "Afficher les émoticônes lancées par les autres joueurs"
+brazilian_portuguese = "Mostrar emoticons lançados por outros jogadores"
+portuguese = "Mostrar emoticons lançados por outros jogadores"
+turkish = "Diğer oyuncuların fırlattığı emoticonları göster"
+polish = "Pokaż emotikony wystrzelone przez innych graczy"
+
+[[message]]
+key = "Toggle emote launcher"
+[message.translations]
+simplified_chinese = "切换表情发射器"
+traditional_chinese = "切換表情發射器"
+japanese = "絵文字ランチャーを切り替え"
+korean = "이모티콘 발사기 전환"
+russian = "Переключить пусковую установку эмоций"
+german = "Emoticon-Abschuss umschalten"
+spanish = "Alternar el lanzador de emoticonos"
+french = "Basculer le lanceur d’émoticônes"
+brazilian_portuguese = "Alternar lançador de emoticons"
+portuguese = "Alternar lançador de emoticons"
+turkish = "Emoticon fırlatıcıyı aç/kapat"
+polish = "Przełącz wyrzutnię emotikon"
+
+[[message]]
+key = "Use large emote"
+[message.translations]
+simplified_chinese = "使用大表情"
+traditional_chinese = "使用大表情"
+japanese = "大型絵文字を使う"
+korean = "대형 이모티콘 사용"
+russian = "Использовать большую эмоцию"
+german = "Großes Emoticon verwenden"
+spanish = "Usar emoticono grande"
+french = "Utiliser une grande émoticône"
+brazilian_portuguese = "Usar emoticon grande"
+portuguese = "Usar emoticon grande"
+turkish = "Büyük emoticon kullan"
+polish = "Użyj dużej emotikony"
+
+[[message]]
+key = "Width of Qm clients column in server browser"
+[message.translations]
+simplified_chinese = "服务器浏览器中 Qm 客户端列宽度"
+traditional_chinese = "伺服器瀏覽器中 Qm 客戶端欄寬度"
+japanese = "サーバーブラウザの Qm クライアント列の幅"
+korean = "서버 브라우저의 Qm 클라이언트 열 너비"
+russian = "Ширина колонки клиентов Qm в браузере серверов"
+german = "Breite der Qm-Client-Spalte im Serverbrowser"
+spanish = "Ancho de la columna de clientes Qm en el navegador de servidores"
+french = "Largeur de la colonne des clients Qm dans le navigateur de serveurs"
+brazilian_portuguese = "Largura da coluna de clientes Qm no navegador de servidores"
+portuguese = "Largura da coluna de clientes Qm no navegador de servidores"
+turkish = "Sunucu tarayıcısındaki Qm istemcileri sütununun genişliği"
+polish = "Szerokość kolumny klientów Qm w przeglądarce serwerów"
+
+[[message]]
+key = "Launch emote key"
+[message.translations]
+simplified_chinese = "发射表情按键"
+traditional_chinese = "發射表情按鍵"
+japanese = "絵文字発射キー"
+korean = "이모티콘 발사 키"
+russian = "Клавиша запуска эмоции"
+german = "Emoticon-Abschuss-Taste"
+spanish = "Tecla de lanzar emoticono"
+french = "Touche de lancer d’émoticône"
+brazilian_portuguese = "Tecla de lançar emoticon"
+portuguese = "Tecla de lançar emoticon"
+turkish = "Emoticon fırlatma tuşu"
+polish = "Klawisz wystrzelenia emotikony"
+
+[[message]]
+key = "Configure Dream-only convenience features"
+[message.translations]
+simplified_chinese = "配置栖梦专属便利功能"
+traditional_chinese = "設定棲夢專屬便利功能"
+japanese = "Qm 専用の便利機能を設定"
+korean = "Qm 전용 편의 기능 설정"
+russian = "Настроить удобные функции Qm"
+german = "Qm-eigene Komfortfunktionen konfigurieren"
+spanish = "Configurar las funciones de comodidad exclusivas de Qm"
+french = "Configurer les fonctions pratiques propres à Qm"
+brazilian_portuguese = "Configurar recursos de conveniência exclusivos do Qm"
+portuguese = "Configurar funcionalidades de conveniência exclusivas do Qm"
+turkish = "Qm’e özel kolaylık özelliklerini yapılandır"
+polish = "Skonfiguruj funkcje ułatwień specyficzne dla Qm"

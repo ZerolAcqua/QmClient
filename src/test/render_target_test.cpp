@@ -2,6 +2,7 @@
 #include <engine/client/backend/vulkan/backend_vulkan.h>
 #include <engine/client/backend_sdl.h>
 #include <engine/client/graphics_threaded.h>
+#include <engine/client/quad_rotation_cache.h>
 
 #include <gtest/gtest.h>
 #include <test/test.h>
@@ -9,6 +10,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <regex>
 #include <type_traits>
 
 namespace
@@ -303,6 +305,53 @@ static_assert(std::is_same_v<decltype(&IGraphics::DualBlurRenderTarget), TDualBl
 static_assert(std::is_same_v<decltype(&IGraphics::CaptureBackbufferToRenderTarget), TCaptureBackbufferToRenderTarget>);
 static_assert(std::is_same_v<decltype(&IGraphics::DrawRenderTarget), TDrawRenderTarget>);
 
+TEST(GraphicsOpenGlCompatibility, ClientArraysDoNotLeakIntoBufferedDraws)
+{
+	const std::string Source = ReadFile("src/engine/client/backend/opengl/backend_opengl.cpp");
+	const std::array<const char *, 4> apSignatures = {
+		"void CCommandProcessorFragment_OpenGL::Cmd_Render(",
+		"void CCommandProcessorFragment_OpenGL::Cmd_RenderTarget_Draw(",
+		"void CCommandProcessorFragment_OpenGL2::Cmd_RenderTex3D(",
+		"bool CCommandProcessorFragment_OpenGL2::DoAnalyzeStep(",
+	};
+	const std::array<const char *, 3> apArrays = {"GL_VERTEX_ARRAY", "GL_TEXTURE_COORD_ARRAY", "GL_COLOR_ARRAY"};
+	const std::regex ArrayCall(R"(gl(EnableClientState|DisableClientState|DrawArrays)\s*\(\s*([A-Z_0-9]+))");
+
+	for(const char *pSignature : apSignatures)
+	{
+		SCOPED_TRACE(pSignature);
+		const std::string Body = ExtractFunctionBody(Source, pSignature);
+		ASSERT_FALSE(Body.empty());
+		std::array<bool, 3> aEnabled{};
+		int DrawCount = 0;
+
+		// 按调用顺序检查状态：本次绘制需要全部数组，后续地图绘制不能继承它们。
+		for(auto Call = std::sregex_iterator(Body.begin(), Body.end(), ArrayCall); Call != std::sregex_iterator(); ++Call)
+		{
+			const std::string Operation = (*Call)[1].str();
+			if(Operation == "DrawArrays")
+			{
+				for(size_t i = 0; i < apArrays.size(); ++i)
+					EXPECT_TRUE(aEnabled[i]) << apArrays[i];
+				++DrawCount;
+			}
+			else
+			{
+				const std::string Array = (*Call)[2].str();
+				for(size_t i = 0; i < apArrays.size(); ++i)
+				{
+					if(Array == apArrays[i])
+						aEnabled[i] = Operation == "EnableClientState";
+				}
+			}
+		}
+
+		ASSERT_GT(DrawCount, 0);
+		for(size_t i = 0; i < apArrays.size(); ++i)
+			EXPECT_FALSE(aEnabled[i]) << apArrays[i];
+	}
+}
+
 TEST(GraphicsRenderTargetGaussianBlur, KernelIsNormalizedAndMonotonic)
 {
 	IGraphics::SGaussianBlurParams Params;
@@ -425,13 +474,15 @@ TEST(GraphicsRenderTarget, RoundedDrawUsesQuadVertexOrderAndRequeuesVertexData)
 		"\t\t\t\t\tvec2(Params.m_X + (1.0f - Ca2) * Rounding, Params.m_Y + (1.0f - Sa2) * Rounding),\n"
 		"\t\t\t\t\tvec2(Params.m_X + (1.0f - Ca3) * Rounding, Params.m_Y + (1.0f - Sa3) * Rounding)";
 	EXPECT_NE(FrontendBody.find(QuadVertexOrder), std::string::npos);
-	EXPECT_NE(FrontendBody.find("Cmd.m_PrimCount = vVertices.size() / 4;"), std::string::npos);
-	EXPECT_NE(FrontendBody.find("const size_t VerticesSize = vVertices.size() * sizeof(CCommandBuffer::SVertex);"), std::string::npos);
+	EXPECT_NE(FrontendBody.find("Cmd.m_PrimCount = NumVertices / 4;"), std::string::npos);
+	EXPECT_NE(FrontendBody.find("const size_t VerticesSize = NumVertices * sizeof(CCommandBuffer::SVertex);"), std::string::npos);
+	EXPECT_EQ(FrontendBody.find("std::vector<"), std::string::npos);
+	EXPECT_NE(FrontendBody.find("CCommandBuffer::SVertex aVertices[MaxVertices];"), std::string::npos);
 
 	const size_t AddCommand = FrontendBody.find("AddCmd(Cmd, [&]");
 	ASSERT_NE(AddCommand, std::string::npos);
 	EXPECT_NE(FrontendBody.find("m_pCommandBuffer->AllocData(VerticesSize)", AddCommand), std::string::npos);
-	EXPECT_NE(FrontendBody.find("mem_copy(Cmd.m_pVertices, vVertices.data(), VerticesSize);", AddCommand), std::string::npos);
+	EXPECT_NE(FrontendBody.find("mem_copy(Cmd.m_pVertices, aVertices, VerticesSize);", AddCommand), std::string::npos);
 }
 
 TEST(GraphicsRenderTarget, ModernBackendsSubmitFourVerticesPerIndexedQuad)
@@ -865,4 +916,34 @@ TEST(GraphicsRenderTarget, VulkanPreviewReadbackDoesNotDependOnSwapchainMsaa)
 	ASSERT_FALSE(CreateBody.empty());
 	EXPECT_EQ(SupportBody.find("!HasMultiSampling()"), std::string::npos);
 	EXPECT_EQ(CreateBody.find("HasMultiSampling() ||"), std::string::npos);
+}
+
+TEST(GraphicsQuadRotation, AngleChangesAndRepeatedDrawsKeepExactDirections)
+{
+	CQmQuadRotationCache Cache;
+	const float Adjacent = std::nextafter(0.75f, 1.0f);
+	for(const float Angle : {0.75f, 0.75f, Adjacent, -0.75f, 8.0f * pi, 0.75f})
+	{
+		const vec2 Direction = Cache.Get(Angle);
+		EXPECT_EQ(Direction.x, std::cos(Angle));
+		EXPECT_EQ(Direction.y, std::sin(Angle));
+	}
+	CQmQuadRotationCache Other;
+	Other.Get(-1.0f);
+	EXPECT_EQ(Cache.Get(0.75f).x, std::cos(0.75f));
+	EXPECT_EQ(Cache.Get(0.75f).y, std::sin(0.75f));
+}
+
+TEST(GraphicsQuadRotation, NonFiniteAnglesDoNotContaminateLaterDraws)
+{
+	CQmQuadRotationCache Cache;
+	for(const float Angle : {std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
+	{
+		const vec2 Invalid = Cache.Get(Angle);
+		EXPECT_TRUE(std::isnan(Invalid.x));
+		EXPECT_TRUE(std::isnan(Invalid.y));
+		const vec2 Valid = Cache.Get(-0.5f);
+		EXPECT_EQ(Valid.x, std::cos(-0.5f));
+		EXPECT_EQ(Valid.y, std::sin(-0.5f));
+	}
 }

@@ -101,8 +101,8 @@ class CScoreboard : public CComponent
 	void RenderTitle(CUIRect TitleLabel, int Team, const char *pTitle, float TitleFontSize);
 	void RenderTitleBar(CUIRect TitleBar, int Team, const char *pTitle);
 	void RenderGoals(CUIRect Goals);
-	void RenderSpectators(CUIRect Spectators);
-	void RenderMediaControls(CUIRect Controls);
+	void RenderFooter(CUIRect Footer);
+	void RenderSpectators(CUIRect Spectators, int NumSpectators);
 	void RenderSoundMuteBar(CUIRect ScoreboardRect);
 	void RenderTeamModeIcons(float x, float y, float IconSize, const SQmScoreboardTeamModeState &State, float Alpha);
 	void UpdateTeamModeCache();

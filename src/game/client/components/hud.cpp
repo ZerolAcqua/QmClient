@@ -26,6 +26,7 @@
 #include <game/client/animstate.h>
 #include <game/client/components/qmclient/demo_display.h>
 #include <game/client/components/qmclient/qm_bind_status_hud.h>
+#include <game/client/components/qmclient/score_hud_layout.h>
 #include <game/client/components/scoreboard.h>
 #include <game/client/gameclient.h>
 #include <game/client/prediction/entities/character.h>
@@ -1657,12 +1658,16 @@ void CHud::RenderScoreHud()
 				char aBuf[16];
 				str_format(aBuf, sizeof(aBuf), "%d.", aPos[t]);
 				if(str_comp(aBuf, m_aScoreInfo[t].m_aRankText) != 0)
+				{
+					m_aScoreInfo[t].m_RankTextWidth = TextRender()->TextWidth(10.0f, aBuf, -1, -1.0f);
 					RecreateRect = true;
+				}
 			}
 
 			static float s_TextWidth10 = TextRender()->TextWidth(14.0f, "10", -1, -1.0f);
 			float ScoreWidthMax = maximum(maximum(m_aScoreInfo[0].m_ScoreTextWidth, m_aScoreInfo[1].m_ScoreTextWidth), s_TextWidth10);
-			float Split = 3.0f, ImageSize = 16.0f, PosSize = 16.0f;
+			float Split = 3.0f;
+			const auto ScoreLayout = QmScoreHudLayout(m_Width, ScoreWidthMax, maximum(m_aScoreInfo[0].m_RankTextWidth, m_aScoreInfo[1].m_RankTextWidth), ScoreSingleBoxHeight);
 
 			for(int t = 0; t < 2; t++)
 			{
@@ -1675,12 +1680,12 @@ void CHud::RenderScoreHud()
 						Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.25f);
 					else
 						Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.25f);
-					m_aScoreInfo[t].m_RoundRectQuadContainerIndex = Graphics()->CreateRectQuadContainer(m_Width - ScoreWidthMax - ImageSize - 2 * Split - PosSize, StartY + t * 20, ScoreWidthMax + ImageSize + 2 * Split + PosSize, ScoreSingleBoxHeight, 5.0f, ScoreHudCorners);
+					m_aScoreInfo[t].m_RoundRectQuadContainerIndex = Graphics()->CreateRectQuadContainer(ScoreLayout.m_BoxLeft, StartY + t * 20, ScoreLayout.m_BoxWidth, ScoreSingleBoxHeight, 5.0f, ScoreHudCorners);
 					m_aScoreInfo[t].m_RoundRectCorners = ScoreHudCorners;
 				}
 				if(m_aScoreInfo[t].m_RoundRectQuadContainerIndex != -1)
 				{
-					Ui()->RenderGaussianBlur({m_Width - ScoreWidthMax - ImageSize - 2 * Split - PosSize, StartY + t * 20, ScoreWidthMax + ImageSize + 2 * Split + PosSize, ScoreSingleBoxHeight}, 1.0f, ScoreHudCorners, 5.0f);
+					Ui()->RenderGaussianBlur({ScoreLayout.m_BoxLeft, StartY + t * 20, ScoreLayout.m_BoxWidth, ScoreSingleBoxHeight}, 1.0f, ScoreHudCorners, 5.0f);
 					Graphics()->TextureClear();
 					Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 					Graphics()->RenderQuadContainer(m_aScoreInfo[t].m_RoundRectQuadContainerIndex, -1);
@@ -1715,7 +1720,7 @@ void CHud::RenderScoreHud()
 							str_copy(m_aScoreInfo[t].m_aPlayerNameText, pName);
 
 							CTextCursor Cursor;
-							Cursor.SetPosition(vec2(minimum(m_Width - TextRender()->TextWidth(8.0f, pName) - 1.0f, m_Width - ScoreWidthMax - ImageSize - 2 * Split - PosSize), StartY + (t + 1) * 20.0f - 2.0f));
+							Cursor.SetPosition(vec2(minimum(m_Width - TextRender()->TextWidth(8.0f, pName) - 1.0f, ScoreLayout.m_BoxLeft), StartY + (t + 1) * 20.0f - 2.0f));
 							Cursor.m_FontSize = 8.0f;
 							TextRender()->RecreateTextContainer(m_aScoreInfo[t].m_OptionalNameTextContainerIndex, &Cursor, pName);
 						}
@@ -1734,7 +1739,7 @@ void CHud::RenderScoreHud()
 						const CAnimState *pIdleState = CAnimState::GetIdle();
 						vec2 OffsetToMid;
 						CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeInfo, OffsetToMid);
-						vec2 TeeRenderPos(m_Width - ScoreWidthMax - TeeInfo.m_Size / 2 - Split, StartY + (t * 20) + ScoreSingleBoxHeight / 2.0f + OffsetToMid.y);
+						vec2 TeeRenderPos(ScoreLayout.m_TeeX, StartY + (t * 20) + ScoreSingleBoxHeight / 2.0f + OffsetToMid.y);
 
 						RenderTools()->RenderTee(pIdleState, &TeeInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
 					}
@@ -1752,7 +1757,7 @@ void CHud::RenderScoreHud()
 					str_copy(m_aScoreInfo[t].m_aRankText, aBuf);
 
 					CTextCursor Cursor;
-					Cursor.SetPosition(vec2(m_Width - ScoreWidthMax - ImageSize - Split - PosSize, StartY + t * 20 + (18.f - 10.f) / 2.f));
+					Cursor.SetPosition(vec2(ScoreLayout.m_RankX, StartY + t * 20 + (18.f - 10.f) / 2.f));
 					Cursor.m_FontSize = 10.0f;
 					TextRender()->RecreateTextContainer(m_aScoreInfo[t].m_TextRankContainerIndex, &Cursor, aBuf);
 				}

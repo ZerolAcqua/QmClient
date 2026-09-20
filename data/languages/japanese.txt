@@ -205,9 +205,6 @@
 3 stars
 == 3 つ星
 
-3D Background
-== 3D 背景
-
 3D background
 == 3D 背景
 
@@ -730,24 +727,6 @@ API key
 
 Appearance
 == 外観
-
-Appearance / Chat
-== 外観 / チャット
-
-Appearance / Hook Collision
-== 外観/フック補助線
-
-Appearance / HUD
-== 外観 / HUD
-
-Appearance / Info Messages
-== 外観 / 情報メッセージ
-
-Appearance / Laser
-== 外観 / レーザー
-
-Appearance / Name Plate
-== 外観 / ネームプレート
 
 Append to log file instead of overwriting
 == 上書きではなくログファイルに追記
@@ -1526,9 +1505,6 @@ Call vote
 Camera
 == カメラ
 
-Camera & FOV
-== カメラと FOV
-
 Camera drift intensity (0-200)
 == カメラドリフト強度 (0-200)
 
@@ -1654,9 +1630,6 @@ Chat Binds
 
 Chat box width
 == チャットボックスの幅
-
-Chat Bubble
-== チャットバブル
 
 Chat bubble
 == チャットバブル
@@ -2103,7 +2076,7 @@ Configure display and rendering
 == 表示とレンダリングを設定
 
 Configure Dream-only convenience features
-== Configure Dream-only convenience features
+== Qm 専用の便利機能を設定
 
 Configure game and client preferences
 == ゲームとクライアントの設定を構成
@@ -2153,8 +2126,8 @@ Configure QmClient HUD elements
 Configure remaining DDNet client preferences
 == Configure remaining DDNet client preferences
 
-Configure skin downloads, prefix, and default eyes
-== スキンのダウンロード、プレフィックス、既定の目を設定
+Configure skin colors, eyes, and filters
+== Configure skin colors, eyes, and filters
 
 Configure sound and audio packs
 == サウンドとオーディオパックを設定
@@ -2747,9 +2720,6 @@ Default output open failed
 Default preset
 == デフォルトプリセット
 
-Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)
-== リスポーン後にデフォルトでリクエストする武器（0=オフ、1=ハンマー、2=ピストル、3=ショットガン、4=グレネードランチャー、5=レーザー）
-
 Default zoom
 == デフォルトのズーム
 
@@ -3155,9 +3125,6 @@ Draw where mouse is
 Draw!
 == 引き分け！
 
-Dream Features
-== ドリーム機能
-
 Drift direction
 == ドリフト方向
 
@@ -3284,9 +3251,6 @@ Dummy skin queue max length
 Dummy skin queue switch interval (ms)
 == ダミースキンキュー切り替え間隔 (ms)
 
-Dummy Window
-== ダミーウィンドウ
-
 Dummy window size
 == ダミーウィンドウサイズ
 
@@ -3337,9 +3301,6 @@ Dynamic FOV smoothness
 
 Dynamic FOV smoothness (0=instant, 100=smoothest)
 == 動的視野の滑らかさ（0=瞬時、100=最も滑らか）
-
-Dynamic Island
-== ダイナミックアイランド
 
 Dynamic island
 == ダイナミックアイランド
@@ -3866,9 +3827,6 @@ Entity assets
 Entity Background Image
 == エンティティ背景画像
 
-Entity Layer Colors
-== エンティティレイヤーの色
-
 Entity overlay
 == エンティティオーバーレイ
 
@@ -4376,9 +4334,6 @@ Friend note
 Friend notification refresh interval (sec)
 == フレンド通知の更新間隔（秒）
 
-Friend Notifications
-== フレンド通知
-
 Friend notify
 == フレンド通知
 
@@ -4553,9 +4508,6 @@ Gives you infinite jump
 Glitch
 == グリッチ
 
-Global card
-== グローバルカード
-
 Global card ordering (format: stableId|tab|col|order; semicolon-separated)
 == グローバルカードソート（形式 stableId|tab|col|order; セミコロン区切り）
 
@@ -4606,9 +4558,6 @@ Go forward the specified duration
 
 Gores
 == ゴア
-
-Gores Actor
-== Gores アクター専用
 
 Gores actor
 == ゴアアクター
@@ -4672,9 +4621,6 @@ GUI cursor assets
 
 Guide line color
 == ガイドラインの色
-
-Gun
-== ピストル
 
 Hammer
 == ハンマー
@@ -4805,9 +4751,6 @@ Highlighted message
 Highlighted message color
 == ハイライトされたメッセージの色
 
-Hitbox mode
-== ヒットボックスモード
-
 Hitbox Mode Freeze Border Color
 == 衝突ボックスモード Freeze 境界色
 
@@ -4825,9 +4768,6 @@ Hitbox Mode Tee Collision Color
 
 Hitbox Mode Weapon Interaction Color
 == 衝突ボックスモード武器インタラクション色
-
-HJ Assist
-== HJ アシスト
 
 HJ assist
 == HJ アシスト
@@ -4946,9 +4886,6 @@ HUD editor layout
 HUD editor preview
 == HUD エディタープレビュー
 
-HUD island appearance settings
-== HUD アイランド表示設定
-
 HUD notifications
 == HUD 通知
 
@@ -4963,9 +4900,6 @@ Hue speed
 
 i = Receive rate
 == i = 受信レート
-
-I am a robot
-== 私はロボットです
 
 I am away from the game window
 == ゲームウィンドウから離れています
@@ -5140,9 +5074,6 @@ Input device open failed, try reconnecting headset/mic or reselecting input devi
 
 Input overlay
 == 入力オーバーレイ
-
-Input overlay display
-== 入力オーバーレイ表示
 
 Input overlay keyboard scale (percent)
 == 入力オーバーレイのキーボード倍率（パーセント）
@@ -5345,9 +5276,6 @@ Keep unsent message on chat close
 Keep vote window open after voting
 == 投票後も投票ウィンドウを開いたままにする
 
-Key Bindings
-== キーバインディング
-
 Key binds
 == キーバインド
 
@@ -5374,9 +5302,6 @@ Keyboard focus ring color
 
 Keyboard size
 == キーボードサイズ
-
-Keyword Reply
-== キーワード返信
 
 Keyword reply
 == キーワード返信
@@ -5453,11 +5378,8 @@ Language
 Language file to use
 == 使用する言語ファイル
 
-Large emoticons and launch mode
-== Large emoticons and launch mode
-
 Large emoticons and launched emoticons
-== Large emoticons and launched emoticons
+== 大型絵文字と発射絵文字
 
 Large text announcement for friend joining
 == フレンド参加時の大きなテキスト通知
@@ -5512,6 +5434,12 @@ Latency Jitter
 
 Launch count threshold for the next sponsor reminder
 == 次のスポンサー通知までの起動回数しきい値
+
+Launch emote
+== 絵文字を発射
+
+Launch emote key
+== 絵文字発射キー
 
 Layout
 == レイアウト
@@ -5762,6 +5690,9 @@ Local Time
 Local-only
 == ローカルのみ
 
+Locate
+== 位置へ移動
+
 Lock delay
 == ロック遅延
 
@@ -5794,9 +5725,6 @@ Low to high
 
 Lyrics
 == 歌詞
-
-Lyrics sources and display
-== 歌詞のソースと表示
 
 Main Asset
 == メインアセット
@@ -6115,6 +6043,9 @@ Menu option - normal
 
 Menu option - selected
 == メニューオプション - 選択中
+
+Merge consecutive identical echo messages within this window in milliseconds (0 disables merging)
+== この時間枠（ミリ秒）内の連続する同一 Echo メッセージを統合（0 で無効）
 
 Merge consecutive identical player messages within 2 seconds
 == 2 秒以内に連続した同一プレイヤーの同じメッセージを統合
@@ -6854,9 +6785,6 @@ Notification hold time
 Notification text size
 == 通知のテキストサイズ
 
-Notifications
-== 通知
-
 Notify when friends come online
 == フレンドがオンラインになったら通知
 
@@ -6946,9 +6874,6 @@ Only show when the other Tee is not on screen
 
 Only show with this nickname
 == このニックネーム使用時のみ表示
-
-Only what you can't imagine, nothing Dream can't do
-== 想像できないことだけが、Dreamにできないことです
 
 Opacity
 == 不透明度
@@ -7298,9 +7223,6 @@ Pick result: %s
 Pickup range
 == ピックアップ範囲
 
-Pie Menu
-== パイメニュー
-
 Pie menu
 == パイメニュー
 
@@ -7372,9 +7294,6 @@ Player country filter in server browser (ISO 3166-1 numeric)
 
 Player country:
 == プレイヤーの国：
-
-Player data
-== プレイヤーデータ
 
 Player decoration color
 == プレイヤーのデコレーションカラー
@@ -7691,8 +7610,8 @@ Preview import file
 Preview laser bodies, outlines, and impacts
 == Preview laser bodies, outlines, and impacts
 
-Preview player and dummy appearance and colors
-== 本体とダミーの外見と色をプレビュー
+Preview player and dummy appearance
+== Preview player and dummy appearance
 
 Preview player and dummy nameplates
 == Preview player and dummy nameplates
@@ -7867,15 +7786,6 @@ qm_profile_queue: index must be between 1 and %d
 
 QmClient
 == QmClient
-
-QmClient / Function
-== QmClient / 機能
-
-QmClient / HUD
-== QmClient / HUD
-
-QmClient / Visual
-== QmClient / ビジュアル
 
 QmClient chat log
 == QmClient チャットログ
@@ -8501,9 +8411,6 @@ Resource preview VRAM budget override (MB, 0=auto)
 Resource preview VRAM budget percentage (based on device local VRAM budget)
 == リソースプレビューのVRAM予算パーセント（デバイスのローカルVRAM予算に基づく）
 
-Respawn default weapon (when owned)
-== リスポーン時のデフォルト武器（所持時のみ）
-
 Restart
 == 再起動
 
@@ -8867,20 +8774,26 @@ Search
 Search and navigate settings
 == 設定を検索して移動
 
-Search and pick skins and manage the skin queue
-== スキンを検索して選択し、スキンローテーションキューを管理
-
 Search donor asset
 == ドナーアセットを検索
 
 Search main asset
 == メインアセットを検索
 
+Search maps and downloadedmaps, including subfolders
+== maps と downloadedmaps のサブフォルダーも検索
+
 Search settings by title, feature, or keyword
 == Search settings by title, feature, or keyword
 
+Search skins and manage the skin queue
+== Search skins and manage the skin queue
+
 Searching
 == 検索中
+
+Searching all map folders...
+== すべてのマップフォルダーを検索中…
 
 Sec-WebSocket-Protocol sent during the realtime handshake
 == リアルタイムハンドシェイクで送信する Sec-WebSocket-Protocol
@@ -9203,6 +9116,9 @@ Severe
 Shape
 == 形状
 
+Share of the server browser name/map split given to the name column (per mille)
+== サーバーブラウザの名前/マップ分割のうち名前列に割り当てる割合（パーミル）
+
 Shimmer speed (polished)
 == 光の走査速度（光沢）
 
@@ -9349,9 +9265,6 @@ Show compact vote HUD
 
 Show configurable outlines around map tiles
 == Show configurable outlines around map tiles
-
-Show Coordinates
-== 座標を表示
 
 Show coordinates above players
 == プレイヤーの上に座標を表示
@@ -9535,9 +9448,6 @@ Show important messages when rendering video
 
 Show important server prompts
 == 重要なサーバープロンプトを表示
-
-Show important server prompts and Echo messages as popups
-== 重要なサーバープロンプトと Echo メッセージをポップアップ表示
 
 Show important server prompts as notifications
 == 重要なサーバープロンプトを通知として表示
@@ -9762,10 +9672,10 @@ Show other players' hook collision lines when rendering video
 == 動画レンダリング時に他のプレイヤーのフック衝突線を表示
 
 Show other players' large emoticons
-== Show other players' large emoticons
+== 他プレイヤーの大型絵文字を表示
 
 Show other players' launched emoticons
-== Show other players' launched emoticons
+== 他プレイヤーが発射した絵文字を表示
 
 Show other team players (2=own team only)
 == 他のチームのプレイヤーを表示（2 = 自チームのみ）
@@ -10232,9 +10142,6 @@ Skin switch animation range: 0=Self, 1=Local+Dummy, 2=All players
 Skin switch animation type (0=Ghost pop, 1=Soft fade, 2=Slide left, 3=Rotate pop, 4=Light dark switch, 5=Glitch shake, 6=Elastic scale)
 == スキン切り替えアニメーションタイプ (0=残像ポップ, 1=ソフトフェード, 2=左スライド, 3=回転ポップ, 4=明暗切り替え, 5=グリッチシェイク, 6=弾性スケール)
 
-Skin transition
-== スキン遷移
-
 Skin transition animation
 == スキン切り替えアニメーション
 
@@ -10309,9 +10216,6 @@ Smooth zoom animation time in editor (in ms, 0=off)
 
 Smoothness of multi-view zoom (in ms, higher = slower)
 == マルチビューズームのスムーズさ（ms、高いほど遅い）
-
-SMTC
-== システムメディアコントロール
 
 Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
 == 揺れのオフセットを整数ピクセルに合わせる（字形は鮮明、動きはぎこちない）
@@ -10631,9 +10535,6 @@ Stop server
 Stop the current demo
 == 現在のデモを停止
 
-Streamer Mode
-== ストリーマーモード
-
 Streamer mode
 == ストリーマーモード
 
@@ -10787,9 +10688,6 @@ System
 System default
 == システムデフォルト
 
-System media control
-== システムメディアコントロール
-
 System media controls
 == システムメディアコントロール
 
@@ -10826,14 +10724,11 @@ Target language code (e.g. zh, en, ja, zh-TW)
 Target language ratio
 == ターゲット言語比率
 
+Target server: %s
+== 送信先サーバー：%s
+
 TClient
 == TClient
-
-TClient / Bind Wheel
-== TClient / バインドホイール
-
-TClient / Status Bar
-== TClient / ステータスバー
 
 TClient Developers
 == TClient 開発者
@@ -11391,7 +11286,7 @@ Toggle dyncam
 == ダイナミックカメラ切り替え
 
 Toggle emote launcher
-== Toggle emote launcher
+== 絵文字ランチャーを切り替え
 
 Toggle fast practice mode
 == 高速練習モードを切り替え
@@ -11521,9 +11416,6 @@ Trail width
 
 Translate
 == 翻訳
-
-Translate button
-== 翻訳ボタン
 
 Translate ID:
 == 翻訳 ID：
@@ -11973,7 +11865,7 @@ Use k key to kill (restart), q to pause and watch other players. See settings fo
 == K キーで自殺（再スタート）、Q キーで一時停止して他のプレイヤーを観戦します。他のキーバインドは設定で確認してください。
 
 Use large emote
-== Use large emote
+== 大型絵文字を使う
 
 Use mouse sensitivity when dynamic camera is on
 == 動的カメラオン時にマウス感度を使用
@@ -12389,9 +12281,6 @@ Weapon switch easing
 Weapon switch rotation
 == 武器切り替え回転
 
-Weapon Trajectory
-== 武器軌道
-
 Weapon trajectory
 == 武器軌跡
 
@@ -12418,9 +12307,6 @@ Welcome to DDNet
 
 What level DDRace binding is set to (automatic, you don't need to use it).
 == DDRace バインディングが設定されているレベル（自動設定のため、使用する必要はありません）。
-
-What's done is done, no use saying more
-== 済んだことは仕方ない、言っても無駄だ
 
 Wheel animate
 == ホイールアニメーション
@@ -12530,14 +12416,14 @@ Width of friends column in server browser
 Width of latency column in server browser
 == サーバーブラウザのレイテンシ列の幅
 
-Width of map column in server browser
-== サーバーブラウザのマップ列の幅
-
 Width of others' hook collision line
 == 他のプレイヤーのフック衝突線の幅
 
 Width of players column in server browser
 == サーバーブラウザのプレイヤー列の幅
+
+Width of Qm clients column in server browser
+== サーバーブラウザの Qm クライアント列の幅
 
 Width of type column in server browser
 == サーバーブラウザのタイプ列の幅
@@ -12922,15 +12808,6 @@ Zoom to current mouse target
 
 ⚠️ Tencent Cloud API not configured
 == ⚠️ テンセントクラウド API が設定されていません
-
-发射表情按键
-== 发射表情按键
-
-显示他人发射表情
-== 显示他人发射表情
-
-显示他人大表情
-== 显示他人大表情
 
 [Assets editor blend mode]
 Color

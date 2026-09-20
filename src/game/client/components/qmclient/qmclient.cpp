@@ -50,6 +50,7 @@
 #include <queue>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -930,23 +931,10 @@ void CQmClient::LoadQmNewsCache()
 
 void CQmClient::SaveQmNewsCache()
 {
-	CJsonStringWriter Writer;
-	Writer.BeginObject();
-	Writer.WriteAttribute("cache_version");
-	Writer.WriteIntValue(QMCLIENT_NEWS_CACHE_VERSION);
-	Writer.WriteAttribute("version");
-	Writer.WriteIntValue(m_QmNewsVersion);
-	Writer.WriteAttribute("markdown");
-	Writer.WriteStrValue(m_QmNewsMarkdown.c_str());
-	Writer.EndObject();
-	const std::string Output = Writer.GetOutputString();
-	// IStorage 没有整文件写接口，统一走 OpenFile + io_write；缓存目录与其它 qmclient 凭证一致。
-	Storage()->CreateFolder("qmclient", IStorage::TYPE_SAVE);
-	IOHANDLE File = Storage()->OpenFile(QMCLIENT_NEWS_CACHE_FILE, IOFLAG_WRITE, IStorage::TYPE_SAVE);
-	if(!File)
-		return;
-	io_write(File, Output.c_str(), Output.size());
-	io_close(File);
+	char aPath[IO_MAX_PATH_LENGTH];
+	Storage()->GetCompletePath(IStorage::TYPE_SAVE, QMCLIENT_NEWS_CACHE_FILE, aPath, sizeof(aPath));
+	if(auto pJob = m_QmNewsCacheWriter.Enqueue(aPath, QMCLIENT_NEWS_CACHE_VERSION, m_QmNewsVersion, m_QmNewsMarkdown))
+		Engine()->AddJob(pJob);
 }
 
 void CQmClient::ApplyQmNewsPayload(const char *pBody, size_t BodySize)
@@ -1071,22 +1059,10 @@ void CQmClient::InitQmSponsors()
 
 void CQmClient::SaveQmSponsorsCache()
 {
-	CJsonStringWriter Writer;
-	Writer.BeginObject();
-	Writer.WriteAttribute("cache_version");
-	Writer.WriteIntValue(QMCLIENT_NEWS_CACHE_VERSION);
-	Writer.WriteAttribute("version");
-	Writer.WriteIntValue(m_QmSponsorsVersion);
-	Writer.WriteAttribute("markdown");
-	Writer.WriteStrValue(m_QmSponsorsMarkdown.c_str());
-	Writer.EndObject();
-	const std::string Output = Writer.GetOutputString();
-	Storage()->CreateFolder("qmclient", IStorage::TYPE_SAVE);
-	IOHANDLE File = Storage()->OpenFile(QMCLIENT_SPONSORS_CACHE_FILE, IOFLAG_WRITE, IStorage::TYPE_SAVE);
-	if(!File)
-		return;
-	io_write(File, Output.c_str(), Output.size());
-	io_close(File);
+	char aPath[IO_MAX_PATH_LENGTH];
+	Storage()->GetCompletePath(IStorage::TYPE_SAVE, QMCLIENT_SPONSORS_CACHE_FILE, aPath, sizeof(aPath));
+	if(auto pJob = m_QmSponsorsCacheWriter.Enqueue(aPath, QMCLIENT_NEWS_CACHE_VERSION, m_QmSponsorsVersion, m_QmSponsorsMarkdown))
+		Engine()->AddJob(pJob);
 }
 
 bool CQmClient::ApplyQmSponsorsPayload(const json_value *pPayload, bool SaveCache)
@@ -1508,6 +1484,7 @@ void CQmClient::FinishQmClientUsers()
 		if(!m_QmClientDistributionSuccessLatched)
 			LogQmClientDistributionEvent("parse_ok", Result.m_OnlineUserCount, Result.m_OnlineDummyCount, (int)Result.m_vLocalServerMarks.size());
 		m_QmClientDistributionSuccessLatched = true;
+		PushQmClientServerCounts();
 		for(const auto &Mark : Result.m_vLocalServerMarks)
 		{
 			for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
@@ -1523,6 +1500,23 @@ void CQmClient::FinishQmClientUsers()
 		}
 		return;
 	}
+}
+
+void CQmClient::PushQmClientServerCounts()
+{
+	IServerBrowser *pServerBrowser = ServerBrowser();
+	if(pServerBrowser == nullptr)
+		return;
+	// 与「梦」列显示同一份快照：只推有梦客户端的服务器，其余按 0 处理。
+	std::unordered_map<std::string, int> Counts;
+	Counts.reserve(m_QmClientDistribution.m_vServers.size());
+	for(const SQmClientServerDistribution &Distribution : m_QmClientDistribution.m_vServers)
+	{
+		const int Count = Distribution.m_UserCount + Distribution.m_DummyCount;
+		if(Count > 0 && !Distribution.m_ServerAddress.empty())
+			Counts.emplace(Distribution.m_ServerAddress, Count);
+	}
+	pServerBrowser->SetQmClientServerCounts(Counts);
 }
 
 void CQmClient::UpdateQmClientRecognition()

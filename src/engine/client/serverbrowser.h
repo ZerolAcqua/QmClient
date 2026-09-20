@@ -14,6 +14,8 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <string>
+#include <unordered_map>
 
 typedef struct _json_value json_value;
 class CNetClient;
@@ -262,6 +264,7 @@ public:
 	int LoadingProgression() const override;
 	void RequestResort() { m_NeedResort = true; }
 
+	uint64_t FriendListRevision() const override { return m_FriendListRevision; }
 	int NumServers() const override { return m_vpServerlist.size(); }
 	const CServerInfo *Get(int Index) const override;
 	int NumHttpServers() const override;
@@ -271,6 +274,7 @@ public:
 	int NumSortedServers() const override { return m_vSortedServerlist.size(); }
 	int NumSortedPlayers() const override { return m_NumSortedPlayers; }
 	const CServerInfo *SortedGet(int Index) const override;
+	void SetQmClientServerCounts(const std::unordered_map<std::string, int> &Counts) override;
 
 	const json_value *LoadDDNetInfo();
 	void LoadDDNetInfoJson();
@@ -365,6 +369,7 @@ private:
 	int m_NumRequests;
 
 	bool m_NeedResort;
+	uint64_t m_FriendListRevision = 0;
 	int m_Sorthash;
 
 	// used instead of g_Config.br_max_requests to get more servers
@@ -380,6 +385,11 @@ private:
 	static int GetBasicToken(int Token);
 	static int GetExtraToken(int Token);
 
+	// 最近一次由游戏层推送的在线梦客户端分布，排序前物化到 CServerInfo。
+	std::unordered_map<std::string, int> m_QmClientServerCounts;
+	int QmClientCountForServer(const CServerInfo &Info) const;
+	void UpdateQmClientServerCounts();
+
 	// sorting criteria
 	bool SortCompareName(int Index1, int Index2) const;
 	bool SortCompareMap(int Index1, int Index2) const;
@@ -390,6 +400,7 @@ private:
 	bool SortCompareNumFriends(int Index1, int Index2) const;
 	bool SortCompareNumPlayersAndPing(int Index1, int Index2) const;
 	bool SortCompareFavoritesNumPlayersAndPing(int Index1, int Index2) const;
+	bool SortCompareQmClients(int Index1, int Index2) const;
 
 	//
 	void Filter();
@@ -422,7 +433,7 @@ private:
 	bool ValidateCountryName(const char *pCountryName) const;
 	bool ValidateTypeName(const char *pTypeName) const;
 
-	void SetInfo(CServerEntry *pEntry, const CServerInfo &Info) const;
+	void SetInfo(CServerEntry *pEntry, const CServerInfo &Info);
 	void SetLatency(NETADDR Addr, int Latency);
 
 	static bool ParseCommunityFinishes(CCommunity *pCommunity, const json_value &Finishes);

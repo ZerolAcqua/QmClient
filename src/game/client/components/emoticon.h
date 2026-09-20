@@ -36,11 +36,11 @@ namespace QmEmoticon
 		return SuperLaunch ? EEffect::SUPER_HEAD : EEffect::NONE;
 	}
 
-	inline EEffect ConsumeEffect(int Emoticon, bool LaunchMode, bool &SuperPending)
+	inline EEffect ConsumeEffect(int Emoticon, bool LaunchMode, bool &SuperPending, bool ForceLaunch = false)
 	{
 		const bool SuperLaunch = SuperPending;
 		SuperPending = false;
-		return ResolveEffect(Emoticon, LaunchMode, SuperLaunch);
+		return ResolveEffect(Emoticon, LaunchMode || ForceLaunch, SuperLaunch);
 	}
 
 	inline EEffect ResolveRemoteEffect(int Emoticon, bool LaunchMode, bool SuperLaunch, bool ShowEmotes, bool EmoticonIgnored, bool ShowSuper, bool ShowLaunch)
@@ -113,7 +113,6 @@ class CEmoticon : public CComponent
 	int m_aRemoteSuperHeadExpireTicks[MAX_CLIENTS] = {};
 
 	static void ConKeyEmoticon(IConsole::IResult *pResult, void *pUserData);
-	static void ConEmote(IConsole::IResult *pResult, void *pUserData);
 	static void ConLocalBlink(IConsole::IResult *pResult, void *pUserData);
 	static void ConSuperEmote(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleLaunchMode(IConsole::IResult *pResult, void *pUserData);
@@ -121,7 +120,7 @@ class CEmoticon : public CComponent
 	void UpdateSelection();
 	void SetActive(bool Active);
 	void RenderProjectiles();
-	void SpawnProjectile(vec2 Pos, vec2 Dir, int Emoticon, bool Super);
+	void SpawnProjectile(vec2 Pos, vec2 Dir, int Emoticon, bool Super, int OwnerClientId);
 	QmEmoticon::CAlphaMask m_aCollisionMasks[NUM_EMOTICONS];
 
 public:
@@ -146,7 +145,7 @@ public:
 	bool OnCursorMove(float x, float y, IInput::ECursorType CursorType) override;
 	bool OnInput(const IInput::CEvent &Event) override;
 
-	void Emote(int Emoticon);
+	void Emote(int Emoticon, bool ForceLaunch = false);
 	void SuperEmote(int Emoticon);
 	void EyeEmote(int EyeEmote);
 	void TriggerLocalBlink();

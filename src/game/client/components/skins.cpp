@@ -25,6 +25,7 @@
 #include <game/client/components/qmclient/qm_chat_avatar.h>
 #include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/components/qmclient/settings_resource_preview.h>
+#include <game/client/components/qmclient/skin_load_budget.h>
 #include <game/client/components/settings_runtime_cache.h>
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
@@ -680,6 +681,16 @@ CSkins::CSkinContainer::EState CSkins::CSkinContainer::DetermineInitialState() c
 void CSkins::CSkinContainer::SetState(EState State, ESettingsResourcePriority Priority)
 {
 	const EState OldState = m_State;
+	if(OldState != EState::LOADING && State == EState::LOADING)
+		++m_pSkins->m_NumLoadingSkins;
+	else if(OldState == EState::LOADING && State != EState::LOADING)
+	{
+		--m_pSkins->m_NumLoadingSkins;
+		if(m_pSkins->m_pSkinPreviewUpload == this)
+			m_pSkins->m_pSkinPreviewUpload = nullptr;
+	}
+	if(ShouldDiscardPendingUpload(OldState, State))
+		m_pSkins->DiscardSkinPreviewUpload(this);
 	m_State = State;
 	m_pSkins->m_UnresolvedSkinScanState.OnStateChange(OldState, State);
 	if(State != OldState)
@@ -894,6 +905,7 @@ int CSkins::SkinScan(const char *pName, int IsDir, int StorageType, void *pUser)
 
 bool CSkins::PrepareSkinData(const char *pName, CSkinLoadData &Data)
 {
+	Data.m_pPreparedTextures.reset();
 	const SSkinSpriteSpec Body{
 		g_pData->m_aSprites[SPRITE_TEE_BODY].m_pSet->m_Gridx,
 		g_pData->m_aSprites[SPRITE_TEE_BODY].m_pSet->m_Gridy,
@@ -1019,50 +1031,42 @@ bool CSkins::PrepareSkinData(const char *pName, CSkinLoadData &Data)
 		}
 	}
 
-	return true;
+	// 像素复制和轮廓遮罩缩放随解码任务完成，主线程仅接管结果。
+	Data.m_PreparedVisuals = QmPrepareSkinVisuals(Data.m_Info, Data.m_InfoGrayscale, g_pData->m_aSprites);
+	Data.m_pPreparedTextures = QmPrepareSkinTextures(Data.m_Info, Data.m_InfoGrayscale, g_pData->m_aSprites);
+	Data.m_SourceWidth = Data.m_Info.m_Width;
+	Data.m_SourceHeight = Data.m_Info.m_Height;
+	// 裁切后不在待上传队列同时保留整张原图；尺寸单独用于现有统计。
+	Data.m_Info.Free();
+	Data.m_InfoGrayscale.Free();
+	return Data.m_pPreparedTextures != nullptr;
 }
 
-static std::shared_ptr<const QmChatAvatar::SSource> CreateChatAvatarSource(const CImageInfo &Image)
-{
-	auto pSource = std::make_shared<QmChatAvatar::SSource>();
-	constexpr int s_aSprites[] = {SPRITE_TEE_BODY, SPRITE_TEE_BODY_OUTLINE, SPRITE_TEE_FOOT, SPRITE_TEE_FOOT_OUTLINE, SPRITE_TEE_EYE_NORMAL};
-	for(size_t Index = 0; Index < std::size(s_aSprites); ++Index)
-		pSource->m_aSprites[Index] = QmChatAvatar::CopySprite(Image, g_pData->m_aSprites[s_aSprites[Index]]);
-	return pSource;
-}
-
-void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData &Data)
+void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, CSkinLoadData &Data)
 {
 	const std::chrono::nanoseconds UploadStart = time_get_nanoseconds();
 	CSkin Skin{pSkinContainer->Name()};
 
-	Skin.m_OriginalSkin.m_Body = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_BODY]);
-	Skin.m_OriginalSkin.m_BodyOutline = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]);
-	Skin.m_OriginalSkin.m_Feet = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_FOOT]);
-	Skin.m_OriginalSkin.m_FeetOutline = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]);
-	Skin.m_OriginalSkin.m_Hands = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_HAND]);
-	Skin.m_OriginalSkin.m_HandsOutline = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]);
-	for(size_t i = 0; i < std::size(Skin.m_OriginalSkin.m_aEyes); ++i)
-	{
-		Skin.m_OriginalSkin.m_aEyes[i] = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + i]);
-	}
+	const auto UploadVariant = [&](CSkin::CSkinTextures &Textures, size_t Variant) {
+		size_t Index = 0;
+		const auto Upload = [&]() {
+			const CDataSprite &Sprite = g_pData->m_aSprites[CQmPreparedSkinTextures::SpriteId(Index)];
+			return Graphics()->LoadTextureRawMove(Data.m_pPreparedTextures->Image(Variant, Index++), 0, Sprite.m_pName);
+		};
+		Textures.m_Body = Upload();
+		Textures.m_BodyOutline = Upload();
+		Textures.m_Feet = Upload();
+		Textures.m_FeetOutline = Upload();
+		Textures.m_Hands = Upload();
+		Textures.m_HandsOutline = Upload();
+		for(auto &Eye : Textures.m_aEyes)
+			Eye = Upload();
+	};
+	UploadVariant(Skin.m_OriginalSkin, 0);
+	UploadVariant(Skin.m_ColorableSkin, 1);
 
-	Skin.m_ColorableSkin.m_Body = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_BODY]);
-	Skin.m_ColorableSkin.m_BodyOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]);
-	Skin.m_ColorableSkin.m_Feet = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_FOOT]);
-	Skin.m_ColorableSkin.m_FeetOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]);
-	Skin.m_ColorableSkin.m_Hands = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_HAND]);
-	Skin.m_ColorableSkin.m_HandsOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]);
-	for(size_t i = 0; i < std::size(Skin.m_ColorableSkin.m_aEyes); ++i)
-	{
-		Skin.m_ColorableSkin.m_aEyes[i] = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + i]);
-	}
-
-	Skin.m_OriginalSkin.m_pChatAvatar = CreateChatAvatarSource(Data.m_Info);
-	Skin.m_ColorableSkin.m_pChatAvatar = CreateChatAvatarSource(Data.m_InfoGrayscale);
+	Data.m_PreparedVisuals.Apply(Skin);
 	Skin.m_Metrics = Data.m_Metrics;
-	Skin.m_OriginalSkin.m_pBodyOutline = QmCreateSkinOutline(Data.m_Info, g_pData->m_aSprites[SPRITE_TEE_BODY], g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE], vec2(64, 64));
-	Skin.m_OriginalSkin.m_pFeetOutline = QmCreateSkinOutline(Data.m_Info, g_pData->m_aSprites[SPRITE_TEE_FOOT], g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE], vec2(64, 32));
 	Skin.m_BloodColor = Data.m_BloodColor;
 
 	if(g_Config.m_Debug)
@@ -1073,10 +1077,10 @@ void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData 
 	auto SkinIt = m_Skins.find(pSkinContainer->Name());
 	dbg_assert(SkinIt != m_Skins.end(), "LoadSkinFinish on skin '%s' which is not in m_Skins", pSkinContainer->Name());
 	const bool BackgroundTracked = SkinIt->second->IsBackgroundTracked();
-	SkinIt->second->m_SettingsSourceApproxBytes = SettingsSkinSourceBytesEstimate((int)Data.m_Info.m_Width, (int)Data.m_Info.m_Height, 2);
+	SkinIt->second->m_SettingsSourceApproxBytes = SettingsSkinSourceBytesEstimate((int)Data.m_SourceWidth, (int)Data.m_SourceHeight, 2);
 	SkinIt->second->m_pSkin = std::make_unique<CSkin>(std::move(Skin));
 	pSkinContainer->SetState(CSkinContainer::EState::LOADED, BackgroundTracked ? ESettingsResourcePriority::BACKGROUND : ESettingsResourcePriority::VISIBLE);
-	LogSettingsSkinSourceStageEvent("upload_done", pSkinContainer->Name(), Data.m_Info.m_Width, Data.m_Info.m_Height, (int)SkinIt->second->m_SettingsSourceApproxBytes, std::chrono::duration<double, std::milli>(time_get_nanoseconds() - UploadStart).count(), SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS);
+	LogSettingsSkinSourceStageEvent("upload_done", pSkinContainer->Name(), Data.m_SourceWidth, Data.m_SourceHeight, (int)SkinIt->second->m_SettingsSourceApproxBytes, std::chrono::duration<double, std::milli>(time_get_nanoseconds() - UploadStart).count(), SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS);
 }
 
 bool CSkins::BeginSkinPreviewUpload(CSkinContainer *pSkinContainer, CSkinLoadData &&Data)
@@ -1086,16 +1090,31 @@ bool CSkins::BeginSkinPreviewUpload(CSkinContainer *pSkinContainer, CSkinLoadDat
 	pSkinContainer->m_SettingsPendingUploadData = std::move(Data);
 	pSkinContainer->m_SettingsPendingUploadSprite = 0;
 	pSkinContainer->m_SettingsPendingUploadStart = time_get_nanoseconds();
-	if(pSkinContainer->m_pSkin == nullptr)
-		pSkinContainer->m_pSkin = std::make_unique<CSkin>(pSkinContainer->Name());
+	m_pSkinPreviewUpload = pSkinContainer;
+	if(pSkinContainer->m_pPendingSkin == nullptr)
+		pSkinContainer->m_pPendingSkin = std::make_unique<CSkin>(pSkinContainer->Name());
 	return true;
 }
 
-static bool LoadSkinSpriteTexture(IGraphics *pGraphics, IGraphics::CTextureHandle *pTargetTexture, const CImageInfo &SourceImage, const CDataSprite *pSprite)
+void CSkins::DiscardSkinPreviewUpload(CSkinContainer *pSkinContainer)
+{
+	// 分步上传尚未发布，取消时回收部分纹理和剩余 CPU 数据，重试从新任务开始。
+	if(pSkinContainer->m_pPendingSkin != nullptr)
+	{
+		pSkinContainer->m_pPendingSkin->m_OriginalSkin.Unload(Graphics());
+		pSkinContainer->m_pPendingSkin->m_ColorableSkin.Unload(Graphics());
+		pSkinContainer->m_pPendingSkin.reset();
+	}
+	pSkinContainer->m_SettingsPendingUploadData = {};
+	pSkinContainer->m_SettingsPendingUploadSprite = 0;
+	pSkinContainer->m_SettingsPendingUploadStart = {};
+}
+
+static bool LoadSkinSpriteTexture(IGraphics *pGraphics, IGraphics::CTextureHandle *pTargetTexture, CImageInfo &SourceImage, const CDataSprite *pSprite)
 {
 	if(pGraphics == nullptr || pTargetTexture == nullptr)
 		return false;
-	IGraphics::CTextureHandle Texture = pGraphics->LoadSpriteTexture(SourceImage, pSprite);
+	IGraphics::CTextureHandle Texture = pGraphics->LoadTextureRawMove(SourceImage, 0, pSprite->m_pName);
 	if(!Texture.IsValid())
 		return false;
 	if(pTargetTexture->IsValid())
@@ -1106,108 +1125,108 @@ static bool LoadSkinSpriteTexture(IGraphics *pGraphics, IGraphics::CTextureHandl
 
 bool CSkins::UploadNextSkinPreviewSprite(CSkinContainer *pSkinContainer, SResourcePreviewUploadBudget &Budget)
 {
-	if(pSkinContainer == nullptr || pSkinContainer->m_pSkin == nullptr)
+	if(pSkinContainer == nullptr || pSkinContainer->m_pPendingSkin == nullptr)
 		return false;
 	(void)Budget;
 
-	const CSkinLoadData &Data = pSkinContainer->m_SettingsPendingUploadData;
-	CSkin &Skin = *pSkinContainer->m_pSkin;
+	CSkinLoadData &Data = pSkinContainer->m_SettingsPendingUploadData;
+	CSkin &Skin = *pSkinContainer->m_pPendingSkin;
 	switch(pSkinContainer->m_SettingsPendingUploadSprite)
 	{
 	case 0:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_Body, Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_BODY]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_Body, Data.m_pPreparedTextures->Image(0, 0), &g_pData->m_aSprites[SPRITE_TEE_BODY]))
 			break;
 		return false;
 	case 1:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_BodyOutline, Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_BodyOutline, Data.m_pPreparedTextures->Image(0, 1), &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]))
 			break;
 		return false;
 	case 2:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_Feet, Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_FOOT]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_Feet, Data.m_pPreparedTextures->Image(0, 2), &g_pData->m_aSprites[SPRITE_TEE_FOOT]))
 			break;
 		return false;
 	case 3:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_FeetOutline, Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_FeetOutline, Data.m_pPreparedTextures->Image(0, 3), &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]))
 			break;
 		return false;
 	case 4:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_Hands, Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_HAND]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_Hands, Data.m_pPreparedTextures->Image(0, 4), &g_pData->m_aSprites[SPRITE_TEE_HAND]))
 			break;
 		return false;
 	case 5:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_HandsOutline, Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_HandsOutline, Data.m_pPreparedTextures->Image(0, 5), &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]))
 			break;
 		return false;
 	case 6:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[0], Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 0]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[0], Data.m_pPreparedTextures->Image(0, 6), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 0]))
 			break;
 		return false;
 	case 7:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[1], Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 1]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[1], Data.m_pPreparedTextures->Image(0, 7), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 1]))
 			break;
 		return false;
 	case 8:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[2], Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 2]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[2], Data.m_pPreparedTextures->Image(0, 8), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 2]))
 			break;
 		return false;
 	case 9:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[3], Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 3]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[3], Data.m_pPreparedTextures->Image(0, 9), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 3]))
 			break;
 		return false;
 	case 10:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[4], Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 4]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[4], Data.m_pPreparedTextures->Image(0, 10), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 4]))
 			break;
 		return false;
 	case 11:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[5], Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 5]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_OriginalSkin.m_aEyes[5], Data.m_pPreparedTextures->Image(0, 11), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 5]))
 			break;
 		return false;
 	case 12:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_Body, Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_BODY]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_Body, Data.m_pPreparedTextures->Image(1, 0), &g_pData->m_aSprites[SPRITE_TEE_BODY]))
 			break;
 		return false;
 	case 13:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_BodyOutline, Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_BodyOutline, Data.m_pPreparedTextures->Image(1, 1), &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]))
 			break;
 		return false;
 	case 14:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_Feet, Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_FOOT]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_Feet, Data.m_pPreparedTextures->Image(1, 2), &g_pData->m_aSprites[SPRITE_TEE_FOOT]))
 			break;
 		return false;
 	case 15:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_FeetOutline, Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_FeetOutline, Data.m_pPreparedTextures->Image(1, 3), &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]))
 			break;
 		return false;
 	case 16:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_Hands, Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_HAND]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_Hands, Data.m_pPreparedTextures->Image(1, 4), &g_pData->m_aSprites[SPRITE_TEE_HAND]))
 			break;
 		return false;
 	case 17:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_HandsOutline, Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_HandsOutline, Data.m_pPreparedTextures->Image(1, 5), &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]))
 			break;
 		return false;
 	case 18:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[0], Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 0]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[0], Data.m_pPreparedTextures->Image(1, 6), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 0]))
 			break;
 		return false;
 	case 19:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[1], Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 1]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[1], Data.m_pPreparedTextures->Image(1, 7), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 1]))
 			break;
 		return false;
 	case 20:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[2], Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 2]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[2], Data.m_pPreparedTextures->Image(1, 8), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 2]))
 			break;
 		return false;
 	case 21:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[3], Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 3]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[3], Data.m_pPreparedTextures->Image(1, 9), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 3]))
 			break;
 		return false;
 	case 22:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[4], Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 4]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[4], Data.m_pPreparedTextures->Image(1, 10), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 4]))
 			break;
 		return false;
 	case 23:
-		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[5], Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 5]))
+		if(LoadSkinSpriteTexture(Graphics(), &Skin.m_ColorableSkin.m_aEyes[5], Data.m_pPreparedTextures->Image(1, 11), &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + 5]))
 			break;
 		return false;
 	default:
@@ -1224,18 +1243,22 @@ void CSkins::FinishSkinPreviewUpload(CSkinContainer *pSkinContainer)
 	auto SkinIt = m_Skins.find(pSkinContainer->Name());
 	dbg_assert(SkinIt != m_Skins.end(), "FinishSkinPreviewUpload on skin '%s' which is not in m_Skins", pSkinContainer->Name());
 	const bool BackgroundTracked = SkinIt->second->IsBackgroundTracked();
-	pSkinContainer->m_pSkin->m_Metrics = pSkinContainer->m_SettingsPendingUploadData.m_Metrics;
-	pSkinContainer->m_pSkin->m_OriginalSkin.m_pChatAvatar = CreateChatAvatarSource(pSkinContainer->m_SettingsPendingUploadData.m_Info);
-	pSkinContainer->m_pSkin->m_ColorableSkin.m_pChatAvatar = CreateChatAvatarSource(pSkinContainer->m_SettingsPendingUploadData.m_InfoGrayscale);
-	const CImageInfo &OutlineSource = pSkinContainer->m_SettingsPendingUploadData.m_Info;
-	pSkinContainer->m_pSkin->m_OriginalSkin.m_pBodyOutline = QmCreateSkinOutline(OutlineSource, g_pData->m_aSprites[SPRITE_TEE_BODY], g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE], vec2(64, 64));
-	pSkinContainer->m_pSkin->m_OriginalSkin.m_pFeetOutline = QmCreateSkinOutline(OutlineSource, g_pData->m_aSprites[SPRITE_TEE_FOOT], g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE], vec2(64, 32));
-	pSkinContainer->m_pSkin->m_BloodColor = pSkinContainer->m_SettingsPendingUploadData.m_BloodColor;
-	SkinIt->second->m_SettingsSourceApproxBytes = SettingsSkinSourceBytesEstimate((int)pSkinContainer->m_SettingsPendingUploadData.m_Info.m_Width, (int)pSkinContainer->m_SettingsPendingUploadData.m_Info.m_Height, 2);
+	pSkinContainer->m_pPendingSkin->m_Metrics = pSkinContainer->m_SettingsPendingUploadData.m_Metrics;
+	pSkinContainer->m_SettingsPendingUploadData.m_PreparedVisuals.Apply(*pSkinContainer->m_pPendingSkin);
+	pSkinContainer->m_pPendingSkin->m_BloodColor = pSkinContainer->m_SettingsPendingUploadData.m_BloodColor;
+	SkinIt->second->m_SettingsSourceApproxBytes = SettingsSkinSourceBytesEstimate((int)pSkinContainer->m_SettingsPendingUploadData.m_SourceWidth, (int)pSkinContainer->m_SettingsPendingUploadData.m_SourceHeight, 2);
+	// 完整皮肤才对外可见；旧皮肤的引用由完成后的 OnSkinUpdate 同步刷新。
+	if(pSkinContainer->m_pSkin != nullptr)
+	{
+		pSkinContainer->m_pSkin->m_OriginalSkin.Unload(Graphics());
+		pSkinContainer->m_pSkin->m_ColorableSkin.Unload(Graphics());
+	}
+	pSkinContainer->m_pSkin = std::move(pSkinContainer->m_pPendingSkin);
 	pSkinContainer->SetState(CSkinContainer::EState::LOADED, BackgroundTracked ? ESettingsResourcePriority::BACKGROUND : ESettingsResourcePriority::VISIBLE);
-	LogSettingsSkinSourceStageEvent("upload_done", pSkinContainer->Name(), pSkinContainer->m_SettingsPendingUploadData.m_Info.m_Width, pSkinContainer->m_SettingsPendingUploadData.m_Info.m_Height, (int)SkinIt->second->m_SettingsSourceApproxBytes, std::chrono::duration<double, std::milli>(time_get_nanoseconds() - pSkinContainer->m_SettingsPendingUploadStart).count(), SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS);
+	LogSettingsSkinSourceStageEvent("upload_done", pSkinContainer->Name(), pSkinContainer->m_SettingsPendingUploadData.m_SourceWidth, pSkinContainer->m_SettingsPendingUploadData.m_SourceHeight, (int)SkinIt->second->m_SettingsSourceApproxBytes, std::chrono::duration<double, std::milli>(time_get_nanoseconds() - pSkinContainer->m_SettingsPendingUploadStart).count(), SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS);
 	pSkinContainer->m_SettingsPendingUploadData.m_Info.Free();
 	pSkinContainer->m_SettingsPendingUploadData.m_InfoGrayscale.Free();
+	pSkinContainer->m_SettingsPendingUploadData.m_pPreparedTextures.reset();
 	pSkinContainer->m_SettingsPendingUploadSprite = 0;
 	++m_SettingsSourceUploadsCompleted;
 }
@@ -1316,6 +1339,9 @@ void CSkins::OnShutdown()
 			pSkinContainer->m_pLoadJob->Abort();
 		}
 	}
+	m_pSkinPreviewUpload = nullptr;
+	m_NumLoadingSkins = 0;
+	m_SkinUploadFrameBudget.Reset();
 	m_Skins.clear();
 	m_UnresolvedSkinScanState = {};
 }
@@ -1330,9 +1356,18 @@ void CSkins::OnUpdate()
 
 	m_vSkinsUnresolvedThisFrame.clear();
 
+	// 续传不等待容器维护周期，也不逐帧遍历全部皮肤；统计只需当前在途数量。
+	if(m_pSkinPreviewUpload != nullptr)
+	{
+		CSkinLoadingStats Stats;
+		Stats.m_NumLoading = m_NumLoadingSkins;
+		int SkinsProcessedThisFrame = 0;
+		DrainSettingsSkinPreviewUpload(m_pSkinPreviewUpload, Stats, SkinsProcessedThisFrame, Now, 1ms);
+	}
+
 	// Only update skins periodically to reduce FPS impact
-	const std::chrono::nanoseconds MaxTime = std::chrono::milliseconds(std::clamp(round_to_int(Client()->RenderFrameTime() * 50000.0f), 25, 500));
-	if(m_ContainerUpdateTime.has_value() && Now - m_ContainerUpdateTime.value() < MaxTime)
+	const std::chrono::nanoseconds UpdateInterval = std::chrono::milliseconds(std::clamp(round_to_int(Client()->RenderFrameTime() * 50000.0f), 25, 500));
+	if(m_ContainerUpdateTime.has_value() && Now - m_ContainerUpdateTime.value() < UpdateInterval)
 	{
 		return;
 	}
@@ -1352,7 +1387,8 @@ void CSkins::OnUpdate()
 	ProcessSkinDirectoryScanJob();
 	UpdateUnloadSkins(Stats);
 	UpdateStartLoading(Stats);
-	UpdateFinishLoading(Stats, Now, MaxTime);
+	// 检查间隔不是主线程预算，避免一次集中处理占用 25–500 ms。
+	UpdateFinishLoading(Stats, time_get_nanoseconds(), 1ms);
 	ProcessSkinListPlanJob();
 	CollectUnresolvedSkins();
 
@@ -1372,11 +1408,17 @@ void CSkins::OnUpdate()
 	m_vSkinsTexturesUnloadedThisFrame.clear();
 }
 
+void CSkins::OnRender()
+{
+	m_SkinUploadFrameBudget.Reset();
+}
+
 void CSkins::UpdateForSettingsWarmup()
 {
 	// Startup warmup pumps skin jobs in a tight loop; bypass the normal frame-rate
 	// throttle so the blocking preload actually advances before the menu appears.
 	m_ContainerUpdateTime.reset();
+	m_SkinUploadFrameBudget.Reset();
 	OnUpdate();
 }
 
@@ -2169,7 +2211,11 @@ CSkins::ESkinProcessResult CSkins::ProcessSkinContainer(CSkinContainer *pSkinCon
 		return ESkinProcessResult::CONTINUE;
 	}
 
-	if(pSkinContainer->m_pLoadJob->State() == IJob::STATE_DONE && pSkinContainer->m_pLoadJob->m_Data.m_Info.m_pData)
+	if(!QmSkinCanFinalize(SkinsProcessedThisFrame, time_get_nanoseconds() - StartTime, MaxTime))
+		return ESkinProcessResult::BREAK_TIME_EXCEEDED;
+
+	if(pSkinContainer->m_pLoadJob->State() == IJob::STATE_DONE &&
+		(pSkinContainer->m_pLoadJob->m_Data.m_pPreparedTextures || pSkinContainer->m_SettingsPendingUploadData.m_pPreparedTextures))
 		return DrainSettingsSkinPreviewUpload(pSkinContainer, Stats, SkinsProcessedThisFrame, StartTime, MaxTime);
 	else
 	{
@@ -2201,8 +2247,10 @@ CSkins::ESkinProcessResult CSkins::DrainSettingsSkinPreviewUpload(CSkinContainer
 	int &SkinsProcessedThisFrame, std::chrono::nanoseconds StartTime,
 	std::chrono::nanoseconds MaxTime)
 {
+	if(!m_SkinUploadFrameBudget.TryConsume())
+		return ESkinProcessResult::BREAK_UPLOAD;
 	const int MaxSkinsPerFrame = SettingsSkinMaxPerFrame(GameClient());
-	if(!GameClient()->GpuUploadLimiter()->CanUpload(SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS))
+	if(!GameClient()->GpuUploadLimiter()->CanUpload(1))
 	{
 		LogSettingsSkinSourceWaitEvent(pSkinContainer->Name(), "gpu_upload_budget",
 			GameClient()->GpuUploadLimiter()->RemainingUploads(),
@@ -2210,31 +2258,52 @@ CSkins::ESkinProcessResult CSkins::DrainSettingsSkinPreviewUpload(CSkinContainer
 		LogSkinSettingsResourcePerf("upload", 0, MaxSkinsPerFrame, Stats.m_NumLoading, ESettingsWarmupMissReason::GPU_UPLOAD_BUDGET, 0.0);
 		return ESkinProcessResult::BREAK_GPU_LIMIT;
 	}
-	SSettingsResourceMergeBudget UploadBudget;
-	UploadBudget.m_MaxGpuUploads = 1;
-	if(!SettingsResourceConsumeGpuUpload(UploadBudget, SettingsFrameBudgetOrNull(GameClient())))
+	if(!pSkinContainer->m_SettingsPendingUploadData.m_pPreparedTextures)
 	{
-		LogSettingsSkinSourceWaitEvent(pSkinContainer->Name(), "max_per_frame",
-			GameClient()->GpuUploadLimiter()->RemainingUploads(),
-			GameClient()->GpuUploadLimiter()->MaxUploadsPerFrame());
-		LogSkinSettingsResourcePerf("upload", 0, MaxSkinsPerFrame, Stats.m_NumLoading, SettingsResourceMissReason(UploadBudget.m_StopReason), 0.0);
-		return ESkinProcessResult::BREAK_GPU_LIMIT;
+		SSettingsResourceMergeBudget UploadBudget;
+		UploadBudget.m_MaxGpuUploads = 1;
+		if(!SettingsResourceConsumeGpuUpload(UploadBudget, SettingsFrameBudgetOrNull(GameClient())))
+		{
+			LogSettingsSkinSourceWaitEvent(pSkinContainer->Name(), "max_per_frame",
+				GameClient()->GpuUploadLimiter()->RemainingUploads(),
+				GameClient()->GpuUploadLimiter()->MaxUploadsPerFrame());
+			LogSkinSettingsResourcePerf("upload", 0, MaxSkinsPerFrame, Stats.m_NumLoading, SettingsResourceMissReason(UploadBudget.m_StopReason), 0.0);
+			return ESkinProcessResult::BREAK_GPU_LIMIT;
+		}
+		if(!BeginSkinPreviewUpload(pSkinContainer, std::move(pSkinContainer->m_pLoadJob->m_Data)))
+			return ESkinProcessResult::BREAK_UPLOAD;
 	}
+
 	SResourcePreviewUploadBudget SkinPreviewUploadBudget;
-	SkinPreviewUploadBudget.m_MaxUploads = GameClient()->GpuUploadLimiter()->RemainingUploads();
+	SkinPreviewUploadBudget.m_MaxUploads = 1;
 	SkinPreviewUploadBudget.m_pGpuUploadLimiter = GameClient()->GpuUploadLimiter();
-	if(!SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS))
+	if(!SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget))
 	{
 		LogSettingsSkinSourceStageEvent("preview_uploads", pSkinContainer->Name(), 0, 0, 0, 0.0, 0);
 		return ESkinProcessResult::BREAK_GPU_LIMIT;
 	}
-	LogSettingsSkinSourceStageEvent("preview_uploads", pSkinContainer->Name(), 0, 0, 0, 0.0, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS);
+	const bool Uploaded = UploadNextSkinPreviewSprite(pSkinContainer, SkinPreviewUploadBudget);
+	if(!Uploaded)
+	{
+		pSkinContainer->m_pLoadJob = nullptr;
+		pSkinContainer->SetState(CSkinContainer::EState::ERROR);
+		Stats.m_NumLoading--;
+		SkinsProcessedThisFrame++;
+		Stats.m_NumError++;
+		return ESkinProcessResult::BREAK_UPLOAD;
+	}
+	SettingsResourcePreviewCommitUploadBudget(SkinPreviewUploadBudget);
+	LogSettingsSkinSourceStageEvent("preview_uploads", pSkinContainer->Name(),
+		(int)pSkinContainer->m_SettingsPendingUploadData.m_SourceWidth,
+		(int)pSkinContainer->m_SettingsPendingUploadData.m_SourceHeight, 0, 0.0, 1);
+
+	// 每个皮肤每帧只推进一张纹理，避免把 4K 皮肤的 24 次 GPU 上传集中到同一帧。
+	if(pSkinContainer->m_SettingsPendingUploadSprite < SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)
+		return ESkinProcessResult::BREAK_UPLOAD;
 
 	Stats.m_NumLoading--;
 	SkinsProcessedThisFrame++;
-	LoadSkinFinish(pSkinContainer, pSkinContainer->m_pLoadJob->m_Data);
-	SettingsResourcePreviewCommitUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS);
-	++m_SettingsSourceUploadsCompleted;
+	FinishSkinPreviewUpload(pSkinContainer);
 	GameClient()->OnSkinUpdate(pSkinContainer->Name());
 	pSkinContainer->m_pLoadJob = nullptr;
 	Stats.m_NumLoaded++;
@@ -2298,7 +2367,7 @@ void CSkins::UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseco
 		}
 
 		ESkinProcessResult Result = ProcessSkinContainer(It->second.get(), Stats, SkinsProcessedThisFrame, StartTime, MaxTime);
-		if(Result == ESkinProcessResult::BREAK_GPU_LIMIT || Result == ESkinProcessResult::BREAK_TIME_EXCEEDED)
+		if(Result == ESkinProcessResult::BREAK_GPU_LIMIT || Result == ESkinProcessResult::BREAK_TIME_EXCEEDED || Result == ESkinProcessResult::BREAK_UPLOAD)
 		{
 			return;
 		}
@@ -2344,7 +2413,7 @@ void CSkins::UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseco
 		}
 
 		ESkinProcessResult Result = ProcessSkinContainer(It->second.get(), Stats, SkinsProcessedThisFrame, StartTime, MaxTime);
-		if(Result == ESkinProcessResult::BREAK_GPU_LIMIT || Result == ESkinProcessResult::BREAK_TIME_EXCEEDED)
+		if(Result == ESkinProcessResult::BREAK_GPU_LIMIT || Result == ESkinProcessResult::BREAK_TIME_EXCEEDED || Result == ESkinProcessResult::BREAK_UPLOAD)
 		{
 			return;
 		}
@@ -2370,7 +2439,7 @@ void CSkins::UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseco
 		}
 
 		ESkinProcessResult Result = ProcessSkinContainer(pSkinContainer.get(), Stats, SkinsProcessedThisFrame, StartTime, MaxTime);
-		if(Result == ESkinProcessResult::BREAK_GPU_LIMIT || Result == ESkinProcessResult::BREAK_TIME_EXCEEDED)
+		if(Result == ESkinProcessResult::BREAK_GPU_LIMIT || Result == ESkinProcessResult::BREAK_TIME_EXCEEDED || Result == ESkinProcessResult::BREAK_UPLOAD)
 		{
 			break;
 		}
@@ -3542,7 +3611,7 @@ void CSkins::CSkinLoadJob::Run()
 	}
 	if(PrepareSkinData(m_aName, m_Data))
 	{
-		LogSettingsSkinSourceStageEvent("decode_done", m_aName, m_Data.m_Info.m_Width, m_Data.m_Info.m_Height, (int)FileSize, std::chrono::duration<double, std::milli>(time_get_nanoseconds() - DecodeStart).count());
+		LogSettingsSkinSourceStageEvent("decode_done", m_aName, m_Data.m_SourceWidth, m_Data.m_SourceHeight, (int)FileSize, std::chrono::duration<double, std::milli>(time_get_nanoseconds() - DecodeStart).count());
 	}
 }
 
@@ -3625,7 +3694,7 @@ void CSkins::CSkinDownloadJob::Run()
 	}
 	if(pGet->StatusCode() == 304) // 304 Not Modified
 	{
-		bool Success = m_Data.m_Info.m_pData != nullptr;
+		bool Success = m_Data.m_pPreparedTextures != nullptr;
 		pGet->OnValidation(Success);
 		if(Success)
 		{
@@ -3661,6 +3730,7 @@ void CSkins::CSkinDownloadJob::Run()
 	size_t ResultSize;
 	pGet->Result(&pResult, &ResultSize);
 
+	m_Data.m_pPreparedTextures.reset();
 	m_Data.m_Info.Free();
 	m_Data.m_InfoGrayscale.Free();
 	const bool Success = CImageLoader::LoadPng(pResult, ResultSize, aUrl, m_Data.m_Info);

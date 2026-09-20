@@ -25,6 +25,8 @@
 #include <generated/protocolglue.h>
 
 #include <game/client/components/qmclient/qm_hook_coll_candidates.h>
+#include <game/client/components/qmclient/qm_hook_coll_spatial_index.h>
+#include <game/client/components/qmclient/snapshot_entities.h>
 #include <game/client/prediction/gameworld.h>
 #include <game/client/race.h>
 #include <game/collision.h>
@@ -181,13 +183,6 @@ public:
 	bool m_DDRaceTeam;
 	bool m_PredictEvents;
 	char m_aGameType[16];
-};
-
-class CSnapEntities
-{
-public:
-	IClient::CSnapItem m_Item;
-	const CNetObj_EntityEx *m_pDataEx;
 };
 
 enum class EClientIdFormat
@@ -1019,6 +1014,7 @@ public:
 	};
 	SHookCollTarget m_aHookCollTargets[MAX_CLIENTS] = {};
 	CQmHookCollCandidates m_HookCollCandidates;
+	CQmHookCollSpatialIndex m_HookCollSpatialIndex;
 	void UpdateHookCollTargets();
 
 	int IntersectCharacter(vec2 HookPos, vec2 NewPos, vec2 &NewPos2, int OwnId, vec2 *pPlayerPosition = nullptr);
@@ -1294,6 +1290,7 @@ public:
 
 private:
 	std::vector<CSnapEntities> m_vSnapEntities;
+	std::vector<CSnapEntities> m_vSnapEntityExtensionsScratch;
 	void SnapCollectEntities();
 	int GetFastInputPredictionAmountMs();
 	int GetFastInputPredictionTicks();

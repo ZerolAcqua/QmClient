@@ -205,9 +205,6 @@
 3 stars
 == 3 звезды
 
-3D Background
-== 3D-фон
-
 3D background
 == 3D фон
 
@@ -730,24 +727,6 @@ API key
 
 Appearance
 == Внешний вид
-
-Appearance / Chat
-== Внешний вид / Чат
-
-Appearance / Hook Collision
-== Внешний вид / Вспомогательные линии крюка
-
-Appearance / HUD
-== Внешний вид / HUD
-
-Appearance / Info Messages
-== Внешний вид / Информационные сообщения
-
-Appearance / Laser
-== Внешний вид / Лазер
-
-Appearance / Name Plate
-== Внешний вид / Табличка с именем
 
 Append to log file instead of overwriting
 == Добавлять в файл журнала вместо перезаписи
@@ -1526,9 +1505,6 @@ Call vote
 Camera
 == Камера
 
-Camera & FOV
-== Камера и FOV
-
 Camera drift intensity (0-200)
 == Интенсивность дрейфа камеры (0-200)
 
@@ -1654,9 +1630,6 @@ Chat Binds
 
 Chat box width
 == Ширина окна чата
-
-Chat Bubble
-== Пузырёк чата
 
 Chat bubble
 == Пузырь чата
@@ -2103,7 +2076,7 @@ Configure display and rendering
 == Настроить экран и рендеринг
 
 Configure Dream-only convenience features
-== Configure Dream-only convenience features
+== Настроить удобные функции Qm
 
 Configure game and client preferences
 == Настроить параметры игры и клиента
@@ -2153,8 +2126,8 @@ Configure QmClient HUD elements
 Configure remaining DDNet client preferences
 == Configure remaining DDNet client preferences
 
-Configure skin downloads, prefix, and default eyes
-== Настройка загрузки скинов, префикса и глаз по умолчанию
+Configure skin colors, eyes, and filters
+== Configure skin colors, eyes, and filters
 
 Configure sound and audio packs
 == Настроить звук и аудиопакеты
@@ -2747,9 +2720,6 @@ Default output open failed
 Default preset
 == Пресет по умолчанию
 
-Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)
-== Оружие для автоматического переключения после возрождения (0=выкл, 1=молот, 2=пистолет, 3=дробовик, 4=гранатомёт, 5=лазер)
-
 Default zoom
 == Масштаб по умолчанию
 
@@ -3155,9 +3125,6 @@ Draw where mouse is
 Draw!
 == Ничья!
 
-Dream Features
-== Мечтательные функции
-
 Drift direction
 == Направление дрейфа
 
@@ -3284,9 +3251,6 @@ Dummy skin queue max length
 Dummy skin queue switch interval (ms)
 == Интервал переключения очереди скинов Дами (ms)
 
-Dummy Window
-== Окно Дами
-
 Dummy window size
 == Размер окна Дами
 
@@ -3337,9 +3301,6 @@ Dynamic FOV smoothness
 
 Dynamic FOV smoothness (0=instant, 100=smoothest)
 == Плавность динамического обзора (0 = мгновенно, 100 = максимально плавно)
-
-Dynamic Island
-== Динамический остров
 
 Dynamic island
 == Динамический остров
@@ -3866,9 +3827,6 @@ Entity assets
 Entity Background Image
 == Фоновое изображение сущностей
 
-Entity Layer Colors
-== Цвета слоёв объектов
-
 Entity overlay
 == Наложение сущностей
 
@@ -4376,9 +4334,6 @@ Friend note
 Friend notification refresh interval (sec)
 == Интервал обновления уведомлений друга (сек)
 
-Friend Notifications
-== Уведомления друга
-
 Friend notify
 == Уведомление о друзьях
 
@@ -4553,9 +4508,6 @@ Gives you infinite jump
 Glitch
 == Глитч
 
-Global card
-== Глобальная карточка
-
 Global card ordering (format: stableId|tab|col|order; semicolon-separated)
 == Глобальная сортировка карточек (формат stableId|tab|col|order; разделитель точка с запятой)
 
@@ -4607,11 +4559,8 @@ Go forward the specified duration
 Gores
 == Горы
 
-Gores Actor
-== Актёр Gores
-
 Gores actor
-== Горы актёр
+== Актёр Gores
 
 Gores auto weapon switch
 == Автосмена оружия Gores
@@ -4672,9 +4621,6 @@ GUI cursor assets
 
 Guide line color
 == Цвет направляющей линии
-
-Gun
-== Пистолет
 
 Hammer
 == Молот
@@ -4805,9 +4751,6 @@ Highlighted message
 Highlighted message color
 == Цвет выделенного сообщения
 
-Hitbox mode
-== Режим хитбоксов
-
 Hitbox Mode Freeze Border Color
 == Цвет границ Freeze в режиме хитбоксов
 
@@ -4825,9 +4768,6 @@ Hitbox Mode Tee Collision Color
 
 Hitbox Mode Weapon Interaction Color
 == Цвет взаимодействия с оружием в режиме хитбоксов
-
-HJ Assist
-== Помощь HJ
 
 HJ assist
 == Помощь HJ
@@ -4946,9 +4886,6 @@ HUD editor layout
 HUD editor preview
 == Предпросмотр редактора HUD
 
-HUD island appearance settings
-== Настройки внешнего вида островков HUD
-
 HUD notifications
 == Уведомления HUD
 
@@ -4963,9 +4900,6 @@ Hue speed
 
 i = Receive rate
 == i = Скорость приёма
-
-I am a robot
-== Я робот
 
 I am away from the game window
 == Я отошёл от окна игры
@@ -5140,9 +5074,6 @@ Input device open failed, try reconnecting headset/mic or reselecting input devi
 
 Input overlay
 == Наложение ввода
-
-Input overlay display
-== Отображение наложения ввода
 
 Input overlay keyboard scale (percent)
 == Масштаб клавиатуры в оверлее ввода (проценты)
@@ -5345,9 +5276,6 @@ Keep unsent message on chat close
 Keep vote window open after voting
 == Оставлять окно голосования открытым после голосования
 
-Key Bindings
-== Привязки клавиш
-
 Key binds
 == Привязки клавиш
 
@@ -5374,9 +5302,6 @@ Keyboard focus ring color
 
 Keyboard size
 == Размер клавиатуры
-
-Keyword Reply
-== Ответ по ключевым словам
 
 Keyword reply
 == Ответ по ключевому слову
@@ -5453,11 +5378,8 @@ Language
 Language file to use
 == Используемый языковой файл
 
-Large emoticons and launch mode
-== Large emoticons and launch mode
-
 Large emoticons and launched emoticons
-== Large emoticons and launched emoticons
+== Большие и запускаемые эмоции
 
 Large text announcement for friend joining
 == Крупнотекстовое объявление о входе друга
@@ -5512,6 +5434,12 @@ Latency Jitter
 
 Launch count threshold for the next sponsor reminder
 == Порог числа запусков до следующего напоминания
+
+Launch emote
+== Запустить эмоцию
+
+Launch emote key
+== Клавиша запуска эмоции
 
 Layout
 == Раскладка
@@ -5762,6 +5690,9 @@ Local Time
 Local-only
 == Только локально
 
+Locate
+== Перейти
+
 Lock delay
 == Задержка блокировки
 
@@ -5794,9 +5725,6 @@ Low to high
 
 Lyrics
 == Текст песни
-
-Lyrics sources and display
-== Источники текста и отображение
 
 Main Asset
 == Основной ресурс
@@ -6115,6 +6043,9 @@ Menu option - normal
 
 Menu option - selected
 == Пункт меню - выбранный
+
+Merge consecutive identical echo messages within this window in milliseconds (0 disables merging)
+== Объединять подряд идущие одинаковые сообщения Echo в этом окне (мс, 0 = не объединять)
 
 Merge consecutive identical player messages within 2 seconds
 == Объединять последовательные одинаковые сообщения игрока в течение 2 секунд
@@ -6854,9 +6785,6 @@ Notification hold time
 Notification text size
 == Размер текста уведомления
 
-Notifications
-== Уведомления
-
 Notify when friends come online
 == Уведомлять, когда друзья заходят в игру
 
@@ -6946,9 +6874,6 @@ Only show when the other Tee is not on screen
 
 Only show with this nickname
 == Показывать только с этим ником
-
-Only what you can't imagine, nothing Dream can't do
-== Только то, что вы не можете себе представить, нет ничего, что Dream не может сделать
 
 Opacity
 == Прозрачность
@@ -7298,9 +7223,6 @@ Pick result: %s
 Pickup range
 == Диапазон подбора
 
-Pie Menu
-== Пи-меню
-
 Pie menu
 == Круговое меню
 
@@ -7372,9 +7294,6 @@ Player country filter in server browser (ISO 3166-1 numeric)
 
 Player country:
 == Страна игрока:
-
-Player data
-== Данные игрока
 
 Player decoration color
 == Цвет украшения игрока
@@ -7691,8 +7610,8 @@ Preview import file
 Preview laser bodies, outlines, and impacts
 == Preview laser bodies, outlines, and impacts
 
-Preview player and dummy appearance and colors
-== Предпросмотр внешнего вида и цветов игрока и дубликата
+Preview player and dummy appearance
+== Preview player and dummy appearance
 
 Preview player and dummy nameplates
 == Preview player and dummy nameplates
@@ -7867,15 +7786,6 @@ qm_profile_queue: index must be between 1 and %d
 
 QmClient
 == QmClient
-
-QmClient / Function
-== QmClient / Функция
-
-QmClient / HUD
-== QmClient / HUD
-
-QmClient / Visual
-== QmClient / Визуальные
 
 QmClient chat log
 == Лог чата QmClient
@@ -8501,9 +8411,6 @@ Resource preview VRAM budget override (MB, 0=auto)
 Resource preview VRAM budget percentage (based on device local VRAM budget)
 == Бюджет видеопамяти для предпросмотра ресурсов (в процентах от локального бюджета устройства)
 
-Respawn default weapon (when owned)
-== Оружие по умолчанию после возрождения (если есть)
-
 Restart
 == Перезапустить
 
@@ -8867,20 +8774,26 @@ Search
 Search and navigate settings
 == Поиск и переход к настройкам
 
-Search and pick skins and manage the skin queue
-== Поиск и выбор скинов, а также управление очередью ротации
-
 Search donor asset
 == Поиск ресурса донора
 
 Search main asset
 == Поиск основного ресурса
 
+Search maps and downloadedmaps, including subfolders
+== Поиск в maps и downloadedmaps, включая подпапки
+
 Search settings by title, feature, or keyword
 == Search settings by title, feature, or keyword
 
+Search skins and manage the skin queue
+== Search skins and manage the skin queue
+
 Searching
 == Поиск
+
+Searching all map folders...
+== Поиск во всех папках карт...
 
 Sec-WebSocket-Protocol sent during the realtime handshake
 == Sec-WebSocket-Protocol, отправляемый при рукопожатии реального времени
@@ -9203,6 +9116,9 @@ Severe
 Shape
 == Форма
 
+Share of the server browser name/map split given to the name column (per mille)
+== Доля ширины, отданная колонке названия в разбивке название/карта (промилле)
+
 Shimmer speed (polished)
 == Скорость блика (глянец)
 
@@ -9349,9 +9265,6 @@ Show compact vote HUD
 
 Show configurable outlines around map tiles
 == Show configurable outlines around map tiles
-
-Show Coordinates
-== Показывать координаты
 
 Show coordinates above players
 == Показывать координаты над игроками
@@ -9535,9 +9448,6 @@ Show important messages when rendering video
 
 Show important server prompts
 == Показывать важные подсказки сервера
-
-Show important server prompts and Echo messages as popups
-== Показывать важные подсказки сервера и сообщения Echo во всплывающих уведомлениях
 
 Show important server prompts as notifications
 == Показывать важные подсказки сервера как уведомления
@@ -9762,10 +9672,10 @@ Show other players' hook collision lines when rendering video
 == Показывать линии столкновения крюка других игроков при рендеринге видео
 
 Show other players' large emoticons
-== Show other players' large emoticons
+== Показывать большие эмоции других игроков
 
 Show other players' launched emoticons
-== Show other players' launched emoticons
+== Показывать запускаемые эмоции других игроков
 
 Show other team players (2=own team only)
 == Показывать игроков других команд (2 = только своя команда)
@@ -10232,9 +10142,6 @@ Skin switch animation range: 0=Self, 1=Local+Dummy, 2=All players
 Skin switch animation type (0=Ghost pop, 1=Soft fade, 2=Slide left, 3=Rotate pop, 4=Light dark switch, 5=Glitch shake, 6=Elastic scale)
 == Тип анимации смены скина (0=вылет с остаточным следом, 1=мягкое затухание, 2=сдвиг влево, 3=вращательный вылет, 4=смена яркости, 5=глитч-дрожание, 6=упругое масштабирование)
 
-Skin transition
-== Смена скина
-
 Skin transition animation
 == Анимация смены скина
 
@@ -10309,9 +10216,6 @@ Smooth zoom animation time in editor (in ms, 0=off)
 
 Smoothness of multi-view zoom (in ms, higher = slower)
 == Плавность масштабирования многовидового режима (в ms, выше = медленнее)
-
-SMTC
-== Системное медиа-управление
 
 Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
 == Привязывать смещение покачивания к целым пикселям (чётче глифы, резче движение)
@@ -10631,9 +10535,6 @@ Stop server
 Stop the current demo
 == Остановить текущее демо
 
-Streamer Mode
-== Режим стримера
-
 Streamer mode
 == Режим стримера
 
@@ -10787,9 +10688,6 @@ System
 System default
 == Системное значение по умолчанию
 
-System media control
-== Системное управление медиа
-
 System media controls
 == Системные медиа-кнопки
 
@@ -10826,14 +10724,11 @@ Target language code (e.g. zh, en, ja, zh-TW)
 Target language ratio
 == Соотношение целевого языка
 
+Target server: %s
+== Целевой сервер: %s
+
 TClient
 == TClient
-
-TClient / Bind Wheel
-== TClient / Колесо привязок
-
-TClient / Status Bar
-== TClient / Строка состояния
 
 TClient Developers
 == Разработчики TClient
@@ -11391,7 +11286,7 @@ Toggle dyncam
 == Переключить dyncam
 
 Toggle emote launcher
-== Toggle emote launcher
+== Переключить пусковую установку эмоций
 
 Toggle fast practice mode
 == Переключить режим быстрой практики
@@ -11521,9 +11416,6 @@ Trail width
 
 Translate
 == Перевести
-
-Translate button
-== Кнопка перевода
 
 Translate ID:
 == ID перевода:
@@ -11973,7 +11865,7 @@ Use k key to kill (restart), q to pause and watch other players. See settings fo
 == Используйте клавишу K, чтобы убить (перезапустить), Q, чтобы поставить на паузу и смотреть за другими игроками. Другие привязки клавиш смотрите в настройках.
 
 Use large emote
-== Use large emote
+== Использовать большую эмоцию
 
 Use mouse sensitivity when dynamic camera is on
 == Использовать чувствительность мыши при включённой динамической камере
@@ -12389,9 +12281,6 @@ Weapon switch easing
 Weapon switch rotation
 == Вращение при переключении оружия
 
-Weapon Trajectory
-== Траектория оружия
-
 Weapon trajectory
 == Траектория оружия
 
@@ -12418,9 +12307,6 @@ Welcome to DDNet
 
 What level DDRace binding is set to (automatic, you don't need to use it).
 == Какой уровень привязки DDRace установлен (автоматически, вам не нужно его использовать).
-
-What's done is done, no use saying more
-== Что сделано, то сделано, бесполезно говорить больше
 
 Wheel animate
 == Анимация колёсика
@@ -12530,14 +12416,14 @@ Width of friends column in server browser
 Width of latency column in server browser
 == Ширина столбца задержки в браузере серверов
 
-Width of map column in server browser
-== Ширина столбца карты в списке серверов
-
 Width of others' hook collision line
 == Ширина линии столкновения крюка других
 
 Width of players column in server browser
 == Ширина столбца игроков в списке серверов
+
+Width of Qm clients column in server browser
+== Ширина колонки клиентов Qm в браузере серверов
 
 Width of type column in server browser
 == Ширина столбца типа в списке серверов
@@ -12922,15 +12808,6 @@ Zoom to current mouse target
 
 ⚠️ Tencent Cloud API not configured
 == ⚠️ API Tencent Cloud не настроен
-
-发射表情按键
-== 发射表情按键
-
-显示他人发射表情
-== 显示他人发射表情
-
-显示他人大表情
-== 显示他人大表情
 
 [Assets editor blend mode]
 Color

@@ -5,6 +5,7 @@
 
 #include "demoedit.h"
 #include "friends.h"
+#include "perf_file_logger.h"
 #include "serverbrowser.h"
 
 #include <base/crashdump.h>
@@ -75,44 +76,6 @@
 
 #include "SDL.h"
 
-// 性能日志文件的运行时开关包装：CFutureLogger 只能 Set 一次，游戏内
-// 开/关文件通过替换内部 logger（文件 logger ↔ noop）实现。旧 logger 在
-// 锁内被析构（CLoggerAsync 析构时关闭文件并等待排空）。
-class CQmPerfFileSwitchLogger : public ILogger
-{
-public:
-	void Set(std::shared_ptr<ILogger> pLogger)
-	{
-		const CLockScope LockScope(m_SwitchLock);
-		m_pLogger = std::move(pLogger);
-	}
-
-	void Log(const CLogMessage *pMessage) override
-	{
-		const CLockScope LockScope(m_SwitchLock);
-		if(m_pLogger)
-			m_pLogger->Log(pMessage);
-	}
-
-	void GlobalFinish() override
-	{
-		const CLockScope LockScope(m_SwitchLock);
-		if(m_pLogger)
-			m_pLogger->GlobalFinish();
-	}
-
-	void OnFilterChange() override
-	{
-		const CLockScope LockScope(m_SwitchLock);
-		if(m_pLogger)
-			m_pLogger->SetFilter(m_Filter);
-	}
-
-private:
-	CLock m_SwitchLock;
-	std::shared_ptr<ILogger> m_pLogger;
-};
-
 namespace
 {
 }
@@ -160,6 +123,10 @@ static void ApplyProcessPriorityConfig()
 
 static constexpr ColorRGBA gs_ClientNetworkPrintColor{0.7f, 1, 0.7f, 1.0f};
 static constexpr ColorRGBA gs_ClientNetworkErrPrintColor{1.0f, 0.25f, 0.25f, 1.0f};
+// 网络积压分帧处理，避免异常 burst 把整个渲染帧占满。
+static constexpr int gs_NetworkPumpMaxChunksPerFrame = 256;
+static constexpr std::chrono::nanoseconds gs_NetworkPumpOnlineBudget = 2ms;
+static constexpr std::chrono::nanoseconds gs_NetworkPumpLoadingBudget = 6ms;
 static constexpr int64_t gs_HangTimeoutSeconds = 10;
 static constexpr const char *gs_pQmCrashDumpDir = "dumps/QmClient_Crash";
 static constexpr const char *gs_pQmLifecycleMarkerFile = "qmclient/lifecycle_pending.marker";
@@ -3727,10 +3694,16 @@ void CClient::PumpNetwork()
 	// process packets
 	CNetChunk Packet;
 	SECURITY_TOKEN ResponseToken;
+	const std::chrono::nanoseconds NetworkPumpStart = time_get_nanoseconds();
+	const std::chrono::nanoseconds NetworkPumpBudget = State() == IClient::STATE_ONLINE ? gs_NetworkPumpOnlineBudget : gs_NetworkPumpLoadingBudget;
+	int NetworkChunksProcessed = 0;
 	for(int Conn = 0; Conn < NUM_CONNS; Conn++)
 	{
-		while(m_aNetClient[Conn].Recv(&Packet, &ResponseToken, IsSixup()))
+		while(NetworkChunksProcessed < gs_NetworkPumpMaxChunksPerFrame &&
+			(NetworkChunksProcessed == 0 || time_get_nanoseconds() - NetworkPumpStart < NetworkPumpBudget) &&
+			m_aNetClient[Conn].Recv(&Packet, &ResponseToken, IsSixup()))
 		{
+			++NetworkChunksProcessed;
 			if(Packet.m_ClientId == -1)
 			{
 				if(ResponseToken != NET_SECURITY_TOKEN_UNKNOWN)
@@ -4523,9 +4496,6 @@ void CClient::Run()
 		}
 
 		int IdleRenderThrottleRate = 0;
-		// 本帧生效的刷新率门控速率（0 = 不门控）。仅用于把被门控掉的迭代从
-		// 忙等换成等待，不参与任何渲染时机判断。
-		int RenderGateRate = 0;
 
 		// render
 		{
@@ -4570,14 +4540,6 @@ void CClient::Run()
 					GfxRefreshRate = std::clamp(RequestedRenderThrottleRate, 10, 10000);
 					IdleRenderThrottleRate = GfxRefreshRate;
 				}
-				else if(g_Config.m_QmPresentAlign != 0 && g_Config.m_GfxScreenRefreshRate > 0)
-				{
-					// 关垂直同步且未设上限时，呈现模式是 IMMEDIATE：客户端既不等显示器也不被
-					// 节流，会以数倍于刷新率的速率持续投递。把渲染对齐到显示器刷新率，
-					// 把时间片还给合成/扫描输出；画面内容与玩法不变，只降低投递速率。
-					GfxRefreshRate = std::clamp(g_Config.m_GfxScreenRefreshRate, 10, 10000);
-					RequestedRenderThrottleRate = GfxRefreshRate;
-				}
 			}
 
 #if defined(CONF_VIDEORECORDER)
@@ -4590,9 +4552,6 @@ void CClient::Run()
 				IdleRenderThrottleRate = 0;
 			}
 #endif
-			// 只在确实要渲染时把被门控掉的迭代交给等待；窗口失活、录制等情形保持原行为。
-			if(IsRenderActive && GfxRefreshRate > 0)
-				RenderGateRate = GfxRefreshRate;
 			if(QmPerfEnabled() && (IdleRenderThrottleRate != LastIdleRenderThrottleRate || RequestedRenderThrottleRate != LastRequestedRenderThrottleRate))
 			{
 				char aPayload[192];
@@ -4716,15 +4675,6 @@ void CClient::Run()
 			WaitWithNetwork(SleepTimeInNanoSeconds);
 			Slept = true;
 		}
-		else if(RenderGateRate > 0)
-		{
-			// 仅由刷新率门控限速时，被门控掉的迭代原本是忙等（gfx_refresh_rate 非零会
-			// 关掉空闲节流分支）。这里等待到同一个时间片：门控判据、渲染时机与结果不变，
-			// 只去掉空转占用的 CPU 时间片。
-			SleepTimeInNanoSeconds = (std::chrono::nanoseconds(1s) / (int64_t)RenderGateRate) - (Now - LastTime);
-			WaitWithNetwork(SleepTimeInNanoSeconds);
-			Slept = true;
-		}
 		if(Slept)
 		{
 			// if the diff gets too small it shouldn't get even smaller (drop the updates, that could not be handled)
@@ -4772,6 +4722,8 @@ void CClient::Run()
 
 	m_Fifo.Shutdown();
 	m_Http.Shutdown();
+	if(m_pQmPerfFileSwitch != nullptr)
+		m_pQmPerfFileSwitch->FinishPending();
 	Engine()->ShutdownJobs();
 
 	// Stop the hang watchdog AFTER ShutdownJobs() so that hangs occurring
@@ -7441,7 +7393,10 @@ void CClient::FinishQmPerfSession(bool Shutdown)
 	m_QmPerfConfigSnapshot.Update(this);
 	QmPerfFlushDropped(this);
 	QmPerfLogFields("perf/session", std::string("\"event\":\"session_end\",\"reason\":") + QmPerfJsonString(Shutdown ? "shutdown" : "disabled"), this);
-	m_pQmPerfFileSwitch->Set(log_logger_noop());
+	if(Shutdown)
+		m_pQmPerfFileSwitch->Set(log_logger_noop());
+	else
+		Engine()->AddJob(m_pQmPerfFileSwitch->SetAsync(log_logger_noop()));
 	m_QmPerfFileLoggerActive = false;
 	m_QmPerfLastFrameEnd = 0;
 }

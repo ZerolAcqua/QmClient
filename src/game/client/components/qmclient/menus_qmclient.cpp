@@ -34,6 +34,9 @@
 #include <game/client/QmUi/UiOverlays.h>
 #include <game/client/QmUi/UiSurface.h>
 #include <game/client/QmUi/UiTokens.h>
+#include <game/client/QmUi/cards/QmCardCatalog.h>
+#include <game/client/QmUi/cards/QmCardCatalogFunctionMetrics.h>
+#include <game/client/QmUi/cards/QmCardCatalogInternal.h>
 #include <game/client/animstate.h>
 #include <game/client/components/binds.h>
 #include <game/client/components/chat.h>
@@ -110,42 +113,11 @@ namespace
 	std::function<bool()> g_QmClientEnsureSponsorQrTexture;
 	std::function<void(const CUIRect &, float)> g_QmClientRenderTexture;
 
-	// 「梦的小功能」的普通开关行。渲染与卡片高度都取自同一张表，
-	// 避免增删开关后高度测量与实际行数再次错位而留下空白。
-	struct SQmMiniFeatureRow
-	{
-		const void *m_pId;
-		const char *m_pTextId;
-		int *m_pValue;
-	};
-
-	constexpr std::array<SQmMiniFeatureRow, 16> s_aQmMiniFeatureRows = {{
-		{&g_Config.m_QmClientShowBadge, "Show Qm badge", &g_Config.m_QmClientShowBadge},
-		{&g_Config.m_QmAutoUpdate, "Automatic updates", &g_Config.m_QmAutoUpdate},
-		{&g_Config.m_QmShowOutdatedVersionWarning, "Show outdated version warning", &g_Config.m_QmShowOutdatedVersionWarning},
-		{&g_Config.m_QmBetterScoreboard, "Better scoreboard", &g_Config.m_QmBetterScoreboard},
-		{&g_Config.m_QmScoreboardPoints, "Scoreboard point check", &g_Config.m_QmScoreboardPoints},
-		{&g_Config.m_QmScoreboardOnDeath, "Show scoreboard after death", &g_Config.m_QmScoreboardOnDeath},
-		{&g_Config.m_QmHideJoinServerInfo, "Hide server information on join", &g_Config.m_QmHideJoinServerInfo},
-		{&g_Config.m_QmMessageMerge, "Message merging", &g_Config.m_QmMessageMerge},
-		{&g_Config.m_QmNewUi, "New UI", &g_Config.m_QmNewUi},
-		{&g_Config.m_QmShortServerNames, "Short server names", &g_Config.m_QmShortServerNames},
-		{&g_Config.m_QmImeAutoManage, "Auto manage IME while typing", &g_Config.m_QmImeAutoManage},
-		{&g_Config.m_QmProcessHighPriority, "High process priority", &g_Config.m_QmProcessHighPriority},
-		{&g_Config.m_QmRepeatEnabled, "Enable repeat", &g_Config.m_QmRepeatEnabled},
-		{&g_Config.m_QmRandomEmoteOnHit, "Random emoticon", &g_Config.m_QmRandomEmoteOnHit},
-		{&g_Config.m_QmComboPopup, "Combo", &g_Config.m_QmComboPopup},
-		{&g_Config.m_QmSayNoPop, "Hide input emoticon", &g_Config.m_QmSayNoPop},
-	}};
-
-	// 「新版 IME」需要独立文案、「赞助提醒」需要关闭时的灵动岛提示，两者单独渲染，
-	// 因而卡片总行数为普通行加这两行。
-	constexpr size_t QmMiniFeatureSpecialRowCount = 2;
-
 	// Visual Deck 需要完整的模块表，才能在切换单张卡片的折叠状态时保留其他 tab 的历史配置。
 	const std::array<qm_module::SQmModuleEntry, qm_module::QmModuleCount> s_aQmModuleDefaults = {{{qm_module::EQmModuleId::Info, qm_module::EQmModuleColumn::Full, 0, "info"},
 		{qm_module::EQmModuleId::ChatBubble, qm_module::EQmModuleColumn::Left, 0, "chat_bubble"},
-		{qm_module::EQmModuleId::SkinTransition, qm_module::EQmModuleColumn::Left, 1, "skin_transition"},
+		{qm_module::EQmModuleId::SkinAppearance, qm_module::EQmModuleColumn::Left, 1, "skin_appearance"},
+		{qm_module::EQmModuleId::SkinTransition, qm_module::EQmModuleColumn::Left, 2, "skin_transition"},
 		{qm_module::EQmModuleId::GoresActor, qm_module::EQmModuleColumn::Left, 3, "gores_actor"},
 		{qm_module::EQmModuleId::Gores, qm_module::EQmModuleColumn::Left, 4, "gores"},
 		{qm_module::EQmModuleId::KeyBinds, qm_module::EQmModuleColumn::Left, 5, "key_binds"},
@@ -181,278 +153,273 @@ namespace
 		{qm_module::EQmModuleId::Background3D, qm_module::EQmModuleColumn::Right, 17, "background_3d"},
 		{qm_module::EQmModuleId::DebugMode, qm_module::EQmModuleColumn::Right, 19, "debug_mode"},
 		{qm_module::EQmModuleId::BindStatusHud, qm_module::EQmModuleColumn::Right, 20, "bind_status_hud"}}};
-}
 
-using SQmGlobalSearchCard = qm_card_registry::SCardSearchResult;
-
-struct SQmGlobalSearchNavigation
-{
-	int m_SettingsPage = CMenus::SETTINGS_QMCLIENT;
-	int m_QmClientTab = -1;
-	int m_TClientTab = -1;
-	int m_AppearanceTab = -1;
-};
-
-struct SQmGlobalSearchTabRoute
-{
-	const char *m_pTab;
-	int m_SettingsPage;
-	int m_TClientTab = -1;
-	int m_AppearanceTab = -1;
-	int m_QmClientTab = -1;
-};
-
-static constexpr SQmGlobalSearchTabRoute s_aGlobalSearchTabRoutes[] = {
-	{"general", CMenus::SETTINGS_GENERAL},
-	{"player", CMenus::SETTINGS_PLAYER},
-	{"tee", CMenus::SETTINGS_TEE},
-	{"tee7", CMenus::SETTINGS_TEE},
-	{"graphics", CMenus::SETTINGS_GRAPHICS},
-	{"sound", CMenus::SETTINGS_SOUND},
-	{"ddnet", CMenus::SETTINGS_DDNET},
-	{"controls", CMenus::SETTINGS_CONTROLS},
-	{"tclient-bind-wheel", CMenus::SETTINGS_TCLIENT, 1},
-	{"tclient-warlist", CMenus::SETTINGS_TCLIENT, 2},
-	{"tclient-chat-binds", CMenus::SETTINGS_TCLIENT, 3},
-	{"tclient-status-bar", CMenus::SETTINGS_TCLIENT, 4},
-	{"tclient-info", CMenus::SETTINGS_TCLIENT, 5},
-	{"tclient-profiles", CMenus::SETTINGS_PROFILES},
-	{"tclient-configs", CMenus::SETTINGS_QMCLIENT, -1, -1, CMenus::QMCLIENT_SETTINGS_TAB_CONFIG},
-	{"appearance-hud", CMenus::SETTINGS_APPEARANCE, -1, CMenus::APPEARANCE_TAB_HUD},
-	{"appearance-chat", CMenus::SETTINGS_APPEARANCE, -1, CMenus::APPEARANCE_TAB_CHAT},
-	{"appearance-name-plate", CMenus::SETTINGS_APPEARANCE, -1, CMenus::APPEARANCE_TAB_NAME_PLATE},
-	{"appearance-hook-collision", CMenus::SETTINGS_APPEARANCE, -1, CMenus::APPEARANCE_TAB_HOOK_COLLISION},
-	{"appearance-info-messages", CMenus::SETTINGS_APPEARANCE, -1, CMenus::APPEARANCE_TAB_INFO_MESSAGES},
-	{"appearance-laser", CMenus::SETTINGS_APPEARANCE, -1, CMenus::APPEARANCE_TAB_LASER},
-};
-
-struct SQmGlobalSearchResults
-{
-	std::vector<SQmGlobalSearchCard> m_vAllVisibleCards;
-};
-
-namespace
-{
-	void CollectGlobalSearchResults(const char *pSearch, bool Sixup, const qm_card_order::CModel &Model, SQmGlobalSearchResults &Out)
+	// NOLINTNEXTLINE(misc-use-internal-linkage)
+	struct SAutoReplyRulePlain
 	{
-		Out.m_vAllVisibleCards.clear();
-		std::vector<SQmGlobalSearchCard> vCards;
-		if(pSearch != nullptr && pSearch[0] != '\0')
-			vCards = qm_card_registry::SearchCards(pSearch, Model);
-		else
-		{
-			vCards.reserve(qm_card_registry::Defaults().size());
-			for(const qm_card_registry::SCardDefault &Default : qm_card_registry::Defaults())
-			{
-				SQmGlobalSearchCard Card;
-				Card.m_pStableId = Default.m_pStableId;
-				Card.m_Title = Default.m_pTitle != nullptr ? Localize(Default.m_pTitle) : "";
-				Card.m_Description = Default.m_pDescription != nullptr ? Localize(Default.m_pDescription) : "";
-				Card.m_Target = qm_card_registry::ResolveCardNavigationTarget(Default, Model);
-				vCards.push_back(std::move(Card));
-			}
-		}
-		Out.m_vAllVisibleCards.reserve(vCards.size());
-		for(SQmGlobalSearchCard &Card : vCards)
-		{
-			const char *pTab = Card.m_Target.m_pTab;
-			if(pTab != nullptr && str_comp(pTab, "global-search") == 0)
-				continue;
-			if(pTab != nullptr && ((Sixup && str_comp(pTab, "tee") == 0) || (!Sixup && str_comp(pTab, "tee7") == 0)))
-				continue;
-			Out.m_vAllVisibleCards.push_back(std::move(Card));
-		}
-	}
-
-	SQmGlobalSearchNavigation ResolveGlobalSearchNavigation(const SQmGlobalSearchCard &Card)
-	{
-		SQmGlobalSearchNavigation Navigation;
-		const char *pStableId = Card.m_pStableId != nullptr ? Card.m_pStableId : "";
-		const char *pTab = Card.m_Target.m_pTab != nullptr ? Card.m_Target.m_pTab : "";
-		if(str_startswith(pStableId, "qm:") != nullptr)
-		{
-			Navigation.m_SettingsPage = CMenus::SETTINGS_QMCLIENT;
-			if(str_comp(pTab, "function") == 0)
-				Navigation.m_QmClientTab = CMenus::QMCLIENT_SETTINGS_TAB_FUNCTION;
-			else if(str_comp(pTab, "hud") == 0)
-				Navigation.m_QmClientTab = CMenus::QMCLIENT_SETTINGS_TAB_HUD;
-			else
-				Navigation.m_QmClientTab = CMenus::QMCLIENT_SETTINGS_TAB_VISUAL;
-			return Navigation;
-		}
-		if(str_comp(pTab, "qmclient-contributors") == 0)
-		{
-			Navigation.m_SettingsPage = CMenus::SETTINGS_QMCLIENT;
-			Navigation.m_QmClientTab = CMenus::QMCLIENT_SETTINGS_TAB_CONTRIBUTORS;
-			return Navigation;
-		}
-		if(str_startswith(pStableId, "tclient:") != nullptr)
-		{
-			Navigation.m_SettingsPage = CMenus::SETTINGS_TCLIENT;
-			Navigation.m_TClientTab = 0;
-			return Navigation;
-		}
-		for(const SQmGlobalSearchTabRoute &Route : s_aGlobalSearchTabRoutes)
-		{
-			if(str_comp(pTab, Route.m_pTab) != 0)
-				continue;
-			Navigation.m_SettingsPage = Route.m_SettingsPage;
-			Navigation.m_TClientTab = Route.m_TClientTab;
-			Navigation.m_AppearanceTab = Route.m_AppearanceTab;
-			Navigation.m_QmClientTab = Route.m_QmClientTab;
-			break;
-		}
-		return Navigation;
-	}
-
-	const char *GlobalSearchNavigationLabel(const SQmGlobalSearchNavigation &Navigation)
-	{
-		switch(Navigation.m_SettingsPage)
-		{
-		case CMenus::SETTINGS_QMCLIENT:
-			if(Navigation.m_QmClientTab == CMenus::QMCLIENT_SETTINGS_TAB_FUNCTION)
-				return Localize("QmClient / Function");
-			if(Navigation.m_QmClientTab == CMenus::QMCLIENT_SETTINGS_TAB_HUD)
-				return Localize("QmClient / HUD");
-			return Localize("QmClient / Visual");
-		case CMenus::SETTINGS_TCLIENT:
-			if(Navigation.m_TClientTab == 1)
-				return Localize("TClient / Bind Wheel");
-			if(Navigation.m_TClientTab == 4)
-				return Localize("TClient / Status Bar");
-			return Localize("TClient");
-		case CMenus::SETTINGS_GRAPHICS:
-			return Localize("Graphics");
-		case CMenus::SETTINGS_SOUND:
-			return Localize("Sound");
-		case CMenus::SETTINGS_DDNET:
-			return Localize("DDNet");
-		case CMenus::SETTINGS_APPEARANCE:
-			switch(Navigation.m_AppearanceTab)
-			{
-			case CMenus::APPEARANCE_TAB_CHAT: return Localize("Appearance / Chat");
-			case CMenus::APPEARANCE_TAB_NAME_PLATE: return Localize("Appearance / Name Plate");
-			case CMenus::APPEARANCE_TAB_HOOK_COLLISION: return Localize("Appearance / Hook Collision");
-			case CMenus::APPEARANCE_TAB_INFO_MESSAGES: return Localize("Appearance / Info Messages");
-			case CMenus::APPEARANCE_TAB_LASER: return Localize("Appearance / Laser");
-			case CMenus::APPEARANCE_TAB_HUD:
-			default: return Localize("Appearance / HUD");
-			}
-		default:
-			return Localize("QmClient / Visual");
-		}
-	}
-
-	bool PerfDebugEnabled()
-	{
-		return g_Config.m_QmPerfDebug != 0;
-	}
-
-	void LogQmPerfStage(IClient *pClient, const char *pStage, double DurationMs, bool Force = false, const char *pExtra = nullptr)
-	{
-		if(!PerfDebugEnabled())
-			return;
-		QmPerfLogStage("perf/qmclient", pStage, DurationMs, Force, pClient, nullptr, nullptr, pExtra);
-	}
-
-	[[maybe_unused]] void LogTClientPerfStage(const char *pStage, double DurationMs, bool Force = false, const char *pExtra = nullptr)
-	{
-		if(!PerfDebugEnabled())
-			return;
-		QmPerfLogStage("perf/tclient", pStage, DurationMs, Force, nullptr, nullptr, nullptr, pExtra);
-	}
-
-	const char *QmSettingsTabName(int Tab)
-	{
-		switch(Tab)
-		{
-		case CMenus::QMCLIENT_SETTINGS_TAB_VISUAL: return "visuals";
-		case CMenus::QMCLIENT_SETTINGS_TAB_FUNCTION: return "functions";
-		case CMenus::QMCLIENT_SETTINGS_TAB_HUD: return "hud";
-		case CMenus::QMCLIENT_SETTINGS_TAB_CONTRIBUTORS: return "contributors";
-		case CMenus::QMCLIENT_SETTINGS_TAB_CONFIG: return "config";
-		default: return "unknown";
-		}
-	}
-
-	struct SSectionCullContext
-	{
-		float m_ViewportTop;
-		float m_ViewportBottom;
-		float m_PrefetchPadding;
+		std::string m_Keywords;
+		std::string m_Reply;
+		bool m_AutoRename = false;
+		bool m_Regex = false;
 	};
 
-	bool IsSectionVisible(const CUIRect &SectionRect, const SSectionCullContext &Context)
+	// NOLINTNEXTLINE(misc-use-internal-linkage)
+	struct SAutoReplyRuleInputRow
 	{
-		return SectionRect.y + SectionRect.h >= Context.m_ViewportTop - Context.m_PrefetchPadding &&
-		       SectionRect.y <= Context.m_ViewportBottom + Context.m_PrefetchPadding;
-	}
+		char m_aTrigger[512] = "";
+		char m_aReply[256] = "";
+		int m_AutoRename = 0;
+		int m_Regex = 0;
+		CLineInput m_TriggerInput;
+		CLineInput m_ReplyInput;
 
-	uint64_t HashBytesFnv1a64(uint64_t Hash, const void *pData, size_t DataSize)
-	{
-		const uint8_t *pBytes = static_cast<const uint8_t *>(pData);
-		for(size_t i = 0; i < DataSize; ++i)
+		SAutoReplyRuleInputRow()
 		{
-			Hash ^= pBytes[i];
-			Hash *= 1099511628211ull;
+			m_TriggerInput.SetBuffer(m_aTrigger, sizeof(m_aTrigger));
+			m_ReplyInput.SetBuffer(m_aReply, sizeof(m_aReply));
 		}
-		return Hash;
-	}
+	};
 
-	template<typename T>
-	uint64_t HashValueFnv1a64(uint64_t Hash, const T &Value)
+	static std::vector<std::unique_ptr<SAutoReplyRuleInputRow>> s_vKeywordRuleRows;
+	static bool s_KeywordRuleRowsInited = false;
+	static CButtonContainer s_KeywordAddRuleButton;
+	static std::vector<CButtonContainer> s_vKeywordRemoveRuleButtons;
+	static uint64_t s_BlockWordsLayoutRevision = 1;
+	static char s_aBlockWordsLayoutConfigCache[sizeof(g_Config.m_QmBlockWordsList)] = {};
+	static uint64_t s_KeywordRulesLayoutRevision = 1;
+	static size_t s_KeywordRulesLayoutCount = 0;
+	static bool s_KeywordRulesHalfFilled = false;
+	static bool s_KeywordRulesLayoutHalfFilled = false;
+	static char s_aKeywordRulesConfigCache[sizeof(g_Config.m_QmKeywordReplyRules)] = {};
+	static uint64_t s_FavoriteMapsLayoutRevision = 1;
+	static size_t s_FavoriteMapsLayoutCount = std::numeric_limits<size_t>::max();
+
+	// 栖梦侧栏卡片折叠状态的写回：折叠状态由各页面持有的数组承载，
+	// 这里把它序列化回同一份配置（key 集合取自 s_aQmModuleDefaults，未注册 key 不会写回）。
+	void ToggleQmSidebarCardCollapsed(void *pUser, qm_module::EQmModuleId Id)
 	{
-		return HashBytesFnv1a64(Hash, &Value, sizeof(Value));
+		bool *pCollapsed = static_cast<bool *>(pUser);
+		if(pCollapsed == nullptr)
+			return;
+		const int Index = std::clamp((int)Id, 0, (int)qm_module::QmModuleCount - 1);
+		pCollapsed[Index] = !pCollapsed[Index];
+		SerializeLegacyQmCollapsed(s_aQmModuleDefaults, {pCollapsed, qm_module::QmModuleCount}, g_Config.m_QmSidebarCardCollapsed, sizeof(g_Config.m_QmSidebarCardCollapsed));
 	}
 
-	uint64_t HashStringFnv1a64(uint64_t Hash, const char *pString)
+	// 卡片目录需要的函数页布局版本快照：缓存与计数由本文件持有（卡片内容渲染会就地更新它们），
+	// 卡片模块只读取快照，避免把测量逻辑复制到卡片目录里造成两处漂移。
+	qm_card_catalog::SQmFunctionCardLayoutState ResolveFunctionCardLayoutState()
 	{
-		return pString == nullptr ? Hash : HashBytesFnv1a64(Hash, pString, str_length(pString));
+		return {s_BlockWordsLayoutRevision, s_KeywordRulesLayoutRevision, s_KeywordRulesLayoutCount, s_KeywordRulesHalfFilled, s_FavoriteMapsLayoutRevision};
 	}
 
+	// 单张卡片的内容重测版本（按 module id 分派给各分类的测量口径）。
+	uint64_t ResolveModuleCardMeasureRevision(qm_module::EQmModuleId Id)
+	{
+		switch(Id)
+		{
+		case qm_module::EQmModuleId::DummyMiniView: return g_Config.m_QmDummyMiniView ? 1u : 0u;
+		case qm_module::EQmModuleId::PlayerStats: return (g_Config.m_QmPlayerStatsMapProgress ? 1u : 0u) | (g_Config.m_QmPlayerStatsMapProgressStyle ? 2u : 0u);
+		case qm_module::EQmModuleId::InputOverlay: return g_Config.m_QmInputOverlay ? 1u : 0u;
+		case qm_module::EQmModuleId::HudNotifications:
+		{
+			uint64_t Revision = g_Config.m_QmHudNotificationsShowAdvanced ? 1u : 0u;
+			if(g_Config.m_QmHudNotificationsShowAdvanced && g_Config.m_QmHudNotificationsUseCategoryFilters)
+				Revision |= 2u;
+			return Revision;
+		}
+		case qm_module::EQmModuleId::Voice: return ResolveQmHudVoiceRevision(g_Config.m_QmVoiceEnable != 0, g_Config.m_QmVoiceShowAdvanced != 0, g_Config.m_QmVoiceShowConnectionStatus != 0, g_Config.m_QmVoiceNoiseSuppressEnable, g_Config.m_QmVoiceVadEnable != 0, g_Config.m_QmVoiceStereo != 0);
+		case qm_module::EQmModuleId::DynamicIsland: return (g_Config.m_QmHudIslandUseOriginalStyle ? 1u : 0u) | (g_Config.m_QmSwitchCountdown ? 2u : 0u);
+		case qm_module::EQmModuleId::SystemMediaControls: return g_Config.m_QmSmtcEnable ? 1u : 0u;
+		case qm_module::EQmModuleId::Lyrics: return (g_Config.m_QmSpotifyEnable ? 1u : 0u) | (g_Config.m_QmKugouHookEnable ? 2u : 0u) | (g_Config.m_QmQQMusicHookEnable ? 4u : 0u); // 来源附加行影响布局高度
+		case qm_module::EQmModuleId::Background3D: return ResolveQmHudBackground3DRevision(g_Config.m_Qm3DParticles != 0, g_Config.m_Qm3DParticlesColorMode == 1, g_Config.m_Qm3DParticlesGlow != 0, g_Config.m_Qm3DParticlesTrail != 0, g_Config.m_Qm3DParticlesPulse != 0, g_Config.m_Qm3DParticlesTwinkle != 0);
+		case qm_module::EQmModuleId::ChatBubble: return g_Config.m_QmChatBubble ? 1u : 0u;
+		case qm_module::EQmModuleId::CameraView:
+			return (g_Config.m_QmCameraDrift ? 1u : 0u) |
+			       (g_Config.m_QmDynamicFov ? 2u : 0u) |
+			       (g_Config.m_QmAspectPreset == 6 ? 4u : 0u);
+		case qm_module::EQmModuleId::SkinTransition: return g_Config.m_QmSkinChangeTransition ? 1u : 0u;
+		case qm_module::EQmModuleId::WeaponAnimation:
+			return (g_Config.m_QmWeaponSwitchAnim ? 1u : 0u) |
+			       (g_Config.m_QmWeaponReloadAnim ? 2u : 0u);
+		case qm_module::EQmModuleId::CollisionHitbox:
+			return (g_Config.m_QmHitboxMode || g_Config.m_QmShowCollisionHitbox ? 1u : 0u) |
+			       (g_Config.m_QmHitboxShowMap ? 1u << 1 : 0u) |
+			       (g_Config.m_QmHitboxShowTeeCollision ? 1u << 2 : 0u) |
+			       (g_Config.m_QmHitboxShowTeeFreeze ? 1u << 3 : 0u) |
+			       (g_Config.m_QmHitboxShowTeeDeath ? 1u << 4 : 0u) |
+			       (g_Config.m_QmHitboxShowPickups ? 1u << 5 : 0u) |
+			       (g_Config.m_QmHitboxShowHammer ? 1u << 6 : 0u) |
+			       (g_Config.m_QmHitboxShowProjectiles ? 1u << 7 : 0u) |
+			       (g_Config.m_QmHitboxShowLasers ? 1u << 8 : 0u) |
+			       (g_Config.m_QmHitboxShowFreezeLasers ? 1u << 9 : 0u) |
+			       (g_Config.m_QmHitboxShowHook ? 1u << 10 : 0u);
+		case qm_module::EQmModuleId::GoresActor:
+			return g_Config.m_TcFreezeChatEnabled ? 1u | (g_Config.m_TcFreezeChatEmoticon ? 2u : 0u) : 0u;
+		case qm_module::EQmModuleId::Gores:
+			return (g_Config.m_QmAxiomAutoLogin ? 1u : 0u) |
+			       ((g_Config.m_QmGores || g_Config.m_QmGoresAutoEnable) ? 2u : 0u);
+		case qm_module::EQmModuleId::Emoticons:
+			return (g_Config.m_QmShowOtherSuperEmotes ? 1u : 0u) |
+			       (g_Config.m_QmShowOtherLaunchEmotes ? 2u : 0u);
+		case qm_module::EQmModuleId::WeaponTrajectory: return g_Config.m_QmWeaponTrajectory != 0 ? 1u : 0u;
+		case qm_module::EQmModuleId::FriendNotify:
+			return (g_Config.m_QmFriendOnlineAutoRefresh ? 1u : 0u) |
+			       (g_Config.m_QmFriendEnterBroadcast ? 2u : 0u) |
+			       (g_Config.m_QmFriendEnterAutoGreet ? 4u : 0u);
+		case qm_module::EQmModuleId::BlockWords: return s_BlockWordsLayoutRevision * 2u + (g_Config.m_QmBlockWordsAction == 0 ? 0u : 1u);
+		case qm_module::EQmModuleId::Translate:
+			if(str_comp_nocase(g_Config.m_QmTranslateBackend, "ftapi") == 0)
+				return 1u;
+			if(str_comp_nocase(g_Config.m_QmTranslateBackend, "tencentcloud") == 0)
+				return 2u;
+			if(str_comp_nocase(g_Config.m_QmTranslateBackend, "libretranslate") == 0)
+				return 3u;
+			if(str_comp_nocase(g_Config.m_QmTranslateBackend, "llm") == 0)
+				return 4u | ((g_Config.m_QmTranslateLlmEnableThinking && (g_Config.m_QmTranslateLlmProvider == 2 || g_Config.m_QmTranslateLlmProvider == 3)) ? 8u : 0u);
+			return 0u;
+		case qm_module::EQmModuleId::QiaFen: return s_KeywordRulesLayoutRevision;
+		case qm_module::EQmModuleId::PieMenu: return g_Config.m_QmPieMenuEnabled ? 1u : 0u;
+		case qm_module::EQmModuleId::FavoriteMaps: return s_FavoriteMapsLayoutRevision;
+		case qm_module::EQmModuleId::HJAssist: return g_Config.m_QmAutoTeamLock ? 1u : 0u;
+		default: return 0u;
+		}
+	}
+
+	// 卡片目录聚合重测版本：与卡片目录内各分类自己的版本聚合（qm_card_catalog::MeasureContentRevision）配合，
+	// 任一卡片的内容高度依赖项变化都会让 definitions 失效重建。
+	uint64_t ResolveModuleCardMeasureRevision()
+	{
+		uint64_t CardLayoutRevision = qm_card_catalog::MeasureContentRevision();
+		for(int ModuleIndex = 0; ModuleIndex < (int)qm_module::QmModuleCount; ++ModuleIndex)
+			CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ ResolveModuleCardMeasureRevision((qm_module::EQmModuleId)ModuleIndex);
+		return CardLayoutRevision;
+	}
+
+	// 关键词回复卡片的测量缓存失效：换行编辑行只在展开态渲染，展开后必须重测。
+	void BumpQiaFenCardMeasureRevision(void *, qm_module::EQmModuleId Id)
+	{
+		if(Id != qm_module::EQmModuleId::QiaFen)
+			return;
+		s_KeywordRuleRowsInited = false;
+		++s_KeywordRulesLayoutRevision;
+	}
+
+} // namespace
+
+using SQmGlobalSearchCard = qm_card_catalog::SQmSearchResultEntry;
+
+// 搜索页的导航目标：优先用当前布局模型里这张卡所在分类，模型未收录时退回卡片注册表的默认 Placement。
+qm_card_registry::SCardNavigationTarget ResolveGlobalSearchNavigation(const SQmGlobalSearchCard &Card, const qm_card_order::CModel &Model)
+{
+	if(Card.m_pStableId == nullptr || Card.m_pStableId[0] == '\0')
+		return {nullptr, nullptr};
+	const int StateIndex = Model.FindByStableId(Card.m_pStableId);
+	const char *pTab = StateIndex >= 0 ? Model.Entry(StateIndex).m_pDefaultTab : nullptr;
+	if(pTab == nullptr)
+		pTab = Card.m_pTab;
+	return {pTab, Card.m_pStableId};
 }
 
-// NOLINTNEXTLINE(misc-use-internal-linkage)
-struct SAutoReplyRulePlain
+// 「定位」入口的点击处理：命中的卡片在搜索页就地可改，标题右侧这个入口负责跳回它所属的分类页。
+void CMenus::NavigateToGlobalSearchCard(const qm_card_catalog::SQmSearchResultEntry &Card)
 {
-	std::string m_Keywords;
-	std::string m_Reply;
-	bool m_AutoRename = false;
-	bool m_Regex = false;
-};
+	const qm_card_registry::SCardNavigationTarget Target = ResolveGlobalSearchNavigation(Card, SettingsCardOrderModel());
+	if(Target.m_pStableId == nullptr || Target.m_pTab == nullptr)
+		return;
+	NavigateToSettingsCard(Target);
+	Ui()->ReleaseActiveTextInput(&m_GlobalCardSearchInput);
+	m_GlobalCardSearchInput.Deactivate();
+}
 
-// NOLINTNEXTLINE(misc-use-internal-linkage)
-struct SAutoReplyRuleInputRow
+// 结果卡片标题下方的"定位"入口：跳到该卡所属的分类页并高亮它。
+// 卡片本体在搜索页就地可改，这个入口只负责"回到它的家"。
+FSettingsCardHeaderAction CMenus::BuildGlobalSearchLocateHeaderAction(const qm_card_catalog::SQmSearchResultEntry &Card, bool ReadOnly, float SmallSize)
 {
-	char m_aTrigger[512] = "";
-	char m_aReply[256] = "";
-	int m_AutoRename = 0;
-	int m_Regex = 0;
-	CLineInput m_TriggerInput;
-	CLineInput m_ReplyInput;
+	return [this, Card, ReadOnly, SmallSize](const SSettingsCardFrame &Frame, bool) {
+		if(ReadOnly)
+			return;
+		CUIRect LocateButton = Frame.m_SubtitleRect;
+		if(LocateButton.w <= 0.0f || LocateButton.h <= 0.0f)
+			return;
+		const float LocateWidth = std::min(LocateButton.w, 54.0f + SmallSize);
+		LocateButton.x += LocateButton.w - LocateWidth;
+		LocateButton.w = LocateWidth;
+		if(qm_card_catalog::QmCardRenderHook::DoButtonLogic(this, Card.m_pStableId, 0, &LocateButton, BUTTONFLAG_LEFT))
+		{
+			NavigateToGlobalSearchCard(Card);
+			return;
+		}
+		qm_card_catalog::QmCardRenderHook::DoSettingsLabel(this, Card.m_pStableId, Localize("Locate"), &LocateButton, SmallSize, TEXTALIGN_MR);
+	};
+}
 
-	SAutoReplyRuleInputRow()
+bool PerfDebugEnabled()
+{
+	return g_Config.m_QmPerfDebug != 0;
+}
+
+void LogQmPerfStage(IClient *pClient, const char *pStage, double DurationMs, bool Force = false, const char *pExtra = nullptr)
+{
+	if(!PerfDebugEnabled())
+		return;
+	QmPerfLogStage("perf/qmclient", pStage, DurationMs, Force, pClient, nullptr, nullptr, pExtra);
+}
+
+[[maybe_unused]] void LogTClientPerfStage(const char *pStage, double DurationMs, bool Force = false, const char *pExtra = nullptr)
+{
+	if(!PerfDebugEnabled())
+		return;
+	QmPerfLogStage("perf/tclient", pStage, DurationMs, Force, nullptr, nullptr, nullptr, pExtra);
+}
+
+const char *QmSettingsTabName(int Tab)
+{
+	switch(Tab)
 	{
-		m_TriggerInput.SetBuffer(m_aTrigger, sizeof(m_aTrigger));
-		m_ReplyInput.SetBuffer(m_aReply, sizeof(m_aReply));
+	case CMenus::QMCLIENT_SETTINGS_TAB_VISUAL: return "visuals";
+	case CMenus::QMCLIENT_SETTINGS_TAB_FUNCTION: return "functions";
+	case CMenus::QMCLIENT_SETTINGS_TAB_HUD: return "hud";
+	case CMenus::QMCLIENT_SETTINGS_TAB_CONTRIBUTORS: return "contributors";
+	case CMenus::QMCLIENT_SETTINGS_TAB_CONFIG: return "config";
+	default: return "unknown";
 	}
+}
+
+struct SSectionCullContext
+{
+	float m_ViewportTop;
+	float m_ViewportBottom;
+	float m_PrefetchPadding;
 };
 
-static std::vector<std::unique_ptr<SAutoReplyRuleInputRow>> s_vKeywordRuleRows;
-static bool s_KeywordRuleRowsInited = false;
-static CButtonContainer s_KeywordAddRuleButton;
-static std::vector<CButtonContainer> s_vKeywordRemoveRuleButtons;
-static uint64_t s_BlockWordsLayoutRevision = 1;
-static char s_aBlockWordsLayoutConfigCache[sizeof(g_Config.m_QmBlockWordsList)] = {};
-static uint64_t s_KeywordRulesLayoutRevision = 1;
-static size_t s_KeywordRulesLayoutCount = 0;
-static bool s_KeywordRulesLayoutHalfFilled = false;
-static char s_aKeywordRulesConfigCache[sizeof(g_Config.m_QmKeywordReplyRules)] = {};
-static uint64_t s_FavoriteMapsLayoutRevision = 1;
-static size_t s_FavoriteMapsLayoutCount = std::numeric_limits<size_t>::max();
-// 开关倒计时显示位置的两个复选框：渲染与卡片预布局必须共用同一组 id，否则同一次点击会被处理两次。
-static int s_SwitchCountdownFollowTeeId;
-static int s_SwitchCountdownMediaIslandId;
+bool IsSectionVisible(const CUIRect &SectionRect, const SSectionCullContext &Context)
+{
+	return SectionRect.y + SectionRect.h >= Context.m_ViewportTop - Context.m_PrefetchPadding &&
+	       SectionRect.y <= Context.m_ViewportBottom + Context.m_PrefetchPadding;
+}
+
+uint64_t HashBytesFnv1a64(uint64_t Hash, const void *pData, size_t DataSize)
+{
+	const uint8_t *pBytes = static_cast<const uint8_t *>(pData);
+	for(size_t i = 0; i < DataSize; ++i)
+	{
+		Hash ^= pBytes[i];
+		Hash *= 1099511628211ull;
+	}
+	return Hash;
+}
+
+template<typename T>
+uint64_t HashValueFnv1a64(uint64_t Hash, const T &Value)
+{
+	return HashBytesFnv1a64(Hash, &Value, sizeof(Value));
+}
+
+uint64_t HashStringFnv1a64(uint64_t Hash, const char *pString)
+{
+	return pString == nullptr ? Hash : HashBytesFnv1a64(Hash, pString, str_length(pString));
+}
 
 // 头衔样式下拉的条目预览上下文：条目里画「头衔文本 + 该风格」的实时效果。
 struct SQmTitleStylePreviewContext
@@ -840,6 +807,31 @@ static size_t CountAutoReplyRules(const char *pRules)
 			++Count;
 	}
 	return Count;
+}
+
+// 函数分类的布局缓存刷新：卡片高度依赖词条过滤/关键词回复/收藏地图的内容量，
+// 内容变化时递增版本，卡片目录按版本重测。分类页与搜索页共用同一份刷新口径。
+void RefreshFunctionCardLayoutState(CMenus *pMenus)
+{
+	if(str_comp(s_aBlockWordsLayoutConfigCache, g_Config.m_QmBlockWordsList) != 0)
+	{
+		str_copy(s_aBlockWordsLayoutConfigCache, g_Config.m_QmBlockWordsList, sizeof(s_aBlockWordsLayoutConfigCache));
+		++s_BlockWordsLayoutRevision;
+	}
+	if(str_comp(s_aKeywordRulesConfigCache, g_Config.m_QmKeywordReplyRules) != 0)
+	{
+		char aDecodedRules[sizeof(g_Config.m_QmKeywordReplyRules)];
+		QmKeywordReplyRules::DecodeFromConfig(g_Config.m_QmKeywordReplyRules, aDecodedRules, sizeof(aDecodedRules));
+		s_KeywordRuleRowsInited = false;
+		UpdateKeywordRulesLayoutState(CountAutoReplyRules(aDecodedRules), false);
+		str_copy(s_aKeywordRulesConfigCache, g_Config.m_QmKeywordReplyRules, sizeof(s_aKeywordRulesConfigCache));
+	}
+	const size_t FavoriteMapCount = qm_card_catalog::QmCardRenderHook::FavoriteMapCount(pMenus);
+	if(s_FavoriteMapsLayoutCount != FavoriteMapCount)
+	{
+		s_FavoriteMapsLayoutCount = FavoriteMapCount;
+		++s_FavoriteMapsLayoutRevision;
+	}
 }
 
 static bool AutoReplyRowsMatchRules(const std::vector<std::unique_ptr<SAutoReplyRuleInputRow>> &vRows, const std::vector<SAutoReplyRulePlain> &vRules)
@@ -1275,117 +1267,6 @@ void CMenus::RenderQmVisualChatBubbleContent(CUIRect &Content, float LineHeight,
 	DoLine_ColorPicker(&s_ChatBubbleTextColorId, CurrentSettingsContentMetrics(), &Content, Localize("Text color"), &g_Config.m_QmChatBubbleTextColor, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false);
 }
 
-void CMenus::RenderQmVisualSkinTransitionContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)
-{
-	const float SmallSize = CurrentSettingsContentMetrics().m_SmallSize;
-	CUIRect Row, LabelColumn, ControlColumn;
-	Content.HSplitTop(LineHeight, &Row, &Content);
-	TextRender()->TextColor(ColorRGBA(0.9f, 0.9f, 0.9f, 0.9f));
-	RenderQmVisualLabel("qmclient-tee-appearance-title", &Row, Localize("Tee appearance"), SmallSize);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinOutlineLocal, "Skin outline for self and dummy", Localize("Skin outline for self and dummy"), &g_Config.m_QmSkinOutlineLocal);
-	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinOutlineOthers, "Skin outline for other players", Localize("Skin outline for other players"), &g_Config.m_QmSkinOutlineOthers);
-	static CButtonContainer s_SkinOutlineColorId;
-	DoLine_ColorPicker(&s_SkinOutlineColorId, CurrentSettingsContentMetrics(), &Content, Localize("Skin outline color"), &g_Config.m_QmSkinOutlineColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::QmSkinOutlineColor)), false);
-	Content.HSplitTop(LineHeight, &Row, &Content);
-	Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
-	RenderQmVisualLabel("qmclient-skin-outline-width", &LabelColumn, Localize("Skin outline width"), BodySize);
-	static int s_SkinOutlineWidthInputId;
-	RenderQmSettingsSliderWithValueInput(&s_SkinOutlineWidthInputId, ControlColumn, &g_Config.m_QmSkinOutlineWidth, 1, 6, "", PrewarmOnly);
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-	Content.HSplitTop(LineHeight, &Row, &Content);
-	Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
-	RenderQmVisualLabel("qmclient-skin-outline-opacity", &LabelColumn, Localize("Skin outline opacity"), BodySize);
-	static int s_SkinOutlineAlphaInputId;
-	RenderQmSettingsSliderWithValueInput(&s_SkinOutlineAlphaInputId, ControlColumn, &g_Config.m_QmSkinOutlineAlpha, 0, 100, "%", PrewarmOnly);
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-
-	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmCycleTeeHue, "Cycle custom Tee hue", Localize("Cycle custom Tee hue"), &g_Config.m_QmCycleTeeHue);
-	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmCycleTeeHueDummy, "Also apply to dummy", Localize("Also apply to dummy"), &g_Config.m_QmCycleTeeHueDummy);
-
-	Content.HSplitTop(LineHeight, &Row, &Content);
-	Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
-	SLabelProperties CycleHueSpeedLabelProps;
-	CycleHueSpeedLabelProps.m_DisallowNewline = true;
-	CycleHueSpeedLabelProps.m_StopAtEnd = true;
-	CycleHueSpeedLabelProps.m_MinimumFontSize = 6.0f;
-	if(!g_Config.m_QmCycleTeeHue)
-		TextRender()->TextColor(ColorRGBA(0.8f, 0.8f, 0.8f, 0.55f));
-	RenderQmVisualLabel("qmclient-cycle-tee-hue-speed", &LabelColumn, Localize("Hue speed"), BodySize, TEXTALIGN_ML, CycleHueSpeedLabelProps);
-	static int s_QmCycleTeeHueSpeedInputId;
-	int DisabledSpeedPreview = g_Config.m_QmCycleTeeHueSpeed;
-	RenderQmSettingsSliderWithValueInput(&s_QmCycleTeeHueSpeedInputId, ControlColumn, g_Config.m_QmCycleTeeHue ? &g_Config.m_QmCycleTeeHueSpeed : &DisabledSpeedPreview, 0, 360, "°/s", PrewarmOnly);
-	if(!g_Config.m_QmCycleTeeHue)
-		TextRender()->TextColor(TextRender()->DefaultTextColor());
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-
-	Content.HSplitTop(SmallSize, &Row, &Content);
-	TextRender()->TextColor(ColorRGBA(0.85f, 0.85f, 0.85f, 0.72f));
-	RenderQmVisualLabel("qmclient-cycle-tee-hue-custom-note", &Row, Localize("Only affects custom Tee colors."), SmallSize);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-
-	Content.HSplitTop(SmallSize, &Row, &Content);
-	TextRender()->TextColor(g_Config.m_TcRainbowTees ? ColorRGBA(1.0f, 0.78f, 0.45f, 0.9f) : ColorRGBA(0.85f, 0.85f, 0.85f, 0.72f));
-	RenderQmVisualLabel("qmclient-cycle-tee-hue-tclient-note", &Row, Localize("When TClient rainbow Tee is enabled, this feature has no effect."), SmallSize);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-
-	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmHammerSwapSkin, "Hammer skin steal", Localize("Hammer skin steal"), &g_Config.m_QmHammerSwapSkin);
-	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmEmoticonShadow, "Emoticon shadow", Localize("Emoticon shadow"), &g_Config.m_QmEmoticonShadow);
-
-	Content.HSplitTop(LineHeight, &Row, &Content);
-	if(DoSettingsButton_CheckBox(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_VISUAL, QMCLIENT_SETTINGS_TAB_VISUAL, &g_Config.m_QmSkinChangeTransition, "Skin transition animation", Localize("Skin transition animation"), g_Config.m_QmSkinChangeTransition, &Row))
-		g_Config.m_QmSkinChangeTransition ^= 1;
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-	if(!g_Config.m_QmSkinChangeTransition)
-		return;
-
-	auto RenderDropDown = [&](const char *pTextId, const char *pText, int *pValue, int MaxValue, const char **ppNames, int NumNames, CUi::SDropDownState &State, CScrollRegion &ScrollRegion) {
-		Content.HSplitTop(LineHeight, &Row, &Content);
-		Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
-		RenderQmVisualLabel(pTextId, &LabelColumn, Localize(pText), BodySize);
-		State.m_SelectionPopupContext.m_pScrollRegion = &ScrollRegion;
-		const int NewValue = DoSettingsDropDown(&ControlColumn, std::clamp(*pValue, 0, MaxValue), ppNames, NumNames, State);
-		if(*pValue != NewValue)
-			*pValue = NewValue;
-		Content.HSplitTop(LineSpacing, nullptr, &Content);
-	};
-	static CUi::SDropDownState s_SkinTransitionTypeDropDownState;
-	static CScrollRegion s_SkinTransitionTypeDropDownScrollRegion;
-	const char *apSkinTransitionTypeNames[] = {Localize("Afterimage pop"), Localize("Smooth fade"), Localize("Slide left"), Localize("Spin pop"), Localize("Brightness shift"), Localize("Glitch"), Localize("Elastic")};
-	RenderDropDown("qmclient-skin-transition-type", "Skin transition type", &g_Config.m_QmSkinChangeTransitionType, 6, apSkinTransitionTypeNames, std::size(apSkinTransitionTypeNames), s_SkinTransitionTypeDropDownState, s_SkinTransitionTypeDropDownScrollRegion);
-	static CUi::SDropDownState s_SkinTransitionScopeDropDownState;
-	static CScrollRegion s_SkinTransitionScopeDropDownScrollRegion;
-	static std::vector<const char *> s_SkinTransitionScopeDropDownNames;
-	s_SkinTransitionScopeDropDownNames = {Localize("Self only"), Localize("Local"), Localize("All players")};
-	RenderDropDown("qmclient-skin-transition-range", "Animation range", &g_Config.m_QmSkinChangeTransitionScope, 2, s_SkinTransitionScopeDropDownNames.data(), (int)s_SkinTransitionScopeDropDownNames.size(), s_SkinTransitionScopeDropDownState, s_SkinTransitionScopeDropDownScrollRegion);
-
-	Content.HSplitTop(LineHeight, &Row, &Content);
-	Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
-	SLabelProperties DurationLabelProps;
-	DurationLabelProps.m_DisallowNewline = true;
-	DurationLabelProps.m_StopAtEnd = true;
-	DurationLabelProps.m_MinimumFontSize = 6.0f;
-	RenderQmVisualLabel("qmclient-skin-transition-duration", &LabelColumn, Localize("Skin transition duration"), BodySize, TEXTALIGN_ML, DurationLabelProps);
-	static int s_QmSkinChangeTransitionMsInputId;
-	RenderQmSettingsSliderWithValueInput(&s_QmSkinChangeTransitionMsInputId, ControlColumn, &g_Config.m_QmSkinChangeTransitionMs, 0, 2000, "ms", PrewarmOnly);
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-
-	static CUi::SDropDownState s_SkinTransitionEasingDropDownState;
-	static CScrollRegion s_SkinTransitionEasingDropDownScrollRegion;
-	const char *apSkinTransitionEasingNames[] = {Localize("Ease out cubic"), Localize("Elastic back"), Localize("Linear"), Localize("Ease in out quad")};
-	RenderDropDown("qmclient-skin-transition-easing", "Skin transition easing", &g_Config.m_QmSkinChangeTransitionEasing, 3, apSkinTransitionEasingNames, std::size(apSkinTransitionEasingNames), s_SkinTransitionEasingDropDownState, s_SkinTransitionEasingDropDownScrollRegion);
-
-	Content.HSplitTop(LineHeight, &Row, &Content);
-	Row.VSplitLeft(LabelWidth, &LabelColumn, &ControlColumn);
-	RenderQmVisualLabel("qmclient-skin-transition-intensity", &LabelColumn, Localize("Skin transition intensity"), BodySize);
-	static int s_QmSkinChangeTransitionIntensityInputId;
-	RenderQmSettingsSliderWithValueInput(&s_QmSkinChangeTransitionIntensityInputId, ControlColumn, &g_Config.m_QmSkinChangeTransitionIntensity, 0, 300, "%", PrewarmOnly);
-	Content.HSplitTop(LineSpacing, nullptr, &Content);
-}
-
 void CMenus::RenderQmVisualCameraViewContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)
 {
 	auto RenderValue = [&](const char *pTextId, const char *pText, const void *pId, int *pValue, int MinValue, int MaxValue, const char *pSuffix = "", unsigned Flags = 0u) {
@@ -1718,10 +1599,17 @@ void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOn
 				}
 			}
 
-			static constexpr std::array<std::pair<const char *, const char *>, 3> s_aAuthors = {{
-				{"qmclient-community-author-xuanmeng", "璇梦"},
-				{"qmclient-community-author-dyl", "DYL"},
-				{"qmclient-community-author-xiari", "夏日"},
+			struct SAuthorEntry
+			{
+				const char *m_pTextId;
+				const char *m_pName;
+				const char *m_pSkin;
+			};
+			// 每位作者展示各自的皮肤；皮肤缺失时由 RenderDevSkin 回退到 default，与 TClient 信息页一致。
+			static constexpr std::array<SAuthorEntry, 3> s_aAuthors = {{
+				{"qmclient-community-author-xuanmeng", "璇梦", "owocat_mie"},
+				{"qmclient-community-author-dyl", "DYL", "default_v2"},
+				{"qmclient-community-author-xiari", "夏日", "blacktee"},
 			}};
 			const float AuthorTeeSize = std::max(LineHeight * 2.0f, 50.0f * UiScale);
 			for(size_t Index = 0; Index < s_aAuthors.size(); ++Index)
@@ -1730,8 +1618,8 @@ void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOn
 				Content.HSplitTop(AuthorTeeSize + LineSpacing, &AuthorRow, &Content);
 				AuthorRow.VSplitLeft(AuthorTeeSize + LineSpacing, &TeeRect, &Label);
 				TeeRect.w = AuthorTeeSize;
-				RenderDevSkin(TeeRect.Center(), AuthorTeeSize, "default", "default", false, 0, 0, 0, false, true);
-				DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, s_aAuthors[Index].first, &Label, s_aAuthors[Index].second, BodySize, TEXTALIGN_ML, {}, (int)Label.w);
+				RenderDevSkin(TeeRect.Center(), AuthorTeeSize, s_aAuthors[Index].m_pSkin, "default", false, 0, 0, 0, false, true);
+				DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, s_aAuthors[Index].m_pTextId, &Label, s_aAuthors[Index].m_pName, BodySize, TEXTALIGN_ML, {}, (int)Label.w);
 			}
 			Content.HSplitTop(LineSpacing, nullptr, &Content);
 			Content.HSplitTop(LineHeight, &Row, &Content);
@@ -2199,8 +2087,7 @@ void CMenus::RenderQmFunctionKeyBindsContent(CUIRect &Content, float LineHeight,
 		s_ReaderButton45Degrees, s_ClearButton45Degrees,
 		s_ReaderButtonSmallSens, s_ClearButtonSmallSens,
 		s_ReaderButtonLeftJump, s_ClearButtonLeftJump,
-		s_ReaderButtonRightJump, s_ClearButtonRightJump,
-		s_ReaderButtonWeaponTrajectory, s_ClearButtonWeaponTrajectory;
+		s_ReaderButtonRightJump, s_ClearButtonRightJump;
 	[[maybe_unused]] static CButtonContainer s_ReaderButtonDeepflyToggle, s_ClearButtonDeepflyToggle;
 
 	RenderQmHudKeyBindRow(Content, s_ReaderButtonDummyPseudo, s_ClearButtonDummyPseudo,
@@ -2215,8 +2102,7 @@ void CMenus::RenderQmFunctionKeyBindsContent(CUIRect &Content, float LineHeight,
 		Localize("Left jump"), "+jump; +left", LineHeight, BodySize, LineSpacing, LabelWidth);
 	RenderQmHudKeyBindRow(Content, s_ReaderButtonRightJump, s_ClearButtonRightJump,
 		Localize("Right jump"), "+jump; +right", LineHeight, BodySize, LineSpacing, LabelWidth);
-	RenderQmHudKeyBindRow(Content, s_ReaderButtonWeaponTrajectory, s_ClearButtonWeaponTrajectory,
-		Localize("Weapon Trajectory"), "+showweapontrajectory", LineHeight, BodySize, LineSpacing, LabelWidth);
+	// 武器辅助线绑定已归入「控制 → 武器」卡片（deck:controls-weapon），这里不再重复提供。
 }
 
 void CMenus::RenderQmFunctionEmoticonsContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth)
@@ -2225,13 +2111,13 @@ void CMenus::RenderQmFunctionEmoticonsContent(CUIRect &Content, float LineHeight
 	static CButtonContainer s_ClearButtonLaunchEmote;
 	CUIRect Row;
 	Content.HSplitTop(LineHeight, &Row, &Content);
-	RenderQmFunctionCheckbox(&g_Config.m_QmShowOtherSuperEmotes, "qm-emoticons-show-super", Localize("显示他人大表情"), &g_Config.m_QmShowOtherSuperEmotes, &Row, false);
+	RenderQmFunctionCheckbox(&g_Config.m_QmShowOtherSuperEmotes, "qm-emoticons-show-super", Localize("Show other players' large emoticons"), &g_Config.m_QmShowOtherSuperEmotes, &Row, false);
 	Content.HSplitTop(LineSpacing, nullptr, &Content);
 	Content.HSplitTop(LineHeight, &Row, &Content);
-	RenderQmFunctionCheckbox(&g_Config.m_QmShowOtherLaunchEmotes, "qm-emoticons-show-launch", Localize("显示他人发射表情"), &g_Config.m_QmShowOtherLaunchEmotes, &Row, false);
+	RenderQmFunctionCheckbox(&g_Config.m_QmShowOtherLaunchEmotes, "qm-emoticons-show-launch", Localize("Show other players' launched emoticons"), &g_Config.m_QmShowOtherLaunchEmotes, &Row, false);
 	Content.HSplitTop(LineSpacing, nullptr, &Content);
 	RenderQmHudKeyBindRow(Content, s_ReaderButtonLaunchEmote, s_ClearButtonLaunchEmote,
-		Localize("发射表情按键"), "toggle_emote_launcher", LineHeight, BodySize, LineSpacing, LabelWidth);
+		Localize("Launch emote key"), "toggle_emote_launcher", LineHeight, BodySize, LineSpacing, LabelWidth);
 }
 
 void CMenus::RenderQmFunctionGoresActorContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)
@@ -2457,7 +2343,7 @@ void CMenus::RenderQmFunctionFriendNotifyContent(CUIRect &Content, float LineHei
 void CMenus::RenderQmFunctionMiniFeaturesContent(CUIRect &Content, float LineHeight, float LineSpacing, bool PrewarmOnly)
 {
 	CUIRect Row;
-	for(const SQmMiniFeatureRow &Feature : s_aQmMiniFeatureRows)
+	for(const qm_card_catalog::SQmMiniFeatureRow &Feature : qm_card_catalog::QmMiniFeatureRows())
 	{
 		Content.HSplitTop(LineHeight, &Row, &Content);
 		RenderQmFunctionCheckbox(Feature.m_pId, Feature.m_pTextId, Localize(Feature.m_pTextId), Feature.m_pValue, &Row, PrewarmOnly);
@@ -2582,8 +2468,7 @@ void CMenus::RenderQmFunctionBlockWordsContent(CUIRect &Content, float UiScale, 
 	if(ui_widget::InputField(ListInputCtx, &s_BlockWordsInput, ControlColumn, InputOptions).m_Changed)
 	{
 		str_copy(g_Config.m_QmBlockWordsList, s_BlockWordsInput.GetString(), sizeof(g_Config.m_QmBlockWordsList));
-		str_copy(s_aBlockWordsLayoutConfigCache, g_Config.m_QmBlockWordsList, sizeof(s_aBlockWordsLayoutConfigCache));
-		++s_BlockWordsLayoutRevision;
+		RefreshFunctionCardLayoutState(this);
 	}
 }
 
@@ -3443,279 +3328,10 @@ void CMenus::RenderQmFunctionPieMenuContent(CUIRect &Content, float UiScale, flo
 	LogQmPerfStage(Client(), "pie_menu_controls", ControlsTimer.ElapsedMs(), false, aLayoutExtra);
 }
 
-namespace
-{
-	std::array<const char *, 3> QmMapUploadInstructions()
-	{
-		return {Localize("Upload .map files. Server and admin passwords: s."),
-			Localize("Press F2, log in, then use: change_map map_name"),
-			Localize("After uploading again, use: reload or hot_reload")};
-	}
-
-	float QmMapUploadHelpLineHeight(ITextRender *pTextRender, const char *pText, float Width, float BodySize, float LineHeight)
-	{
-		return std::max(LineHeight, pTextRender->TextBoundingBox(BodySize, pText, -1, std::max(1.0f, Width)).m_H + BodySize * 0.25f);
-	}
-}
-
-const char *CMenus::QmMapUploadPlayerName() const
-{
-	if(Client()->State() == IClient::STATE_ONLINE)
-	{
-		const int ClientId = GameClient()->m_aLocalIds[g_Config.m_ClDummy];
-		return ClientId >= 0 && ClientId < MAX_CLIENTS ? GameClient()->m_aClients[ClientId].m_aName : "";
-	}
-	return g_Config.m_PlayerName;
-}
-
-int CMenus::QmMapUploadScan(const CFsFileInfo *pInfo, int IsDir, int StorageType, void *pUser)
-{
-	auto *pPicker = static_cast<CQmMapUploadPicker *>(pUser);
-	if(str_comp(pInfo->m_pName, ".") == 0 || str_comp(pInfo->m_pName, "..") == 0 ||
-		(!IsDir && !qm_map_upload::IsMapFilename(pInfo->m_pName)))
-		return 0;
-	SQmMapUploadFile File;
-	str_copy(File.m_aFilename, pInfo->m_pName);
-	File.m_IsDirectory = IsDir != 0;
-	File.m_StorageType = StorageType;
-	pPicker->m_vFiles.push_back(File);
-	return 0;
-}
-
-void CMenus::PopulateQmMapUploadPicker()
-{
-	auto &Picker = m_QmMapUploadPicker;
-	Picker.m_vFiles.clear();
-	Picker.m_Selected = -1;
-	Picker.m_ListBox.ResetScroll();
-	if(Picker.m_aFolder[0] == '\0')
-	{
-		for(const char *pFolder : {"maps", "downloadedmaps"})
-		{
-			SQmMapUploadFile Folder;
-			str_copy(Folder.m_aFilename, pFolder);
-			Folder.m_IsDirectory = true;
-			Picker.m_vFiles.push_back(Folder);
-		}
-		return;
-	}
-	SQmMapUploadFile Parent;
-	str_copy(Parent.m_aFilename, "..");
-	Parent.m_IsDirectory = true;
-	Picker.m_vFiles.push_back(Parent);
-	Storage()->ListDirectoryInfo(Picker.m_StorageType, Picker.m_aFolder, QmMapUploadScan, &Picker);
-	std::stable_sort(Picker.m_vFiles.begin() + 1, Picker.m_vFiles.end(), [](const SQmMapUploadFile &Left, const SQmMapUploadFile &Right) {
-		if(Left.m_IsDirectory != Right.m_IsDirectory)
-			return Left.m_IsDirectory;
-		const int NameOrder = str_comp_filenames(Left.m_aFilename, Right.m_aFilename);
-		return NameOrder != 0 ? NameOrder < 0 : Left.m_StorageType < Right.m_StorageType;
-	});
-}
-
-CUi::EPopupMenuFunctionResult CMenus::PopupQmMapUploadPicker(void *pContext, CUIRect View, bool Active)
-{
-	auto *pPicker = static_cast<CQmMapUploadPicker *>(pContext);
-	CMenus *pMenus = pPicker->m_pMenus;
-	if(pMenus == nullptr || pMenus->m_QmMapUpload.Busy())
-		return CUi::POPUP_CLOSE_CURRENT;
-
-	const SSettingsContentMetrics Metrics = pMenus->CurrentSettingsContentMetrics();
-	View.Margin(Metrics.m_LineSpacing, &View);
-	CUIRect Path, Footer;
-	View.HSplitTop(Metrics.m_LineHeight, &Path, &View);
-	View.HSplitBottom(Metrics.m_ButtonHeight, &View, &Footer);
-	View.HSplitBottom(Metrics.m_LineSpacing, &View, nullptr);
-	SLabelProperties SingleLine;
-	SingleLine.m_MaxWidth = Path.w;
-	SingleLine.m_DisallowNewline = true;
-	SingleLine.m_EllipsisAtEnd = true;
-	SingleLine.m_EnableWidthCheck = false;
-	pMenus->Ui()->DoLabel(&Path, pPicker->m_aFolder[0] ? pPicker->m_aFolder : Localize("Map folders"), Metrics.m_BodySize, TEXTALIGN_ML, SingleLine);
-	if(pMenus->Ui()->DoButton_PopupMenu(&pPicker->m_CancelButton, Localize("Cancel"), &Footer, Metrics.m_BodySize, TEXTALIGN_MC) ||
-		(Active && pMenus->Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE)))
-		return CUi::POPUP_CLOSE_CURRENT;
-
-	CListBox &List = pPicker->m_ListBox;
-	List.SetActive(Active);
-	List.SetWheelOwnerPriority(EUiWheelOwnerPriority::POPUP);
-	List.SetScrollProfile(EQmScrollProfile::POPUP_LIST);
-	List.DoStart(Metrics.m_LineHeight + Metrics.m_SmallSize + Metrics.m_LineSpacing, (int)pPicker->m_vFiles.size(), 1, 3, pPicker->m_Selected, &View, false);
-	for(size_t Index = 0; Index < pPicker->m_vFiles.size(); ++Index)
-	{
-		const SQmMapUploadFile &File = pPicker->m_vFiles[Index];
-		const CListboxItem Item = List.DoNextItem(&File, (int)Index == pPicker->m_Selected);
-		if(!Item.m_Visible)
-			continue;
-		CUIRect Name = Item.m_Rect, Source;
-		Name.HSplitTop(Metrics.m_LineHeight, &Name, &Source);
-		char aLabel[IO_MAX_PATH_LENGTH + 2];
-		str_format(aLabel, sizeof(aLabel), "%s%s", File.m_aFilename, File.m_IsDirectory ? "/" : "");
-		SingleLine.m_MaxWidth = Name.w;
-		pMenus->Ui()->DoLabel(&Name, aLabel, Metrics.m_BodySize, TEXTALIGN_ML, SingleLine);
-		// 同名地图可能来自不同存储目录，显示实际来源并保留上传时的 StorageType。
-		if(File.m_StorageType >= 0)
-		{
-			char aSource[IO_MAX_PATH_LENGTH];
-			pMenus->Storage()->GetCompletePath(File.m_StorageType, pPicker->m_aFolder, aSource, sizeof(aSource));
-			pMenus->Ui()->DoLabel(&Source, aSource, Metrics.m_SmallSize, TEXTALIGN_ML, SingleLine);
-		}
-	}
-	const int Selected = List.DoEnd();
-	pPicker->m_Selected = Selected >= 0 && Selected < (int)pPicker->m_vFiles.size() ? Selected : -1;
-	if(pPicker->m_vFiles.size() == 1 && str_comp(pPicker->m_vFiles.front().m_aFilename, "..") == 0)
-		pMenus->Ui()->DoLabel(&View, Localize("No saved maps found"), Metrics.m_BodySize, TEXTALIGN_MC);
-	if(!Active || pPicker->m_Selected < 0 || (!List.WasItemSelected() && !List.WasItemActivated()))
-		return CUi::POPUP_KEEP_OPEN;
-
-	const SQmMapUploadFile SelectedFile = pPicker->m_vFiles[pPicker->m_Selected];
-	if(SelectedFile.m_IsDirectory)
-	{
-		if(str_comp(SelectedFile.m_aFilename, "..") == 0)
-		{
-			if(str_comp(pPicker->m_aFolder, "maps") == 0 || str_comp(pPicker->m_aFolder, "downloadedmaps") == 0)
-				pPicker->m_aFolder[0] = '\0';
-			else
-				fs_parent_dir(pPicker->m_aFolder);
-			if(pPicker->m_aFolder[0] == '\0' || str_comp(pPicker->m_aFolder, "maps") == 0 || str_comp(pPicker->m_aFolder, "downloadedmaps") == 0)
-				pPicker->m_StorageType = IStorage::TYPE_ALL;
-		}
-		else
-		{
-			const size_t Needed = str_length(pPicker->m_aFolder) + str_length(SelectedFile.m_aFilename) + 2;
-			if(Needed > sizeof(pPicker->m_aFolder))
-				return CUi::POPUP_KEEP_OPEN;
-			if(pPicker->m_aFolder[0])
-				str_append(pPicker->m_aFolder, "/");
-			str_append(pPicker->m_aFolder, SelectedFile.m_aFilename);
-			pPicker->m_StorageType = SelectedFile.m_StorageType;
-		}
-		pMenus->PopulateQmMapUploadPicker();
-		return CUi::POPUP_KEEP_OPEN;
-	}
-
-	const size_t Needed = str_length(pPicker->m_aFolder) + str_length(SelectedFile.m_aFilename) + 2;
-	if(Needed > sizeof(pMenus->m_aQmMapUploadPath))
-		return CUi::POPUP_KEEP_OPEN;
-	str_format(pMenus->m_aQmMapUploadPath, sizeof(pMenus->m_aQmMapUploadPath), "%s/%s", pPicker->m_aFolder, SelectedFile.m_aFilename);
-	pMenus->m_QmMapUploadStorageType = SelectedFile.m_StorageType;
-	pMenus->m_QmMapUpload.Reset();
-	pMenus->Ui()->SetActiveItem(nullptr);
-	return CUi::POPUP_CLOSE_CURRENT;
-}
-
-void CMenus::RenderQmFunctionMapUploadContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, bool PrewarmOnly)
-{
-	const bool ReadOnly = PrewarmOnly || Ui()->RenderOnly();
-	const bool Busy = m_QmMapUpload.Busy();
-	auto NextRow = [&](float Height) {
-		CUIRect Row;
-		Content.HSplitTop(Height, &Row, &Content);
-		Content.HSplitTop(LineSpacing, nullptr, &Content);
-		return Row;
-	};
-	SLabelProperties SingleLine;
-	SingleLine.m_MaxWidth = Content.w;
-	SingleLine.m_DisallowNewline = true;
-	SingleLine.m_EllipsisAtEnd = true;
-	SingleLine.m_EnableWidthCheck = false;
-	char aText[IO_MAX_PATH_LENGTH + 128];
-	CUIRect Row = NextRow(LineHeight);
-	str_format(aText, sizeof(aText), Localize("File: %s"), m_aQmMapUploadPath[0] ? m_aQmMapUploadPath : Localize("No map selected"));
-	DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_FUNCTION, QMCLIENT_SETTINGS_TAB_FUNCTION, "qmclient-map-upload-file", &Row, aText, BodySize, TEXTALIGN_ML, SingleLine);
-	Row = NextRow(LineHeight);
-	str_format(aText, sizeof(aText), Localize("Player: %s"), Busy ? m_aQmMapUploadPlayer : QmMapUploadPlayerName());
-	DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_FUNCTION, QMCLIENT_SETTINGS_TAB_FUNCTION, "qmclient-map-upload-player", &Row, aText, BodySize, TEXTALIGN_ML, SingleLine);
-
-	Row = NextRow(LineHeight);
-	CUIRect SelectButton, ActionButton;
-	Row.VSplitMid(&SelectButton, &ActionButton, LineSpacing);
-	static CButtonContainer s_SelectButton, s_UploadButton, s_CancelButton;
-	if(DoSettingsButton_Menu(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_FUNCTION, QMCLIENT_SETTINGS_TAB_FUNCTION, &s_SelectButton, "qmclient-map-upload-select", Localize("Select map"), Busy || ReadOnly ? -1 : 0, &SelectButton) && !Busy && !ReadOnly)
-	{
-		m_QmMapUploadPicker.m_pMenus = this;
-		PopulateQmMapUploadPicker();
-		const CUIRect Screen = *Ui()->Screen();
-		const float Width = std::min(520.0f, Screen.w - 20.0f);
-		const float Height = std::min(360.0f, Screen.h - 20.0f);
-		SPopupMenuProperties Props;
-		Props.m_BlockUnderlyingScroll = true;
-		Props.m_BlockUnderlyingPointerInput = true;
-		Ui()->DoPopupMenu(&m_QmMapUploadPicker, Screen.x + (Screen.w - Width) * 0.5f, Screen.y + (Screen.h - Height) * 0.5f, Width, Height, &m_QmMapUploadPicker, PopupQmMapUploadPicker, Props);
-	}
-	if(Busy)
-	{
-		const bool CanCancel = !ReadOnly && m_QmMapUpload.Status() == qm_map_upload::EStatus::UPLOADING;
-		if(DoSettingsButton_Menu(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_FUNCTION, QMCLIENT_SETTINGS_TAB_FUNCTION, &s_CancelButton, "qmclient-map-upload-cancel", Localize("Cancel"), CanCancel ? 0 : -1, &ActionButton) && CanCancel)
-			m_QmMapUpload.Cancel();
-	}
-	else
-	{
-		const bool CanUpload = !ReadOnly && m_aQmMapUploadPath[0] != '\0';
-		if(DoSettingsButton_Menu(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_FUNCTION, QMCLIENT_SETTINGS_TAB_FUNCTION, &s_UploadButton, "qmclient-map-upload-submit", Localize("Upload map"), CanUpload ? 0 : -1, &ActionButton) && CanUpload)
-		{
-			// 提交时快照当前控制角色的服务端名字，随后切换分身不会改变本次上传。
-			str_copy(m_aQmMapUploadPlayer, QmMapUploadPlayerName());
-			m_QmMapUpload.Start(Storage(), Http(), Engine(), m_aQmMapUploadPath, m_QmMapUploadStorageType, m_aQmMapUploadPlayer);
-		}
-	}
-
-	const char *pStatus = Localize("Select a saved .map file (client limit: 64 MiB).");
-	switch(m_QmMapUpload.Status())
-	{
-	case qm_map_upload::EStatus::IDLE: break;
-	case qm_map_upload::EStatus::UPLOADING: pStatus = Localize("Map upload in progress..."); break;
-	case qm_map_upload::EStatus::SUCCESS: pStatus = Localize("Map uploaded successfully."); break;
-	case qm_map_upload::EStatus::CANCELLED: pStatus = Localize("Map upload cancelled."); break;
-	case qm_map_upload::EStatus::INVALID_FILE: pStatus = Localize("Invalid map file or filename."); break;
-	case qm_map_upload::EStatus::TOO_LARGE: pStatus = Localize("Map exceeds the client limit of 64 MiB."); break;
-	case qm_map_upload::EStatus::READ_FAILED: pStatus = Localize("Could not read the map file."); break;
-	case qm_map_upload::EStatus::NETWORK_ERROR: pStatus = Localize("Map upload network error."); break;
-	case qm_map_upload::EStatus::SERVER_ERROR: pStatus = Localize("The server rejected the map upload."); break;
-	case qm_map_upload::EStatus::INVALID_RESPONSE: pStatus = Localize("Unexpected map upload response."); break;
-	case qm_map_upload::EStatus::MISSING_PLAYER: pStatus = Localize("A player name is required."); break;
-	}
-	char aStatus[256];
-	if(m_QmMapUpload.Detail().empty() && m_QmMapUpload.StatusCode() > 0 &&
-		(m_QmMapUpload.Status() == qm_map_upload::EStatus::SERVER_ERROR || m_QmMapUpload.Status() == qm_map_upload::EStatus::INVALID_RESPONSE))
-	{
-		str_format(aStatus, sizeof(aStatus), "%s (HTTP %d)", pStatus, m_QmMapUpload.StatusCode());
-		pStatus = aStatus;
-	}
-	SLabelProperties Wrapped;
-	Wrapped.m_MaxWidth = Content.w;
-	Wrapped.m_EnableWidthCheck = false;
-	Row = NextRow(LineHeight * 2.0f);
-	Ui()->ClipEnable(&Row);
-	DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_FUNCTION, QMCLIENT_SETTINGS_TAB_FUNCTION, "qmclient-map-upload-status", &Row, pStatus, BodySize, TEXTALIGN_TL, Wrapped);
-	Ui()->ClipDisable();
-	Row = NextRow(LineHeight * 2.0f);
-	// 服务端消息只按普通文本显示，固定区域允许换行并裁剪过长内容。
-	if(!m_QmMapUpload.Detail().empty())
-	{
-		char aDetail[768];
-		str_copy(aDetail, m_QmMapUpload.Detail().c_str());
-		Ui()->ClipEnable(&Row);
-		DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_FUNCTION, QMCLIENT_SETTINGS_TAB_FUNCTION, "qmclient-map-upload-detail", &Row, aDetail, BodySize, TEXTALIGN_TL, Wrapped);
-		Ui()->ClipDisable();
-	}
-	const auto Instructions = QmMapUploadInstructions();
-	for(size_t Index = 0; Index < Instructions.size(); ++Index)
-	{
-		Row = NextRow(QmMapUploadHelpLineHeight(TextRender(), Instructions[Index], Content.w, BodySize, LineHeight));
-		char aId[64];
-		str_format(aId, sizeof(aId), "qmclient-map-upload-help-%d", (int)Index);
-		DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_FUNCTION, QMCLIENT_SETTINGS_TAB_FUNCTION, aId, &Row, Instructions[Index], BodySize, TEXTALIGN_TL, Wrapped);
-	}
-}
-
 void CMenus::RenderQmFunctionFavoriteMapsContent(CUIRect &Content, float UiScale, float LineHeight, float BodySize, float LineSpacing, bool PrewarmOnly)
 {
 	const auto &FavMaps = GameClient()->TClientComponent().GetFavoriteMaps();
-	if(s_FavoriteMapsLayoutCount != FavMaps.size())
-	{
-		s_FavoriteMapsLayoutCount = FavMaps.size();
-		++s_FavoriteMapsLayoutRevision;
-	}
+	RefreshFunctionCardLayoutState(this);
 
 	auto MapCategoryKeyFromText = [](const char *pText) -> const char * {
 		if(!pText || pText[0] == '\0')
@@ -3956,12 +3572,7 @@ void CMenus::RenderQmFunctionFavoriteMapsContent(CUIRect &Content, float UiScale
 	if(!RemoveMapName.empty())
 	{
 		GameClient()->TClientComponent().RemoveFavoriteMap(RemoveMapName.c_str());
-		const size_t FavoriteMapCount = GameClient()->TClientComponent().GetFavoriteMaps().size();
-		if(s_FavoriteMapsLayoutCount != FavoriteMapCount)
-		{
-			s_FavoriteMapsLayoutCount = FavoriteMapCount;
-			++s_FavoriteMapsLayoutRevision;
-		}
+		RefreshFunctionCardLayoutState(this);
 	}
 }
 
@@ -4115,8 +3726,8 @@ void CMenus::RenderQmHudDynamicIslandContent(CUIRect &Content, float LineHeight,
 	const int CurrentMode = std::clamp(g_Config.m_QmSwitchCountdownMode, static_cast<int>(EQmSwitchCountdownMode::FOLLOW_TEE), static_cast<int>(EQmSwitchCountdownMode::BOTH));
 	bool LocationChanged = false;
 
-	LocationChanged |= RenderQmHudCheckbox(Content, LineHeight, LineSpacing, &s_SwitchCountdownFollowTeeId, "qmclient-switch-countdown-follow-tee", Localize("Follow Tee"), &FollowTee);
-	LocationChanged |= RenderQmHudCheckbox(Content, LineHeight, LineSpacing, &s_SwitchCountdownMediaIslandId, "qmclient-switch-countdown-media-island", Localize("Show in Dynamic Island"), &MediaIsland);
+	LocationChanged |= RenderQmHudCheckbox(Content, LineHeight, LineSpacing, qm_card_catalog::SwitchCountdownFollowTeeId(), "qmclient-switch-countdown-follow-tee", Localize("Follow Tee"), &FollowTee);
+	LocationChanged |= RenderQmHudCheckbox(Content, LineHeight, LineSpacing, qm_card_catalog::SwitchCountdownMediaIslandId(), "qmclient-switch-countdown-media-island", Localize("Show in Dynamic Island"), &MediaIsland);
 
 	if(CountdownChanged || LocationChanged)
 	{
@@ -5197,9 +4808,6 @@ void CMenus::RenderSettingsQmClientHudDeck(CUIRect MainView, bool PrewarmOnly)
 	const bool ReadOnly = PrewarmOnly || Ui()->RenderOnly();
 	const SSettingsContentMetrics Metrics = ResolveSettingsContentMetrics(MainView.w);
 	const float UiScale = Metrics.m_UiScale;
-	const float LineHeight = Metrics.m_LineHeight;
-	const float BodySize = Metrics.m_BodySize;
-	const float LineSpacing = Metrics.m_LineSpacing;
 	const SSettingsPageLayoutFrame Page = SettingsPageLayout(MainView, UiScale);
 	const float LabelWidth = ResolveSettingsCardLabelWidth(Page.m_TwoColumns ? Page.m_aColumns[0].w : Page.m_ContentViewport.w, Metrics);
 	IUiContext CardCtx = SettingsUiContext("settings_qmclient_hud", UiScale);
@@ -5224,322 +4832,27 @@ void CMenus::RenderSettingsQmClientHudDeck(CUIRect MainView, bool PrewarmOnly)
 		str_copy(g_Config.m_QmSidebarCardCollapsed, aNormalizedCollapsed, sizeof(g_Config.m_QmSidebarCardCollapsed));
 	str_copy(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed, sizeof(s_aCollapsedConfigCache));
 
-	auto ModuleStateIndex = [](EQmModuleId Id) { return std::clamp((int)Id, 0, (int)QmModuleCount - 1); };
-	auto ToggleCollapsed = [](EQmModuleId Id) {
-		const int Index = std::clamp((int)Id, 0, (int)QmModuleCount - 1);
-		s_aCollapsed[Index] = !s_aCollapsed[Index];
-		SerializeLegacyQmCollapsed(s_aQmModuleDefaults, s_aCollapsed, g_Config.m_QmSidebarCardCollapsed, sizeof(g_Config.m_QmSidebarCardCollapsed));
-		str_copy(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed, sizeof(s_aCollapsedConfigCache));
+	const qm_card_catalog::SQmFunctionCardLayoutState FunctionCardLayout = ResolveFunctionCardLayoutState();
+	const SQmSettingsCardStyle CardStyle = QmSettingsCardStyle(UiScale);
+	qm_card_catalog::SQmCardBuildContext CardBuild;
+	CardBuild.m_pMenus = this;
+	CardBuild.m_ReadOnly = ReadOnly;
+	CardBuild.m_Page = Page;
+	CardBuild.m_Metrics = Metrics;
+	CardBuild.m_LabelWidth = LabelWidth;
+	CardBuild.m_UiContext = CardCtx;
+	CardBuild.m_Padding = CardStyle.m_Padding;
+	CardBuild.m_CornerRadius = CardStyle.m_CornerRadius;
+	CardBuild.m_pCollapsed = s_aCollapsed.data();
+	CardBuild.m_pCollapseButtons = s_aCollapseButtons.data();
+	CardBuild.m_pToggleCollapsed = ToggleQmSidebarCardCollapsed;
+	CardBuild.m_pToggleCollapsedUser = s_aCollapsed.data();
+	CardBuild.m_pFunctionLayout = &FunctionCardLayout;
+	// 页面只声明"这一页有哪些卡片"，卡片的测量与渲染都在卡片目录里。
+	const auto BuildDefinitions = [&](std::vector<SSettingsCardDefinition> &vCards) {
+		qm_card_catalog::BuildCards(CardBuild, qm_card_catalog::HudCardStableIds(), vCards);
 	};
-	const bool DummyMiniViewExpanded = g_Config.m_QmDummyMiniView != 0;
-	const bool DynamicIslandOriginalStyle = g_Config.m_QmHudIslandUseOriginalStyle != 0;
-	auto EstimateContentHeight = [Metrics, LineHeight, LineSpacing, DummyMiniViewExpanded, DynamicIslandOriginalStyle](EQmModuleId Id, float ContentWidth) {
-		const auto Rows = [LineHeight, LineSpacing](float Count) { return Count * (LineHeight + LineSpacing); };
-		switch(Id)
-		{
-		case EQmModuleId::DummyMiniView: return ResolveQmHudDummyMiniViewHeight(Metrics, DummyMiniViewExpanded);
-		case EQmModuleId::Coords: return ResolveQmHudCoordsHeight(Metrics);
-		case EQmModuleId::PlayerStats: return ResolveQmHudPlayerStatsHeight(Metrics, g_Config.m_QmPlayerStatsMapProgress != 0, g_Config.m_QmPlayerStatsMapProgressStyle != 0);
-		case EQmModuleId::DebugGraph: return Rows(2.0f);
-		case EQmModuleId::DebugMode: return Rows(5.0f);
-		case EQmModuleId::InputOverlay: return ResolveQmHudInputOverlayHeight(Metrics, g_Config.m_QmInputOverlay != 0);
-		case EQmModuleId::HudNotifications: return ResolveQmHudNotificationsHeight(Metrics, g_Config.m_QmHudNotificationsShowAdvanced != 0, g_Config.m_QmHudNotificationsUseCategoryFilters != 0);
-		case EQmModuleId::Voice: return ResolveQmHudVoiceHeight(Metrics, g_Config.m_QmVoiceEnable != 0, g_Config.m_QmVoiceShowAdvanced != 0, g_Config.m_QmVoiceShowConnectionStatus != 0, g_Config.m_QmVoiceNoiseSuppressEnable, g_Config.m_QmVoiceVadEnable != 0, g_Config.m_QmVoiceStereo != 0);
-		case EQmModuleId::DynamicIsland: return ResolveQmHudDynamicIslandHeight(Metrics, DynamicIslandOriginalStyle, g_Config.m_QmSwitchCountdown != 0, ContentWidth);
-		case EQmModuleId::SystemMediaControls: return g_Config.m_QmSmtcEnable ? Rows(3.0f) : Rows(1.0f);
-		case EQmModuleId::Lyrics:
-		{
-			// 来源开关、歌词开关和对应来源的接入操作、状态或凭据行。
-			size_t HookCount = 0;
-			QmMusicHookRegistry(&HookCount);
-			return Rows((float)HookCount + 2.0f + (g_Config.m_QmSpotifyEnable != 0 ? 1.0f : 0.0f) + (g_Config.m_QmKugouHookEnable != 0 ? 1.0f : 0.0f) + (g_Config.m_QmKugouHookEnable != 0 || g_Config.m_QmQQMusicHookEnable != 0 ? 1.0f : 0.0f));
-		}
-		case EQmModuleId::Background3D: return ResolveQmHudBackground3DHeight(Metrics, ContentWidth, g_Config.m_Qm3DParticles != 0, g_Config.m_Qm3DParticlesColorMode == 1, g_Config.m_Qm3DParticlesGlow != 0, g_Config.m_Qm3DParticlesTrail != 0, g_Config.m_Qm3DParticlesPulse != 0, g_Config.m_Qm3DParticlesTwinkle != 0);
-		case EQmModuleId::BindStatusHud: return Rows(4.0f); // 4 个状态开关
-		default: return Rows(1.0f);
-		}
-	};
-	auto MeasureContentRevision = [DummyMiniViewExpanded, DynamicIslandOriginalStyle](EQmModuleId Id) -> uint64_t {
-		switch(Id)
-		{
-		case EQmModuleId::DummyMiniView: return DummyMiniViewExpanded ? 1u : 0u;
-		case EQmModuleId::PlayerStats: return (g_Config.m_QmPlayerStatsMapProgress ? 1u : 0u) | (g_Config.m_QmPlayerStatsMapProgressStyle ? 2u : 0u);
-		case EQmModuleId::InputOverlay: return g_Config.m_QmInputOverlay ? 1u : 0u;
-		case EQmModuleId::HudNotifications:
-		{
-			uint64_t Revision = g_Config.m_QmHudNotificationsShowAdvanced ? 1u : 0u;
-			if(g_Config.m_QmHudNotificationsShowAdvanced && g_Config.m_QmHudNotificationsUseCategoryFilters)
-				Revision |= 2u;
-			return Revision;
-		}
-		case EQmModuleId::Voice: return ResolveQmHudVoiceRevision(g_Config.m_QmVoiceEnable != 0, g_Config.m_QmVoiceShowAdvanced != 0, g_Config.m_QmVoiceShowConnectionStatus != 0, g_Config.m_QmVoiceNoiseSuppressEnable, g_Config.m_QmVoiceVadEnable != 0, g_Config.m_QmVoiceStereo != 0);
-		case EQmModuleId::DynamicIsland: return (DynamicIslandOriginalStyle ? 1u : 0u) | (g_Config.m_QmSwitchCountdown ? 2u : 0u);
-		case EQmModuleId::SystemMediaControls: return g_Config.m_QmSmtcEnable ? 1u : 0u;
-		case EQmModuleId::Lyrics: return (g_Config.m_QmSpotifyEnable ? 1u : 0u) | (g_Config.m_QmKugouHookEnable ? 2u : 0u) | (g_Config.m_QmQQMusicHookEnable ? 4u : 0u); // 来源附加行影响布局高度
-		case EQmModuleId::Background3D: return ResolveQmHudBackground3DRevision(g_Config.m_Qm3DParticles != 0, g_Config.m_Qm3DParticlesColorMode == 1, g_Config.m_Qm3DParticlesGlow != 0, g_Config.m_Qm3DParticlesTrail != 0, g_Config.m_Qm3DParticlesPulse != 0, g_Config.m_Qm3DParticlesTwinkle != 0);
-		default: return 0u;
-		}
-	};
-
-	const auto ConsumeQmHudRow = [LineHeight, LineSpacing](CUIRect &Content) {
-		Content.HSplitTop(LineHeight, nullptr, &Content);
-		Content.HSplitTop(LineSpacing, nullptr, &Content);
-	};
-	const auto ConsumeQmHudHeight = [](CUIRect &Content, const float Height) {
-		Content.HSplitTop(std::max(0.0f, Height), nullptr, &Content);
-	};
-	const auto BuildHudPreLayoutInput = [this, Metrics, LineHeight, LineSpacing, ReadOnly, ConsumeQmHudRow, ConsumeQmHudHeight](EQmModuleId Id) -> FSettingsCardPreLayoutInput {
-		if(ReadOnly)
-			return {};
-		switch(Id)
-		{
-		case EQmModuleId::InputOverlay:
-			return [this, Metrics](CUIRect Content) {
-				return HandleQmHudCheckboxInput(Content, Metrics.m_LineHeight, Metrics.m_LineSpacing, &g_Config.m_QmInputOverlay, &g_Config.m_QmInputOverlay);
-			};
-		case EQmModuleId::DynamicIsland:
-			return [this, Metrics, LineHeight, LineSpacing](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmHudIslandUseOriginalStyle, &g_Config.m_QmHudIslandUseOriginalStyle);
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmHudIslandShowTeam, &g_Config.m_QmHudIslandShowTeam) || Changed;
-				if(!g_Config.m_QmHudIslandUseOriginalStyle)
-				{
-					const SSettingsColorRowLayout ColorLayout = ResolveSettingsColorRowLayout(Content, Metrics, false);
-					Content.HSplitTop(ColorLayout.m_ConsumedHeight, nullptr, &Content);
-				}
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmHookCountdown, &g_Config.m_QmHookCountdown) || Changed;
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSwitchCountdown, &g_Config.m_QmSwitchCountdown) || Changed;
-				if(!g_Config.m_QmSwitchCountdown)
-					return Changed;
-				// 两个位置开关各自翻转自己的标志位，再合成模式值，与渲染路径保持一致。
-				int FollowTee = QmHudSwitchCountdownShowsFollowTee(g_Config.m_QmSwitchCountdownMode) ? 1 : 0;
-				int MediaIsland = QmHudSwitchCountdownShowsMediaIsland(g_Config.m_QmSwitchCountdownMode) ? 1 : 0;
-				bool LocationChanged = ToggleQmHudCountdownLocation(Content, LineHeight, LineSpacing, &s_SwitchCountdownFollowTeeId, &FollowTee);
-				LocationChanged |= ToggleQmHudCountdownLocation(Content, LineHeight, LineSpacing, &s_SwitchCountdownMediaIslandId, &MediaIsland);
-				if(LocationChanged)
-				{
-					if(FollowTee == 0 && MediaIsland == 0)
-					{
-						g_Config.m_QmSwitchCountdown = 0;
-						FollowTee = 0;
-						MediaIsland = 1;
-					}
-					g_Config.m_QmSwitchCountdownMode = QmHudSwitchCountdownModeFromLocations(FollowTee != 0, MediaIsland != 0, g_Config.m_QmSwitchCountdownMode);
-					Changed = true;
-				}
-				return Changed;
-			};
-		case EQmModuleId::PlayerStats:
-			return [this, LineHeight, LineSpacing, ConsumeQmHudRow](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmPlayerStatsHud, &g_Config.m_QmPlayerStatsHud);
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmPlayerStatsMapProgress, &g_Config.m_QmPlayerStatsMapProgress) || Changed;
-				if(g_Config.m_QmPlayerStatsMapProgress)
-				{
-					Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmPlayerStatsMapProgressStyle, &g_Config.m_QmPlayerStatsMapProgressStyle) || Changed;
-					if(!g_Config.m_QmPlayerStatsMapProgressStyle)
-					{
-						ConsumeQmHudRow(Content);
-						for(int Index = 0; Index < 4; ++Index)
-							ConsumeQmHudRow(Content);
-					}
-					Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmPlayerStatsMapProgressDbgRoute, &g_Config.m_QmPlayerStatsMapProgressDbgRoute) || Changed;
-				}
-				HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmPlayerStatsResetOnJoin, &g_Config.m_QmPlayerStatsResetOnJoin);
-				return Changed;
-			};
-		case EQmModuleId::HudNotifications:
-			return [this, LineHeight, LineSpacing, ConsumeQmHudRow](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmHudNotificationsSystem, &g_Config.m_QmHudNotificationsSystem);
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmHudNotificationsEcho, &g_Config.m_QmHudNotificationsEcho) || Changed;
-				ConsumeQmHudRow(Content);
-				ConsumeQmHudRow(Content);
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmHudNotificationsShowAdvanced, &g_Config.m_QmHudNotificationsShowAdvanced) || Changed;
-				if(g_Config.m_QmHudNotificationsShowAdvanced)
-					Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmHudNotificationsUseCategoryFilters, &g_Config.m_QmHudNotificationsUseCategoryFilters) || Changed;
-				return Changed;
-			};
-		case EQmModuleId::Voice:
-			return [this, Metrics, LineHeight, LineSpacing, ConsumeQmHudRow, ConsumeQmHudHeight](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmVoiceEnable, &g_Config.m_QmVoiceEnable);
-				if(!g_Config.m_QmVoiceEnable)
-					return Changed;
-				ConsumeQmHudRow(Content); // room password
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmVoiceMicMute, &g_Config.m_QmVoiceMicMute) || Changed;
-				ConsumeQmHudRow(Content); // microphone volume
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmVoiceVadEnable, &g_Config.m_QmVoiceVadEnable) || Changed;
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmVoiceShowAdvanced, &g_Config.m_QmVoiceShowAdvanced) || Changed;
-				if(!g_Config.m_QmVoiceShowAdvanced)
-					return Changed;
-
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmVoiceShowConnectionStatus, &g_Config.m_QmVoiceShowConnectionStatus) || Changed;
-				if(g_Config.m_QmVoiceShowConnectionStatus)
-				{
-					ConsumeQmHudHeight(Content, LineHeight * 1.46f + LineSpacing * 0.75f);
-					ConsumeQmHudHeight(Content, 10.0f * (LineHeight + LineSpacing * 0.75f) + LineSpacing * 0.5f);
-				}
-
-				for(int Index = 0; Index < 5; ++Index)
-					ConsumeQmHudRow(Content); // server, input/output device, bitrate and noise mode
-				if(g_Config.m_QmVoiceNoiseSuppressEnable != 0)
-				{
-#if !defined(CONF_RNNOISE)
-					if(g_Config.m_QmVoiceNoiseSuppressEnable == 2)
-						ConsumeQmHudHeight(Content, LineHeight * 0.78f + LineSpacing * 0.75f);
-#endif
-					ConsumeQmHudRow(Content); // noise reduction strength
-				}
-				ConsumeQmHudRow(Content); // AGC
-				if(g_Config.m_QmVoiceVadEnable)
-				{
-					ConsumeQmHudRow(Content);
-					ConsumeQmHudRow(Content);
-				}
-				ConsumeQmHudHeight(Content, LineSpacing * 1.15f);
-				ConsumeQmHudRow(Content); // playback volume
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmVoiceStereo, &g_Config.m_QmVoiceStereo) || Changed;
-				if(g_Config.m_QmVoiceStereo)
-					ConsumeQmHudRow(Content);
-				return Changed;
-			};
-		case EQmModuleId::SystemMediaControls:
-			return [this, LineHeight, LineSpacing](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSmtcEnable, &g_Config.m_QmSmtcEnable);
-				return Changed;
-			};
-		case EQmModuleId::Lyrics:
-			return [this, LineHeight, LineSpacing, ConsumeQmHudRow](CUIRect Content) {
-				bool Changed = false;
-				// 音乐 Hook 开关互斥:点开一个时自动关闭其余(见 QmMusicHookRegistry)。
-				size_t HookCount = 0;
-				const SQmMusicHookEntry *apHooks = QmMusicHookRegistry(&HookCount);
-				for(size_t i = 0; i < HookCount; ++i)
-				{
-					const SQmMusicHookEntry &Hook = apHooks[i];
-					const bool HookChanged = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, Hook.m_pEnableConfig, Hook.m_pEnableConfig);
-					if(HookChanged && *Hook.m_pEnableConfig != 0)
-					{
-						for(size_t j = 0; j < HookCount; ++j)
-						{
-							if(j != i)
-								*apHooks[j].m_pEnableConfig = 0;
-						}
-					}
-					Changed = HookChanged || Changed;
-				}
-				// 兜底:配置被外部直接改成多个 Hook 同时开启时,保留第一个,关闭其余。
-				int FirstEnabled = -1;
-				for(size_t i = 0; i < HookCount; ++i)
-				{
-					if(*apHooks[i].m_pEnableConfig != 0)
-					{
-						if(FirstEnabled == -1)
-							FirstEnabled = (int)i;
-						else
-							*apHooks[i].m_pEnableConfig = 0;
-					}
-				}
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmLyrics, &g_Config.m_QmLyrics) || Changed;
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmLyricsInMediaIsland, &g_Config.m_QmLyricsInMediaIsland) || Changed;
-				if(g_Config.m_QmKugouHookEnable != 0)
-					ConsumeQmHudRow(Content); // 酷狗接入与恢复按钮
-				if(g_Config.m_QmKugouHookEnable != 0 || g_Config.m_QmQQMusicHookEnable != 0)
-					ConsumeQmHudRow(Content); // 当前采集状态
-				if(g_Config.m_QmSpotifyEnable != 0)
-					ConsumeQmHudRow(Content); // Spotify sp_dc 输入行(与渲染保持一致)
-				return Changed;
-			};
-		case EQmModuleId::Background3D:
-			return [this, Metrics, LineHeight, LineSpacing, ConsumeQmHudRow, ConsumeQmHudHeight](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_Qm3DParticles, &g_Config.m_Qm3DParticles);
-				if(!g_Config.m_Qm3DParticles)
-					return Changed;
-				ConsumeQmHudRow(Content); // particle type
-				for(int Index = 0; Index < 9; ++Index)
-					ConsumeQmHudRow(Content); // numeric particle options
-				ConsumeQmHudRow(Content); // collision
-				ConsumeQmHudRow(Content); // push radius
-				ConsumeQmHudRow(Content); // push strength
-				const SSettingsRadioRowLayout RadioLayout = ResolveSettingsRadioRowLayout(Content, 2, Metrics);
-				ConsumeQmHudHeight(Content, RadioLayout.m_Height + LineSpacing);
-				if(g_Config.m_Qm3DParticlesColorMode == 1)
-					ConsumeQmHudRow(Content); // custom color
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_Qm3DParticlesGlow, &g_Config.m_Qm3DParticlesGlow) || Changed;
-				if(g_Config.m_Qm3DParticlesGlow)
-				{
-					ConsumeQmHudRow(Content);
-					ConsumeQmHudRow(Content);
-				}
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_Qm3DParticlesTrail, &g_Config.m_Qm3DParticlesTrail) || Changed;
-				if(g_Config.m_Qm3DParticlesTrail)
-				{
-					ConsumeQmHudRow(Content);
-					ConsumeQmHudRow(Content);
-				}
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_Qm3DParticlesPulse, &g_Config.m_Qm3DParticlesPulse) || Changed;
-				if(g_Config.m_Qm3DParticlesPulse)
-				{
-					ConsumeQmHudRow(Content);
-					ConsumeQmHudRow(Content); // pulse strength/speed are two rows
-				}
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_Qm3DParticlesTwinkle, &g_Config.m_Qm3DParticlesTwinkle) || Changed;
-				return Changed;
-			};
-		case EQmModuleId::BindStatusHud:
-			return [this, LineHeight, LineSpacing](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_ClShowhudKeyStatusReset, &g_Config.m_ClShowhudKeyStatusReset);
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_ClShowhudKeyStatusHammer, &g_Config.m_ClShowhudKeyStatusHammer) || Changed;
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_ClShowhudKeyStatusControl, &g_Config.m_ClShowhudKeyStatusControl) || Changed;
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_ClShowhudKeyStatusSync, &g_Config.m_ClShowhudKeyStatusSync) || Changed;
-				return Changed;
-			};
-		default:
-			return {};
-		}
-	};
-
-	auto BuildDefinitions = [&](std::vector<SSettingsCardDefinition> &vCards) {
-		vCards.reserve(12);
-		const auto AddCard = [&](EQmModuleId Id, const char *pStableId, const char *pTitle, const char *pSubtitle, const FSettingsCardRenderMeasured &Render) {
-			SSettingsCardDefinition Definition;
-			const char *pRegisteredSubtitle = qm_card_registry::ResolveLocalizedDescription(pStableId);
-			Definition.m_Spec = {pStableId, Localize(pTitle), pRegisteredSubtitle != nullptr ? pRegisteredSubtitle : Localize(pSubtitle)};
-			Definition.m_Measure = [Id, EstimateContentHeight](float ContentWidth) { return EstimateContentHeight(Id, ContentWidth); };
-			Definition.m_Render = [Render](CUIRect Content) { Render(Content); };
-			Definition.m_IsCollapsed = [Id, &Collapsed = s_aCollapsed, ModuleStateIndex] { return Collapsed[ModuleStateIndex(Id)]; };
-			Definition.m_PreLayoutHeaderInput = [this, Id, ToggleCollapsed, ReadOnly, ModuleStateIndex, &CollapseButtons = s_aCollapseButtons](const SSettingsCardFrame &Frame, bool IsCollapsed) {
-				const int Index = ModuleStateIndex(Id);
-				if(ReadOnly || !Ui()->DoButtonLogic(&CollapseButtons[Index], IsCollapsed, &Frame.m_HandleRect, BUTTONFLAG_LEFT))
-					return false;
-				ToggleCollapsed(Id);
-				return true;
-			};
-			Definition.m_HeaderAction = [CardCtx](const SSettingsCardFrame &Frame, bool Collapsed) { RenderSettingsCardCollapseButton(CardCtx, Frame.m_HandleRect, Collapsed); };
-			Definition.m_MeasureRevision = MeasureContentRevision(Id);
-			Definition.m_PreLayoutInput = BuildHudPreLayoutInput(Id);
-			vCards.push_back(std::move(Definition));
-		};
-
-		AddCard(EQmModuleId::DummyMiniView, "qm:dummy_miniview", "Dummy Window", "Show a small view of the dummy", [this, LineHeight, BodySize, LineSpacing, LabelWidth, DummyMiniViewExpanded, ReadOnly](CUIRect &Content) { RenderQmHudDummyMiniViewContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, DummyMiniViewExpanded, ReadOnly); });
-		AddCard(EQmModuleId::Coords, "qm:coords", "Show Coordinates", "Show coordinates above players", [this, Metrics, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmHudCoordsContent(Content, Metrics, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::PlayerStats, "qm:player_stats", "Player data", "Player stats and info display", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmHudPlayerStatsContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::DebugGraph, "qm:debug_graph", "Debug graph", "Debug performance graph panel", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmHudDebugGraphContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::DebugMode, "qm:debug_mode", "Debug mode", "Enable performance debug logging and diagnostics", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmHudDebugModeContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::InputOverlay, "qm:input_overlay", "Input overlay", "Input overlay display", [this, Metrics, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmHudInputOverlayContent(Content, Metrics, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::HudNotifications, "qm:hud_notifications", "Notifications", "Show important server prompts and Echo messages as popups", [this, Metrics, LabelWidth, ReadOnly](CUIRect &Content) {
-			RenderQmHudNotificationsBasicContent(Content, Metrics, LabelWidth, ReadOnly);
-			if(g_Config.m_QmHudNotificationsShowAdvanced)
-				RenderQmHudNotificationsAdvancedContent(Content, Metrics, LabelWidth, ReadOnly);
-		});
-		AddCard(EQmModuleId::Voice, "qm:voice", "Voice", "Voice chat settings and diagnostics", [this, Metrics, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmHudVoiceContent(Content, Metrics, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::DynamicIsland, "qm:dynamic_island", "Dynamic Island", "HUD island appearance settings", [this, LineHeight, LineSpacing, DynamicIslandOriginalStyle](CUIRect &Content) { RenderQmHudDynamicIslandContent(Content, LineHeight, LineSpacing, DynamicIslandOriginalStyle); });
-		AddCard(EQmModuleId::SystemMediaControls, "qm:system_media_controls", "SMTC", "System media control", [this, LineHeight, BodySize, LineSpacing, ReadOnly](CUIRect &Content) { RenderQmHudSystemMediaControlsContent(Content, LineHeight, BodySize, LineSpacing, ReadOnly); });
-		AddCard(EQmModuleId::Lyrics, "qm:lyrics", "Lyrics", "Lyrics sources and display", [this, LineHeight, LineSpacing, ReadOnly](CUIRect &Content) { RenderQmHudLyricsContent(Content, LineHeight, LineSpacing, ReadOnly); });
-		AddCard(EQmModuleId::Background3D, "qm:background_3d", "3D Background", "Configure background 3D particle effects", [this, Metrics, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmHudBackground3DContent(Content, Metrics, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::BindStatusHud, "qm:bind_status_hud", "DDRace HUD Pro", "Dummy key/hammer/control/copy status switches", [this, LineHeight, LineSpacing](CUIRect &Content) { RenderQmHudBindStatusContent(Content, LineHeight, LineSpacing); });
-	};
-	uint64_t CardLayoutRevision = 0;
-	for(int ModuleIndex = 0; ModuleIndex < (int)QmModuleCount; ++ModuleIndex)
-		CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ MeasureContentRevision((EQmModuleId)ModuleIndex);
-	const uint64_t DefinitionsRevision = ResolveSettingsCardDefinitionsRevision(m_SettingsCardDeckDisplayCycle, m_MenuTextPoolGeneration, MainView.w, CardLayoutRevision);
+	const uint64_t DefinitionsRevision = ResolveSettingsCardDefinitionsRevision(m_SettingsCardDeckDisplayCycle, m_MenuTextPoolGeneration, MainView.w, ResolveModuleCardMeasureRevision());
 
 	const SQmResolvedScrollPolicy ScrollPolicy = QmResolveScrollPolicy({EQmScrollProfile::SETTINGS_OUTER}, UiScale, 0.0f);
 	const CScrollRegionParams ScrollParams = QmScrollRegionParamsFromPolicy(ScrollPolicy);
@@ -5574,10 +4887,6 @@ void CMenus::RenderSettingsQmClientFunctionDeck(CUIRect MainView, bool PrewarmOn
 	const bool ReadOnly = PrewarmOnly || Ui()->RenderOnly();
 	const SSettingsContentMetrics Metrics = ResolveSettingsContentMetrics(MainView.w);
 	const float UiScale = Metrics.m_UiScale;
-	const float LineHeight = Metrics.m_LineHeight;
-	const float BodySize = Metrics.m_BodySize;
-	const float LineSpacing = Metrics.m_LineSpacing;
-	const SQmSettingsCardStyle CardStyle = QmSettingsCardStyle(UiScale);
 	const SSettingsPageLayoutFrame Page = SettingsPageLayout(MainView, UiScale);
 	const float LabelWidth = ResolveSettingsCardLabelWidth(Page.m_TwoColumns ? Page.m_aColumns[0].w : Page.m_ContentViewport.w, Metrics);
 	IUiContext CardCtx = SettingsUiContext("settings_qmclient_function", UiScale);
@@ -5602,186 +4911,30 @@ void CMenus::RenderSettingsQmClientFunctionDeck(CUIRect MainView, bool PrewarmOn
 		str_copy(g_Config.m_QmSidebarCardCollapsed, aNormalizedCollapsed, sizeof(g_Config.m_QmSidebarCardCollapsed));
 	str_copy(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed, sizeof(s_aCollapsedConfigCache));
 
-	auto ModuleStateIndex = [](EQmModuleId Id) { return std::clamp((int)Id, 0, (int)QmModuleCount - 1); };
-	if(str_comp(s_aBlockWordsLayoutConfigCache, g_Config.m_QmBlockWordsList) != 0)
-	{
-		str_copy(s_aBlockWordsLayoutConfigCache, g_Config.m_QmBlockWordsList, sizeof(s_aBlockWordsLayoutConfigCache));
-		++s_BlockWordsLayoutRevision;
-	}
-	if(str_comp(s_aKeywordRulesConfigCache, g_Config.m_QmKeywordReplyRules) != 0)
-	{
-		char aDecodedRules[sizeof(g_Config.m_QmKeywordReplyRules)];
-		QmKeywordReplyRules::DecodeFromConfig(g_Config.m_QmKeywordReplyRules, aDecodedRules, sizeof(aDecodedRules));
-		s_KeywordRuleRowsInited = false;
-		UpdateKeywordRulesLayoutState(CountAutoReplyRules(aDecodedRules), false);
-		str_copy(s_aKeywordRulesConfigCache, g_Config.m_QmKeywordReplyRules, sizeof(s_aKeywordRulesConfigCache));
-	}
-	const size_t FavoriteMapCount = GameClient()->TClientComponent().GetFavoriteMaps().size();
-	if(s_FavoriteMapsLayoutCount != FavoriteMapCount)
-	{
-		s_FavoriteMapsLayoutCount = FavoriteMapCount;
-		++s_FavoriteMapsLayoutRevision;
-	}
-	auto ToggleCollapsed = [this](EQmModuleId Id) {
-		const int Index = std::clamp((int)Id, 0, (int)QmModuleCount - 1);
-		const bool WasCollapsed = s_aCollapsed[Index];
-		s_aCollapsed[Index] = !s_aCollapsed[Index];
-		if(Id == EQmModuleId::BlockWords && WasCollapsed)
-			++s_BlockWordsLayoutRevision;
-		else if(Id == EQmModuleId::QiaFen && WasCollapsed)
-		{
-			s_KeywordRuleRowsInited = false;
-			++s_KeywordRulesLayoutRevision;
-		}
-		else if(Id == EQmModuleId::FavoriteMaps && WasCollapsed)
-		{
-			const size_t FavoriteMapCount = GameClient()->TClientComponent().GetFavoriteMaps().size();
-			if(s_FavoriteMapsLayoutCount != FavoriteMapCount)
-			{
-				s_FavoriteMapsLayoutCount = FavoriteMapCount;
-				++s_FavoriteMapsLayoutRevision;
-			}
-		}
-		SerializeLegacyQmCollapsed(s_aQmModuleDefaults, s_aCollapsed, g_Config.m_QmSidebarCardCollapsed, sizeof(g_Config.m_QmSidebarCardCollapsed));
-		str_copy(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed, sizeof(s_aCollapsedConfigCache));
-	};
-	auto MeasureContentHeight = [this, UiScale, LineHeight, BodySize, LineSpacing, LabelWidth, Metrics](EQmModuleId Id, float ContentWidth) {
-		const auto Rows = [LineHeight, LineSpacing](float Count) { return Count * (LineHeight + LineSpacing); };
-		const auto Row = [LineHeight, LineSpacing](float Spacing = 1.0f) { return LineHeight + LineSpacing * Spacing; };
-		switch(Id)
-		{
-		case EQmModuleId::GoresActor:
-			return !g_Config.m_TcFreezeChatEnabled ? Row() : Row() * (g_Config.m_TcFreezeChatEmoticon ? 5.0f : 4.0f);
-		case EQmModuleId::Gores:
-			return Row() * (3.0f + (g_Config.m_QmAxiomAutoLogin ? 2.0f : 0.0f) + ((g_Config.m_QmGores || g_Config.m_QmGoresAutoEnable) ? 6.0f : 0.0f)) + LineHeight;
-		case EQmModuleId::KeyBinds: return Rows(7.0f);
-		case EQmModuleId::Emoticons: return Rows(3.0f);
-		case EQmModuleId::MiniFeatures: return Rows(static_cast<float>(s_aQmMiniFeatureRows.size() + QmMiniFeatureSpecialRowCount));
-		case EQmModuleId::JumpHint: return Row() * 5.0f;
-		case EQmModuleId::WeaponTrajectory: return g_Config.m_QmWeaponTrajectory == 0 ? Row() : Row() * 6.0f;
-		case EQmModuleId::FriendNotify:
-			return Row() * (5.0f + (g_Config.m_QmFriendOnlineAutoRefresh ? 1.0f : 0.0f) + (g_Config.m_QmFriendEnterBroadcast ? 1.0f : 0.0f) + (g_Config.m_QmFriendEnterAutoGreet ? 1.0f : 0.0f));
-		case EQmModuleId::BlockWords: return Row() * (g_Config.m_QmBlockWordsAction == 0 ? 7.0f : 4.0f) + CalcQiaFenInputHeight(TextRender(), g_Config.m_QmBlockWordsList, std::max(1.0f, ContentWidth - LabelWidth), BodySize, std::clamp(2.0f * UiScale, 1.0f, 2.0f), LineHeight);
-		case EQmModuleId::Translate:
-		{
-			const bool IsTencentCloudBackend = str_comp_nocase(g_Config.m_QmTranslateBackend, "tencentcloud") == 0;
-			const bool IsLibreTranslateBackend = str_comp_nocase(g_Config.m_QmTranslateBackend, "libretranslate") == 0;
-			const bool IsLlmBackend = str_comp_nocase(g_Config.m_QmTranslateBackend, "llm") == 0;
-			const bool IsFtapiBackend = str_comp_nocase(g_Config.m_QmTranslateBackend, "ftapi") == 0;
-			float Height = Rows(9.0f) + LineHeight * 1.6f + LineSpacing * 1.35f;
-			if(IsFtapiBackend)
-				Height += Row() + LineHeight * 0.8f + LineSpacing;
-			if(IsTencentCloudBackend)
-				Height += Row() * 4.0f;
-			else if(IsLibreTranslateBackend)
-				Height += Row() * 2.0f;
-			if(IsLlmBackend)
-			{
-				Height += Row() * 7.0f + LineHeight + LineSpacing * 0.5f;
-				if(g_Config.m_QmTranslateLlmEnableThinking && (g_Config.m_QmTranslateLlmProvider == 2 || g_Config.m_QmTranslateLlmProvider == 3))
-					Height += Metrics.m_SmallSize + Metrics.m_LineSpacing;
-			}
-			return Height;
-		}
-		case EQmModuleId::TranslateUi: return Rows(5.0f);
-		case EQmModuleId::QiaFen:
-			return Row() * (4.0f + (float)s_KeywordRulesLayoutCount) + (s_KeywordRulesLayoutHalfFilled ? Row() : 0.0f);
-		case EQmModuleId::PieMenu:
-			if(!g_Config.m_QmPieMenuEnabled)
-				return Row();
-			return Row() * 5.0f + BodySize + LineSpacing * 3.0f + std::min(ContentWidth, std::clamp(ContentWidth * 0.88f, LineHeight * 10.0f, LineHeight * 13.5f)) * 0.8f;
-		case EQmModuleId::FavoriteMaps:
-		{
-			const size_t FavoriteCount = GameClient()->TClientComponent().GetFavoriteMaps().size();
-			return Rows((float)std::max<size_t>(1, std::min<size_t>(FavoriteCount, 64)));
-		}
-		case EQmModuleId::MapUpload:
-		{
-			float Height = LineHeight * 7.0f + LineSpacing * 5.0f;
-			for(const char *pText : QmMapUploadInstructions())
-				Height += QmMapUploadHelpLineHeight(TextRender(), pText, ContentWidth, BodySize, LineHeight) + LineSpacing;
-			return Height;
-		}
-		case EQmModuleId::HJAssist: return Row() * (g_Config.m_QmAutoTeamLock ? 6.0f : 5.0f);
-		default: return Rows(1.0f);
-		}
-	};
-	auto MeasureContentRevision = [](EQmModuleId Id) -> uint64_t {
-		switch(Id)
-		{
-		case EQmModuleId::GoresActor:
-			return g_Config.m_TcFreezeChatEnabled ? 1u | (g_Config.m_TcFreezeChatEmoticon ? 2u : 0u) : 0u;
-		case EQmModuleId::Gores:
-			return (g_Config.m_QmAxiomAutoLogin ? 1u : 0u) |
-			       ((g_Config.m_QmGores || g_Config.m_QmGoresAutoEnable) ? 2u : 0u);
-		case EQmModuleId::Emoticons:
-			return (g_Config.m_QmShowOtherSuperEmotes ? 1u : 0u) |
-			       (g_Config.m_QmShowOtherLaunchEmotes ? 2u : 0u);
-		case EQmModuleId::WeaponTrajectory: return g_Config.m_QmWeaponTrajectory != 0 ? 1u : 0u;
-		case EQmModuleId::FriendNotify:
-			return (g_Config.m_QmFriendOnlineAutoRefresh ? 1u : 0u) |
-			       (g_Config.m_QmFriendEnterBroadcast ? 2u : 0u) |
-			       (g_Config.m_QmFriendEnterAutoGreet ? 4u : 0u);
-		case EQmModuleId::BlockWords: return s_BlockWordsLayoutRevision * 2u + (g_Config.m_QmBlockWordsAction == 0 ? 0u : 1u);
-		case EQmModuleId::Translate:
-			if(str_comp_nocase(g_Config.m_QmTranslateBackend, "ftapi") == 0)
-				return 1u;
-			if(str_comp_nocase(g_Config.m_QmTranslateBackend, "tencentcloud") == 0)
-				return 2u;
-			if(str_comp_nocase(g_Config.m_QmTranslateBackend, "libretranslate") == 0)
-				return 3u;
-			if(str_comp_nocase(g_Config.m_QmTranslateBackend, "llm") == 0)
-				return 4u | ((g_Config.m_QmTranslateLlmEnableThinking && (g_Config.m_QmTranslateLlmProvider == 2 || g_Config.m_QmTranslateLlmProvider == 3)) ? 8u : 0u);
-			return 0u;
-		case EQmModuleId::QiaFen: return s_KeywordRulesLayoutRevision;
-		case EQmModuleId::PieMenu: return g_Config.m_QmPieMenuEnabled ? 1u : 0u;
-		case EQmModuleId::FavoriteMaps: return s_FavoriteMapsLayoutRevision;
-		case EQmModuleId::HJAssist: return g_Config.m_QmAutoTeamLock ? 1u : 0u;
-		default: return 0u;
-		}
-	};
-	auto BuildDefinitions = [&](std::vector<SSettingsCardDefinition> &vCards) {
-		vCards.reserve(16);
-		const auto AddCard = [&](EQmModuleId Id, const char *pStableId, const char *pTitle, const char *pSubtitle, const FSettingsCardRenderMeasured &Render) {
-			SSettingsCardDefinition Definition;
-			const char *pRegisteredSubtitle = qm_card_registry::ResolveLocalizedDescription(pStableId);
-			Definition.m_Spec = {pStableId, Localize(pTitle), pRegisteredSubtitle != nullptr ? pRegisteredSubtitle : Localize(pSubtitle)};
-			Definition.m_Measure = [Id, MeasureContentHeight](float ContentWidth) { return MeasureContentHeight(Id, ContentWidth); };
-			Definition.m_Render = [Render](CUIRect Content) { Render(Content); };
-			Definition.m_IsCollapsed = [Id, &Collapsed = s_aCollapsed, ModuleStateIndex] { return Collapsed[ModuleStateIndex(Id)]; };
-			Definition.m_PreLayoutHeaderInput = [this, Id, ToggleCollapsed, ReadOnly, ModuleStateIndex, &CollapseButtons = s_aCollapseButtons](const SSettingsCardFrame &Frame, bool IsCollapsed) {
-				const int Index = ModuleStateIndex(Id);
-				if(ReadOnly || !Ui()->DoButtonLogic(&CollapseButtons[Index], IsCollapsed, &Frame.m_HandleRect, BUTTONFLAG_LEFT))
-					return false;
-				ToggleCollapsed(Id);
-				return true;
-			};
-			Definition.m_HeaderAction = [CardCtx](const SSettingsCardFrame &Frame, bool Collapsed) { RenderSettingsCardCollapseButton(CardCtx, Frame.m_HandleRect, Collapsed); };
-			Definition.m_MeasureRevision = MeasureContentRevision(Id);
-			vCards.push_back(std::move(Definition));
-		};
+	// 布局缓存刷新：卡片高度依赖词条过滤/关键词回复/收藏地图的内容量，变化时递增版本让卡片重测。
+	RefreshFunctionCardLayoutState(this);
 
-		AddCard(EQmModuleId::GoresActor, "qm:gores_actor", "Gores Actor", "Auto chat when dying in water", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionGoresActorContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::Gores, "qm:gores", "Gores Mode", "Gores auto weapon switch", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionGoresContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::KeyBinds, "qm:key_binds", "Key Bindings", "Common key bindings", [this, LineHeight, BodySize, LineSpacing, LabelWidth](CUIRect &Content) { RenderQmFunctionKeyBindsContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth); });
-		AddCard(EQmModuleId::Emoticons, "qm:emoticons", "Emoticons", "Large emoticons and launch mode", [this, LineHeight, BodySize, LineSpacing, LabelWidth](CUIRect &Content) { RenderQmFunctionEmoticonsContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth); });
-		AddCard(EQmModuleId::MiniFeatures, "qm:mini_features", "Dream Features", "Only what you can't imagine, nothing Dream can't do", [this, LineHeight, LineSpacing, ReadOnly](CUIRect &Content) { RenderQmFunctionMiniFeaturesContent(Content, LineHeight, LineSpacing, ReadOnly); });
-		AddCard(EQmModuleId::JumpHint, "qm:jump_hint", "Position jump hint", "Jump hint text", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionJumpHintContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::WeaponTrajectory, "qm:weapon_trajectory", "Weapon Trajectory", "Show grenade and laser trajectory preview", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionWeaponTrajectoryContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::FriendNotify, "qm:friend_notify", "Friend Notifications", "Friend online and join notifications", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionFriendNotifyContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::BlockWords, "qm:block_words", "Word Filter", "Chat word filtering", [this, UiScale, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionBlockWordsContent(Content, UiScale, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::Translate, "qm:translate", "Translate", "Chat translation settings", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionTranslateContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::TranslateUi, "qm:translate_ui", "Translate button", "Customize translate button and menu colors", [this, LineHeight, BodySize, LineSpacing](CUIRect &Content) { RenderQmVisualTranslateUiContent(Content, LineHeight, BodySize, LineSpacing); });
-		AddCard(EQmModuleId::QiaFen, "qm:qiafen", "Keyword Reply", "I am a robot", [this, UiScale, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionKeywordReplyContent(Content, UiScale, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::PieMenu, "qm:pie_menu", "Pie Menu", "Quick action menu for players", [this, UiScale, LineHeight, BodySize, LineSpacing, LabelWidth, ButtonHeight = Metrics.m_ButtonHeight, CardStyle, ReadOnly](CUIRect &Content) { RenderQmFunctionPieMenuContent(Content, UiScale, LineHeight, BodySize, LineSpacing, LabelWidth, ButtonHeight, CardStyle.m_Padding, CardStyle.m_CornerRadius, ReadOnly); });
-		AddCard(EQmModuleId::MapUpload, "qm:map_upload", "Map upload", "Upload a saved map to the public test server", [this, LineHeight, BodySize, LineSpacing, ReadOnly](CUIRect &Content) { RenderQmFunctionMapUploadContent(Content, LineHeight, BodySize, LineSpacing, ReadOnly); });
-		AddCard(EQmModuleId::FavoriteMaps, "qm:favorite_maps", "Favorite maps", "Your favorite map manager", [this, UiScale, LineHeight, BodySize, LineSpacing, ReadOnly](CUIRect &Content) { RenderQmFunctionFavoriteMapsContent(Content, UiScale, LineHeight, BodySize, LineSpacing, ReadOnly); });
-		AddCard(EQmModuleId::HJAssist, "qm:hj_assist", "HJ Assist", "What's done is done, no use saying more", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmFunctionHJAssistContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
+	const qm_card_catalog::SQmFunctionCardLayoutState FunctionCardLayout = ResolveFunctionCardLayoutState();
+	const SQmSettingsCardStyle CardStyle = QmSettingsCardStyle(UiScale);
+	qm_card_catalog::SQmCardBuildContext CardBuild;
+	CardBuild.m_pMenus = this;
+	CardBuild.m_ReadOnly = ReadOnly;
+	CardBuild.m_Page = Page;
+	CardBuild.m_Metrics = Metrics;
+	CardBuild.m_LabelWidth = LabelWidth;
+	CardBuild.m_UiContext = CardCtx;
+	CardBuild.m_Padding = CardStyle.m_Padding;
+	CardBuild.m_CornerRadius = CardStyle.m_CornerRadius;
+	CardBuild.m_pCollapsed = s_aCollapsed.data();
+	CardBuild.m_pCollapseButtons = s_aCollapseButtons.data();
+	CardBuild.m_pToggleCollapsed = ToggleQmSidebarCardCollapsed;
+	CardBuild.m_pToggleCollapsedUser = s_aCollapsed.data();
+	CardBuild.m_pFunctionLayout = &FunctionCardLayout;
+	// 页面只声明"这一页有哪些卡片"，卡片的测量与渲染都在卡片目录里。
+	const auto BuildDefinitions = [&](std::vector<SSettingsCardDefinition> &vCards) {
+		qm_card_catalog::BuildCards(CardBuild, qm_card_catalog::FunctionCardStableIds(), vCards);
 	};
-	uint64_t CardLayoutRevision = 0;
-	for(int ModuleIndex = 0; ModuleIndex < (int)QmModuleCount; ++ModuleIndex)
-		CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ MeasureContentRevision((EQmModuleId)ModuleIndex);
-	const uint64_t DefinitionsRevision = ResolveSettingsCardDefinitionsRevision(m_SettingsCardDeckDisplayCycle, m_MenuTextPoolGeneration, MainView.w, CardLayoutRevision);
+	const uint64_t DefinitionsRevision = ResolveSettingsCardDefinitionsRevision(m_SettingsCardDeckDisplayCycle, m_MenuTextPoolGeneration, MainView.w, ResolveModuleCardMeasureRevision());
 
 	const SQmResolvedScrollPolicy ScrollPolicy = QmResolveScrollPolicy({EQmScrollProfile::SETTINGS_OUTER}, UiScale, 0.0f);
 	const CScrollRegionParams ScrollParams = QmScrollRegionParamsFromPolicy(ScrollPolicy);
@@ -5816,9 +4969,6 @@ void CMenus::RenderSettingsQmClientVisualDeck(CUIRect MainView, bool PrewarmOnly
 	const bool ReadOnly = PrewarmOnly || Ui()->RenderOnly();
 	const SSettingsContentMetrics Metrics = ResolveSettingsContentMetrics(MainView.w);
 	const float UiScale = Metrics.m_UiScale;
-	const float LineHeight = Metrics.m_LineHeight;
-	const float BodySize = Metrics.m_BodySize;
-	const float LineSpacing = Metrics.m_LineSpacing;
 	const SSettingsPageLayoutFrame Page = SettingsPageLayout(MainView, UiScale);
 	const float LabelWidth = ResolveSettingsCardLabelWidth(Page.m_TwoColumns ? Page.m_aColumns[0].w : Page.m_ContentViewport.w, Metrics);
 	IUiContext CardCtx = SettingsUiContext("settings_qmclient_visual", UiScale);
@@ -5844,169 +4994,27 @@ void CMenus::RenderSettingsQmClientVisualDeck(CUIRect MainView, bool PrewarmOnly
 		str_copy(g_Config.m_QmSidebarCardCollapsed, aNormalizedCollapsed, sizeof(g_Config.m_QmSidebarCardCollapsed));
 	str_copy(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed, sizeof(s_aCollapsedConfigCache));
 
-	auto ModuleStateIndex = [](EQmModuleId Id) { return std::clamp((int)Id, 0, (int)QmModuleCount - 1); };
-	auto ToggleCollapsed = [](EQmModuleId Id) {
-		const int Index = std::clamp((int)Id, 0, (int)QmModuleCount - 1);
-		s_aCollapsed[Index] = !s_aCollapsed[Index];
-		SerializeLegacyQmCollapsed(s_aQmModuleDefaults, s_aCollapsed, g_Config.m_QmSidebarCardCollapsed, sizeof(g_Config.m_QmSidebarCardCollapsed));
-		str_copy(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed, sizeof(s_aCollapsedConfigCache));
+	const qm_card_catalog::SQmFunctionCardLayoutState FunctionCardLayout = ResolveFunctionCardLayoutState();
+	const SQmSettingsCardStyle CardStyle = QmSettingsCardStyle(UiScale);
+	qm_card_catalog::SQmCardBuildContext CardBuild;
+	CardBuild.m_pMenus = this;
+	CardBuild.m_ReadOnly = ReadOnly;
+	CardBuild.m_Page = Page;
+	CardBuild.m_Metrics = Metrics;
+	CardBuild.m_LabelWidth = LabelWidth;
+	CardBuild.m_UiContext = CardCtx;
+	CardBuild.m_Padding = CardStyle.m_Padding;
+	CardBuild.m_CornerRadius = CardStyle.m_CornerRadius;
+	CardBuild.m_pCollapsed = s_aCollapsed.data();
+	CardBuild.m_pCollapseButtons = s_aCollapseButtons.data();
+	CardBuild.m_pToggleCollapsed = ToggleQmSidebarCardCollapsed;
+	CardBuild.m_pToggleCollapsedUser = s_aCollapsed.data();
+	CardBuild.m_pFunctionLayout = &FunctionCardLayout;
+	// 页面只声明"这一页有哪些卡片"，卡片的测量与渲染都在卡片目录里。
+	const auto BuildDefinitions = [&](std::vector<SSettingsCardDefinition> &vCards) {
+		qm_card_catalog::BuildCards(CardBuild, qm_card_catalog::VisualCardStableIds(), vCards);
 	};
-	auto EstimateContentHeight = [Metrics](EQmModuleId Id) {
-		const auto Rows = [&Metrics](float Count) { return Count * Metrics.m_RowStep; };
-		switch(Id)
-		{
-		case EQmModuleId::ChatBubble:
-			return g_Config.m_QmChatBubble ? Rows(5.0f) + 2.0f * Metrics.m_LineHeight + 2.0f * Metrics.m_LineSpacing : Rows(1.0f);
-		case EQmModuleId::CameraView:
-			return Rows(5.0f + (g_Config.m_QmCameraDrift ? 3.0f : 0.0f) + (g_Config.m_QmDynamicFov ? 2.0f : 0.0f) + (g_Config.m_QmAspectPreset == 6 ? 1.0f : 0.0f)) + Metrics.m_BodySize;
-		case EQmModuleId::SkinTransition:
-			return ResolveQmVisualSkinTransitionHeight(Metrics, g_Config.m_QmSkinChangeTransition != 0);
-		case EQmModuleId::WeaponAnimation:
-			return ResolveQmVisualWeaponAnimationHeight(Metrics, g_Config.m_QmWeaponSwitchAnim != 0, g_Config.m_QmWeaponReloadAnim != 0);
-		case EQmModuleId::Streamer: return Rows(3.0f);
-		case EQmModuleId::EntityOverlay: return Rows(9.0f);
-		case EQmModuleId::CollisionHitbox:
-			return ResolveQmVisualCollisionHitboxHeight(Metrics, g_Config.m_QmHitboxMode || g_Config.m_QmShowCollisionHitbox);
-		case EQmModuleId::TranslateUi: return Rows(6.0f);
-		default: return Rows(1.0f);
-		}
-	};
-	auto MeasureContentRevision = [](EQmModuleId Id) -> uint64_t {
-		switch(Id)
-		{
-		case EQmModuleId::ChatBubble: return g_Config.m_QmChatBubble ? 1u : 0u;
-		case EQmModuleId::CameraView:
-			return (g_Config.m_QmCameraDrift ? 1u : 0u) |
-			       (g_Config.m_QmDynamicFov ? 2u : 0u) |
-			       (g_Config.m_QmAspectPreset == 6 ? 4u : 0u);
-		case EQmModuleId::SkinTransition: return g_Config.m_QmSkinChangeTransition ? 1u : 0u;
-		case EQmModuleId::WeaponAnimation:
-			return (g_Config.m_QmWeaponSwitchAnim ? 1u : 0u) |
-			       (g_Config.m_QmWeaponReloadAnim ? 2u : 0u);
-		case EQmModuleId::CollisionHitbox:
-			return (g_Config.m_QmHitboxMode || g_Config.m_QmShowCollisionHitbox ? 1u : 0u) |
-			       (g_Config.m_QmHitboxShowMap ? 1u << 1 : 0u) |
-			       (g_Config.m_QmHitboxShowTeeCollision ? 1u << 2 : 0u) |
-			       (g_Config.m_QmHitboxShowTeeFreeze ? 1u << 3 : 0u) |
-			       (g_Config.m_QmHitboxShowTeeDeath ? 1u << 4 : 0u) |
-			       (g_Config.m_QmHitboxShowPickups ? 1u << 5 : 0u) |
-			       (g_Config.m_QmHitboxShowHammer ? 1u << 6 : 0u) |
-			       (g_Config.m_QmHitboxShowProjectiles ? 1u << 7 : 0u) |
-			       (g_Config.m_QmHitboxShowLasers ? 1u << 8 : 0u) |
-			       (g_Config.m_QmHitboxShowFreezeLasers ? 1u << 9 : 0u) |
-			       (g_Config.m_QmHitboxShowHook ? 1u << 10 : 0u);
-		default: return 0u;
-		}
-	};
-	const auto ConsumeVisualRow = [LineHeight, LineSpacing](CUIRect &Content) {
-		Content.HSplitTop(LineHeight + LineSpacing, nullptr, &Content);
-	};
-	const auto ConsumeVisualHeight = [](CUIRect &Content, const float Height) {
-		Content.HSplitTop(std::max(0.0f, Height), nullptr, &Content);
-	};
-	const auto BuildVisualPreLayoutInput = [this, Metrics, LineHeight, LineSpacing, ReadOnly, ConsumeVisualRow, ConsumeVisualHeight](EQmModuleId Id) -> FSettingsCardPreLayoutInput {
-		if(ReadOnly)
-			return {};
-		switch(Id)
-		{
-		case EQmModuleId::ChatBubble:
-			return [this, LineHeight, LineSpacing](CUIRect Content) {
-				return HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmChatBubble, &g_Config.m_QmChatBubble);
-			};
-		case EQmModuleId::CameraView:
-			return [this, LineHeight, LineSpacing, ConsumeVisualRow](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmCameraDrift, &g_Config.m_QmCameraDrift);
-				if(g_Config.m_QmCameraDrift)
-				{
-					ConsumeVisualRow(Content);
-					ConsumeVisualRow(Content);
-					ConsumeVisualRow(Content);
-				}
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmDynamicFov, &g_Config.m_QmDynamicFov) || Changed;
-				if(g_Config.m_QmDynamicFov)
-				{
-					ConsumeVisualRow(Content);
-					ConsumeVisualRow(Content);
-				}
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmCinematicCamera, &g_Config.m_QmCinematicCamera) || Changed;
-				return Changed;
-			};
-		case EQmModuleId::SkinTransition:
-			return [this, Metrics, LineHeight, LineSpacing, ConsumeVisualRow, ConsumeVisualHeight](CUIRect Content) {
-				ConsumeVisualRow(Content); // Tee appearance heading
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinOutlineLocal, &g_Config.m_QmSkinOutlineLocal);
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinOutlineOthers, &g_Config.m_QmSkinOutlineOthers) || Changed;
-				for(int Index = 0; Index < 3; ++Index)
-					ConsumeVisualRow(Content); // 描边颜色、粗细、透明度
-				for(int Index = 0; Index < 3; ++Index)
-					ConsumeVisualRow(Content); // hue toggles and speed
-				ConsumeVisualHeight(Content, Metrics.m_SmallSize + LineSpacing);
-				ConsumeVisualHeight(Content, Metrics.m_SmallSize + LineSpacing);
-				ConsumeVisualRow(Content); // hammer skin steal
-				ConsumeVisualRow(Content); // emoticon shadow
-				return HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmSkinChangeTransition, &g_Config.m_QmSkinChangeTransition) || Changed;
-			};
-		case EQmModuleId::WeaponAnimation:
-			return [this, LineHeight, LineSpacing](CUIRect Content) {
-				bool Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmWeaponSwitchAnim, &g_Config.m_QmWeaponSwitchAnim);
-				Changed = HandleQmHudCheckboxInput(Content, LineHeight, LineSpacing, &g_Config.m_QmWeaponReloadAnim, &g_Config.m_QmWeaponReloadAnim) || Changed;
-				return Changed;
-			};
-		case EQmModuleId::CollisionHitbox:
-			return [this, LineHeight](CUIRect Content) {
-				const CUIRect VisibleContent = Content;
-				CUIRect Row;
-				Content.HSplitTop(LineHeight, &Row, &Content);
-				const CUIRect HitRect = Row.Intersection(VisibleContent);
-				int HitboxModeEnabled = g_Config.m_QmHitboxMode || g_Config.m_QmShowCollisionHitbox;
-				const bool Changed = HitRect.w > 0.0f && HitRect.h > 0.0f && Ui()->DoButtonLogic(&g_Config.m_QmHitboxMode, HitboxModeEnabled, &HitRect, BUTTONFLAG_LEFT) != 0;
-				if(Changed)
-				{
-					HitboxModeEnabled ^= 1;
-					g_Config.m_QmHitboxMode = HitboxModeEnabled;
-					g_Config.m_QmShowCollisionHitbox = 0;
-				}
-				return Changed;
-			};
-		default:
-			return {};
-		}
-	};
-
-	auto BuildDefinitions = [&](std::vector<SSettingsCardDefinition> &vCards) {
-		vCards.reserve(9);
-		const auto AddCard = [&](EQmModuleId Id, const char *pStableId, const char *pTitle, const char *pSubtitle, const FSettingsCardRenderMeasured &Render) {
-			SSettingsCardDefinition Definition;
-			const char *pRegisteredSubtitle = qm_card_registry::ResolveLocalizedDescription(pStableId);
-			Definition.m_Spec = {pStableId, Localize(pTitle), pRegisteredSubtitle != nullptr ? pRegisteredSubtitle : Localize(pSubtitle)};
-			Definition.m_Measure = [Id, EstimateContentHeight](float) { return EstimateContentHeight(Id); };
-			Definition.m_Render = [Render](CUIRect Content) { Render(Content); };
-			Definition.m_IsCollapsed = [Id, &Collapsed = s_aCollapsed, ModuleStateIndex] { return Collapsed[ModuleStateIndex(Id)]; };
-			Definition.m_PreLayoutHeaderInput = [this, Id, ToggleCollapsed, ReadOnly, ModuleStateIndex, &CollapseButtons = s_aCollapseButtons](const SSettingsCardFrame &Frame, bool IsCollapsed) {
-				const int Index = ModuleStateIndex(Id);
-				if(ReadOnly || !Ui()->DoButtonLogic(&CollapseButtons[Index], IsCollapsed, &Frame.m_HandleRect, BUTTONFLAG_LEFT))
-					return false;
-				ToggleCollapsed(Id);
-				return true;
-			};
-			Definition.m_HeaderAction = [CardCtx](const SSettingsCardFrame &Frame, bool Collapsed) { RenderSettingsCardCollapseButton(CardCtx, Frame.m_HandleRect, Collapsed); };
-			Definition.m_MeasureRevision = MeasureContentRevision(Id);
-			Definition.m_PreLayoutInput = BuildVisualPreLayoutInput(Id);
-			vCards.push_back(std::move(Definition));
-		};
-
-		AddCard(EQmModuleId::ChatBubble, "qm:chat_bubble", "Chat Bubble", "Show chat messages above players", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmVisualChatBubbleContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::CameraView, "qm:camera_view", "Camera & FOV", "Adjust game camera and FOV settings", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmVisualCameraViewContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::SkinTransition, "qm:skin_transition", "Skin transition", "Configure hammer skin steal and skin transition animations", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmVisualSkinTransitionContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::WeaponAnimation, "qm:weapon_animation", "Weapon animation", "Play a slide-in rotation animation when switching weapons", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmVisualWeaponAnimationContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, LineSpacing, ReadOnly); });
-		AddCard(EQmModuleId::Streamer, "qm:streamer", "Streamer Mode", "Protect names and skins while streaming", [this, LineHeight, LineSpacing](CUIRect &Content) { RenderQmVisualStreamerContent(Content, LineHeight, LineSpacing); });
-		AddCard(EQmModuleId::EntityOverlay, "qm:entity_overlay", "Entity Layer Colors", "Adjust opacity of entity layers", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmVisualEntityOverlayContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-		AddCard(EQmModuleId::CollisionHitbox, "qm:collision_hitbox", "Hitbox mode", "Show collision and weapon interaction", [this, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { RenderQmVisualCollisionHitboxContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });
-	};
-	uint64_t CardLayoutRevision = 0;
-	for(int ModuleIndex = 0; ModuleIndex < (int)QmModuleCount; ++ModuleIndex)
-		CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ MeasureContentRevision((EQmModuleId)ModuleIndex);
-	const uint64_t DefinitionsRevision = ResolveSettingsCardDefinitionsRevision(m_SettingsCardDeckDisplayCycle, m_MenuTextPoolGeneration, MainView.w, CardLayoutRevision);
+	const uint64_t DefinitionsRevision = ResolveSettingsCardDefinitionsRevision(m_SettingsCardDeckDisplayCycle, m_MenuTextPoolGeneration, MainView.w, ResolveModuleCardMeasureRevision());
 
 	const SQmResolvedScrollPolicy ScrollPolicy = QmResolveScrollPolicy({EQmScrollProfile::SETTINGS_OUTER}, UiScale, 0.0f);
 	const CScrollRegionParams ScrollParams = QmScrollRegionParamsFromPolicy(ScrollPolicy);
@@ -6056,8 +5064,6 @@ void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnl
 	const float SmallSize = Metrics.m_SmallSize;
 	const float LineHeight = Metrics.m_LineHeight;
 	const float LineSpacing = Metrics.m_LineSpacing;
-	const float CardGap = Metrics.m_CardGap;
-	const float ResultHeight = std::clamp(84.0f * UiScale, 70.0f, 84.0f);
 	const SSettingsPageLayoutFrame Page = SettingsPageLayout(MainView, UiScale);
 	const bool ReadOnly = PrewarmOnly || Ui()->RenderOnly();
 	IUiContext SearchCtx = SettingsUiContext("settings_global_search", UiScale);
@@ -6070,6 +5076,13 @@ void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnl
 
 	CLineInputBuffered<128> &ModuleSearchInput = m_GlobalCardSearchInput;
 	const char *pModuleSearch = ModuleSearchInput.GetString();
+	const char *pLanguage = g_Config.m_ClLanguagefile;
+	const bool Sixup = Client()->IsSixup();
+
+	// 折叠状态：搜索页按 id 顺序读写同一份配置，与分类页的持久化口径一致。
+	static std::array<bool, qm_module::QmModuleCount> s_aGlobalSearchCollapsed = {};
+	static std::array<CButtonContainer, qm_module::QmModuleCount> s_aGlobalSearchCollapseButtons;
+
 	struct SGlobalSearchCache
 	{
 		bool m_Valid = false;
@@ -6077,105 +5090,139 @@ void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnl
 		std::string m_Language;
 		bool m_Sixup = false;
 		uint64_t m_LayoutRevision = 0;
-		SQmGlobalSearchResults m_Results;
+		std::vector<SQmGlobalSearchCard> m_vResults;
+		std::vector<qm_card_order::SEntry> m_vModelEntries;
+		qm_card_order::CModel m_Model;
 	};
 	static SGlobalSearchCache s_GlobalSearchCache;
 	static qm_card_order::CModel s_GlobalSearchPrewarmOrderModel;
-	static std::string s_GlobalSearchPrewarmOrderSource;
 	static bool s_GlobalSearchPrewarmOrderModelInitialized = false;
-	static CSettingsCardDeck s_GlobalSearchPrewarmDeck;
-	if(ReadOnly && (!s_GlobalSearchPrewarmOrderModelInitialized || s_GlobalSearchPrewarmOrderSource != g_Config.m_QmGlobalCardOrder))
+	// 搜索页与分类页共用同一份卡片构造上下文（UI 尺度、布局帧、折叠状态与折叠回调）。
+	static qm_card_catalog::SQmCardBuildContext s_GlobalSearchCardBuild;
+	// 函数分类卡片的测量版本快照（搜索结果可能命中它们）：快照本身也要有静态生命周期，
+	// 因为卡片构造上下文会跨帧持有它的地址。
+	static qm_card_catalog::SQmFunctionCardLayoutState s_GlobalSearchFunctionCardLayout;
+	// 页级卡片（输入卡 + 空结果卡）的模型条目：CSettingsCardDeck 只渲染「模型成员 ∩ definitions」，
+	// 页级卡片不是命中结果，必须显式登记进本页模型；OrderInColumn = -1 恒排在全部命中卡（从 0 起）之前。
+	// 可见卡片与预热（ReadOnly）卡片共用同一份清单，保证两遍渲染的卡片集合一致。
+	const auto WithGlobalSearchBaseEntries = [](std::vector<qm_card_order::SEntry> vEntries) {
+		static constexpr std::array<qm_card_order::SEntry, 2> s_aBaseEntries = {{
+			{"deck:global-search-input", "global-search", 0, -1},
+			{"deck:global-search-empty", "global-search", 0, -1},
+		}};
+		vEntries.insert(vEntries.begin(), s_aBaseEntries.begin(), s_aBaseEntries.end());
+		return vEntries;
+	};
+	if(ReadOnly && !s_GlobalSearchPrewarmOrderModelInitialized)
 	{
-		s_GlobalSearchPrewarmOrderModel.LoadMerged(g_Config.m_QmGlobalCardOrder, qm_card_registry::BuildDefaultEntries());
-		s_GlobalSearchPrewarmOrderSource = g_Config.m_QmGlobalCardOrder;
+		s_GlobalSearchPrewarmOrderModel.SetEntries(WithGlobalSearchBaseEntries(qm_card_registry::BuildDefaultEntries()));
 		s_GlobalSearchPrewarmOrderModelInitialized = true;
 	}
-	qm_card_order::CModel &CardOrderModel = ReadOnly ? s_GlobalSearchPrewarmOrderModel : SettingsCardOrderModel();
-	CSettingsCardDeck &CardDeck = ReadOnly ? s_GlobalSearchPrewarmDeck : m_SettingsCardDeck;
-	const char *pLanguage = g_Config.m_ClLanguagefile;
+	// 当前布局模型（卡片归属分类与顺序的唯一权威），搜索页只读取它解析导航目标。
+	const qm_card_order::CModel &CardOrderModel = SettingsCardOrderModel();
+	qm_card_order::CModel &DeckOrderModel = ReadOnly ? s_GlobalSearchPrewarmOrderModel : s_GlobalSearchCache.m_Model;
 	const uint64_t LayoutRevision = CardOrderModel.LayoutRevision();
-	if(!s_GlobalSearchCache.m_Valid || s_GlobalSearchCache.m_Search != (pModuleSearch != nullptr ? pModuleSearch : "") || s_GlobalSearchCache.m_Language != (pLanguage != nullptr ? pLanguage : "") || s_GlobalSearchCache.m_Sixup != Client()->IsSixup() || s_GlobalSearchCache.m_LayoutRevision != LayoutRevision)
+	// 结果卡片里含函数分类卡片（词条过滤/关键词回复/收藏地图），它们的测量版本同样要刷新。
+	RefreshFunctionCardLayoutState(this);
+	if(!s_GlobalSearchCache.m_Valid || s_GlobalSearchCache.m_Search != (pModuleSearch != nullptr ? pModuleSearch : "") || s_GlobalSearchCache.m_Language != (pLanguage != nullptr ? pLanguage : "") || s_GlobalSearchCache.m_Sixup != Sixup || s_GlobalSearchCache.m_LayoutRevision != LayoutRevision)
 	{
 		s_GlobalSearchCache.m_Search = pModuleSearch != nullptr ? pModuleSearch : "";
 		s_GlobalSearchCache.m_Language = pLanguage != nullptr ? pLanguage : "";
-		s_GlobalSearchCache.m_Sixup = Client()->IsSixup();
+		s_GlobalSearchCache.m_Sixup = Sixup;
 		s_GlobalSearchCache.m_LayoutRevision = LayoutRevision;
-		CollectGlobalSearchResults(pModuleSearch, s_GlobalSearchCache.m_Sixup, CardOrderModel, s_GlobalSearchCache.m_Results);
+		s_GlobalSearchCache.m_vResults = qm_card_catalog::SearchResultEntries(pModuleSearch, CardOrderModel);
+		// 页级卡片（搜索输入卡与空结果卡）不是命中结果，但必须是 deck 布局模型的成员：
+		// CSettingsCardDeck 只渲染「模型成员 ∩ definitions」，不在模型里的 definition 会被整卡跳过。
+		s_GlobalSearchCache.m_vModelEntries = WithGlobalSearchBaseEntries(qm_card_catalog::BuildSearchModelEntries(s_GlobalSearchCache.m_vResults));
+		s_GlobalSearchCache.m_Model.SetEntries(s_GlobalSearchCache.m_vModelEntries);
 		s_GlobalSearchCache.m_Valid = true;
 	}
-	const std::vector<SQmGlobalSearchCard> &SearchVisibleGlobalCards = s_GlobalSearchCache.m_Results.m_vAllVisibleCards;
+	const std::vector<SQmGlobalSearchCard> &SearchVisibleGlobalCards = s_GlobalSearchCache.m_vResults;
 	const int SearchMatchedGlobalCardCount = (int)SearchVisibleGlobalCards.size();
 	uint64_t CardLayoutRevision = str_quickhash("global-search");
 	CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ str_quickhash(pModuleSearch != nullptr ? pModuleSearch : "");
 	CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ LayoutRevision;
-	CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ (Client()->IsSixup() ? 1u : 0u);
+	CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ (Sixup ? 1u : 0u);
 	CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ (ReadOnly ? 1u : 0u);
-	CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ (uint64_t)SearchMatchedGlobalCardCount;
+	CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ qm_card_catalog::MeasureContentRevision();
+	for(const SQmGlobalSearchCard &MatchedCard : SearchVisibleGlobalCards)
+		CardLayoutRevision = CardLayoutRevision * 1099511628211ULL ^ str_quickhash(MatchedCard.m_pStableId != nullptr ? MatchedCard.m_pStableId : "");
 	const uint64_t DefinitionsRevision = ResolveSettingsCardDefinitionsRevision(m_SettingsCardDeckDisplayCycle, m_MenuTextPoolGeneration, MainView.w, CardLayoutRevision);
-	const auto BuildDefinitions = [this, UiScale, BodySize, SmallSize, LineHeight, LineSpacing, ResultHeight, CardGap, SearchMatchedGlobalCardCount, ReadOnly](std::vector<SSettingsCardDefinition> &vCards) {
-		vCards.reserve(2);
-		SSettingsCardDefinition InputCard;
-		InputCard.m_Spec = {"deck:global-search-input", Localize("Feature Search"), qm_card_registry::ResolveLocalizedDescription("deck:global-search-input")};
-		InputCard.m_Measure = [LineHeight, LineSpacing](float) { return 2.0f * LineHeight + LineSpacing; };
-		InputCard.m_Render = [this, UiScale, BodySize, SmallSize, LineHeight, LineSpacing, SearchMatchedGlobalCardCount, ReadOnly](CUIRect Content) {
-			CUIRect Row;
-			Content.HSplitTop(LineHeight, &Row, &Content);
-			IUiContext InputCtx = SettingsUiContext("settings_global_search", UiScale);
-			if(ReadOnly)
-			{
-				InputCtx.m_pAnim = nullptr;
-				InputCtx.m_pTree = nullptr;
-			}
-			ui_widget::InputField(InputCtx, &m_GlobalCardSearchInput, Row, BodySize, !ReadOnly && !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive());
-			Content.HSplitTop(LineSpacing * 0.65f, nullptr, &Content);
-			Content.HSplitTop(LineHeight, &Row, &Content);
-			char aSearchHint[64];
-			str_format(aSearchHint, sizeof(aSearchHint), Localize("Found %d global cards"), SearchMatchedGlobalCardCount);
-			TextRender()->TextColor(ColorRGBA(0.9f, 0.9f, 0.9f, 0.82f));
-			Ui()->DoLabel(&Row, aSearchHint, SmallSize, TEXTALIGN_ML);
-			TextRender()->TextColor(TextRender()->DefaultTextColor());
-		};
-		vCards.push_back(std::move(InputCard));
 
-		SSettingsCardDefinition ResultsCard;
-		ResultsCard.m_Spec = {"deck:global-search-results", Localize("Search"), qm_card_registry::ResolveLocalizedDescription("deck:global-search-results")};
-		ResultsCard.m_Measure = [SearchMatchedGlobalCardCount, ResultHeight, CardGap, LineHeight](float) {
-			return SearchMatchedGlobalCardCount == 0 ? LineHeight : SearchMatchedGlobalCardCount * ResultHeight + std::max(0, SearchMatchedGlobalCardCount - 1) * CardGap;
-		};
-		ResultsCard.m_Render = [this, BodySize, SmallSize, LineHeight, LineSpacing, ResultHeight, CardGap, ReadOnly](CUIRect Content) {
-			const std::vector<SQmGlobalSearchCard> &VisibleCards = s_GlobalSearchCache.m_Results.m_vAllVisibleCards;
-			if(VisibleCards.empty())
-			{
-				DoSettingsMenuLabel(SETTINGS_SEARCH, -1, -1, "qmclient-search-no-matching-features", &Content, Localize("No matching features found. Try other keywords"), SmallSize, TEXTALIGN_ML, {}, (int)Content.w);
-				return;
-			}
-			for(size_t Index = 0; Index < VisibleCards.size(); ++Index)
-			{
-				const SQmGlobalSearchCard &Card = VisibleCards[Index];
-				CUIRect ResultRect;
-				Content.HSplitTop(ResultHeight, &ResultRect, &Content);
-				const SQmGlobalSearchNavigation Navigation = ResolveGlobalSearchNavigation(Card);
-				const bool Clicked = !ReadOnly && Ui()->DoButtonLogic(Card.m_pStableId, 0, &ResultRect, BUTTONFLAG_LEFT);
-				if(Clicked)
-				{
-					NavigateToSettingsCard(Card.m_Target);
-					Ui()->ReleaseActiveTextInput(&m_GlobalCardSearchInput);
-					m_GlobalCardSearchInput.Deactivate();
-				}
-				CUIRect ResultContent;
-				ResultRect.Margin(std::max(4.0f, LineSpacing), &ResultContent);
+	const SQmSettingsCardStyle CardStyle = QmSettingsCardStyle(UiScale);
+	s_GlobalSearchCardBuild = {};
+	s_GlobalSearchCardBuild.m_pMenus = this;
+	s_GlobalSearchCardBuild.m_ReadOnly = ReadOnly;
+	s_GlobalSearchCardBuild.m_Page = Page;
+	s_GlobalSearchCardBuild.m_Metrics = Metrics;
+	s_GlobalSearchCardBuild.m_LabelWidth = ResolveSettingsCardLabelWidth(Page.m_TwoColumns ? Page.m_aColumns[0].w : Page.m_ContentViewport.w, Metrics);
+	s_GlobalSearchCardBuild.m_UiContext = SearchCtx;
+	s_GlobalSearchCardBuild.m_Padding = CardStyle.m_Padding;
+	s_GlobalSearchCardBuild.m_CornerRadius = CardStyle.m_CornerRadius;
+	s_GlobalSearchCardBuild.m_pCollapsed = s_aGlobalSearchCollapsed.data();
+	s_GlobalSearchCardBuild.m_pCollapseButtons = s_aGlobalSearchCollapseButtons.data();
+	s_GlobalSearchCardBuild.m_pToggleCollapsed = ToggleQmSidebarCardCollapsed;
+	s_GlobalSearchCardBuild.m_pToggleCollapsedUser = s_aGlobalSearchCollapsed.data();
+	s_GlobalSearchCardBuild.m_pOnCardExpanded = BumpQiaFenCardMeasureRevision;
+	s_GlobalSearchFunctionCardLayout = ResolveFunctionCardLayoutState();
+	s_GlobalSearchCardBuild.m_pFunctionLayout = &s_GlobalSearchFunctionCardLayout;
+	const qm_card_catalog::SQmCardBuildContext &SearchCardBuild = s_GlobalSearchCardBuild;
+
+	// 页面只声明"这一页有哪些卡片"：搜索输入卡 + 空结果卡 + 命中的全部卡片，
+	// 命中的卡片在这里就是完整可交互的卡片本体（就地可改，不是跳转链接）。
+	// 页级卡片与模型条目（WithGlobalSearchBaseEntries）按同一顺序声明，两边都必须有。
+	using FGlobalSearchBaseCard = std::function<void(std::vector<SSettingsCardDefinition> &)>;
+	const std::array<FGlobalSearchBaseCard, 2> aBaseCards = {
+		[this, UiScale, BodySize, SmallSize, LineHeight, LineSpacing, SearchMatchedGlobalCardCount, ReadOnly](std::vector<SSettingsCardDefinition> &vCards) {
+			SSettingsCardDefinition InputCard;
+			InputCard.m_Spec = {"deck:global-search-input", Localize("Feature Search"), qm_card_registry::ResolveLocalizedDescription("deck:global-search-input")};
+			InputCard.m_Measure = [LineHeight, LineSpacing](float) { return 2.0f * LineHeight + LineSpacing; };
+			InputCard.m_Render = [this, UiScale, BodySize, SmallSize, LineHeight, LineSpacing, SearchMatchedGlobalCardCount, ReadOnly](CUIRect Content) {
 				CUIRect Row;
-				ResultContent.HSplitTop(LineHeight, &Row, &ResultContent);
-				DoSettingsLabelStreamed(SettingsTextElement(SETTINGS_SEARCH, -1, "qmclient-search-global-card-title"), &Row, Card.m_Title.empty() ? Localize("Global card") : Card.m_Title.c_str(), BodySize, TEXTALIGN_ML);
-				ResultContent.HSplitTop(LineSpacing * 0.3f, nullptr, &ResultContent);
-				ResultContent.HSplitTop(LineHeight, &Row, &ResultContent);
-				DoSettingsLabelStreamed(SettingsTextElement(SETTINGS_SEARCH, -1, "qmclient-search-global-card-destination"), &Row, GlobalSearchNavigationLabel(Navigation), BodySize * 0.9f, TEXTALIGN_ML);
-				if(Index + 1 < VisibleCards.size())
-					Content.HSplitTop(CardGap, nullptr, &Content);
-			}
-		};
-		ResultsCard.m_MeasureRevision = SearchMatchedGlobalCardCount;
-		vCards.push_back(std::move(ResultsCard));
+				Content.HSplitTop(LineHeight, &Row, &Content);
+				IUiContext InputCtx = SettingsUiContext("settings_global_search", UiScale);
+				if(ReadOnly)
+				{
+					InputCtx.m_pAnim = nullptr;
+					InputCtx.m_pTree = nullptr;
+				}
+				ui_widget::InputField(InputCtx, &m_GlobalCardSearchInput, Row, BodySize, !ReadOnly && !Ui()->IsPopupOpen() && !qm_card_catalog::QmCardRenderHook::GameConsoleActive(this));
+				Content.HSplitTop(LineSpacing * 0.65f, nullptr, &Content);
+				Content.HSplitTop(LineHeight, &Row, &Content);
+				char aSearchHint[64];
+				str_format(aSearchHint, sizeof(aSearchHint), Localize("Found %d global cards"), SearchMatchedGlobalCardCount);
+				qm_card_catalog::QmCardRenderHook::DoSettingsLabel(this, "qmclient-search-global-card-count", aSearchHint, &Row, SmallSize, TEXTALIGN_ML);
+			};
+			vCards.push_back(std::move(InputCard));
+		},
+		[this, SmallSize, LineHeight, SearchMatchedGlobalCardCount](std::vector<SSettingsCardDefinition> &vCards) {
+			SSettingsCardDefinition EmptyCard;
+			EmptyCard.m_Spec = {"deck:global-search-empty", Localize("Search"), qm_card_registry::ResolveLocalizedDescription("deck:global-search-results")};
+			EmptyCard.m_Measure = [LineHeight](float) { return LineHeight; };
+			EmptyCard.m_Render = [this, SmallSize, LineHeight](CUIRect Content) {
+				CUIRect Row;
+				Content.HSplitTop(LineHeight, &Row, &Content);
+				DoSettingsMenuLabel(SETTINGS_SEARCH, -1, -1, "qmclient-search-no-matching-features", &Row, Localize("No matching features found. Try other keywords"), SmallSize, TEXTALIGN_ML, {}, (int)Row.w);
+			};
+			EmptyCard.m_IsVisible = [SearchMatchedGlobalCardCount] { return SearchMatchedGlobalCardCount == 0; };
+			vCards.push_back(std::move(EmptyCard));
+		},
+	};
+
+	const auto BuildDefinitions = [this, SmallSize, ReadOnly, &SearchCardBuild, &SearchVisibleGlobalCards, &aBaseCards](std::vector<SSettingsCardDefinition> &vCards) {
+		vCards.clear();
+		for(const FGlobalSearchBaseCard &BuildBaseCard : aBaseCards)
+			BuildBaseCard(vCards);
+
+		for(const SQmGlobalSearchCard &MatchedCard : SearchVisibleGlobalCards)
+		{
+			SSettingsCardDefinition Definition;
+			if(!qm_card_catalog::BuildCard(SearchCardBuild, MatchedCard.m_pStableId, Definition))
+				continue;
+			// 结果卡片标题下方给一个"定位"入口，其余交互与卡片本体完全一致。
+			Definition.m_HeaderAction = BuildGlobalSearchLocateHeaderAction(MatchedCard, ReadOnly, SmallSize);
+			vCards.push_back(std::move(Definition));
+		}
 	};
 
 	const SQmResolvedScrollPolicy ScrollPolicy = QmResolveScrollPolicy({EQmScrollProfile::SETTINGS_OUTER}, UiScale, 0.0f);
@@ -6187,9 +5234,13 @@ void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnl
 	InputState.m_MouseDown = !ReadOnly && Ui()->MouseButton(0);
 	InputState.m_MouseReleased = !ReadOnly && !InputState.m_MouseDown && Ui()->LastMouseButton(0);
 	InputState.m_CtrlPressed = !ReadOnly && Input()->ModifierIsPressed();
+	// 搜索页的卡片顺序由查询决定，不参与跨页拖拽排序。
+	InputState.m_AllowHeaderDrag = false;
 	InputState.m_FrameDt = GameClient()->UiRuntimeV2()->FrameDt();
 	InputState.m_pScrollParams = ReadOnly ? nullptr : &ScrollParams;
-	const SSettingsCardDeckResult DeckResult = CardDeck.RenderCached(SearchCtx, Page, "global-search", DefinitionsRevision, BuildDefinitions, CardOrderModel, ReadOnly ? nullptr : &s_GlobalSearchScrollRegion, InputState, SettingsCardMotionSpec(), SettingsCardDeckVisualOptions());
+	static CSettingsCardDeck s_GlobalSearchPrewarmDeck;
+	CSettingsCardDeck &CardDeck = ReadOnly ? s_GlobalSearchPrewarmDeck : m_SettingsCardDeck;
+	const SSettingsCardDeckResult DeckResult = CardDeck.RenderCached(SearchCtx, Page, "global-search", DefinitionsRevision, BuildDefinitions, DeckOrderModel, ReadOnly ? nullptr : &s_GlobalSearchScrollRegion, InputState, SettingsCardMotionSpec(), SettingsCardDeckVisualOptions());
 	if(!ReadOnly && DeckResult.m_OrderChanged)
 		SaveSettingsCardOrderModel();
 }

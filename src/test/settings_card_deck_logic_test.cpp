@@ -9,6 +9,7 @@
 #include <game/client/QmUi/SettingsCardDeckLogic.h>
 #include <game/client/QmUi/SettingsPageLayout.h>
 #include <game/client/QmUi/UiForms.h>
+#include <game/client/QmUi/cards/QmCardCatalogSkinMetrics.h>
 #include <game/client/components/qmclient/collision_hitbox_logic.h>
 
 #include <gtest/gtest.h>
@@ -265,8 +266,9 @@ TEST(SettingsPageLayout, DynamicVisualCardHeightsUseSharedMetrics)
 	EXPECT_FLOAT_EQ(ResolveQmVisualCollisionHitboxHeight(Metrics, true), 16.0f * Metrics.m_RowStep);
 	EXPECT_FLOAT_EQ(ResolveQmVisualSkinTransitionHeight(Metrics, true) - ResolveQmVisualSkinTransitionHeight(Metrics, false), 5.0f * Metrics.m_RowStep);
 	EXPECT_GT(ResolveQmVisualSkinTransitionHeight(Metrics, false), 0.0f);
-	// 描边的两个范围开关、颜色和两个滑块始终各占一行。
-	EXPECT_FLOAT_EQ(ResolveQmVisualSkinTransitionHeight(Metrics, false), 12.0f * Metrics.m_RowStep + 2.0f * (Metrics.m_SmallSize + Metrics.m_LineSpacing));
+	// 动画关闭时仅有偷皮和动画两个开关；外观控件的可见性不受动画开关影响。
+	EXPECT_FLOAT_EQ(ResolveQmVisualSkinTransitionHeight(Metrics, false), 2.0f * Metrics.m_RowStep);
+	EXPECT_FLOAT_EQ(ResolveQmVisualSkinAppearanceHeight(Metrics), 9.0f * Metrics.m_RowStep + 2.0f * (Metrics.m_SmallSize + Metrics.m_LineSpacing));
 }
 
 TEST(CollisionHitboxLogic, CapsuleOutlineHandlesDegenerateAndAxisAlignedLasers)
@@ -466,8 +468,8 @@ TEST(SettingsPageLayout, GeneralDynamicCameraConsumesNoHiddenRowWhenCollapsed)
 	const SSettingsContentMetrics Metrics = ResolveSettingsContentMetrics(1000.0f);
 	const float Collapsed = ResolveSettingsGeneralGameContentHeight(Metrics, false);
 	const float Expanded = ResolveSettingsGeneralGameContentHeight(Metrics, true);
-	EXPECT_FLOAT_EQ(Collapsed, ResolveSettingsRowsHeight(4, Metrics.m_LineHeight, Metrics.m_LineSpacing));
-	EXPECT_FLOAT_EQ(Expanded, ResolveSettingsRowsHeight(5, Metrics.m_LineHeight, Metrics.m_LineSpacing));
+	EXPECT_FLOAT_EQ(Collapsed, ResolveSettingsRowsHeight(3, Metrics.m_LineHeight, Metrics.m_LineSpacing));
+	EXPECT_FLOAT_EQ(Expanded, ResolveSettingsRowsHeight(4, Metrics.m_LineHeight, Metrics.m_LineSpacing));
 	EXPECT_FLOAT_EQ(Expanded - Collapsed, Metrics.m_RowStep);
 }
 
@@ -535,7 +537,6 @@ TEST(SettingsCardDeck, AuditedUiLabelsHaveSimplifiedChineseRuntimeTranslations)
 		"Card height animation",
 		"Card list entry animation",
 		"Card reflow animation",
-		"Enable client stutter diagnostics at startup",
 		"Enable enhanced scoreboard presentation",
 		"Enable macOS graphics diagnostics and Instruments signposts",
 		"Enable smooth cinematic camera while free spectating",
@@ -1169,4 +1170,84 @@ TEST(SettingsCardDeck, ColumnProjectionCacheRebuildsOnlyForLayoutOrActiveDefinit
 	const auto &aMovedColumns = Cache.Resolve(Model, "graphics", vActiveStateIndices);
 	EXPECT_EQ(Cache.RebuildCount(), 3u);
 	EXPECT_EQ(aMovedColumns[2], (std::vector<int>{Visual, Modes}));
+}
+
+TEST(CollisionHitboxLogic, CapsuleCanFillBoundedRenderStorageWithoutIntermediateVectors)
+{
+	std::array<SCollisionHitboxLine, COLLISION_HITBOX_CAPSULE_MAX_LINES + 2> aLines{};
+	aLines.front() = {{-123, -456}, {-789, -123}};
+	aLines.back() = aLines.front();
+	int Count = 0;
+	BuildHitboxCapsuleOutline({0, 0}, {10, 0}, 2.0f, 1000, [&](vec2 From, vec2 To) {
+		ASSERT_LT(Count, COLLISION_HITBOX_CAPSULE_MAX_LINES);
+		aLines[++Count] = {From, To};
+	});
+	ASSERT_EQ(Count, COLLISION_HITBOX_CAPSULE_MAX_LINES);
+	EXPECT_EQ(aLines.front().m_From, vec2(-123, -456));
+	EXPECT_EQ(aLines.back().m_To, vec2(-789, -123));
+	EXPECT_EQ(aLines[1].m_From, vec2(0, 2));
+	EXPECT_EQ(aLines[1].m_To, vec2(10, 2));
+	EXPECT_EQ(aLines[2].m_From, vec2(10, -2));
+	EXPECT_EQ(aLines[2].m_To, vec2(0, -2));
+	for(int i = 3; i < 66; ++i)
+		EXPECT_EQ(aLines[i].m_To, aLines[i + 1].m_From);
+	for(int i = 67; i < Count; ++i)
+		EXPECT_EQ(aLines[i].m_To, aLines[i + 1].m_From);
+	EXPECT_NEAR(aLines[66].m_To.x, 10.0f, 0.0001f);
+	EXPECT_NEAR(aLines[66].m_To.y, -2.0f, 0.0001f);
+	EXPECT_NEAR(aLines[Count].m_To.x, 0.0f, 0.0001f);
+	EXPECT_NEAR(aLines[Count].m_To.y, 2.0f, 0.0001f);
+}
+
+TEST(CollisionHitboxLogic, CapsuleEmitterClampsDetailAndSkipsInvalidGeometry)
+{
+	int Count = 0;
+	const auto CountLine = [&](vec2, vec2) { ++Count; };
+	BuildHitboxCapsuleOutline({0, 0}, {1, 0}, 2.0f, -1, CountLine);
+	EXPECT_EQ(Count, 6);
+	Count = 0;
+	BuildHitboxCapsuleOutline({0, 0}, {0, 0}, 2.0f, 1000, CountLine);
+	EXPECT_EQ(Count, COLLISION_HITBOX_CAPSULE_MAX_LINES - 2);
+	Count = 0;
+	const float MaxFloat = std::numeric_limits<float>::max();
+	BuildHitboxCapsuleOutline({-MaxFloat, 0}, {MaxFloat, 0}, 2.0f, 16, CountLine);
+	BuildHitboxCapsuleOutline({0, 0}, {1, 0}, 0.0f, 16, CountLine);
+	BuildHitboxCapsuleOutline({0, 0}, {1, 0}, std::numeric_limits<float>::infinity(), 16, CountLine);
+	EXPECT_EQ(Count, 0);
+}
+
+TEST(CollisionHitboxLogic, CachedCircleDirectionsPreserveOriginalOutlineAtEveryDetail)
+{
+	CQmHitboxCircleDirections Directions;
+	const vec2 Center(123.25f, -41.5f);
+	const float Radius = 28.0f;
+	for(int Segments = 8; Segments <= 64; ++Segments)
+	{
+		const vec2 *pDirections = Directions.Get(Segments);
+		EXPECT_EQ(pDirections[0], vec2(1, 0));
+		const float Step = 2.0f * pi / Segments;
+		for(int i = 1; i <= Segments; ++i)
+		{
+			const float Angle = Step * i;
+			const vec2 Original = Center + vec2(std::cos(Angle) * Radius, std::sin(Angle) * Radius);
+			const vec2 Cached = Center + pDirections[i] * Radius;
+			EXPECT_FLOAT_EQ(Cached.x, Original.x);
+			EXPECT_FLOAT_EQ(Cached.y, Original.y);
+			EXPECT_NEAR(length(pDirections[i]), 1.0f, 0.000001f);
+		}
+		EXPECT_NEAR(distance(pDirections[0], pDirections[Segments]), 0.0f, 0.000001f);
+	}
+}
+
+TEST(CollisionHitboxLogic, CircleDetailSwitchesKeepEarlierDirectionsAvailable)
+{
+	CQmHitboxCircleDirections Directions;
+	const vec2 *pTee = Directions.Get(36);
+	const vec2 Saved = pTee[7];
+	for(int Segments : {16, 20, 28, 48, 8, 64, 17})
+	{
+		EXPECT_NE(Directions.Get(Segments), pTee);
+		EXPECT_EQ(Directions.Get(36), pTee);
+		EXPECT_EQ(pTee[7], Saved);
+	}
 }

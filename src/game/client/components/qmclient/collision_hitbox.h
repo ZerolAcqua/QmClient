@@ -28,6 +28,7 @@ class CCollisionHitbox : public CComponent
 private:
 	ivec2 m_MapDataSize;
 	std::vector<int> m_vMapData;
+	CQmHitboxCircleDirections m_CircleDirections;
 
 	float HitboxAlpha() const;
 	bool HitboxModeEnabled() const;

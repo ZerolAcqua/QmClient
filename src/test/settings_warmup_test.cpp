@@ -2537,14 +2537,16 @@ TEST(SettingsWarmup, SettingsCardsAvoidIdlePerFrameMeasurement)
 {
 	const std::string Settings = ReadTestSourceFile("src/game/client/components/menus_settings.cpp");
 	const std::string QmClient = ReadTestSourceFile("src/game/client/components/qmclient/menus_qmclient.cpp");
+	const std::string QmCardCatalog = ReadTestSourceFile("src/game/client/QmUi/cards/QmCardCatalog.cpp");
 	const std::string TClient = ReadTestSourceFile("src/game/client/components/tclient/menus_tclient.cpp");
 
 	EXPECT_EQ(Settings.find("Definition.m_MeasureEachFrame = true;"), std::string::npos);
 	EXPECT_EQ(QmClient.find("m_MeasureEachFrame = true;"), std::string::npos);
 	EXPECT_EQ(TClient.find("m_MeasureEachFrame = true;"), std::string::npos);
 	EXPECT_NE(Settings.find("Definition.m_MeasureRevision = static_cast<uint64_t>"), std::string::npos);
+	// 卡片 definition 的装配已迁到全局卡片目录：重测版本由卡片目录写入，页面只给聚合版本。
 	EXPECT_EQ(QmClient.find("Definition.m_MeasureRevision = static_cast<uint64_t>"), std::string::npos);
-	EXPECT_NE(QmClient.find("Definition.m_MeasureRevision = MeasureContentRevision(Id);"), std::string::npos);
+	EXPECT_NE(QmCardCatalog.find("Out.m_MeasureRevision = MeasureRevision;"), std::string::npos);
 }
 
 TEST(SettingsWarmup, TeeOffscreenDrainRequiresExplicitPrewarm)

@@ -1,5 +1,7 @@
 #include "serverbrowser_http.h"
 
+#include "serverbrowser_http_parse.h"
+
 #include <base/lock.h>
 #include <base/log.h>
 #include <base/system.h>
@@ -306,6 +308,35 @@ namespace
 		m_pData->m_BestIndex.store(BestIndex);
 	}
 
+	// 仅持有已完成的 HTTP 响应，不引用浏览器对象；浏览器销毁后任务也能安全收尾。
+	class CServerListParseJob : public IJob
+	{
+		std::shared_ptr<CHttpRequest> m_pResponse;
+
+		void Run() override
+		{
+			if(m_pResponse->State() == EHttpState::DONE)
+			{
+				json_value *pJson = m_pResponse->ResultJson();
+				m_Success = !ServerBrowserParseHttpList(pJson, &m_vServers);
+				json_value_free(pJson);
+				m_Age = SanitizeAge(m_pResponse->ResultAgeSeconds());
+			}
+			// 在任务线程释放本任务持有的响应引用。
+			m_pResponse.reset();
+		}
+
+	public:
+		explicit CServerListParseJob(std::shared_ptr<CHttpRequest> pResponse) :
+			m_pResponse(std::move(pResponse))
+		{
+		}
+
+		bool m_Success = false;
+		int m_Age = 0;
+		std::vector<CServerInfo> m_vServers;
+	};
+
 	class CServerBrowserHttp : public IServerBrowserHttp
 	{
 	public:
@@ -332,22 +363,25 @@ namespace
 			STATE_DONE,
 			STATE_WANTREFRESH,
 			STATE_REFRESHING,
+			STATE_PARSING,
 			STATE_NO_MASTER,
 		};
 
 		static bool Validate(json_value *pJson);
-		static bool Parse(json_value *pJson, std::vector<CServerInfo> *pvServers);
 
+		IEngine *m_pEngine;
 		IHttp *m_pHttp;
 
 		int m_State = STATE_WANTREFRESH;
 		std::shared_ptr<CHttpRequest> m_pGetServers;
+		std::shared_ptr<CServerListParseJob> m_pParseJob;
 		std::unique_ptr<CChooseMaster> m_pChooseMaster;
 
 		std::vector<CServerInfo> m_vServers;
 	};
 
 	CServerBrowserHttp::CServerBrowserHttp(IEngine *pEngine, IHttp *pHttp, const char **ppUrls, int NumUrls, int PreviousBestIndex) :
+		m_pEngine(pEngine),
 		m_pHttp(pHttp),
 		m_pChooseMaster(new CChooseMaster(pEngine, pHttp, Validate, ppUrls, NumUrls, PreviousBestIndex))
 	{
@@ -389,15 +423,21 @@ namespace
 			{
 				return;
 			}
+			m_pParseJob = std::make_shared<CServerListParseJob>(std::move(m_pGetServers));
+			m_State = STATE_PARSING;
+			m_pEngine->AddJob(m_pParseJob);
+		}
+		else if(m_State == STATE_PARSING)
+		{
+			// 只有任务完成才读取结果，解析期间保留上次发布的服务器列表。
+			if(m_pParseJob->State() != IJob::STATE_DONE)
+				return;
+			const bool Success = m_pParseJob->m_Success;
+			const int Age = m_pParseJob->m_Age;
+			if(Success)
+				m_vServers = std::move(m_pParseJob->m_vServers);
+			m_pParseJob.reset();
 			m_State = STATE_DONE;
-			std::shared_ptr<CHttpRequest> pGetServers = nullptr;
-			std::swap(m_pGetServers, pGetServers);
-
-			bool Success = true;
-			json_value *pJson = pGetServers->State() == EHttpState::DONE ? pGetServers->ResultJson() : nullptr;
-			Success = Success && pJson;
-			Success = Success && !Parse(pJson, &m_vServers);
-			json_value_free(pJson);
 			if(!Success)
 			{
 				log_error("serverbrowser_http", "failed getting serverlist, trying to find best URL");
@@ -409,7 +449,6 @@ namespace
 			{
 				// Try to find new master if the current one returns
 				// results that are 5 minutes old.
-				int Age = SanitizeAge(pGetServers->ResultAgeSeconds());
 				if(Age > 300)
 				{
 					log_info("serverbrowser_http", "got stale serverlist, age=%ds, trying to find best URL", Age);
@@ -440,104 +479,10 @@ namespace
 		}
 		Update();
 	}
-	bool ServerbrowserParseUrl(NETADDR *pOut, const char *pUrl)
-	{
-		int Failure = net_addr_from_url(pOut, pUrl, nullptr, 0);
-		if(Failure || pOut->port == 0)
-		{
-			return true;
-		}
-		return false;
-	}
 	bool CServerBrowserHttp::Validate(json_value *pJson)
 	{
 		std::vector<CServerInfo> vServers;
-		return Parse(pJson, &vServers);
-	}
-	bool CServerBrowserHttp::Parse(json_value *pJson, std::vector<CServerInfo> *pvServers)
-	{
-		std::vector<CServerInfo> vServers;
-
-		const json_value &Json = *pJson;
-		const json_value &Servers = Json["servers"];
-		if(Servers.type != json_array)
-		{
-			return true;
-		}
-		for(unsigned int i = 0; i < Servers.u.array.length; i++)
-		{
-			const json_value &Server = Servers[i];
-			const json_value &Addresses = Server["addresses"];
-			const json_value &Info = Server["info"];
-			const json_value &Location = Server["location"];
-			int ParsedLocation = CServerInfo::LOC_UNKNOWN;
-			CServerInfo2 ParsedInfo;
-			if(Addresses.type != json_array || (Location.type != json_string && Location.type != json_none))
-			{
-				return true;
-			}
-			if(Location.type == json_string)
-			{
-				if(CServerInfo::ParseLocation(&ParsedLocation, Location))
-				{
-					return true;
-				}
-			}
-			if(CServerInfo2::FromJson(&ParsedInfo, &Info))
-			{
-				// Only skip the current server on parsing
-				// failure; the server info is "user input" by
-				// the game server and can be set to arbitrary
-				// values.
-				continue;
-			}
-			CServerInfo SetInfo = ParsedInfo;
-			SetInfo.m_Location = ParsedLocation;
-			SetInfo.m_NumAddresses = 0;
-			bool GotVersion6 = false;
-			for(unsigned int a = 0; a < Addresses.u.array.length; a++)
-			{
-				const json_value &Address = Addresses[a];
-				if(Address.type != json_string)
-				{
-					return true;
-				}
-				if(str_startswith(Addresses[a], "tw-0.6+udp://"))
-				{
-					GotVersion6 = true;
-					break;
-				}
-			}
-			for(unsigned int a = 0; a < Addresses.u.array.length; a++)
-			{
-				const json_value &Address = Addresses[a];
-				if(Address.type != json_string)
-				{
-					return true;
-				}
-				if(GotVersion6 && str_startswith(Addresses[a], "tw-0.7+udp://"))
-				{
-					continue;
-				}
-				NETADDR ParsedAddr;
-				if(ServerbrowserParseUrl(&ParsedAddr, Addresses[a]))
-				{
-					// Skip unknown addresses.
-					continue;
-				}
-				if(SetInfo.m_NumAddresses < (int)std::size(SetInfo.m_aAddresses))
-				{
-					SetInfo.m_aAddresses[SetInfo.m_NumAddresses] = ParsedAddr;
-					SetInfo.m_NumAddresses += 1;
-				}
-			}
-			if(SetInfo.m_NumAddresses > 0)
-			{
-				vServers.push_back(SetInfo);
-			}
-		}
-		*pvServers = vServers;
-		return false;
+		return ServerBrowserParseHttpList(pJson, &vServers);
 	}
 
 	const char *DEFAULT_SERVERLIST_URLS[] = {

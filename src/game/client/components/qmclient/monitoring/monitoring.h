@@ -101,6 +101,9 @@ struct SQmPerformanceMetrics
 
 struct SQmDevicePerfSample
 {
+	float m_CpuUsagePct = -1.0f;
+	float m_TotalCpuUsagePct = -1.0f;
+	float m_MemoryUsageMb = -1.0f;
 	float m_GpuUtilPct = -1.0f;
 	float m_GpuDedicatedVramMb = -1.0f;
 	float m_GpuDedicatedVramBudgetMb = -1.0f;
@@ -108,6 +111,9 @@ struct SQmDevicePerfSample
 	float m_DiskReadMbPerSec = -1.0f;
 	bool m_Available = false;
 };
+
+// 后台采样回调，不访问客户端、配置或图形对象。
+SQmDevicePerfSample QmSampleProcessPerf();
 
 struct SQmDevicePerfSnapshot
 {
@@ -152,6 +158,7 @@ private:
 	bool m_Started = false;
 	bool m_Enabled = false;
 	bool m_StopRequested = false;
+	uint64_t m_EnableGeneration = 0;
 };
 
 void QmUpdateDevicePerfSamplerState(CQmAsyncDevicePerfSampler &Sampler, bool Enabled);

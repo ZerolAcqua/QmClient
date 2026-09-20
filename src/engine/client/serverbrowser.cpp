@@ -477,9 +477,45 @@ bool CServerBrowser::SortCompareFavoritesNumPlayersAndPing(int Index1, int Index
 	return IsFavorite1 && !IsFavorite2;
 }
 
+bool CServerBrowser::SortCompareQmClients(int Index1, int Index2) const
+{
+	const CServerEntry *pIndex1 = m_vpServerlist[Index1];
+	const CServerEntry *pIndex2 = m_vpServerlist[Index2];
+	return pIndex1->m_Info.m_QmClientCount > pIndex2->m_Info.m_QmClientCount;
+}
+
+void CServerBrowser::SetQmClientServerCounts(const std::unordered_map<std::string, int> &Counts)
+{
+	if(m_QmClientServerCounts == Counts)
+		return;
+	m_QmClientServerCounts = Counts;
+	UpdateQmClientServerCounts();
+	// 只有当前就按「梦」列排序时才立刻重排；否则等切到该列时 SortHash 变化本来就会重排。
+	if(g_Config.m_BrSort == IServerBrowser::SORT_QM_CLIENTS)
+		RequestResort();
+}
+
+int CServerBrowser::QmClientCountForServer(const CServerInfo &Info) const
+{
+	if(m_QmClientServerCounts.empty() || Info.m_NumAddresses <= 0)
+		return 0;
+	char aAddress[NETADDR_MAXSTRSIZE];
+	net_addr_str(&Info.m_aAddresses[0], aAddress, sizeof(aAddress), true);
+	const auto It = m_QmClientServerCounts.find(aAddress);
+	return It == m_QmClientServerCounts.end() ? 0 : It->second;
+}
+
+void CServerBrowser::UpdateQmClientServerCounts()
+{
+	// 推送变化时更新一次，页面读取计数，不在每帧重建分布索引。
+	for(CServerEntry *pEntry : m_vpServerlist)
+		pEntry->m_Info.m_QmClientCount = QmClientCountForServer(pEntry->m_Info);
+}
+
 void CServerBrowser::Filter()
 {
 	m_NumSortedPlayers = 0;
+	const uint64_t FriendsRevision = m_pFriends->Revision();
 	// 查询在本次过滤期间不变，只分词、裁剪和解析引号一次。
 	const auto vFilterTokens = ParseServerFilterTokens(g_Config.m_BrFilterString);
 	const auto vExcludeTokens = ParseServerFilterTokens(g_Config.m_BrExcludeString);
@@ -495,7 +531,8 @@ void CServerBrowser::Filter()
 	// filter the servers
 	for(int ServerIndex = 0; ServerIndex < (int)m_vpServerlist.size(); ServerIndex++)
 	{
-		CServerInfo &Info = m_vpServerlist[ServerIndex]->m_Info;
+		CServerEntry *pEntry = m_vpServerlist[ServerIndex];
+		CServerInfo &Info = pEntry->m_Info;
 		bool Filtered = false;
 
 		if(g_Config.m_BrFilterEmpty && Info.m_NumFilteredPlayers == 0)
@@ -634,7 +671,15 @@ void CServerBrowser::Filter()
 			}
 		}
 
-		UpdateServerFriends(&Info);
+		if(!pEntry->m_FriendStateValid ||
+			pEntry->m_FriendStateRevision != FriendsRevision ||
+			pEntry->m_FriendStateIgnoreClan != (g_Config.m_ClFriendsIgnoreClan != 0))
+		{
+			UpdateServerFriends(&Info);
+			pEntry->m_FriendStateRevision = FriendsRevision;
+			pEntry->m_FriendStateValid = true;
+			pEntry->m_FriendStateIgnoreClan = g_Config.m_ClFriendsIgnoreClan != 0;
+		}
 
 		if(!Filtered)
 		{
@@ -681,6 +726,7 @@ int CServerBrowser::SortHash() const
 
 void CServerBrowser::Sort()
 {
+	++m_FriendListRevision;
 	// 先消费本次请求；过滤过程中若产生新请求，保留到下一次更新。
 	m_NeedResort = false;
 	// update number of filtered players
@@ -709,6 +755,8 @@ void CServerBrowser::Sort()
 		std::stable_sort(m_vSortedServerlist.begin(), m_vSortedServerlist.end(), CSortWrap(this, &CServerBrowser::SortCompareGametype));
 	else if(g_Config.m_BrSort == IServerBrowser::SORT_FAVORITES)
 		std::stable_sort(m_vSortedServerlist.begin(), m_vSortedServerlist.end(), CSortWrap(this, &CServerBrowser::SortCompareFavoritesNumPlayersAndPing));
+	else if(g_Config.m_BrSort == IServerBrowser::SORT_QM_CLIENTS)
+		std::stable_sort(m_vSortedServerlist.begin(), m_vSortedServerlist.end(), CSortWrap(this, &CServerBrowser::SortCompareQmClients));
 
 	m_Sorthash = SortHash();
 }
@@ -775,19 +823,34 @@ static void ServerBrowserFormatAddresses(char *pBuffer, int BufferSize, NETADDR 
 	}
 }
 
-void CServerBrowser::SetInfo(CServerEntry *pEntry, const CServerInfo &Info) const
+void CServerBrowser::SetInfo(CServerEntry *pEntry, const CServerInfo &Info)
 {
-	const CServerInfo TmpInfo = pEntry->m_Info;
+	++m_FriendListRevision;
+	const int QmClientCount = pEntry->m_Info.m_QmClientCount;
+	const TRISTATE Favorite = pEntry->m_Info.m_Favorite;
+	const TRISTATE FavoriteAllowPing = pEntry->m_Info.m_FavoriteAllowPing;
+	const int ServerIndex = pEntry->m_Info.m_ServerIndex;
+	const int NumAddresses = pEntry->m_Info.m_NumAddresses;
+	NETADDR aAddresses[MAX_SERVER_ADDRESSES];
+	mem_copy(aAddresses, pEntry->m_Info.m_aAddresses, sizeof(aAddresses));
+	char aCommunityId[CServerInfo::MAX_COMMUNITY_ID_LENGTH];
+	char aCommunityCountry[CServerInfo::MAX_COMMUNITY_COUNTRY_LENGTH];
+	char aCommunityType[CServerInfo::MAX_COMMUNITY_TYPE_LENGTH];
+	str_copy(aCommunityId, pEntry->m_Info.m_aCommunityId);
+	str_copy(aCommunityCountry, pEntry->m_Info.m_aCommunityCountry);
+	str_copy(aCommunityType, pEntry->m_Info.m_aCommunityType);
 	pEntry->m_Info = Info;
-	pEntry->m_Info.m_Favorite = TmpInfo.m_Favorite;
-	pEntry->m_Info.m_FavoriteAllowPing = TmpInfo.m_FavoriteAllowPing;
-	pEntry->m_Info.m_ServerIndex = TmpInfo.m_ServerIndex;
-	mem_copy(pEntry->m_Info.m_aAddresses, TmpInfo.m_aAddresses, sizeof(pEntry->m_Info.m_aAddresses));
-	pEntry->m_Info.m_NumAddresses = TmpInfo.m_NumAddresses;
+	pEntry->m_Info.m_QmClientCount = QmClientCount;
+	pEntry->m_Info.m_Favorite = Favorite;
+	pEntry->m_Info.m_FavoriteAllowPing = FavoriteAllowPing;
+	pEntry->m_Info.m_ServerIndex = ServerIndex;
+	mem_copy(pEntry->m_Info.m_aAddresses, aAddresses, sizeof(aAddresses));
+	pEntry->m_Info.m_NumAddresses = NumAddresses;
 	ServerBrowserFormatAddresses(pEntry->m_Info.m_aAddress, sizeof(pEntry->m_Info.m_aAddress), pEntry->m_Info.m_aAddresses, pEntry->m_Info.m_NumAddresses);
-	str_copy(pEntry->m_Info.m_aCommunityId, TmpInfo.m_aCommunityId);
-	str_copy(pEntry->m_Info.m_aCommunityCountry, TmpInfo.m_aCommunityCountry);
-	str_copy(pEntry->m_Info.m_aCommunityType, TmpInfo.m_aCommunityType);
+	str_copy(pEntry->m_Info.m_aCommunityId, aCommunityId);
+	str_copy(pEntry->m_Info.m_aCommunityCountry, aCommunityCountry);
+	str_copy(pEntry->m_Info.m_aCommunityType, aCommunityType);
+	pEntry->m_FriendStateValid = false;
 	UpdateServerRank(&pEntry->m_Info);
 	pEntry->m_Info.m_GametypeColor = CServerInfo::GametypeColor(pEntry->m_Info.m_aGameType);
 
@@ -889,6 +952,7 @@ void CServerBrowser::SetLatency(NETADDR Addr, int Latency)
 
 CServerBrowser::CServerEntry *CServerBrowser::Add(const NETADDR *pAddrs, int NumAddrs)
 {
+	++m_FriendListRevision;
 	// create new pEntry
 	CServerEntry *pEntry = m_ServerlistHeap.Allocate<CServerEntry>();
 	*pEntry = {};
@@ -896,6 +960,7 @@ CServerBrowser::CServerEntry *CServerBrowser::Add(const NETADDR *pAddrs, int Num
 	// set the info
 	mem_copy(pEntry->m_Info.m_aAddresses, pAddrs, NumAddrs * sizeof(pAddrs[0]));
 	pEntry->m_Info.m_NumAddresses = NumAddrs;
+	pEntry->m_Info.m_QmClientCount = QmClientCountForServer(pEntry->m_Info);
 
 	pEntry->m_Info.m_Latency = 999;
 	pEntry->m_Info.m_HasRank = CServerInfo::RANK_UNAVAILABLE;
@@ -926,6 +991,7 @@ CServerBrowser::CServerEntry *CServerBrowser::Add(const NETADDR *pAddrs, int Num
 
 CServerBrowser::CServerEntry *CServerBrowser::ReplaceEntry(CServerEntry *pEntry, const NETADDR *pAddrs, int NumAddrs)
 {
+	++m_FriendListRevision;
 	for(int i = 0; i < pEntry->m_Info.m_NumAddresses; i++)
 	{
 		m_ByAddr.erase(pEntry->m_Info.m_aAddresses[i]);
@@ -934,6 +1000,7 @@ CServerBrowser::CServerEntry *CServerBrowser::ReplaceEntry(CServerEntry *pEntry,
 	// set the info
 	mem_copy(pEntry->m_Info.m_aAddresses, pAddrs, NumAddrs * sizeof(pAddrs[0]));
 	pEntry->m_Info.m_NumAddresses = NumAddrs;
+	pEntry->m_Info.m_QmClientCount = QmClientCountForServer(pEntry->m_Info);
 
 	pEntry->m_Info.m_Latency = 999;
 	pEntry->m_Info.m_HasRank = CServerInfo::RANK_UNAVAILABLE;
@@ -1252,14 +1319,14 @@ void CServerBrowser::UpdateFromHttp()
 
 	for(int i = 0; i < NumServers; i++)
 	{
-		CServerInfo Info = m_pHttp->Server(i);
+		const CServerInfo &Info = m_pHttp->Server(i);
 		if(!Want(Info.m_aAddresses, Info.m_NumAddresses))
 		{
 			continue;
 		}
-		UpdateServerLatency(&Info, OwnLocation);
 		CServerEntry *pEntry = Add(Info.m_aAddresses, Info.m_NumAddresses);
 		SetInfo(pEntry, Info);
+		UpdateServerLatency(&pEntry->m_Info, OwnLocation);
 		pEntry->m_RequestIgnoreInfo = true;
 	}
 
@@ -1297,6 +1364,7 @@ void CServerBrowser::UpdateFromHttp()
 
 void CServerBrowser::CleanUp()
 {
+	++m_FriendListRevision;
 	// clear out everything
 	m_vSortedServerlist.clear();
 	m_vpServerlist.clear();

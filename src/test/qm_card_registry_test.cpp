@@ -1113,3 +1113,28 @@ TEST(QmCardRegistry, AllQimengLegacyKeysMigratable)
 		}
 	}
 }
+
+// 意图：拆分后搜索描边/色调/阴影与换皮动画时应命中各自的全局卡片。
+TEST(QmCardRegistry, SkinSettingsSearchFindsOwningCard)
+{
+	const auto *pAppearance = qm_card_registry::FindByStableId("qm:skin_appearance");
+	const auto *pTransition = qm_card_registry::FindByStableId("qm:skin_transition");
+	ASSERT_NE(pAppearance, nullptr);
+	ASSERT_NE(pTransition, nullptr);
+	EXPECT_STREQ(pAppearance->m_pDefaultTab, "visual");
+	EXPECT_STREQ(pTransition->m_pDefaultTab, "visual");
+	EXPECT_STREQ(pAppearance->m_pTitle, "Tee appearance");
+	EXPECT_STREQ(pTransition->m_pTitle, "Skin transition animation");
+
+	qm_card_order::CModel Model;
+	Model.SetEntries(qm_card_registry::BuildDefaultEntries());
+	const auto ExpectOwner = [&Model](const char *pQuery, const char *pOwner, const char *pOther) {
+		const auto Results = qm_card_registry::SearchCards(pQuery, Model);
+		EXPECT_TRUE(std::any_of(Results.begin(), Results.end(), [pOwner](const auto &Result) { return str_comp(Result.m_pStableId, pOwner) == 0; })) << pQuery;
+		EXPECT_FALSE(std::any_of(Results.begin(), Results.end(), [pOther](const auto &Result) { return str_comp(Result.m_pStableId, pOther) == 0; })) << pQuery;
+	};
+	for(const char *pQuery : {"皮肤描边", "循环色调", "表情阴影", "skin outline"})
+		ExpectOwner(pQuery, "qm:skin_appearance", "qm:skin_transition");
+	for(const char *pQuery : {"锤中偷皮", "皮肤切换", "skin transition animation"})
+		ExpectOwner(pQuery, "qm:skin_transition", "qm:skin_appearance");
+}

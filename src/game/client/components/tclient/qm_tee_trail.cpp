@@ -3,6 +3,9 @@
 
 #include <base/math.h>
 
+#include <game/client/components/qmclient/trail_band_geometry.h>
+#include <game/client/components/qmclient/trail_band_section.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -91,19 +94,22 @@ namespace
 		vOut.push_back({{A, B, C, D}, {Ca, Cb, Cc, Cd}, Additive});
 	}
 
+	SQmTrailBandSection PrepareBandSection(const SBandPoint &Point, vec2 Normal, float Softness, float PixelSize)
+	{
+		return QmPrepareTrailBandSection(Point.m_Pos, Point.m_Left, Point.m_Right, Point.m_Color, Normal, Softness, PixelSize);
+	}
+
 	// 同一个横截面与柔边算法用于主体、细丝和短裂纹。相邻截面共用顶点，没有圆点接缝。
+	void EmitPreparedBand(std::vector<SQuad> &vOut, const SQmTrailBandSection &A, const SQmTrailBandSection &B, bool Additive)
+	{
+		for(int Strip = 0; Strip < 3; ++Strip)
+			PushQuad(vOut, A.m_aPos[Strip], B.m_aPos[Strip], B.m_aPos[Strip + 1], A.m_aPos[Strip + 1],
+				A.m_aColor[Strip], B.m_aColor[Strip], B.m_aColor[Strip + 1], A.m_aColor[Strip + 1], Additive);
+	}
+
 	void EmitBand(std::vector<SQuad> &vOut, const SBandPoint &A, const SBandPoint &B, vec2 Na, vec2 Nb, float Softness, float PixelSize, bool Additive)
 	{
-		const float Wa = std::max(A.m_Left, A.m_Right);
-		const float Wb = std::max(B.m_Left, B.m_Right);
-		const float Fa = std::clamp(std::max(Softness, PixelSize / std::max(Wa, PixelSize)), 0.02f, 1.0f);
-		const float Fb = std::clamp(std::max(Softness, PixelSize / std::max(Wb, PixelSize)), 0.02f, 1.0f);
-		const float aOffsetsA[] = {-A.m_Left, -A.m_Left * (1 - Fa), A.m_Right * (1 - Fa), A.m_Right};
-		const float aOffsetsB[] = {-B.m_Left, -B.m_Left * (1 - Fb), B.m_Right * (1 - Fb), B.m_Right};
-		const float aAlphas[] = {0, 1, 1, 0};
-		for(int Strip = 0; Strip < 3; ++Strip)
-			PushQuad(vOut, A.m_Pos + Na * aOffsetsA[Strip], B.m_Pos + Nb * aOffsetsB[Strip], B.m_Pos + Nb * aOffsetsB[Strip + 1], A.m_Pos + Na * aOffsetsA[Strip + 1],
-				A.m_Color.WithMultipliedAlpha(aAlphas[Strip]), B.m_Color.WithMultipliedAlpha(aAlphas[Strip]), B.m_Color.WithMultipliedAlpha(aAlphas[Strip + 1]), A.m_Color.WithMultipliedAlpha(aAlphas[Strip + 1]), Additive);
+		EmitPreparedBand(vOut, PrepareBandSection(A, Na, Softness, PixelSize), PrepareBandSection(B, Nb, Softness, PixelSize), Additive);
 	}
 
 	std::array<SBandPoint, 4> Shape(const SSample &S, int Style, bool Preset, unsigned Seed)
@@ -404,47 +410,48 @@ void qm_tee_trail::BuildEffect(const std::vector<CTrailPart> &vTrail, int Style,
 	}
 	if(SampleCount < 2)
 		return;
-	for(size_t i = 0; i < SampleCount; ++i)
-	{
-		const vec2 Before = aSamples[i > 0 ? i - 1 : i].m_Pos;
-		const vec2 After = aSamples[i + 1 < SampleCount ? i + 1 : i].m_Pos;
-		const vec2 Tangent = Unit(After - Before);
-		aSamples[i].m_Normal = vec2(-Tangent.y, Tangent.x);
-	}
-
 	vOut.reserve(MAX_QUADS);
 	std::array<std::array<SBandPoint, MAX_RENDER_POINTS>, 4> aaBands;
 	const unsigned StableSeed = unsigned(Seed) * 0x9e3779b9u;
-	for(size_t i = 0; i < SampleCount; ++i)
+	if(Style == STYLE_ORIGINAL)
 	{
-		const auto aLayers = Shape(aSamples[i], Style, UsePresetPalette, StableSeed);
-		for(int Layer = 0; Layer < 4; ++Layer)
-			aaBands[Layer][i] = aLayers[Layer];
+		// 原版只有主体层，宽度系数为 1，扰动与抬升为 0；不准备未使用的特效层。
+		for(size_t i = 0; i < SampleCount; ++i)
+		{
+			const SSample &S = aSamples[i];
+			aaBands[1][i] = {S.m_Pos, S.m_Width, S.m_Width, S.m_Tint.WithAlpha(S.m_Alpha)};
+		}
+	}
+	else
+	{
+		for(size_t i = 0; i < SampleCount; ++i)
+		{
+			const vec2 Before = aSamples[i > 0 ? i - 1 : i].m_Pos;
+			const vec2 After = aSamples[i + 1 < SampleCount ? i + 1 : i].m_Pos;
+			const vec2 Tangent = Unit(After - Before);
+			aSamples[i].m_Normal = vec2(-Tangent.y, Tangent.x);
+		}
+		for(size_t i = 0; i < SampleCount; ++i)
+		{
+			const auto aLayers = Shape(aSamples[i], Style, UsePresetPalette, StableSeed);
+			for(int Layer = 0; Layer < 4; ++Layer)
+				aaBands[Layer][i] = aLayers[Layer];
+		}
 	}
 	for(int Layer = Style == STYLE_ORIGINAL ? 1 : 0; Layer < (Style == STYLE_ORIGINAL ? 2 : 4); ++Layer)
 	{
 		auto &aBand = aaBands[Layer];
 		std::array<vec2, MAX_RENDER_POINTS> aNormals;
-		for(size_t i = 0; i < SampleCount; ++i)
-		{
-			const vec2 Prev = i > 0 ? aBand[i - 1].m_Pos : aBand[i].m_Pos * 2 - aBand[i + 1].m_Pos;
-			const vec2 Next = i + 1 < SampleCount ? aBand[i + 1].m_Pos : aBand[i].m_Pos * 2 - Prev;
-			const vec2 Before = Unit(aBand[i].m_Pos - Prev);
-			const vec2 After = Unit(Next - aBand[i].m_Pos, Before);
-			const vec2 Tangent = Unit(Before + After, After);
-			aNormals[i] = vec2(-Tangent.y, Tangent.x);
-			// 截面不能大于局部曲率半径，否则内侧偏移线自交并叠出亮菱形。
-			const float Turn = std::sqrt(std::max(0.000001f, 2 - 2 * dot(Before, After)));
-			const float Radius = std::min(distance(Prev, aBand[i].m_Pos), distance(Next, aBand[i].m_Pos)) / Turn;
-			const float Miter = 1 / std::max(0.7f, dot(Before, Tangent));
-			aBand[i].m_Left = std::min(aBand[i].m_Left * Miter, Radius * 0.8f);
-			aBand[i].m_Right = std::min(aBand[i].m_Right * Miter, Radius * 0.8f);
-		}
+		QmPrepareTrailBandJoins(aBand.data(), SampleCount, aNormals.data());
+
 		const bool Additive = Style != STYLE_ORIGINAL && (s_aStyles[Style].m_GlowBody || (Layer >= 2 && Style != STYLE_VOID));
 		const float Softness = Layer == 0 ? 0.85f : (Style == STYLE_SPIRIT || (Style == STYLE_INFERNO && Layer >= 2) ? 0.65f : (Style == STYLE_BLACK_FLASH ? 0.06f : 0.22f));
-		for(size_t i = 0; i + 1 < SampleCount; ++i)
+		SQmTrailBandSection Previous = PrepareBandSection(aBand[0], aNormals[0], Softness, PixelSize);
+		for(size_t i = 1; i < SampleCount; ++i)
 		{
-			EmitBand(vOut, aBand[i], aBand[i + 1], aNormals[i], aNormals[i + 1], Softness, PixelSize, Additive);
+			const SQmTrailBandSection Current = PrepareBandSection(aBand[i], aNormals[i], Softness, PixelSize);
+			EmitPreparedBand(vOut, Previous, Current, Additive);
+			Previous = Current;
 		}
 	}
 

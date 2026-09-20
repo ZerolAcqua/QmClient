@@ -5,6 +5,8 @@
 #include <base/sphore.h>
 #include <base/system.h>
 
+#include <engine/client/quad_rotation_cache.h>
+#include <engine/client/rounded_rect_directions.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 
@@ -980,6 +982,8 @@ class CGraphics_Threaded : public IEngineGraphics
 	CCommandBuffer::SVertexTex3DStream m_aVerticesTex3D[CCommandBuffer::MAX_VERTICES];
 	int m_NumVertices;
 
+	CQmRoundedRectDirections m_RoundedRectDirections;
+
 	CCommandBuffer::SColor m_aColor[4];
 	CCommandBuffer::STexCoord m_aTexture[4];
 
@@ -987,6 +991,7 @@ class CGraphics_Threaded : public IEngineGraphics
 	ivec2 m_DesktopSize = ivec2(0, 0);
 
 	float m_Rotation;
+	CQmQuadRotationCache m_QuadRotationCache;
 	EDrawing m_Drawing;
 	bool m_DoScreenshot;
 	char m_aScreenshotName[IO_MAX_PATH_LENGTH];
@@ -1106,8 +1111,9 @@ class CGraphics_Threaded : public IEngineGraphics
 	template<typename TName>
 	void Rotate(const CCommandBuffer::SPoint &Center, TName *pPoints, int NumPoints)
 	{
-		float c = std::cos(m_Rotation);
-		float s = std::sin(m_Rotation);
+		const vec2 Direction = m_QuadRotationCache.Get(m_Rotation);
+		const float c = Direction.x;
+		const float s = Direction.y;
 		float x, y;
 		int i;
 

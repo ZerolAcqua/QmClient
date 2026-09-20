@@ -205,9 +205,6 @@
 3 stars
 == 3성
 
-3D Background
-== 3D 배경
-
 3D background
 == 3D 배경
 
@@ -730,24 +727,6 @@ API key
 
 Appearance
 == 외형
-
-Appearance / Chat
-== 외형 / 채팅
-
-Appearance / Hook Collision
-== 외관 / 갈고리 보조선
-
-Appearance / HUD
-== 외형 / HUD
-
-Appearance / Info Messages
-== 외형 / 정보 메시지
-
-Appearance / Laser
-== 외형 / 레이저
-
-Appearance / Name Plate
-== 외형 / 이름표
 
 Append to log file instead of overwriting
 == 덮어쓰기 대신 로그 파일에 추가
@@ -1526,9 +1505,6 @@ Call vote
 Camera
 == 카메라
 
-Camera & FOV
-== 카메라 및 시야
-
 Camera drift intensity (0-200)
 == 카메라 드리프트 강도 (0-200)
 
@@ -1654,9 +1630,6 @@ Chat Binds
 
 Chat box width
 == 채팅 상자 너비
-
-Chat Bubble
-== 말풍선
 
 Chat bubble
 == 채팅 버블
@@ -2103,7 +2076,7 @@ Configure display and rendering
 == 디스플레이 및 렌더링 구성
 
 Configure Dream-only convenience features
-== Configure Dream-only convenience features
+== Qm 전용 편의 기능 설정
 
 Configure game and client preferences
 == 게임 및 클라이언트 환경 설정 구성
@@ -2153,8 +2126,8 @@ Configure QmClient HUD elements
 Configure remaining DDNet client preferences
 == Configure remaining DDNet client preferences
 
-Configure skin downloads, prefix, and default eyes
-== 스킨 다운로드, 접두사 및 기본 눈을 설정합니다
+Configure skin colors, eyes, and filters
+== Configure skin colors, eyes, and filters
 
 Configure sound and audio packs
 == 사운드 및 오디오 팩 구성
@@ -2747,9 +2720,6 @@ Default output open failed
 Default preset
 == 기본 프리셋
 
-Default weapon on respawn (0=Off, 1=Hammer, 2=Pistol, 3=Shotgun, 4=Grenade, 5=Laser)
-== 리스폰 후 기본 요청 무기 (0=비활성화, 1=망치, 2=권총, 3=산탄총, 4=유탄 발사기, 5=레이저)
-
 Default zoom
 == 기본 줌
 
@@ -3155,9 +3125,6 @@ Draw where mouse is
 Draw!
 == 무승부!
 
-Dream Features
-== 꿈의 기능
-
 Drift direction
 == 드리프트 방향
 
@@ -3284,9 +3251,6 @@ Dummy skin queue max length
 Dummy skin queue switch interval (ms)
 == 더미 스킨 큐 전환 간격 (ms)
 
-Dummy Window
-== 더미 창
-
 Dummy window size
 == 더미 창 크기
 
@@ -3337,9 +3301,6 @@ Dynamic FOV smoothness
 
 Dynamic FOV smoothness (0=instant, 100=smoothest)
 == 동적 시야 부드러움 (0=즉시, 100=가장 부드러움)
-
-Dynamic Island
-== 다이내믹 아일랜드
 
 Dynamic island
 == 다이나믹 아일랜드
@@ -3866,9 +3827,6 @@ Entity assets
 Entity Background Image
 == 엔티티 배경 이미지
 
-Entity Layer Colors
-== 엔티티 레이어 색상
-
 Entity overlay
 == 엔티티 오버레이
 
@@ -4376,9 +4334,6 @@ Friend note
 Friend notification refresh interval (sec)
 == 친구 알림 새로고침 간격 (초)
 
-Friend Notifications
-== 친구 알림
-
 Friend notify
 == 친구 알림
 
@@ -4553,9 +4508,6 @@ Gives you infinite jump
 Glitch
 == 글리치
 
-Global card
-== 전역 카드
-
 Global card ordering (format: stableId|tab|col|order; semicolon-separated)
 == 전역 카드 정렬（형식 stableId|tab|col|order; 세미콜론 구분）
 
@@ -4606,9 +4558,6 @@ Go forward the specified duration
 
 Gores
 == 고어스
-
-Gores Actor
-== Gores 배우 전용
 
 Gores actor
 == 고어스 액터
@@ -4672,9 +4621,6 @@ GUI cursor assets
 
 Guide line color
 == 가이드 라인 색상
-
-Gun
-== 권총
 
 Hammer
 == 망치
@@ -4805,9 +4751,6 @@ Highlighted message
 Highlighted message color
 == 강조된 메시지 색상
 
-Hitbox mode
-== 히트박스 모드
-
 Hitbox Mode Freeze Border Color
 == 히트박스 모드 Freeze 경계 색상
 
@@ -4825,9 +4768,6 @@ Hitbox Mode Tee Collision Color
 
 Hitbox Mode Weapon Interaction Color
 == 히트박스 모드 무기 상호작용 색상
-
-HJ Assist
-== HJ 보조
 
 HJ assist
 == HJ 고수 보조
@@ -4946,9 +4886,6 @@ HUD editor layout
 HUD editor preview
 == HUD 편집기 미리보기
 
-HUD island appearance settings
-== HUD 섬 외형 설정
-
 HUD notifications
 == HUD 알림
 
@@ -4963,9 +4900,6 @@ Hue speed
 
 i = Receive rate
 == i = 수신 속도
-
-I am a robot
-== 저는 로봇입니다
 
 I am away from the game window
 == 게임 창에서 자리 비움
@@ -5140,9 +5074,6 @@ Input device open failed, try reconnecting headset/mic or reselecting input devi
 
 Input overlay
 == 입력 오버레이
-
-Input overlay display
-== 입력 오버레이 표시
 
 Input overlay keyboard scale (percent)
 == 입력 오버레이 키보드 배율(퍼센트)
@@ -5345,9 +5276,6 @@ Keep unsent message on chat close
 Keep vote window open after voting
 == 투표 후 투표 창 유지
 
-Key Bindings
-== 키 바인딩
-
 Key binds
 == 키 바인드
 
@@ -5374,9 +5302,6 @@ Keyboard focus ring color
 
 Keyboard size
 == 키보드 크기
-
-Keyword Reply
-== 키워드 답장
 
 Keyword reply
 == 키워드 응답
@@ -5453,11 +5378,8 @@ Language
 Language file to use
 == 사용할 언어 파일
 
-Large emoticons and launch mode
-== Large emoticons and launch mode
-
 Large emoticons and launched emoticons
-== Large emoticons and launched emoticons
+== 대형 이모티콘 및 발사 이모티콘
 
 Large text announcement for friend joining
 == 친구 입장 시 큰 글자 알림
@@ -5512,6 +5434,12 @@ Latency Jitter
 
 Launch count threshold for the next sponsor reminder
 == 다음 후원 알림까지의 실행 횟수 임계값
+
+Launch emote
+== 이모티콘 발사
+
+Launch emote key
+== 이모티콘 발사 키
 
 Layout
 == 레이아웃
@@ -5762,6 +5690,9 @@ Local Time
 Local-only
 == 로컬 전용
 
+Locate
+== 위치로 이동
+
 Lock delay
 == 잠금 지연
 
@@ -5794,9 +5725,6 @@ Low to high
 
 Lyrics
 == 가사
-
-Lyrics sources and display
-== 가사 소스 및 표시
 
 Main Asset
 == 메인 에셋
@@ -6115,6 +6043,9 @@ Menu option - normal
 
 Menu option - selected
 == 메뉴 옵션 - 선택됨
+
+Merge consecutive identical echo messages within this window in milliseconds (0 disables merging)
+== 이 시간 창(밀리초) 내 연속된 동일 Echo 메시지 병합 (0=병합 안 함)
 
 Merge consecutive identical player messages within 2 seconds
 == 2초 안에 연속으로 표시된 동일 플레이어의 같은 메시지 병합
@@ -6854,9 +6785,6 @@ Notification hold time
 Notification text size
 == 알림 텍스트 크기
 
-Notifications
-== 알림
-
 Notify when friends come online
 == 친구 접속 시 알림
 
@@ -6946,9 +6874,6 @@ Only show when the other Tee is not on screen
 
 Only show with this nickname
 == 이 닉네임을 사용할 때만 표시
-
-Only what you can't imagine, nothing Dream can't do
-== 상상할 수 없는 것만 있을 뿐, Dream 이 할 수 없는 것은 없습니다
 
 Opacity
 == 불투명도
@@ -7298,9 +7223,6 @@ Pick result: %s
 Pickup range
 == 획득 범위
 
-Pie Menu
-== 파이 메뉴
-
 Pie menu
 == 파이 메뉴
 
@@ -7372,9 +7294,6 @@ Player country filter in server browser (ISO 3166-1 numeric)
 
 Player country:
 == 플레이어 국가:
-
-Player data
-== 플레이어 데이터
 
 Player decoration color
 == 플레이어 장식 색상
@@ -7691,8 +7610,8 @@ Preview import file
 Preview laser bodies, outlines, and impacts
 == Preview laser bodies, outlines, and impacts
 
-Preview player and dummy appearance and colors
-== 본체와 더미의 외형과 색상을 미리 봅니다
+Preview player and dummy appearance
+== Preview player and dummy appearance
 
 Preview player and dummy nameplates
 == Preview player and dummy nameplates
@@ -7867,15 +7786,6 @@ qm_profile_queue: index must be between 1 and %d
 
 QmClient
 == QmClient
-
-QmClient / Function
-== QmClient / 기능
-
-QmClient / HUD
-== QmClient / HUD
-
-QmClient / Visual
-== QmClient / 시각
 
 QmClient chat log
 == QmClient 채팅 로그
@@ -8501,9 +8411,6 @@ Resource preview VRAM budget override (MB, 0=auto)
 Resource preview VRAM budget percentage (based on device local VRAM budget)
 == 리소스 미리보기 VRAM 예산 백분율 (장치 로컬 VRAM 예산 기준)
 
-Respawn default weapon (when owned)
-== 리스폰 기본 무기 (보유한 경우)
-
 Restart
 == 다시 시작
 
@@ -8867,20 +8774,26 @@ Search
 Search and navigate settings
 == 설정 검색 및 이동
 
-Search and pick skins and manage the skin queue
-== 스킨을 검색하고 선택하며 스킨 순환 대기열을 관리합니다
-
 Search donor asset
 == 기증자 에셋 검색
 
 Search main asset
 == 메인 에셋 검색
 
+Search maps and downloadedmaps, including subfolders
+== maps 및 downloadedmaps 검색 (하위 폴더 포함)
+
 Search settings by title, feature, or keyword
 == Search settings by title, feature, or keyword
 
+Search skins and manage the skin queue
+== Search skins and manage the skin queue
+
 Searching
 == 검색 중
+
+Searching all map folders...
+== 모든 맵 폴더 검색 중...
 
 Sec-WebSocket-Protocol sent during the realtime handshake
 == 실시간 핸드셰이크에서 보내는 Sec-WebSocket-Protocol
@@ -9203,6 +9116,9 @@ Severe
 Shape
 == 모양
 
+Share of the server browser name/map split given to the name column (per mille)
+== 서버 브라우저 이름/맵 분할에서 이름 열에 할당할 비율 (천분율)
+
 Shimmer speed (polished)
 == 빛 이동 속도 (광택)
 
@@ -9349,9 +9265,6 @@ Show compact vote HUD
 
 Show configurable outlines around map tiles
 == Show configurable outlines around map tiles
-
-Show Coordinates
-== 좌표 표시
 
 Show coordinates above players
 == 플레이어 위에 좌표 표시
@@ -9535,9 +9448,6 @@ Show important messages when rendering video
 
 Show important server prompts
 == 중요한 서버 프롬프트 표시
-
-Show important server prompts and Echo messages as popups
-== 중요한 서버 프롬프트와 Echo 메시지를 팝업으로 표시
 
 Show important server prompts as notifications
 == 중요한 서버 프롬프트를 알림으로 표시
@@ -9762,10 +9672,10 @@ Show other players' hook collision lines when rendering video
 == 비디오 렌더링 시 다른 플레이어의 갈고리 충돌선 표시
 
 Show other players' large emoticons
-== Show other players' large emoticons
+== 다른 플레이어의 대형 이모티콘 표시
 
 Show other players' launched emoticons
-== Show other players' launched emoticons
+== 다른 플레이어가 발사한 이모티콘 표시
 
 Show other team players (2=own team only)
 == 다른 팀 플레이어 표시 (2 = 자신의 팀만)
@@ -10232,9 +10142,6 @@ Skin switch animation range: 0=Self, 1=Local+Dummy, 2=All players
 Skin switch animation type (0=Ghost pop, 1=Soft fade, 2=Slide left, 3=Rotate pop, 4=Light dark switch, 5=Glitch shake, 6=Elastic scale)
 == 스킨 전환 애니메이션 유형 (0=잔상 팝업 1=부드러운 페이드 2=왼쪽 슬라이드 3=회전 팝업 4=명암 전환 5=글리치 떨림 6=탄력적 확대/축소)
 
-Skin transition
-== 스킨 전환
-
 Skin transition animation
 == 스킨 전환 애니메이션
 
@@ -10309,9 +10216,6 @@ Smooth zoom animation time in editor (in ms, 0=off)
 
 Smoothness of multi-view zoom (in ms, higher = slower)
 == 다중 뷰 줌의 부드러움 (ms, 높을수록 느림)
-
-SMTC
-== SMTC
 
 Snap title bob offset to whole pixels (sharper glyphs, choppier motion)
 == 흔들림 오프셋을 정수 픽셀에 맞춤 (글자는 선명, 움직임은 끊김)
@@ -10631,9 +10535,6 @@ Stop server
 Stop the current demo
 == 현재 데모 중지
 
-Streamer Mode
-== 스트리머 모드
-
 Streamer mode
 == 스트리머 모드
 
@@ -10787,9 +10688,6 @@ System
 System default
 == 시스템 기본값
 
-System media control
-== 시스템 미디어 제어
-
 System media controls
 == 시스템 미디어 컨트롤
 
@@ -10826,14 +10724,11 @@ Target language code (e.g. zh, en, ja, zh-TW)
 Target language ratio
 == 대상 언어 비율
 
+Target server: %s
+== 대상 서버: %s
+
 TClient
 == TClient
-
-TClient / Bind Wheel
-== TClient / 바인드 휠
-
-TClient / Status Bar
-== TClient / 상태 표시줄
 
 TClient Developers
 == TClient 개발자
@@ -11391,7 +11286,7 @@ Toggle dyncam
 == 동적 카메라 전환
 
 Toggle emote launcher
-== Toggle emote launcher
+== 이모티콘 발사기 전환
 
 Toggle fast practice mode
 == 빠른 연습 모드 전환
@@ -11521,9 +11416,6 @@ Trail width
 
 Translate
 == 번역
-
-Translate button
-== 번역 버튼
 
 Translate ID:
 == 번역 ID：
@@ -11973,7 +11865,7 @@ Use k key to kill (restart), q to pause and watch other players. See settings fo
 == K 키를 사용하여 죽기(재시작), Q 키를 사용하여 일시 중지 및 다른 플레이어 관전. 다른 키 바인딩은 설정에서 확인하세요.
 
 Use large emote
-== Use large emote
+== 대형 이모티콘 사용
 
 Use mouse sensitivity when dynamic camera is on
 == 동적 카메라가 켜져 있을 때 마우스 감도 사용
@@ -12389,9 +12281,6 @@ Weapon switch easing
 Weapon switch rotation
 == 무기 전환 회전
 
-Weapon Trajectory
-== 무기 궤적
-
 Weapon trajectory
 == 무기 궤적
 
@@ -12418,9 +12307,6 @@ Welcome to DDNet
 
 What level DDRace binding is set to (automatic, you don't need to use it).
 == DDRace 바인딩이 설정된 레벨 (자동이며 사용할 필요 없음)
-
-What's done is done, no use saying more
-== 이미 지난 일, 더 말해도 소용없다
 
 Wheel animate
 == 휠 애니메이션
@@ -12530,14 +12416,14 @@ Width of friends column in server browser
 Width of latency column in server browser
 == 서버 브라우저에서 지연 시간 열 너비
 
-Width of map column in server browser
-== 서버 브라우저에서 맵 열의 너비
-
 Width of others' hook collision line
 == 다른 플레이어의 갈고리 충돌선 너비
 
 Width of players column in server browser
 == 서버 브라우저에서 플레이어 열의 너비
+
+Width of Qm clients column in server browser
+== 서버 브라우저의 Qm 클라이언트 열 너비
 
 Width of type column in server browser
 == 서버 브라우저에서 유형 열의 너비
@@ -12922,15 +12808,6 @@ Zoom to current mouse target
 
 ⚠️ Tencent Cloud API not configured
 == ⚠️ 텐센트 클라우드 API가 구성되지 않음
-
-发射表情按键
-== 发射表情按键
-
-显示他人发射表情
-== 显示他人发射表情
-
-显示他人大表情
-== 显示他人大表情
 
 [Assets editor blend mode]
 Color

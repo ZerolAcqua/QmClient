@@ -20,6 +20,7 @@
 #include <game/client/components/player_points.h>
 #include <game/client/components/qmclient/axiom_scores.h>
 #include <game/client/components/qmclient/friend_heart_icon.h>
+#include <game/client/components/qmclient/scoreboard_footer.h>
 #include <game/client/components/qmclient/scoreboard_skin.h>
 #include <game/client/components/statboard.h>
 #include <game/client/gameclient.h>
@@ -175,37 +176,6 @@ namespace
 		return ScoreboardUiColorSurface(AlphaScale);
 	}
 
-	int DoScoreboardMediaIconButton(CUi *pUi, ITextRender *pTextRender, CButtonContainer *pButtonContainer, const char *pIcon, const CUIRect *pRect, bool Enabled, ColorRGBA ButtonColor, float ContentAlpha)
-	{
-		CUiScopedGaussianBlurSuppression GaussianBlurSuppression(pUi);
-		const float IconAlpha = std::clamp(ContentAlpha, 0.0f, 1.0f);
-		pRect->Draw(pUi->ScaleBackgroundAlpha(ButtonColor), IGraphics::CORNER_ALL, 5.0f);
-
-		const ColorRGBA PreviousTextColor = pTextRender->GetTextColor();
-		const ColorRGBA PreviousOutlineColor = pTextRender->GetTextOutlineColor();
-		pTextRender->SetFontPreset(EFontPreset::ICON_FONT);
-		pTextRender->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING);
-		pTextRender->TextOutlineColor(pTextRender->DefaultTextOutlineColor().WithMultipliedAlpha(IconAlpha));
-		pTextRender->TextColor(pTextRender->DefaultTextColor().WithMultipliedAlpha(IconAlpha));
-
-		CUIRect Label;
-		pRect->HMargin(2.0f, &Label);
-		pUi->DoLabel(&Label, pIcon, Label.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
-
-		if(!Enabled)
-		{
-			pTextRender->TextColor(ColorRGBA(1.0f, 0.0f, 0.0f, IconAlpha));
-			pTextRender->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
-			pUi->DoLabel(&Label, FontIcons::FONT_ICON_SLASH, Label.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
-		}
-
-		pTextRender->SetRenderFlags(0);
-		pTextRender->SetFontPreset(EFontPreset::DEFAULT_FONT);
-		pTextRender->TextOutlineColor(PreviousOutlineColor);
-		pTextRender->TextColor(PreviousTextColor);
-
-		return Enabled ? pUi->DoButtonLogic(pButtonContainer, 0, pRect, BUTTONFLAG_LEFT) : 0;
-	}
 }
 
 CScoreboard::CScoreboard()
@@ -565,163 +535,19 @@ void CScoreboard::RenderGoals(CUIRect Goals)
 	}
 }
 
-void CScoreboard::RenderSpectators(CUIRect Spectators)
+void CScoreboard::RenderFooter(CUIRect Footer)
 {
-	const float ContentAlpha = m_AnimContentAlpha;
-	const ColorRGBA BaseTextColor = TextRender()->DefaultTextColor().WithMultipliedAlpha(ContentAlpha);
-	const ColorRGBA BaseOutlineColor = TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(ContentAlpha);
-	TextRender()->TextColor(BaseTextColor);
-	TextRender()->TextOutlineColor(BaseOutlineColor);
-
-	const bool ShowMediaControls = g_Config.m_QmSmtcEnable != 0;
 	const bool IsTeamPlay = GameClient()->IsTeamPlay();
-	CUIRect SpectatorPanel = Spectators;
-	CUIRect MediaPanel;
-	if(ShowMediaControls)
-	{
-		CUiV2LayoutEngine LayoutEngine;
-		SUiStyle PanelStyle;
-		PanelStyle.m_Axis = EUiAxis::ROW;
-		PanelStyle.m_Gap = 5.0f;
-		PanelStyle.m_AlignItems = EUiAlign::STRETCH;
-		PanelStyle.m_JustifyContent = EUiAlign::START;
-		static thread_local std::vector<SUiLayoutChild> s_vPanels;
-		std::vector<SUiLayoutChild> &vPanels = s_vPanels;
-		vPanels.assign(2, SUiLayoutChild{});
-		vPanels[0].m_Style.m_Width = SUiLength::Flex(1.0f);
-		vPanels[1].m_Style.m_Width = SUiLength::Flex(1.0f);
-		LayoutEngine.ComputeChildren(PanelStyle, CUiV2LegacyAdapter::FromCUIRect(Spectators), vPanels);
-		SpectatorPanel = CUiV2LegacyAdapter::ToCUIRect(vPanels[0].m_Box);
-		MediaPanel = CUiV2LegacyAdapter::ToCUIRect(vPanels[1].m_Box);
-	}
-
-	const float CornerRadius = 7.5f;
-	SpectatorPanel.Draw(ScoreboardUiColorSurface(ContentAlpha), IGraphics::CORNER_ALL, CornerRadius);
-	CUIRect SpectatorList = SpectatorPanel;
-	SpectatorList.Margin(5.0f, &SpectatorList);
-
-	CUIRect MediaControls;
-	if(ShowMediaControls)
-	{
-		MediaPanel.Draw(ScoreboardUiColorSurface(ContentAlpha), IGraphics::CORNER_ALL, CornerRadius);
-		MediaControls = MediaPanel;
-		MediaControls.Margin(5.0f, &MediaControls);
-	}
-
-	CTextCursor Cursor;
-	Cursor.SetPosition(SpectatorList.TopLeft());
-	Cursor.m_FontSize = 11.0f;
-	Cursor.m_LineWidth = SpectatorList.w;
-	Cursor.m_MaxLines = round_truncate(SpectatorList.h / Cursor.m_FontSize);
-
-	int RemainingSpectators = 0;
+	int NumSpectators = 0;
 	for(const CNetObj_PlayerInfo *pInfo : GameClient()->m_Snap.m_apInfoByName)
 	{
-		if(!pInfo || QmScoreboardEffectivePlayerTeam(pInfo->m_Team, GameClient()->m_aClients[pInfo->m_ClientId].m_Spec, IsTeamPlay) != TEAM_SPECTATORS)
-			continue;
-		++RemainingSpectators;
+		if(pInfo && QmScoreboardEffectivePlayerTeam(pInfo->m_Team, GameClient()->m_aClients[pInfo->m_ClientId].m_Spec, IsTeamPlay) == TEAM_SPECTATORS)
+			++NumSpectators;
 	}
 
-	TextRender()->TextEx(&Cursor, Localize("Spectators"));
-
-	if(RemainingSpectators > 0)
-	{
-		TextRender()->TextEx(&Cursor, ": ");
-	}
-
-	bool CommaNeeded = false;
-	for(const CNetObj_PlayerInfo *pInfo : GameClient()->m_Snap.m_apInfoByName)
-	{
-		if(!pInfo || QmScoreboardEffectivePlayerTeam(pInfo->m_Team, GameClient()->m_aClients[pInfo->m_ClientId].m_Spec, IsTeamPlay) != TEAM_SPECTATORS)
-			continue;
-
-		if(CommaNeeded)
-		{
-			TextRender()->TextEx(&Cursor, ", ");
-		}
-
-		if(Cursor.m_LineCount == Cursor.m_MaxLines && RemainingSpectators >= 2)
-		{
-			// This is less expensive than checking with a separate invisible
-			// text cursor though we waste some space at the end of the line.
-			char aRemaining[64];
-			str_format(aRemaining, sizeof(aRemaining), Localize("%d others…", "Spectators"), RemainingSpectators);
-			TextRender()->TextEx(&Cursor, aRemaining);
-			break;
-		}
-
-		const int ClientId = pInfo->m_ClientId;
-		const bool HideIdentity = GameClient()->ShouldHideStreamerIdentity(ClientId);
-		char aNameBuf[MAX_NAME_LENGTH];
-		char aClanBuf[MAX_CLAN_LENGTH];
-		GameClient()->FormatStreamerName(ClientId, aNameBuf, sizeof(aNameBuf));
-		GameClient()->FormatStreamerClan(ClientId, aClanBuf, sizeof(aClanBuf));
-
-		if(g_Config.m_ClShowIds && !HideIdentity)
-		{
-			char aClientId[16];
-			GameClient()->FormatClientId(pInfo->m_ClientId, aClientId, EClientIdFormat::NO_INDENT);
-			TextRender()->TextEx(&Cursor, aClientId);
-		}
-
-		{
-			const char *pClanName = aClanBuf;
-			if(pClanName[0] != '\0')
-			{
-				if(GameClient()->m_aLocalIds[g_Config.m_ClDummy] >= 0 && str_comp(pClanName, GameClient()->m_aClients[GameClient()->m_aLocalIds[g_Config.m_ClDummy]].m_aClan) == 0)
-				{
-					TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClSameClanColor)).WithMultipliedAlpha(ContentAlpha));
-				}
-				else
-				{
-					TextRender()->TextColor(ColorRGBA(0.7f, 0.7f, 0.7f, ContentAlpha));
-				}
-
-				TextRender()->TextEx(&Cursor, pClanName);
-				TextRender()->TextEx(&Cursor, " ");
-
-				TextRender()->TextColor(BaseTextColor);
-			}
-		}
-
-		if(GameClient()->m_aClients[ClientId].m_AuthLevel)
-		{
-			TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClAuthedPlayerColor)).WithMultipliedAlpha(ContentAlpha));
-		}
-
-		TextRender()->TextEx(&Cursor, aNameBuf);
-		TextRender()->TextColor(BaseTextColor);
-
-		CommaNeeded = true;
-		--RemainingSpectators;
-	}
-
-	if(ShowMediaControls)
-	{
-		RenderMediaControls(MediaControls);
-	}
-}
-
-void CScoreboard::RenderMediaControls(CUIRect Controls)
-{
-	const float ContentAlpha = m_AnimContentAlpha;
-	const ColorRGBA BaseTextColor = TextRender()->DefaultTextColor().WithMultipliedAlpha(ContentAlpha);
-	const ColorRGBA BaseOutlineColor = TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(ContentAlpha);
-	auto &&RestoreTextColors = [&]() {
-		TextRender()->TextColor(BaseTextColor);
-		TextRender()->TextOutlineColor(BaseOutlineColor);
-	};
-	RestoreTextColors();
-
+	char aMediaBuf[256] = "";
 	CSystemMediaControls::SState MediaState;
-	const bool HasMedia = GameClient()->m_SystemMediaControls.GetStateSnapshot(MediaState);
-	const bool CanToggle = HasMedia && (MediaState.m_CanPlay || MediaState.m_CanPause);
-	const bool CanPrev = HasMedia && MediaState.m_CanPrev;
-	const bool CanNext = HasMedia && MediaState.m_CanNext;
-
-	char aMediaBuf[256];
-	aMediaBuf[0] = '\0';
-	if(HasMedia)
+	if(g_Config.m_QmSmtcEnable && GameClient()->m_SystemMediaControls.GetStateSnapshot(MediaState))
 	{
 		if(MediaState.m_aTitle[0] != '\0' && MediaState.m_aArtist[0] != '\0')
 			str_format(aMediaBuf, sizeof(aMediaBuf), "%s - %s", MediaState.m_aTitle, MediaState.m_aArtist);
@@ -731,75 +557,121 @@ void CScoreboard::RenderMediaControls(CUIRect Controls)
 			str_copy(aMediaBuf, MediaState.m_aArtist, sizeof(aMediaBuf));
 	}
 
-	CUIRect ButtonArea = Controls;
-	if(aMediaBuf[0] != '\0')
+	const auto Layout = QmScoreboardFooterLayout(Footer, aMediaBuf[0] != '\0', NumSpectators);
+	if(Layout.m_Media.h > 0.0f)
 	{
-		const float TitleFontSize = 10.0f;
-		const float TitleHeight = TitleFontSize + 1.0f;
-		CUIRect TitleRect;
-		ButtonArea.HSplitTop(TitleHeight, &TitleRect, &ButtonArea);
-		ButtonArea.HSplitTop(2.0f, nullptr, &ButtonArea);
-
+		Layout.m_Media.Draw(ScoreboardUiColorSurface(m_AnimContentAlpha), IGraphics::CORNER_ALL, 7.5f);
+		CUIRect Label;
+		Layout.m_Media.Margin(5.0f, &Label);
+		TextRender()->TextColor(TextRender()->DefaultTextColor().WithMultipliedAlpha(m_AnimContentAlpha));
+		TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(m_AnimContentAlpha));
 		SLabelProperties Props;
-		Props.m_MaxWidth = TitleRect.w;
+		Props.m_MaxWidth = Label.w;
 		Props.m_EllipsisAtEnd = true;
-		Props.m_MinimumFontSize = TitleFontSize;
-		Ui()->DoLabel(&TitleRect, aMediaBuf, TitleFontSize, TEXTALIGN_MC, Props);
+		Props.m_MinimumFontSize = 11.0f;
+		Ui()->DoLabel(&Label, aMediaBuf, 11.0f, TEXTALIGN_ML, Props);
 	}
+	if(NumSpectators > 0)
+		RenderSpectators(Layout.m_Spectators, NumSpectators);
+}
 
-	CUIRect Row = ButtonArea;
-	const float LineSize = 20.0f;
-	if(Row.h > LineSize)
-	{
-		Row.HSplitTop((Row.h - LineSize) * 0.5f, nullptr, &Row);
-		Row.HSplitTop(LineSize, &Row, nullptr);
-	}
+void CScoreboard::RenderSpectators(CUIRect Spectators, int NumSpectators)
+{
+	const float ContentAlpha = m_AnimContentAlpha;
+	const ColorRGBA BaseTextColor = TextRender()->DefaultTextColor().WithMultipliedAlpha(ContentAlpha);
+	const ColorRGBA BaseOutlineColor = TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(ContentAlpha);
+	TextRender()->TextColor(BaseTextColor);
+	TextRender()->TextOutlineColor(BaseOutlineColor);
 
-	CUIRect PrevButton, PlayButton, NextButton;
-	const float Spacing = 5.0f;
-	{
-		CUiV2LayoutEngine LayoutEngine;
-		SUiStyle ButtonRowStyle;
-		ButtonRowStyle.m_Axis = EUiAxis::ROW;
-		ButtonRowStyle.m_Gap = Spacing;
-		ButtonRowStyle.m_AlignItems = EUiAlign::STRETCH;
-		ButtonRowStyle.m_JustifyContent = EUiAlign::START;
-		static thread_local std::vector<SUiLayoutChild> s_vButtons;
-		std::vector<SUiLayoutChild> &vButtons = s_vButtons;
-		vButtons.assign(3, SUiLayoutChild{});
-		vButtons[0].m_Style.m_Width = SUiLength::Flex(1.0f);
-		vButtons[1].m_Style.m_Width = SUiLength::Flex(1.0f);
-		vButtons[2].m_Style.m_Width = SUiLength::Flex(1.0f);
-		LayoutEngine.ComputeChildren(ButtonRowStyle, CUiV2LegacyAdapter::FromCUIRect(Row), vButtons);
-		PrevButton = CUiV2LegacyAdapter::ToCUIRect(vButtons[0].m_Box);
-		PlayButton = CUiV2LegacyAdapter::ToCUIRect(vButtons[1].m_Box);
-		NextButton = CUiV2LegacyAdapter::ToCUIRect(vButtons[2].m_Box);
-	}
+	const bool IsTeamPlay = GameClient()->IsTeamPlay();
+	CUIRect SpectatorList;
+	Spectators.Margin(5.0f, &SpectatorList);
+	CTextCursor Cursor;
+	Cursor.SetPosition(SpectatorList.TopLeft());
+	Cursor.m_FontSize = 11.0f;
+	Cursor.m_LineWidth = SpectatorList.w;
+	Cursor.m_MaxLines = maximum(1, (int)(SpectatorList.h / Cursor.m_FontSize));
 
-	static CButtonContainer s_SmtcPrevButton;
-	const float PrevButtonAlpha = 0.5f * Ui()->ButtonColorMul(&s_SmtcPrevButton) * ContentAlpha;
-	if(DoScoreboardMediaIconButton(Ui(), TextRender(), &s_SmtcPrevButton, FontIcons::FONT_ICON_BACKWARD_STEP, &PrevButton, CanPrev && m_RenderInteractions, ColorRGBA(1.0f, 1.0f, 1.0f, PrevButtonAlpha), ContentAlpha))
-	{
-		GameClient()->m_SystemMediaControls.Previous();
-	}
-	RestoreTextColors();
+	auto RenderList = [&](CTextCursor &Cursor) {
+		int RemainingSpectators = NumSpectators;
+		TextRender()->TextEx(&Cursor, Localize("Spectators"));
 
-	static CButtonContainer s_SmtcPlayButton;
-	const char *pPlayIcon = MediaState.m_Playing ? FontIcons::FONT_ICON_PAUSE : FontIcons::FONT_ICON_PLAY;
-	const float PlayButtonAlpha = 0.5f * Ui()->ButtonColorMul(&s_SmtcPlayButton) * ContentAlpha;
-	if(DoScoreboardMediaIconButton(Ui(), TextRender(), &s_SmtcPlayButton, pPlayIcon, &PlayButton, CanToggle && m_RenderInteractions, ColorRGBA(1.0f, 1.0f, 1.0f, PlayButtonAlpha), ContentAlpha))
-	{
-		GameClient()->m_SystemMediaControls.PlayPause();
-	}
-	RestoreTextColors();
+		TextRender()->TextEx(&Cursor, ": ");
 
-	static CButtonContainer s_SmtcNextButton;
-	const float NextButtonAlpha = 0.5f * Ui()->ButtonColorMul(&s_SmtcNextButton) * ContentAlpha;
-	if(DoScoreboardMediaIconButton(Ui(), TextRender(), &s_SmtcNextButton, FontIcons::FONT_ICON_FORWARD_STEP, &NextButton, CanNext && m_RenderInteractions, ColorRGBA(1.0f, 1.0f, 1.0f, NextButtonAlpha), ContentAlpha))
-	{
-		GameClient()->m_SystemMediaControls.Next();
-	}
-	RestoreTextColors();
+		bool CommaNeeded = false;
+		for(const CNetObj_PlayerInfo *pInfo : GameClient()->m_Snap.m_apInfoByName)
+		{
+			if(!pInfo || QmScoreboardEffectivePlayerTeam(pInfo->m_Team, GameClient()->m_aClients[pInfo->m_ClientId].m_Spec, IsTeamPlay) != TEAM_SPECTATORS)
+				continue;
+
+			if(CommaNeeded)
+			{
+				TextRender()->TextEx(&Cursor, ", ");
+			}
+
+			if(Cursor.m_LineCount == Cursor.m_MaxLines && RemainingSpectators >= 2)
+			{
+				// 最后一行保留剩余人数提示，避免列表超出底部区域。
+				char aRemaining[64];
+				str_format(aRemaining, sizeof(aRemaining), Localize("%d others…", "Spectators"), RemainingSpectators);
+				TextRender()->TextEx(&Cursor, aRemaining);
+				break;
+			}
+
+			const int ClientId = pInfo->m_ClientId;
+			const bool HideIdentity = GameClient()->ShouldHideStreamerIdentity(ClientId);
+			char aNameBuf[MAX_NAME_LENGTH];
+			char aClanBuf[MAX_CLAN_LENGTH];
+			GameClient()->FormatStreamerName(ClientId, aNameBuf, sizeof(aNameBuf));
+			GameClient()->FormatStreamerClan(ClientId, aClanBuf, sizeof(aClanBuf));
+
+			if(g_Config.m_ClShowIds && !HideIdentity)
+			{
+				char aClientId[16];
+				GameClient()->FormatClientId(pInfo->m_ClientId, aClientId, EClientIdFormat::NO_INDENT);
+				TextRender()->TextEx(&Cursor, aClientId);
+			}
+
+			{
+				const char *pClanName = aClanBuf;
+				if(pClanName[0] != '\0')
+				{
+					if(GameClient()->m_aLocalIds[g_Config.m_ClDummy] >= 0 && str_comp(pClanName, GameClient()->m_aClients[GameClient()->m_aLocalIds[g_Config.m_ClDummy]].m_aClan) == 0)
+					{
+						TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClSameClanColor)).WithMultipliedAlpha(ContentAlpha));
+					}
+					else
+					{
+						TextRender()->TextColor(ColorRGBA(0.7f, 0.7f, 0.7f, ContentAlpha));
+					}
+
+					TextRender()->TextEx(&Cursor, pClanName);
+					TextRender()->TextEx(&Cursor, " ");
+
+					TextRender()->TextColor(BaseTextColor);
+				}
+			}
+
+			if(GameClient()->m_aClients[ClientId].m_AuthLevel)
+			{
+				TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClAuthedPlayerColor)).WithMultipliedAlpha(ContentAlpha));
+			}
+
+			TextRender()->TextEx(&Cursor, aNameBuf);
+			TextRender()->TextColor(BaseTextColor);
+
+			CommaNeeded = true;
+			--RemainingSpectators;
+		}
+	};
+
+	// 测量与绘制共用文字路径，保留名称颜色和溢出提示，背景只包住实际行数。
+	CTextCursor MeasureCursor = Cursor;
+	MeasureCursor.m_Flags = 0;
+	RenderList(MeasureCursor);
+	Spectators.h = minimum(Spectators.h, minimum(MeasureCursor.m_LineCount, Cursor.m_MaxLines) * Cursor.m_FontSize + 10.0f);
+	Spectators.Draw(ScoreboardUiColorSurface(ContentAlpha), IGraphics::CORNER_ALL, 7.5f);
+	RenderList(Cursor);
 }
 
 void CScoreboard::RenderSoundMuteBar(CUIRect ScoreboardRect)
@@ -2099,11 +1971,11 @@ void CScoreboard::OnRender()
 
 	RenderSoundMuteBar(ScoreboardContent);
 
-	CUIRect Spectators = {(Screen.w - ScoreboardSmallWidth) / 2.0f, ScoreboardContent.y + ScoreboardContent.h + 5.0f, ScoreboardSmallWidth, 100.0f};
+	CUIRect Footer = {ScoreboardContent.x, ScoreboardContent.y + ScoreboardContent.h + 5.0f, ScoreboardContent.w, 100.0f};
 	if(pGameInfoObj && (pGameInfoObj->m_ScoreLimit || pGameInfoObj->m_TimeLimit || (pGameInfoObj->m_RoundNum && pGameInfoObj->m_RoundCurrent)))
 	{
 		CUIRect Goals;
-		CUIRect SpectatorRest;
+		CUIRect FooterRest;
 		CUiV2LayoutEngine LayoutEngine;
 		SUiStyle ColumnStyle;
 		ColumnStyle.m_Axis = EUiAxis::COLUMN;
@@ -2115,13 +1987,13 @@ void CScoreboard::OnRender()
 		vChildren.assign(2, SUiLayoutChild{});
 		vChildren[0].m_Style.m_Height = SUiLength::Px(25.0f);
 		vChildren[1].m_Style.m_Height = SUiLength::Flex(1.0f);
-		LayoutEngine.ComputeChildren(ColumnStyle, CUiV2LegacyAdapter::FromCUIRect(Spectators), vChildren);
+		LayoutEngine.ComputeChildren(ColumnStyle, CUiV2LegacyAdapter::FromCUIRect(Footer), vChildren);
 		Goals = CUiV2LegacyAdapter::ToCUIRect(vChildren[0].m_Box);
-		SpectatorRest = CUiV2LegacyAdapter::ToCUIRect(vChildren[1].m_Box);
-		Spectators = SpectatorRest;
+		FooterRest = CUiV2LegacyAdapter::ToCUIRect(vChildren[1].m_Box);
+		Footer = FooterRest;
 		RenderGoals(Goals);
 	}
-	RenderSpectators(Spectators);
+	RenderFooter(Footer);
 
 	if(!g_Config.m_ClShowhudTimer)
 		RenderRecordingNotification((Screen.w / 7) * 4 + 10);

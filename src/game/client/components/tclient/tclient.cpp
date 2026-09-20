@@ -3795,6 +3795,8 @@ void CTClient::InvalidateGoresDistanceField()
 	m_vGoresCMap.clear();
 	m_vvGoresDirectTeleOuts.clear();
 	m_vGoresDistanceToFinish.clear();
+	m_GoresRouteStartIndex.Reset();
+	m_GoresDebugRouteVisited.Reset();
 	ResetGoresDistanceFieldBuild();
 	for(int i = 0; i < NUM_DUMMIES; ++i)
 	{
@@ -3886,6 +3888,7 @@ void CTClient::StartGoresDistanceFieldBuild()
 	m_vGoresCMap.clear();
 	m_vvGoresDirectTeleOuts.clear();
 	m_vGoresDistanceToFinish.clear();
+	m_GoresRouteStartIndex.Reset();
 
 	const CCollision *pCollision = Collision();
 	if(!pCollision)
@@ -3977,6 +3980,7 @@ void CTClient::FailGoresDistanceFieldBuild()
 	m_vGoresCMap.clear();
 	m_vvGoresDirectTeleOuts.clear();
 	m_vGoresDistanceToFinish.clear();
+	m_GoresRouteStartIndex.Reset();
 	ResetGoresDistanceFieldBuild();
 }
 
@@ -4010,7 +4014,7 @@ void CTClient::StepGoresDistanceFieldTileScan(int Budget)
 	{
 		const int Tile = pGame[Index].m_Index;
 		const int FrontTile = pFront ? pFront[Index].m_Index : TILE_AIR;
-		const bool IsStart = Tile == TILE_START || FrontTile == TILE_START;
+		const bool IsStart = m_GoresRouteStartIndex.AddTile(Index, Tile, FrontTile);
 		const bool IsFinish = Tile == TILE_FINISH || FrontTile == TILE_FINISH;
 		const bool HasPenalty = IsPenaltyTileForGoresDistanceField(Tile) || IsPenaltyTileForGoresDistanceField(FrontTile);
 		const bool HasReward = IsRewardTileForGoresDistanceField(Tile) || IsRewardTileForGoresDistanceField(FrontTile);
@@ -4475,38 +4479,20 @@ bool CTClient::BuildGoresDebugRoute(std::vector<vec2> &vRoutePoints, int Dummy) 
 	int StartIndex = pCollision->GetPureMapIndex(RefPos);
 	if(!IsReachableIndex(StartIndex))
 	{
-		float BestDistanceSquared = std::numeric_limits<float>::max();
-		for(int Index = 0; Index < MapCellCount; ++Index)
-		{
-			if(!IsReachableIndex(Index))
-				continue;
-
-			const int Tile = pGame[Index].m_Index;
-			const int FrontTile = pFront ? pFront[Index].m_Index : TILE_AIR;
-			if(Tile != TILE_START && FrontTile != TILE_START)
-				continue;
-
-			const float DistanceSquared = length_squared(RefPos - pCollision->GetPos(Index));
-			if(DistanceSquared < BestDistanceSquared)
-			{
-				BestDistanceSquared = DistanceSquared;
-				StartIndex = Index;
-			}
-		}
+		StartIndex = m_GoresRouteStartIndex.FindClosest(RefPos, StartIndex, [&](int Index) { return IsReachableIndex(Index) && (pGame[Index].m_Index == TILE_START || (pFront && pFront[Index].m_Index == TILE_START)); }, [&](int Index) { return pCollision->GetPos(Index); });
 	}
 
 	if(!IsReachableIndex(StartIndex))
 		return false;
 
-	std::vector<unsigned char> vVisited((size_t)MapCellCount, 0);
+	m_GoresDebugRouteVisited.Begin((size_t)MapCellCount);
 	vRoutePoints.reserve(256);
 	int CurrentIndex = StartIndex;
 	for(int Guard = 0; Guard < MapCellCount + 64; ++Guard)
 	{
-		if(!IsReachableIndex(CurrentIndex) || vVisited[(size_t)CurrentIndex] != 0)
+		if(!IsReachableIndex(CurrentIndex) || !m_GoresDebugRouteVisited.Visit((size_t)CurrentIndex))
 			break;
 
-		vVisited[(size_t)CurrentIndex] = 1;
 		vRoutePoints.push_back(pCollision->GetPos(CurrentIndex));
 
 		const int CurrentDistance = m_vGoresDistanceToFinish[(size_t)CurrentIndex];

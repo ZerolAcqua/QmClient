@@ -793,7 +793,7 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 	};
 
 	const bool RenderOnly = Ui()->RenderOnly();
-	const auto BuildDefinitions = [this, pGameDefault, pLanguageDefault, pClientDefault, pRecordingDefault, GeneralMetrics, BodySize, GeneralGameContentHeight, GeneralLanguageListHeight, GeneralThemeListHeight, DoNumericField, IsGeneralDynamicCameraEnabled](std::vector<SSettingsCardDefinition> &vCards) {
+	const auto BuildDefinitions = [this, pGameDefault, pLanguageDefault, pClientDefault, pRecordingDefault, GeneralMetrics, GeneralGameContentHeight, GeneralLanguageListHeight, GeneralThemeListHeight, DoNumericField, IsGeneralDynamicCameraEnabled](std::vector<SSettingsCardDefinition> &vCards) {
 		vCards.reserve(4);
 		const SSettingsCardSpec GameSpec{pGameDefault->m_pStableId, Localize(pGameDefault->m_pTitle), qm_card_registry::ResolveLocalizedDescription(*pGameDefault)};
 		const SSettingsCardSpec LanguageSpec{pLanguageDefault->m_pStableId, Localize(pLanguageDefault->m_pTitle), qm_card_registry::ResolveLocalizedDescription(*pLanguageDefault)};
@@ -807,7 +807,7 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 			vCards.push_back(Definition);
 		};
 
-		AddCard(GameSpec, GeneralGameContentHeight, [this, GeneralMetrics, BodySize](CUIRect Content) {
+		AddCard(GameSpec, GeneralGameContentHeight, [this, GeneralMetrics](CUIRect Content) {
 			CUIRect Button;
 			Content.HSplitTop(GeneralMetrics.m_LineHeight, &Button, &Content);
 			const bool IsDyncam = g_Config.m_ClDyncam || g_Config.m_ClMouseFollowfactor > 0;
@@ -844,18 +844,6 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 			Content.HSplitTop(GeneralMetrics.m_LineHeight, &Button, &Content);
 			if(DoSettingsButton_CheckBox(SETTINGS_GENERAL, -1, &g_Config.m_ClAutoswitchWeaponsOutOfAmmo, "general-switch-weapon-out-of-ammo", Localize("Switch weapon when out of ammo"), g_Config.m_ClAutoswitchWeaponsOutOfAmmo, &Button))
 				g_Config.m_ClAutoswitchWeaponsOutOfAmmo ^= 1;
-			Content.HSplitTop(GeneralMetrics.m_LineSpacing, nullptr, &Content);
-			Content.HSplitTop(GeneralMetrics.m_LineHeight, &Button, &Content);
-			CUIRect Label, DropDown;
-			const float DropDownWidth = std::min(140.0f * GeneralMetrics.m_UiScale, Button.w);
-			Button.VSplitRight(DropDownWidth, &Label, &DropDown);
-			Label.VSplitRight(GeneralMetrics.m_LineSpacing, &Label, nullptr);
-			DoSettingsMenuLabel(SETTINGS_GENERAL, -1, -1, "general-respawn-default-weapon-label", &Label, Localize("Respawn default weapon (when owned)"), BodySize, TEXTALIGN_ML);
-			const char *apRespawnDefaultWeapons[] = {Localize("Off"), Localize("Hammer"), Localize("Gun"), Localize("Shotgun"), Localize("Grenade"), Localize("Laser")};
-			static CUi::SDropDownState s_RespawnDefaultWeaponDropDownState;
-			const int RespawnDefaultWeapon = DoSettingsDropDown(&DropDown, std::clamp(g_Config.m_QmRespawnDefaultWeapon, 0, 5), apRespawnDefaultWeapons, std::size(apRespawnDefaultWeapons), s_RespawnDefaultWeaponDropDownState);
-			if(RespawnDefaultWeapon != g_Config.m_QmRespawnDefaultWeapon)
-				g_Config.m_QmRespawnDefaultWeapon = RespawnDefaultWeapon;
 		});
 		vCards.back().m_Measure = [GeneralMetrics, IsGeneralDynamicCameraEnabled](float) {
 			return ResolveSettingsGeneralGameContentHeight(GeneralMetrics, IsGeneralDynamicCameraEnabled());
@@ -4265,15 +4253,12 @@ void CMenus::RenderSettingsGraphics(CUIRect MainView)
 				Segments.VSplitLeft(8.0f, nullptr, &Segments);
 				if(g_Config.m_QmNewUi != 0)
 				{
-					// 胶囊 Tabbar：槽位先算完，再画容器与滑块，最后接手点击。
-					// 行标识带上按钮数组地址，避免同一函数里的多行选择器共用一条滑块轨道。
+					// 预布局只计算槽位并处理输入；背景和滑块留给正式渲染，避免点击时叠加变深。
 					CUIRect aSegmentSlots[8];
 					CUIRect SegmentsRemainder = Segments;
 					const int SegmentCount = std::clamp(Count, 0, (int)std::size(aSegmentSlots));
 					for(int i = 0; i < SegmentCount; ++i)
 						SegmentsRemainder.VSplitLeft(SegmentsRemainder.w / (SegmentCount - i), &aSegmentSlots[i], &SegmentsRemainder);
-					const uint64_t SegmentGroup = BuildUiAnimNodeKey(MakeUiScopeHash("settings_choice_row_capsule"), reinterpret_cast<uint64_t>(pButtons));
-					ui_widget::CapsuleTabBarChrome(TabBarUiContext(), SegmentGroup, aSegmentSlots, SegmentCount, Current, SettingsCapsuleTabBarStyle());
 					for(int i = 0; i < SegmentCount; ++i)
 					{
 						if(Ui()->DoButtonLogic(&pButtons[i], Current == i, &aSegmentSlots[i], BUTTONFLAG_LEFT))

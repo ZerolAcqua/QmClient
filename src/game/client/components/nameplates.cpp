@@ -17,6 +17,7 @@
 #include <game/client/components/qmclient/friend_heart_icon.h>
 #include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/nameplate_layout.h>
+#include <game/client/components/qmclient/nameplate_text_cache.h>
 #include <game/client/components/qmclient/qm_title_color.h>
 #include <game/client/components/qmclient/qm_title_render.h>
 #include <game/client/components/qmclient/qmclient_utils.h>
@@ -421,6 +422,7 @@ class CNamePlatePartText : public CNamePlatePart
 {
 protected:
 	STextContainerIndex m_TextContainerIndex;
+	CQmNameplateTextCache m_TextCache;
 	vec2 m_RenderSize = vec2(0.0f, 0.0f);
 	virtual bool UpdateNeeded(CGameClient &This, const CNamePlateData &Data) = 0;
 	virtual void UpdateText(CGameClient &This, const CNamePlateData &Data) = 0;
@@ -442,8 +444,15 @@ public:
 	void Update(CGameClient &This, const CNamePlateData &Data) override
 	{
 		const bool NeedsTextUpdate = UpdateNeeded(This, Data);
-		if(!NeedsTextUpdate && m_TextContainerIndex.Valid())
+		if(!m_TextCache.NeedsUpdate(m_Visible, NeedsTextUpdate))
 		{
+			if(!m_Visible)
+				return;
+			if(!m_TextContainerIndex.Valid())
+			{
+				m_Visible = false;
+				return;
+			}
 			const float EffectPadding = m_UseTextEffects ? QmNameplateTextEffectPadding(g_Config.m_QmNameplateTextEffects, g_Config.m_QmNameplateTextBorderRange, g_Config.m_QmNameplateTextGlowRange) : 0.0f;
 			const float ExtraPadding = ExtraVerticalPadding();
 			m_Size = m_RenderSize + vec2(EffectPadding * 2.0f, EffectPadding * 2.0f + ExtraPadding * 2.0f);
@@ -471,6 +480,7 @@ public:
 		if(!m_ReuseTextContainer)
 			This.TextRender()->DeleteTextContainer(m_TextContainerIndex);
 		UpdateText(This, Data);
+		m_TextCache.OnUpdate();
 		if(Data.m_InGame)
 			This.Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 
@@ -490,6 +500,7 @@ public:
 	}
 	void Reset(CGameClient &This) override
 	{
+		m_TextCache.Reset();
 		This.TextRender()->DeleteTextContainer(m_TextContainerIndex);
 	}
 	void Render(CGameClient &This, vec2 Pos) const override
@@ -1275,13 +1286,17 @@ protected:
 
 		CTextCursor Cursor;
 		Cursor.m_FontSize = m_FontSize;
-		This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
+		QmUpdateNameplateTextContainer(This.TextRender(), m_TextContainerIndex, &Cursor, m_aText);
 	}
 
 public:
 	CNamePlatePartCoordinates(CGameClient &This, bool IsX) :
 		CNamePlatePartText(This),
-		m_IsX(IsX) {}
+		m_IsX(IsX)
+	{
+		// 坐标每帧可能变化，保留已有文字缓冲并覆盖顶点。
+		m_ReuseTextContainer = true;
+	}
 };
 
 class CNamePlatePartReason : public CNamePlatePartText
@@ -1760,6 +1775,7 @@ public:
 	CNamePlate m_aNamePlates[MAX_CLIENTS];
 	CNamePlate m_aNamePlateFrameReferences[MAX_CLIENTS];
 	CNamePlate m_aPreviewNamePlates[2];
+	CNamePlate m_aPreviewFrameReferences[NUM_DUMMIES];
 	SChatBubbleAnimState m_aChatBubbleAnim[MAX_CLIENTS];
 	SCoordXAlignState m_aCoordXAlign[MAX_CLIENTS];
 	SCoordXAlignFrameState m_CoordXAlignFrame;
@@ -2313,12 +2329,13 @@ void CNamePlates::RenderNamePlatePreview(const CUIRect &PreviewArea, int Dummy)
 	TeeRenderInfo.m_Size = NAMEPLATE_PREVIEW_TEE_SIZE;
 
 	// 全 scope 参考框只用来定行基线：切换预览或开关模块时行位置保持稳定，与游戏内一致。
-	CNamePlate FrameNamePlate;
 	CNamePlate *pFrameNamePlate = nullptr;
 	if(NameplateFreeMoveEnabled())
 	{
 		CNamePlateData FrameData;
 		BuildNamePlatePreviewData(*GameClient(), Dummy, true, FrameData);
+		// 参考框同样复用文字容器，避免预览每帧分配和销毁 GPU 缓冲。
+		CNamePlate &FrameNamePlate = m_pData->m_aPreviewFrameReferences[Dummy];
 		FrameNamePlate.Update(*GameClient(), FrameData);
 		pFrameNamePlate = &FrameNamePlate;
 	}
@@ -2484,8 +2501,6 @@ void CNamePlates::RenderNamePlatePreview(const CUIRect &PreviewArea, int Dummy)
 		m_pData->m_FreeMoveDragRow = ENameplateCoreRow::NUM_ROWS;
 	}
 	NamePlate.Render(*GameClient(), NameplateBottomMiddle, pFrameNamePlate);
-	if(pFrameNamePlate != nullptr)
-		pFrameNamePlate->Reset(*GameClient());
 }
 
 void CNamePlates::ResetNamePlates()
@@ -2495,6 +2510,8 @@ void CNamePlates::ResetNamePlates()
 	for(CNamePlate &NamePlate : m_pData->m_aNamePlateFrameReferences)
 		NamePlate.Reset(*GameClient());
 	for(CNamePlate &NamePlate : m_pData->m_aPreviewNamePlates)
+		NamePlate.Reset(*GameClient());
+	for(CNamePlate &NamePlate : m_pData->m_aPreviewFrameReferences)
 		NamePlate.Reset(*GameClient());
 	for(SCoordXAlignState &CoordXAlignState : m_pData->m_aCoordXAlign)
 		CoordXAlignState = SCoordXAlignState();

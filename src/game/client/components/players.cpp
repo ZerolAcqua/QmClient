@@ -379,6 +379,14 @@ void CPlayers::RenderHookCollLine(
 	if(HookLength < HOOK_START_DISTANCE || HookFireSpeed <= 0.0f)
 		return;
 
+	const int HookCollSize = Local ? g_Config.m_ClHookCollSize : g_Config.m_ClHookCollSizeOther;
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+	const float PixelPadding = std::max((ScreenX1 - ScreenX0) / Graphics()->ScreenWidth(), (ScreenY1 - ScreenY0) / Graphics()->ScreenHeight());
+	const float LinePadding = HookCollSize > 0 ? (0.5f + (HookCollSize - 1) * 0.25f) * GameClient()->m_Camera.m_Zoom + PixelPadding : PixelPadding;
+	if(!m_HookCollVisibility.MayReachView(Position, HookLength, HookFireSpeed, vec2(ScreenX0, ScreenY0), vec2(ScreenX1, ScreenY1), LinePadding, g_Config.m_SvOldTeleportHook != 0))
+		return;
+
 	vec2 QuantizedDirection = Direction;
 	vec2 StartOffset = Direction * HOOK_START_DISTANCE;
 	vec2 BasePos = Position;
@@ -548,8 +556,6 @@ void CPlayers::RenderHookCollLine(
 	}
 
 	// Render hook coll line
-	const int HookCollSize = Local ? g_Config.m_ClHookCollSize : g_Config.m_ClHookCollSizeOther;
-
 	ColorRGBA HookCollTipColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClHookCollTipColor, true));
 
 	Graphics()->TextureClear();
@@ -2082,6 +2088,12 @@ void CPlayers::CreateSpectatorTeeRenderInfo()
 	SpectatorSkinDescriptor.m_Flags |= CSkinDescriptor::FLAG_SIX;
 	str_copy(SpectatorSkinDescriptor.m_aSkinName, "x_spec");
 	m_pSpectatorTeeRenderInfo = GameClient()->CreateManagedTeeRenderInfo(SpectatorTeeRenderInfo, SpectatorSkinDescriptor);
+}
+
+void CPlayers::OnMapLoad()
+{
+	// 传送层在地图加载后保持不变；两种钩子传送规则分别记录，支持运行时切换设置。
+	m_HookCollVisibility.OnMapLoad(Collision()->TeleLayer(), (size_t)Collision()->GetWidth() * Collision()->GetHeight());
 }
 
 void CPlayers::OnReset()

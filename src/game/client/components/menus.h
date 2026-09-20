@@ -27,6 +27,8 @@
 #include <game/client/QmUi/UiForms.h>
 #include <game/client/QmUi/UiNavigation.h>
 #include <game/client/QmUi/UiTheme.h>
+#include <game/client/QmUi/cards/QmCardCatalog.h>
+#include <game/client/QmUi/cards/QmMapUploadSearch.h>
 #include <game/client/component.h>
 #include <game/client/components/assets_resource_registry.h>
 #include <game/client/components/community_icons.h>
@@ -34,7 +36,10 @@
 #include <game/client/components/menus_ingame_touch_controls.h>
 #include <game/client/components/menus_settings_controls.h>
 #include <game/client/components/menus_start.h>
+#include <game/client/components/qmclient/browser_friend_list.h>
 #include <game/client/components/qmclient/demo_cut.h>
+#include <game/client/components/qmclient/local_save_display.h>
+#include <game/client/components/qmclient/map_vote_difficulty.h>
 #include <game/client/components/qmclient/qm_map_upload.h>
 #include <game/client/components/qmclient/settings_perf_windows.h>
 #include <game/client/components/section_loader.h>
@@ -1737,95 +1742,8 @@ protected:
 	void ResetDemoBrowserFolder();
 
 	// friends
-	class CFriendItem
-	{
-		char m_aName[MAX_NAME_LENGTH];
-		char m_aClan[MAX_CLAN_LENGTH];
-		char m_aCategory[IFriends::MAX_FRIEND_CATEGORY_LENGTH];
-		const CServerInfo *m_pServerInfo;
-		int m_FriendState;
-		bool m_IsPlayer;
-		bool m_IsAfk;
-		// skin info 0.6
-		char m_aSkin[MAX_SKIN_LENGTH];
-		bool m_CustomSkinColors;
-		int m_CustomSkinColorBody;
-		int m_CustomSkinColorFeet;
-		// skin info 0.7
-		char m_aaSkin7[protocol7::NUM_SKINPARTS][protocol7::MAX_SKIN_LENGTH];
-		bool m_aUseCustomSkinColor7[protocol7::NUM_SKINPARTS];
-		int m_aCustomSkinColor7[protocol7::NUM_SKINPARTS];
-
-	public:
-		CFriendItem(const CFriendInfo *pFriendInfo) :
-			m_pServerInfo(nullptr),
-			m_IsPlayer(false),
-			m_IsAfk(false),
-			m_CustomSkinColors(false),
-			m_CustomSkinColorBody(0),
-			m_CustomSkinColorFeet(0)
-		{
-			str_copy(m_aName, pFriendInfo->m_aName);
-			str_copy(m_aClan, pFriendInfo->m_aClan);
-			str_copy(m_aCategory, pFriendInfo->m_aCategory[0] != '\0' ? pFriendInfo->m_aCategory : IFriends::DEFAULT_CATEGORY);
-			m_FriendState = m_aName[0] == '\0' ? IFriends::FRIEND_CLAN : IFriends::FRIEND_PLAYER;
-			m_aSkin[0] = '\0';
-			for(int Part = 0; Part < protocol7::NUM_SKINPARTS; Part++)
-			{
-				m_aaSkin7[Part][0] = '\0';
-				m_aUseCustomSkinColor7[Part] = false;
-				m_aCustomSkinColor7[Part] = 0;
-			}
-		}
-		CFriendItem(const CServerInfo::CClient &CurrentClient, const CServerInfo *pServerInfo, const char *pCategory) :
-			m_pServerInfo(pServerInfo),
-			m_FriendState(CurrentClient.m_FriendState),
-			m_IsPlayer(CurrentClient.m_Player),
-			m_IsAfk(CurrentClient.m_Afk),
-			m_CustomSkinColors(CurrentClient.m_CustomSkinColors),
-			m_CustomSkinColorBody(CurrentClient.m_CustomSkinColorBody),
-			m_CustomSkinColorFeet(CurrentClient.m_CustomSkinColorFeet)
-		{
-			str_copy(m_aName, CurrentClient.m_aName);
-			str_copy(m_aClan, CurrentClient.m_aClan);
-			str_copy(m_aCategory, pCategory != nullptr && pCategory[0] != '\0' ? pCategory : IFriends::DEFAULT_CATEGORY);
-			str_copy(m_aSkin, CurrentClient.m_aSkin);
-			for(int Part = 0; Part < protocol7::NUM_SKINPARTS; Part++)
-			{
-				str_copy(m_aaSkin7[Part], CurrentClient.m_aaSkin7[Part]);
-				m_aUseCustomSkinColor7[Part] = CurrentClient.m_aUseCustomSkinColor7[Part];
-				m_aCustomSkinColor7[Part] = CurrentClient.m_aCustomSkinColor7[Part];
-			}
-		}
-
-		const char *Name() const { return m_aName; }
-		const char *Clan() const { return m_aClan; }
-		const char *Category() const { return m_aCategory; }
-		const CServerInfo *ServerInfo() const { return m_pServerInfo; }
-		int FriendState() const { return m_FriendState; }
-		bool IsPlayer() const { return m_IsPlayer; }
-		bool IsAfk() const { return m_IsAfk; }
-		// 0.6 skin
-		const char *Skin() const { return m_aSkin; }
-		bool CustomSkinColors() const { return m_CustomSkinColors; }
-		int CustomSkinColorBody() const { return m_CustomSkinColorBody; }
-		int CustomSkinColorFeet() const { return m_CustomSkinColorFeet; }
-		// 0.7 skin
-		const char *Skin7(int Part) const { return m_aaSkin7[Part]; }
-		bool UseCustomSkinColor7(int Part) const { return m_aUseCustomSkinColor7[Part]; }
-		int CustomSkinColor7(int Part) const { return m_aCustomSkinColor7[Part]; }
-
-		const void *ListItemId() const { return &m_aName; }
-		const void *RemoveButtonId() const { return &m_FriendState; }
-		const void *CommunityTooltipId() const { return &m_IsPlayer; }
-		const void *SkinTooltipId() const { return &m_aSkin; }
-
-		bool operator<(const CFriendItem &Other) const
-		{
-			const int Result = str_comp_nocase(m_aName, Other.m_aName);
-			return Result < 0 || (Result == 0 && str_comp_nocase(m_aClan, Other.m_aClan) < 0);
-		}
-	};
+	using CFriendItem = CQmBrowserFriendList::CItem;
+	CQmBrowserFriendList m_BrowserFriendList;
 
 	std::vector<unsigned char> m_vFriendsCategoryExpanded;
 	std::vector<std::string> m_vFriendsCategoryNames;
@@ -2120,6 +2038,8 @@ protected:
 	void RenderServerbrowserInfo(CUIRect View);
 	void RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *pSelectedServer);
 	void RenderServerbrowserFriends(CUIRect View);
+	CQmLocalSaveDisplayCache m_LocalSaveDisplay;
+	CQmMapVoteDifficulty m_MapVoteDifficulty;
 	void RenderServerbrowserFavoriteMaps(CUIRect View);
 	static CUi::EPopupMenuFunctionResult PopupFriendsCategory(void *pContext, CUIRect View, bool Active);
 	static CUi::EPopupMenuFunctionResult PopupFriendNote(void *pContext, CUIRect View, bool Active);
@@ -2178,12 +2098,7 @@ protected:
 		CButtonContainer m_CancelButton;
 	} m_SkinQueuePresetRenamePopupContext;
 
-	struct SQmMapUploadFile
-	{
-		char m_aFilename[IO_MAX_PATH_LENGTH] = "";
-		bool m_IsDirectory = false;
-		int m_StorageType = IStorage::TYPE_ALL;
-	};
+	using SQmMapUploadFile = qm_map_upload::SMapFile;
 	class CQmMapUploadPicker : public SPopupMenuId
 	{
 	public:
@@ -2192,6 +2107,8 @@ protected:
 		int m_StorageType = IStorage::TYPE_ALL;
 		int m_Selected = -1;
 		std::vector<SQmMapUploadFile> m_vFiles;
+		CLineInputBuffered<IO_MAX_PATH_LENGTH> m_SearchInput;
+		qm_map_upload::CSearchIndex m_SearchIndex;
 		CListBox m_ListBox;
 		CButtonContainer m_CancelButton;
 	} m_QmMapUploadPicker;
@@ -2935,6 +2852,12 @@ private:
 	void RenderSettingsQmClient(CUIRect MainView, bool ContributorsPage = false, bool PrewarmOnly = false);
 	void RenderSettingsGlobalSearch(CUIRect MainView, bool PrewarmOnly = false);
 	void RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnly = false);
+	// 搜索页结果卡片的"定位"入口：跳回该卡所属分类页并高亮它。
+	void NavigateToGlobalSearchCard(const qm_card_catalog::SQmSearchResultEntry &Card);
+	FSettingsCardHeaderAction BuildGlobalSearchLocateHeaderAction(const qm_card_catalog::SQmSearchResultEntry &Card, bool ReadOnly, float SmallSize);
+	// 卡片目录（QmUi/cards）的受控访问口：卡片模块是独立文件，不能直接调用这里的私有内容函数，
+	// 通过本桥接结构显式暴露"卡片可以调用哪些内容渲染/输入助手"，避免把整类成员公开。
+	friend struct qm_card_catalog::QmCardRenderHook;
 	void RenderSettingsQmClientContent(CUIRect MainView, bool ContributorsPage, bool PrewarmOnly);
 	void RenderSettingsQmClientVisualDeck(CUIRect MainView, bool PrewarmOnly);
 	void RenderSettingsQmClientHudDeck(CUIRect MainView, bool PrewarmOnly);
@@ -2949,6 +2872,7 @@ private:
 	void RenderQmVisualCollisionHitboxContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	void RenderQmVisualWeaponAnimationContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, float ContentGap, bool PrewarmOnly);
 	void RenderQmVisualChatBubbleContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
+	void RenderQmVisualSkinAppearanceContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	void RenderQmVisualSkinTransitionContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	void RenderQmVisualCameraViewContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly);
 	bool RenderQmHudCheckbox(CUIRect &Content, float LineHeight, float LineSpacing, const void *pId, const char *pTextId, const char *pText, int *pValue);

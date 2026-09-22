@@ -4315,7 +4315,7 @@ set_target_properties(rust_test PROPERTIES OUTPUT_NAME ddnet_rust_test)
 list(APPEND TARGETS_OWN rust_test)
 list(APPEND TARGETS_LINK rust_test)
 
-set(RUST_TEST_LIBS ${WebP_LIBRARIES} ${LIBS} $<TARGET_FILE:rust_test>)
+set(RUST_TEST_LIBS $<TARGET_FILE:rust_test> ${WebP_LIBRARIES} ${LIBS})
 list(REMOVE_ITEM RUST_TEST_LIBS "rust_engine_shared")
 list(REMOVE_ITEM RUST_TEST_LIBS "-pthread")
 if(MSVC)

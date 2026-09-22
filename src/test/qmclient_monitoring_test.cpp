@@ -6988,11 +6988,11 @@ TEST(QmMonitoringHelpers, GlobalSearchUsesDedicatedSettingsPage)
 	EXPECT_NE(SearchContentBody.find("if(!qm_card_catalog::BuildCard(SearchCardBuild, MatchedCard.m_pStableId, Definition))"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("Definition.m_HeaderAction = BuildGlobalSearchLocateHeaderAction(MatchedCard, ReadOnly, SmallSize);"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("s_GlobalSearchCache.m_vResults = qm_card_catalog::SearchResultEntries(pModuleSearch, CardOrderModel);"), std::string::npos);
-	EXPECT_NE(SearchContentBody.find("s_GlobalSearchCache.m_vModelEntries = qm_card_catalog::BuildSearchModelEntries(s_GlobalSearchCache.m_vResults);"), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("s_GlobalSearchCache.m_vModelEntries = WithGlobalSearchBaseEntries(qm_card_catalog::BuildSearchModelEntries(s_GlobalSearchCache.m_vResults));"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("CardDeck.RenderCached(SearchCtx, Page, \"global-search\""), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("static CScrollRegion s_GlobalSearchScrollRegion;"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("const bool ReadOnly = PrewarmOnly || Ui()->RenderOnly();"), std::string::npos);
-	EXPECT_NE(SearchContentBody.find("s_GlobalSearchPrewarmOrderModel.LoadMerged(\"\", qm_card_registry::BuildDefaultEntries());"), std::string::npos);
+	EXPECT_NE(SearchContentBody.find("s_GlobalSearchPrewarmOrderModel.SetEntries(WithGlobalSearchBaseEntries(qm_card_registry::BuildDefaultEntries()));"), std::string::npos);
 	EXPECT_NE(SearchContentBody.find("qm_card_order::CModel &DeckOrderModel = ReadOnly ? s_GlobalSearchPrewarmOrderModel : s_GlobalSearchCache.m_Model;"), std::string::npos);
 	const size_t ReadOnlyOrderSelection = SearchContentBody.find("qm_card_order::CModel &DeckOrderModel = ReadOnly ?");
 	const size_t SearchLayoutRevision = SearchContentBody.find("const uint64_t LayoutRevision = CardOrderModel.LayoutRevision();");

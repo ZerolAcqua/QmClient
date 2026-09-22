@@ -228,7 +228,7 @@ void CQmAxiomScores::EvictCacheEntryIfNeeded()
 	auto Oldest = m_Cache.end();
 	for(auto It = m_Cache.begin(); It != m_Cache.end(); ++It)
 	{
-		if(Oldest == m_Cache.end() || It->second.m_LastAccessTick < Oldest->second.m_LastAccessTick)
+		if(Oldest == m_Cache.end() || It->second.m_LastAccessOrder < Oldest->second.m_LastAccessOrder)
 			Oldest = It;
 	}
 	if(Oldest != m_Cache.end())
@@ -252,6 +252,8 @@ void CQmAxiomScores::EnsureQueried(const char *pPlayerName)
 	}
 	SCacheEntry &Entry = CacheIt->second;
 	Entry.m_LastAccessTick = Now;
+	// 同一帧内多次 EnsureQueried 的 Now 相同，必须用单调序号区分 LRU，否则淘汰顺序不稳定。
+	Entry.m_LastAccessOrder = ++m_AccessOrderClock;
 
 	const bool MatchFresh = Entry.m_SearchStatus == EQmAxiomScoreStatus::READY &&
 				IsWithinWindow(Entry.m_LastSearchSuccessTick, Now, AXIOM_MATCH_CACHE_TTL_MS);
@@ -293,12 +295,22 @@ SQmAxiomLookupResult CQmAxiomScores::GetLookup(const char *pPlayerName) const
 
 	const SCacheEntry &Entry = It->second;
 	Result.m_Points = Entry.m_Points;
+	// 搜索未就绪：FETCHING 表示「已发起查询」（记分板可据此区分未查/查询中），
+	// 其余原样暴露失败态。
 	if(Entry.m_SearchStatus != EQmAxiomScoreStatus::READY)
 	{
 		Result.m_Status = Entry.m_SearchStatus;
 		return Result;
 	}
-	Result.m_Status = Entry.m_PointsStatus;
+	// 搜索已命中但分数未就绪：对外统一为 NOT_REQUESTED，避免半截状态露出分数列。
+	if(Entry.m_PointsStatus != EQmAxiomScoreStatus::READY)
+	{
+		Result.m_Status = Entry.m_PointsStatus == EQmAxiomScoreStatus::FETCHING ?
+					  EQmAxiomScoreStatus::NOT_REQUESTED :
+					  Entry.m_PointsStatus;
+		return Result;
+	}
+	Result.m_Status = EQmAxiomScoreStatus::READY;
 	return Result;
 }
 
@@ -316,8 +328,9 @@ void CQmAxiomScores::ProcessSearchRequests()
 
 		std::shared_ptr<IQmAxiomHttpRequest> pRequest = std::move(Slot.m_pRequest);
 		const uint64_t ResponseGeneration = Slot.m_Generation;
+		const EQmAxiomMode ResponseMode = Slot.m_Mode;
 		It = m_SearchRequests.erase(It);
-		if(!QmAxiomResponseIsCurrent(m_Generation, ResponseGeneration, m_Mode, Slot.m_Mode))
+		if(!QmAxiomResponseIsCurrent(m_Generation, ResponseGeneration, m_Mode, ResponseMode))
 			continue;
 
 		const auto CacheIt = m_Cache.find(PlayerName);

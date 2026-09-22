@@ -922,8 +922,8 @@ TEST(QmNewUiMenuBranches, SettingsSidebarKeepsPerTabFillInsteadOfCapsule)
 	EXPECT_LT(TabDrawPos, RenderSettings.find("m_SettingsCardDeck.BeginDisplayCycle("));
 	// 旧 UI 仍走 CORNER_R 的贴边分支。
 	EXPECT_NE(RenderSettings.find("if(DoButton_MenuTab(&m_aSettingsTabButtons[i], m_apSettingsTabs[i], Active, &Button, IGraphics::CORNER_R"), std::string::npos);
-	// 设置页的胶囊配色零件仍供横向子 Tab 使用。
-	EXPECT_NE(Source.find("ui_widget::SCapsuleTabBarStyle CMenus::SettingsCapsuleTabBarStyle() const"), std::string::npos);
+	// 设置页的胶囊配色零件仍供横向子 Tab 使用（定义在 menus.cpp，供各设置页共用）。
+	EXPECT_NE(ReadTextFile("src/game/client/components/menus.cpp").find("ui_widget::SCapsuleTabBarStyle CMenus::SettingsCapsuleTabBarStyle() const"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, SettingsSubTabRowsUseCapsuleTabBar)

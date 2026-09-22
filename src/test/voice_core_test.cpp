@@ -2700,7 +2700,8 @@ TEST(QmClient, TitleColorStyleSingleColorCarriesConfiguredOpacity)
 	EXPECT_EQ(Style.m_Mode, EQmTitleColorMode::SINGLE);
 	EXPECT_FALSE(Style.m_Rainbow);
 	EXPECT_FLOAT_EQ(Style.m_Alpha, 0.4f);
-	const ColorRGBA Expected = color_cast<ColorRGBA>(ColorHSLA(0.25f, 1.0f, 0.5f, 0.4f));
+	// 期望值必须与实现同源：PackedColor 经 8-bit 打包/解包，不能拿全精度 HSLA 直接比。
+	const ColorRGBA Expected = color_cast<ColorRGBA>(ColorHSLA(PackedColor).WithAlpha(0.4f));
 	EXPECT_FLOAT_EQ(Style.m_Color.r, Expected.r);
 	EXPECT_FLOAT_EQ(Style.m_Color.g, Expected.g);
 	EXPECT_FLOAT_EQ(Style.m_Color.b, Expected.b);

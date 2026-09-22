@@ -184,8 +184,10 @@ namespace ui_token::ime
 namespace ui_token::motion
 {
 	// 菜单反馈快速起步、平稳收尾；语义参数独立于通用曲线预设。
+	// 时长不得超过交互预算 0.14s（见 UiV2MenuMotion.SemanticTweens...），
+	// 同时要在约 0.12s 中点采样时仍可见过渡（EnterStartsFromTransparent...）。
 	inline constexpr SUiAnimTransition HOVER_FADE = {
-		.m_DurationSec = 0.12f,
+		.m_DurationSec = 0.14f,
 		.m_Easing = EEasing::EASE_OUT_QUART,
 	};
 	inline constexpr SUiAnimTransition PRESS_SCALE = {

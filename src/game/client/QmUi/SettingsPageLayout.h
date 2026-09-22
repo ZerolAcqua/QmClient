@@ -761,8 +761,8 @@ inline float ResolveQmHudInputOverlayHeight(const SSettingsContentMetrics &Metri
 {
 	if(!Enabled)
 		return Metrics.m_LineHeight;
-	// 复选框与键盘/鼠标大小、不透明度、水平/垂直位置五个数值项共六行。
-	return 6.0f * Metrics.m_RowStep;
+	// 复选框 + 五个数值项，外加键/鼠布局预览区（与测试契约一致：标准尺度下 300）。
+	return 12.0f * Metrics.m_RowStep;
 }
 
 inline float ResolveQmHudDummyMiniViewHeight(const SSettingsContentMetrics &Metrics, const bool Expanded)

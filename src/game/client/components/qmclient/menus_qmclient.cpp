@@ -114,8 +114,21 @@ namespace
 	std::function<void(const CUIRect &, float)> g_QmClientRenderTexture;
 
 	// Visual Deck 需要完整的模块表，才能在切换单张卡片的折叠状态时保留其他 tab 的历史配置。
+	// 禅模式卡片首次进入布局前默认收起；用户之后展开/收起由折叠配置自身表达。
+	void SeedQmDefaultCollapsedCards()
+	{
+		if(str_find(g_Config.m_QmGlobalCardOrder, "qm:focus_mode") != nullptr)
+			return;
+		if(str_find(g_Config.m_QmSidebarCardCollapsed, "focus_mode") != nullptr)
+			return;
+		if(g_Config.m_QmSidebarCardCollapsed[0] != '\0')
+			str_append(g_Config.m_QmSidebarCardCollapsed, ";", sizeof(g_Config.m_QmSidebarCardCollapsed));
+		str_append(g_Config.m_QmSidebarCardCollapsed, "focus_mode", sizeof(g_Config.m_QmSidebarCardCollapsed));
+	}
+
 	const std::array<qm_module::SQmModuleEntry, qm_module::QmModuleCount> s_aQmModuleDefaults = {{{qm_module::EQmModuleId::Info, qm_module::EQmModuleColumn::Full, 0, "info"},
 		{qm_module::EQmModuleId::ChatBubble, qm_module::EQmModuleColumn::Left, 0, "chat_bubble"},
+		{qm_module::EQmModuleId::FocusMode, qm_module::EQmModuleColumn::Left, 2, "focus_mode"},
 		{qm_module::EQmModuleId::SkinAppearance, qm_module::EQmModuleColumn::Left, 1, "skin_appearance"},
 		{qm_module::EQmModuleId::SkinTransition, qm_module::EQmModuleColumn::Left, 2, "skin_transition"},
 		{qm_module::EQmModuleId::GoresActor, qm_module::EQmModuleColumn::Left, 3, "gores_actor"},
@@ -1061,6 +1074,77 @@ void CMenus::RenderQmVisualStreamerContent(CUIRect &Content, float LineHeight, f
 	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmStreamerScoreboardDefaultFlags, "Use default flags on scoreboard", Localize("Use default flags on scoreboard"), &g_Config.m_QmStreamerScoreboardDefaultFlags);
 }
 
+void CMenus::RenderQmVisualFocusModeContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float ColumnGap, float LabelWidth)
+{
+	const float SmallSize = CurrentSettingsContentMetrics().m_SmallSize;
+	static CButtonContainer s_ReaderButtonFocusToggle, s_ClearButtonFocusToggle;
+	RenderQmVisualCheckbox(Content, LineHeight, LineSpacing, &g_Config.m_QmFocusMode, "qmclient-focus-mode-enable", Localize("Enable Zen mode"), &g_Config.m_QmFocusMode);
+	CUIRect LeftColumn, RightColumn, Row;
+	Content.VSplitMid(&LeftColumn, &RightColumn, ColumnGap);
+	auto RenderSection = [&](CUIRect &Target, const char *pTextId, const char *pLabel) {
+		Target.HSplitTop(SmallSize, &Row, &Target);
+		TextRender()->TextColor(ColorRGBA(0.72f, 0.72f, 0.78f, 0.86f));
+		RenderQmVisualLabel(pTextId, &Row, Localize(pLabel), SmallSize);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		Target.HSplitTop(LineSpacing, nullptr, &Target);
+	};
+	auto RenderCheckbox = [&](CUIRect &Target, int *pConfig, const char *pTextId, const char *pLabel) {
+		Target.HSplitTop(LineHeight, &Row, &Target);
+		if(DoSettingsButton_CheckBox(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_VISUAL, QMCLIENT_SETTINGS_TAB_VISUAL, pConfig, pTextId, Localize(pLabel), *pConfig, &Row))
+			*pConfig ^= 1;
+		Target.HSplitTop(LineSpacing, nullptr, &Target);
+	};
+	RenderSection(LeftColumn, "qmclient-focus-section-interface", "Interface");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideHud, "qmclient-focus-hide-hud", "Hide HUD");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideMapProgress, "qmclient-focus-hide-map-progress", "Hide map progress");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideInfoMessages, "qmclient-focus-hide-info-messages", "Hide kill/finish messages");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideScoreboard, "qmclient-focus-hide-scoreboard", "Hide scoreboard");
+	RenderSection(LeftColumn, "qmclient-focus-section-players", "Players");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideNames, "qmclient-focus-hide-names", "Hide names");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideNameplates, "qmclient-focus-hide-nameplates", "Hide nameplates");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideDirectionIndicators, "qmclient-focus-hide-direction-indicators", "Hide direction indicators");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideGuideLines, "qmclient-focus-hide-guide-lines", "Hide guide lines");
+	RenderSection(LeftColumn, "qmclient-focus-section-visuals", "Visuals");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideJumpEffects, "qmclient-focus-hide-jump-effects", "Hide jump effects");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideKillEffects, "qmclient-focus-hide-kill-effects", "Hide death/respawn effects");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideExplosionEffects, "qmclient-focus-hide-explosion-effects", "Hide explosion effects");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideFreezeEffects, "qmclient-focus-hide-freeze-effects", "Hide freeze effects");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideHammerEffects, "qmclient-focus-hide-hammer-effects", "Hide hammer effects");
+	RenderCheckbox(LeftColumn, &g_Config.m_QmFocusModeHideMuzzleEffects, "qmclient-focus-hide-muzzle-effects", "Hide weapon muzzle flashes");
+	RenderSection(RightColumn, "qmclient-focus-section-audio", "Audio");
+	RenderCheckbox(RightColumn, &g_Config.m_QmFocusModeMuteJumpSounds, "qmclient-focus-mute-jump-sounds", "Mute jump sounds");
+	RenderCheckbox(RightColumn, &g_Config.m_QmFocusModeMuteDeathSounds, "qmclient-focus-mute-death-sounds", "Mute death/respawn sounds");
+	RenderCheckbox(RightColumn, &g_Config.m_QmFocusModeMuteHammerSounds, "qmclient-focus-mute-hammer-sounds", "Mute hammer sounds");
+	RenderSection(RightColumn, "qmclient-focus-section-chat", "Chat");
+	RenderCheckbox(RightColumn, &g_Config.m_QmFocusModeHideChat, "qmclient-focus-hide-chat", "Hide player messages");
+	RenderCheckbox(RightColumn, &g_Config.m_QmFocusModeHideSystemInfoMessages, "qmclient-focus-hide-system-info-messages", "Hide join/version prompts");
+	RenderCheckbox(RightColumn, &g_Config.m_QmFocusModeHideSystemMessages, "qmclient-focus-hide-system-messages", "Hide server prompt notifications");
+	RenderCheckbox(RightColumn, &g_Config.m_QmFocusModeHideEcho, "qmclient-focus-hide-echo", "Hide Echo messages");
+	Content.y = std::max(LeftColumn.y, RightColumn.y);
+	Content.HSplitTop(LineSpacing, nullptr, &Content);
+	Content.HSplitTop(LineHeight, &Row, &Content);
+	CUIRect BindLabel, BindKey;
+	Row.VSplitLeft(LabelWidth, &BindLabel, &BindKey);
+	RenderQmVisualLabel("qmclient-focus-mode-key", &BindLabel, Localize("Zen mode key"), BodySize);
+	CBindSlot FocusBind(KEY_UNKNOWN, KeyModifier::NONE);
+	if(const auto FocusIt = g_CommandBindCache.find("toggle qm_focus_mode 0 1"); FocusIt != g_CommandBindCache.end())
+		FocusBind = FocusIt->second;
+	const auto Result = GameClient()->m_KeyBinder.DoKeyReader(&s_ReaderButtonFocusToggle, &s_ClearButtonFocusToggle, &BindKey, FocusBind, false);
+	if(Result.m_Bind != FocusBind)
+	{
+		if(FocusBind.m_Key != KEY_UNKNOWN)
+			GameClient()->m_Binds.Bind(FocusBind.m_Key, "", false, FocusBind.m_ModifierMask);
+		if(Result.m_Bind.m_Key != KEY_UNKNOWN)
+		{
+			GameClient()->m_Binds.Bind(Result.m_Bind.m_Key, "toggle qm_focus_mode 0 1", false, Result.m_Bind.m_ModifierMask);
+			g_CommandBindCache.insert_or_assign(std::string("toggle qm_focus_mode 0 1"), Result.m_Bind);
+		}
+		else
+			g_CommandBindCache.erase("toggle qm_focus_mode 0 1");
+	}
+	Content.HSplitTop(LineSpacing, nullptr, &Content);
+}
+
 void CMenus::RenderQmVisualTranslateUiContent(CUIRect &Content, float LineHeight, float BodySize, float LineSpacing)
 {
 	NTranslateUiSettings::RenderTranslateUiModule(this, Content, LineHeight, BodySize, LineSpacing);
@@ -1534,7 +1618,8 @@ void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOn
 			const float QrHeight = s_ShowSponsorQrCode ? LineHeight * 0.5f + std::clamp(ContentWidth, LineHeight * 8.0f, LineHeight * 12.0f) : 0.0f;
 			const float SponsorLinesHeight = ResolveSettingsRowsHeight((int)BuildSponsorLines(ContentWidth).get().size(), LineHeight, LineSpacing);
 			const float AuthorTeeSize = std::max(LineHeight * 2.0f, 50.0f * UiScale);
-			const float AuthorsHeight = 3.0f * (AuthorTeeSize + LineSpacing);
+			// 三位作者并排一行：皮肤在上、名字在下。
+			const float AuthorsHeight = AuthorTeeSize + LineHeight + LineSpacing;
 			const float DeveloperHeight = HasSponsorDeveloper ? 2.0f * (LineHeight + LineSpacing) : 0.0f;
 			return ImageHeight + LineHeight + QrHeight + AuthorsHeight + LineSpacing + LineHeight + SponsorLinesHeight + LineSpacing + LineHeight + DeveloperHeight;
 		};
@@ -1605,21 +1690,34 @@ void CMenus::RenderSettingsQmClientContributors(CUIRect MainView, bool PrewarmOn
 				const char *m_pName;
 				const char *m_pSkin;
 			};
-			// 每位作者展示各自的皮肤；皮肤缺失时由 RenderDevSkin 回退到 default，与 TClient 信息页一致。
+			// 三位作者并排展示；每位作者展示各自的皮肤；皮肤缺失时由 RenderDevSkin 回退到 default，与 TClient 信息页一致。
 			static constexpr std::array<SAuthorEntry, 3> s_aAuthors = {{
 				{"qmclient-community-author-xuanmeng", "璇梦", "owocat_mie"},
 				{"qmclient-community-author-dyl", "DYL", "default_v2"},
 				{"qmclient-community-author-xiari", "夏日", "blacktee"},
 			}};
 			const float AuthorTeeSize = std::max(LineHeight * 2.0f, 50.0f * UiScale);
+			CUIRect AuthorRow;
+			Content.HSplitTop(AuthorTeeSize + LineHeight + LineSpacing, &AuthorRow, &Content);
+			const float AuthorGap = LineSpacing;
+			const float AuthorSlotWidth = std::max(0.0f, (AuthorRow.w - AuthorGap * (float)(s_aAuthors.size() - 1)) / (float)s_aAuthors.size());
+			CUIRect Remain = AuthorRow;
 			for(size_t Index = 0; Index < s_aAuthors.size(); ++Index)
 			{
-				CUIRect AuthorRow, TeeRect, Label;
-				Content.HSplitTop(AuthorTeeSize + LineSpacing, &AuthorRow, &Content);
-				AuthorRow.VSplitLeft(AuthorTeeSize + LineSpacing, &TeeRect, &Label);
-				TeeRect.w = AuthorTeeSize;
-				RenderDevSkin(TeeRect.Center(), AuthorTeeSize, s_aAuthors[Index].m_pSkin, "default", false, 0, 0, 0, false, true);
-				DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, s_aAuthors[Index].m_pTextId, &Label, s_aAuthors[Index].m_pName, BodySize, TEXTALIGN_ML, {}, (int)Label.w);
+				if(Index > 0)
+					Remain.VSplitLeft(AuthorGap, nullptr, &Remain);
+				CUIRect Slot, TeeRect, Label;
+				if(Index + 1 < s_aAuthors.size())
+					Remain.VSplitLeft(AuthorSlotWidth, &Slot, &Remain);
+				else
+					Slot = Remain;
+				Slot.HSplitTop(AuthorTeeSize, &TeeRect, &Label);
+				Label.h = LineHeight;
+				CUIRect TeeBox = TeeRect;
+				TeeBox.w = std::min(AuthorTeeSize, TeeRect.w);
+				TeeBox.x = TeeRect.x + (TeeRect.w - TeeBox.w) * 0.5f;
+				RenderDevSkin(TeeBox.Center(), AuthorTeeSize, s_aAuthors[Index].m_pSkin, "default", false, 0, 0, 0, false, true);
+				DoSettingsMenuLabel(SETTINGS_QMCLIENT, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, QMCLIENT_SETTINGS_TAB_CONTRIBUTORS, s_aAuthors[Index].m_pTextId, &Label, s_aAuthors[Index].m_pName, BodySize, TEXTALIGN_MC, {}, (int)Label.w);
 			}
 			Content.HSplitTop(LineSpacing, nullptr, &Content);
 			Content.HSplitTop(LineHeight, &Row, &Content);
@@ -4823,6 +4921,7 @@ void CMenus::RenderSettingsQmClientHudDeck(CUIRect MainView, bool PrewarmOnly)
 	static bool s_CollapsedInitialized = false;
 	if(!s_CollapsedInitialized || str_comp(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed) != 0)
 	{
+		SeedQmDefaultCollapsedCards();
 		ParseLegacyQmCollapsed(g_Config.m_QmSidebarCardCollapsed, s_aQmModuleDefaults, s_aCollapsed);
 		s_CollapsedInitialized = true;
 	}
@@ -4902,6 +5001,7 @@ void CMenus::RenderSettingsQmClientFunctionDeck(CUIRect MainView, bool PrewarmOn
 	static bool s_CollapsedInitialized = false;
 	if(!s_CollapsedInitialized || str_comp(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed) != 0)
 	{
+		SeedQmDefaultCollapsedCards();
 		ParseLegacyQmCollapsed(g_Config.m_QmSidebarCardCollapsed, s_aQmModuleDefaults, s_aCollapsed);
 		s_CollapsedInitialized = true;
 	}
@@ -4985,6 +5085,7 @@ void CMenus::RenderSettingsQmClientVisualDeck(CUIRect MainView, bool PrewarmOnly
 	const bool CollapsedConfigChanged = !s_CollapsedInitialized || str_comp(s_aCollapsedConfigCache, g_Config.m_QmSidebarCardCollapsed) != 0;
 	if(CollapsedConfigChanged)
 	{
+		SeedQmDefaultCollapsedCards();
 		ParseLegacyQmCollapsed(g_Config.m_QmSidebarCardCollapsed, s_aQmModuleDefaults, s_aCollapsed);
 		s_CollapsedInitialized = true;
 	}

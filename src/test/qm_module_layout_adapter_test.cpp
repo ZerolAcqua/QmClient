@@ -61,6 +61,7 @@ static std::vector<SQmModuleEntry> MakeAllDefaults()
 	return {
 		{EQmModuleId::Info, EQmModuleColumn::Full, 0, "info"},
 		{EQmModuleId::ChatBubble, EQmModuleColumn::Left, 0, "chat_bubble"},
+		{EQmModuleId::FocusMode, EQmModuleColumn::Left, 2, "focus_mode"},
 		{EQmModuleId::SkinAppearance, EQmModuleColumn::Left, 1, "skin_appearance"},
 		{EQmModuleId::SkinTransition, EQmModuleColumn::Left, 2, "skin_transition"},
 		{EQmModuleId::GoresActor, EQmModuleColumn::Left, 3, "gores_actor"},
@@ -101,69 +102,69 @@ static std::vector<SQmModuleEntry> MakeAllDefaults()
 	};
 }
 
-// 意图：旧布局中的禅模式条目应被丢弃，其他卡片的位置与折叠状态仍按 key 恢复。
-TEST(QmModuleLayoutAdapter, RemovedZenModeDoesNotShiftLegacyLayoutOrCollapsedState)
+// 意图：恢复后的禅模式布局条目应保留，其他卡片的位置与折叠状态仍按 key 恢复。
+TEST(QmModuleLayoutAdapter, RestoredZenModeKeepsLegacyLayoutAndCollapsedState)
 {
 	const auto Defaults = MakeAllDefaults();
 	std::vector<SQmModuleEntry> Parsed;
-	ASSERT_TRUE(ParseLegacyQmLayout("focus_mode:left:0;camera_view:left:0;skin_transition:right:0", Defaults, Parsed));
+	ASSERT_TRUE(ParseLegacyQmLayout("focus_mode:left:2;camera_view:left:0;skin_transition:right:0", Defaults, Parsed));
+	bool SawFocusMode = false;
 	for(const auto &Entry : Parsed)
 	{
-		EXPECT_STRNE(Entry.m_pKey, "focus_mode");
+		if(str_comp(Entry.m_pKey, "focus_mode") == 0)
+		{
+			SawFocusMode = true;
+			EXPECT_EQ(Entry.m_Id, EQmModuleId::FocusMode);
+			EXPECT_EQ(Entry.m_Column, EQmModuleColumn::Left);
+		}
 		if(Entry.m_Id == EQmModuleId::CameraView)
 			EXPECT_EQ(Entry.m_Column, EQmModuleColumn::Left);
 		if(Entry.m_Id == EQmModuleId::SkinTransition)
 			EXPECT_EQ(Entry.m_Column, EQmModuleColumn::Right);
 	}
+	EXPECT_TRUE(SawFocusMode);
 	std::array<bool, QmModuleCount> aCollapsed = {};
 	ASSERT_TRUE(ParseLegacyQmCollapsed("focus_mode;camera_view;skin_transition", Defaults, aCollapsed));
+	EXPECT_TRUE(aCollapsed[static_cast<size_t>(EQmModuleId::FocusMode)]);
 	EXPECT_TRUE(aCollapsed[static_cast<size_t>(EQmModuleId::CameraView)]);
 	EXPECT_TRUE(aCollapsed[static_cast<size_t>(EQmModuleId::SkinTransition)]);
 	EXPECT_FALSE(aCollapsed[static_cast<size_t>(EQmModuleId::KeyBinds)]);
 	char aCollapsedConfig[4096];
 	SerializeLegacyQmCollapsed(Defaults, aCollapsed, aCollapsedConfig, sizeof(aCollapsedConfig));
-	EXPECT_EQ(std::string(aCollapsedConfig).find("focus_mode"), std::string::npos);
+	EXPECT_NE(std::string(aCollapsedConfig).find("focus_mode"), std::string::npos);
 	EXPECT_NE(std::string(aCollapsedConfig).find("camera_view"), std::string::npos);
 	EXPECT_NE(std::string(aCollapsedConfig).find("skin_transition"), std::string::npos);
 }
 
-// 意图：全局布局重载后不再保存已删除的卡片，保留其他卡片的自定义页面与列。
-TEST(QmModuleLayoutAdapter, RemovedZenModeIsDiscardedFromGlobalLayoutRoundTrip)
+// 意图：全局布局重载后仍保存禅模式卡片，保留其他卡片的自定义页面与列。
+TEST(QmModuleLayoutAdapter, RestoredZenModeIsKeptInGlobalLayoutRoundTrip)
 {
 	qm_card_order::CModel Model;
-	ASSERT_TRUE(Model.LoadMerged("qm:focus_mode|visual|right|0;qm:camera_view|function|left|0;", qm_card_registry::BuildDefaultEntries()));
-	EXPECT_LT(Model.FindByStableId("qm:focus_mode"), 0);
+	ASSERT_TRUE(Model.LoadMerged("qm:focus_mode|visual|left|2;qm:camera_view|function|left|0;", qm_card_registry::BuildDefaultEntries()));
+	const int FocusIndex = Model.FindByStableId("qm:focus_mode");
+	ASSERT_GE(FocusIndex, 0);
+	EXPECT_STREQ(Model.Entry(FocusIndex).m_pDefaultTab, "visual");
+	EXPECT_EQ(Model.Entry(FocusIndex).m_Column, 1);
 	const int Index = Model.FindByStableId("qm:camera_view");
 	ASSERT_GE(Index, 0);
 	EXPECT_STREQ(Model.Entry(Index).m_pDefaultTab, "function");
 	EXPECT_EQ(Model.Entry(Index).m_Column, 1);
 	char aSerialized[32768];
 	ASSERT_TRUE(Model.Serialize(aSerialized, sizeof(aSerialized)));
-	EXPECT_EQ(std::string(aSerialized).find("qm:focus_mode"), std::string::npos);
+	EXPECT_NE(std::string(aSerialized).find("qm:focus_mode|visual|left|"), std::string::npos);
 	EXPECT_NE(std::string(aSerialized).find("qm:camera_view|function|left|"), std::string::npos);
 }
 
-// 意图：加载设置时清除历史禅模式布局项，其他条目及相似 key 保持原样。
-TEST(QmModuleLayoutAdapter, RemovedZenModeConfigCleanupPreservesOtherEntries)
+// 意图：禅模式恢复后布局配置不再被强制清除，focus_mode 条目原样保留。
+TEST(QmModuleLayoutAdapter, RestoredZenModeConfigCleanupLeavesFocusEntries)
 {
-	SConfigBackup Backup;
-	str_copy(g_Config.m_QmGlobalCardOrder, "qm:focus_mode|visual|left|0;qm:camera_view|function|right|4;qm:focus_mode_extra|visual|left|1;qm:focus_mode:2:0;", sizeof(g_Config.m_QmGlobalCardOrder));
-	str_copy(g_Config.m_QmSidebarCardOrder, "focus_mode:left:2;chat_bubble:right:3;focus_mode_extra:left:1;focus_mode", sizeof(g_Config.m_QmSidebarCardOrder));
-	str_copy(g_Config.m_QmSidebarCardCollapsed, "skin_transition;focus_mode;focus_mode_extra;camera_view", sizeof(g_Config.m_QmSidebarCardCollapsed));
-	for(int Pass = 0; Pass < 2; ++Pass)
-	{
-		RemoveLegacyZenModeLayoutConfig();
-		EXPECT_STREQ(g_Config.m_QmGlobalCardOrder, "qm:camera_view|function|right|4;qm:focus_mode_extra|visual|left|1;");
-		EXPECT_STREQ(g_Config.m_QmSidebarCardOrder, "chat_bubble:right:3;focus_mode_extra:left:1;");
-		EXPECT_STREQ(g_Config.m_QmSidebarCardCollapsed, "skin_transition;focus_mode_extra;camera_view");
-	}
-	str_copy(g_Config.m_QmGlobalCardOrder, "qm:focus_mode|visual|left|0", sizeof(g_Config.m_QmGlobalCardOrder));
-	str_copy(g_Config.m_QmSidebarCardOrder, "focus_mode:left:2", sizeof(g_Config.m_QmSidebarCardOrder));
-	str_copy(g_Config.m_QmSidebarCardCollapsed, "focus_mode", sizeof(g_Config.m_QmSidebarCardCollapsed));
+	str_copy(g_Config.m_QmGlobalCardOrder, "qm:focus_mode|visual|left|2;qm:camera_view|function|right|4;", sizeof(g_Config.m_QmGlobalCardOrder));
+	str_copy(g_Config.m_QmSidebarCardOrder, "focus_mode:left:2;chat_bubble:right:3;", sizeof(g_Config.m_QmSidebarCardOrder));
+	str_copy(g_Config.m_QmSidebarCardCollapsed, "skin_transition;focus_mode;camera_view", sizeof(g_Config.m_QmSidebarCardCollapsed));
 	RemoveLegacyZenModeLayoutConfig();
-	EXPECT_STREQ(g_Config.m_QmGlobalCardOrder, "");
-	EXPECT_STREQ(g_Config.m_QmSidebarCardOrder, "");
-	EXPECT_STREQ(g_Config.m_QmSidebarCardCollapsed, "");
+	EXPECT_STREQ(g_Config.m_QmGlobalCardOrder, "qm:focus_mode|visual|left|2;qm:camera_view|function|right|4;");
+	EXPECT_STREQ(g_Config.m_QmSidebarCardOrder, "focus_mode:left:2;chat_bubble:right:3;");
+	EXPECT_STREQ(g_Config.m_QmSidebarCardCollapsed, "skin_transition;focus_mode;camera_view");
 }
 
 TEST(QmModuleLayoutAdapter, LegacyMigrationWritesIntoProvidedGlobalModel)

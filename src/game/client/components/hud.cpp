@@ -25,6 +25,7 @@
 #include <game/client/QmUi/UiTokens.h>
 #include <game/client/animstate.h>
 #include <game/client/components/qmclient/demo_display.h>
+#include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_bind_status_hud.h>
 #include <game/client/components/qmclient/score_hud_layout.h>
 #include <game/client/components/scoreboard.h>
@@ -6799,6 +6800,9 @@ void CHud::RenderProgressBarWithTee(const CUIRect &BarRect, float Progress, cons
 void CHud::RenderMapProgressBar()
 {
 	const bool Preview = GameClient()->m_HudEditor.IsActive();
+	// 禅模式：隐藏地图进度时直接跳过（预览仍显示，便于 HUD 编辑器布局）。
+	if(!Preview && ShouldHideFocusMapProgress(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMapProgress != 0))
+		return;
 	if(!g_Config.m_QmPlayerStatsMapProgress && !Preview)
 		return;
 	if(!GameClient()->m_TClient.IsGoresMapProgressEnabled() && !Preview)
@@ -7376,6 +7380,12 @@ void CHud::OnRender()
 		GameClient()->m_Voting.Render();
 		if(g_Config.m_ClShowRecord)
 			RenderRecord();
+	}
+	// 禅模式隐藏主 HUD 时，仍可在围观状态下保留围观 HUD（ShouldRenderFocusSpectatorHud）。
+	if(!MainHudVisible && GameClient()->m_Snap.m_SpecInfo.m_Active &&
+		ShouldRenderFocusSpectatorHud(true, g_Config.m_ClShowhudSpectator != 0, false, g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideHud != 0))
+	{
+		RenderSpectatorHud();
 	}
 	GameClient()->m_Voice.RenderOverlay();
 	RenderCursor();

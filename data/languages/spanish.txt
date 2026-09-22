@@ -3770,6 +3770,12 @@ Enable warlist
 Enable word filter list
 == Activar lista de filtro de palabras
 
+Enable Zen Mode
+== Activar modo Zen
+
+Enable Zen mode
+== Activar modo Zen
+
 Enable/disable infinite hook.
 == Activar/desactivar gancho infinito.
 
@@ -3799,6 +3805,9 @@ Endpoint
 
 Endpoint (optional)
 == Endpoint (opcional)
+
+Enhanced rendering
+== Renderizado mejorado
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == Ingresa /practice o reinicia para evitar que todo el equipo sea eliminado en 60 segundos
@@ -4646,6 +4655,9 @@ Has save
 Has unread news
 == Tiene noticias no leídas
 
+HD icons (MSDF)
+== Iconos HD (MSDF)
+
 HDF
 == HDF
 
@@ -4667,8 +4679,38 @@ Helpful for Gores: allow negative internal certainty for more conservative predi
 Hi!
 == ¡Hola!
 
+Hide basic system info (join, version, rules) in Zen mode
+== Ocultar info básica del sistema en modo Zen
+
 Hide chat messages from players marked as enemies
 == Ocultar los mensajes de chat de jugadores marcados como enemigos
+
+Hide death/respawn effects
+== Ocultar efectos de muerte/respawn
+
+Hide death/respawn effects in Zen Mode
+== Ocultar efectos de muerte/respawn en modo Zen
+
+Hide direction in Zen mode
+== Ocultar indicador de dirección en modo Zen
+
+Hide direction indicators
+== Ocultar indicadores de dirección
+
+Hide Echo messages
+== Ocultar mensajes Echo
+
+Hide Echo messages in Zen mode
+== Ocultar mensajes Echo en modo Zen
+
+Hide explosion effects
+== Ocultar efectos de explosión
+
+Hide freeze effects
+== Ocultar efectos de congelación
+
+Hide freeze effects in Zen Mode
+== Ocultar efectos de congelación en modo Zen
 
 Hide ghosts of frozen players
 == Ocultar fantasmas de jugadores congelados
@@ -4676,14 +4718,56 @@ Hide ghosts of frozen players
 Hide guide lines
 == Ocultar líneas guía
 
+Hide hammer effects
+== Ocultar efectos de martillo
+
+Hide hammer effects in Zen Mode
+== Ocultar efectos de martillo en modo Zen
+
 Hide helper lines in Gores mode
 == Ocultar líneas de ayuda en modo Gores
+
+Hide helper lines in Zen mode
+== Ocultar líneas de ayuda en modo Zen
+
+Hide HUD
+== Ocultar HUD
+
+Hide HUD in Zen mode
+== Ocultar HUD en modo Zen
 
 Hide indicator for tees on your screen
 == Ocultar indicador para tees en tu pantalla
 
 Hide input emoticon
 == Ocultar emoticono de entrada
+
+Hide join/version prompts
+== Ocultar avisos de entrada/versión
+
+Hide jump effects
+== Ocultar efectos de salto
+
+Hide jump effects in Zen Mode
+== Ocultar efectos de salto en modo Zen
+
+Hide kill and finish messages in Zen mode
+== Ocultar mensajes de kill/finish en modo Zen
+
+Hide kill/finish messages
+== Ocultar mensajes de muerte/meta
+
+Hide map progress
+== Ocultar progreso del mapa
+
+Hide map progress bar in Zen mode
+== Ocultar barra de progreso del mapa en modo Zen
+
+Hide nameplates
+== Ocultar placas de nombre
+
+Hide names
+== Ocultar nombres
 
 Hide non-friend names/clans and show client ID
 == Ocultar nombres/clanes de no amigos y mostrar ID de cliente
@@ -4697,11 +4781,35 @@ Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
 == Ocultar mensajes de jugadores
 
+Hide player messages in Zen mode
+== Ocultar mensajes de jugadores en modo Zen
+
+Hide player name plates in Zen Mode
+== Ocultar placas de nombre en modo Zen
+
+Hide player names in Zen Mode
+== Ocultar nombres de jugadores en modo Zen
+
+Hide projectile effects in Zen Mode
+== Ocultar efectos de proyectiles en modo Zen
+
+Hide scoreboard
+== Ocultar marcador
+
+Hide scoreboard in Zen mode
+== Ocultar marcador en modo Zen
+
 Hide sensitive info like /save password
 == Ocultar información sensible como contraseña de /save
 
 Hide server information on join
 == Ocultar información del servidor al entrar
+
+Hide server prompt notifications
+== Ocultar notificaciones del servidor
+
+Hide server tip notifications (including notification bar) in Zen mode
+== Ocultar avisos del servidor en modo Zen
 
 Hide Settings Tabs
 == Ocultar Pestañas de Ajustes
@@ -4720,6 +4828,15 @@ Hide toast
 
 Hide typing emoji during input
 == No mostrar emoticonos de escritura al escribir
+
+Hide UI for focused gameplay
+== Ocultar UI para jugar con concentración
+
+Hide weapon fire effects in Zen Mode
+== Ocultar efectos de disparo en modo Zen
+
+Hide weapon muzzle flashes
+== Ocultar fogonazos de arma
 
 High Detail
 == Alto detalle
@@ -5098,6 +5215,9 @@ Insane
 
 Installing update. Please wait...
 == Instalando la actualización. Espera...
+
+Interface
+== Interfaz
 
 Interface accent color
 == Color de acento de la interfaz
@@ -6026,6 +6146,9 @@ Menu camera rotation time in seconds
 Menu camera speed
 == Velocidad de la cámara del menú
 
+Menu Gaussian blur pipeline
+== Pipeline de desenfoque gaussiano del menú
+
 Menu main panel background color
 == Color de fondo del panel principal del menú
 
@@ -6233,14 +6356,32 @@ Multi-View
 Mute
 == Silenciar
 
+Mute death/respawn sound in Zen Mode
+== Silenciar sonido de muerte/respawn en modo Zen
+
+Mute death/respawn sounds
+== Silenciar sonidos de muerte/respawn
+
 Mute emoticons
 == Silenciar emoticonos
 
 Mute flag sounds
 == Silenciar sonidos de bandera
 
+Mute hammer sound in Zen mode
+== Silenciar sonido de martillo en modo Zen
+
+Mute hammer sounds
+== Silenciar sonidos de martillo
+
 Mute hook sound
 == Silenciar sonido del gancho
+
+Mute jump sound in Zen Mode
+== Silenciar sonido de salto en modo Zen
+
+Mute jump sounds
+== Silenciar sonidos de salto
 
 Mute map sounds
 == Silenciar sonidos del mapa
@@ -7736,6 +7877,9 @@ Pulse speed
 Pulse strength
 == Fuerza del pulso
 
+Pure Vulkan fallback
+== Actual: Vulkan puro
+
 Push radius
 == Radio de empuje
 
@@ -7771,6 +7915,9 @@ Pyramid
 
 q = Connection quality
 == q = Calidad de conexión
+
+Qm enhanced rendering: 0=Off pure Vulkan, 1=Auto fallback, 2=Force on
+== Renderizado Qm: 0=Apagado (Vulkan puro), 1=Auto, 2=Forzar
 
 Qm UI custom icon color
 == Color personalizado de iconos de Qm UI
@@ -7813,6 +7960,9 @@ QmUi animation intensity: 0=Off, 1=Reduced, 2=Full
 
 QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
 == Interpolación de animación de color de QmUi: 0=sRGB lineal 1=OKLAB perceptualmente uniforme
+
+QmVulkan active
+== Actual: QmVulkan activo
 
 QQ group: 1076765929 (click to copy)
 == Grupo QQ: 1076765929 (haz clic para copiar)
@@ -10202,6 +10352,9 @@ Smooth Dynamic Camera
 Smooth fade
 == Fundido suave
 
+Smooth island (SDF)
+== Dynamic Island suave (SDF)
+
 Smooth other players' predicted movement
 == Suavizar el movimiento predicho de otros jugadores
 
@@ -11858,6 +12011,9 @@ Use enemy color instead of frozen color
 Use enemy list to drive player indicators
 == Usar lista de enemigos para impulsar indicadores de jugador
 
+Use Gaussian blur pipeline when enhanced rendering is active
+== Usar pipeline de desenfoque gaussiano con renderizado mejorado
+
 Use high bandwidth mode (doubles server bandwidth, LAN only)
 == Usar modo de ancho de banda alto (duplica el ancho de banda del servidor, solo LAN)
 
@@ -11869,6 +12025,9 @@ Use large emote
 
 Use mouse sensitivity when dynamic camera is on
 == Usar sensibilidad del ratón cuando la cámara dinámica está activada
+
+Use MSDF icon pipeline when enhanced rendering is active
+== Usar pipeline de iconos MSDF con renderizado mejorado
 
 Use multi-char replacement based on word length
 == Usar reemplazo de múltiples caracteres según la longitud de la palabra
@@ -11902,6 +12061,9 @@ Use original style for Dynamic Island
 
 Use pre-input to predict other players for more accurate input prediction
 == Usar pre-entrada para predecir a otros jugadores para una predicción de entrada más precisa
+
+Use SDF pipelines for Dynamic Island / rounded rects when enhanced rendering is active
+== Usar pipelines SDF para Dynamic Island y rectángulos redondeados
 
 Use skin color for frozen Tee's feet
 == Usar color de skin para los pies del Tee congelado
@@ -12760,6 +12922,12 @@ Your timeout code has been set. 0.7 clients can not reclaim their tees on timeou
 
 z = Zoom
 == z = Zoom
+
+Zen Mode
+== Modo Zen
+
+Zen mode key
+== Tecla del modo Zen
 
 Zhipu AI
 == Zhipu AI

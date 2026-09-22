@@ -88,6 +88,7 @@ namespace qm_module
 		{
 		case EQmModuleId::Info: return "qm:info";
 		case EQmModuleId::ChatBubble: return "qm:chat_bubble";
+		case EQmModuleId::FocusMode: return "qm:focus_mode";
 		case EQmModuleId::GoresActor: return "qm:gores_actor";
 		case EQmModuleId::Gores: return "qm:gores";
 		case EQmModuleId::KeyBinds: return "qm:key_binds";
@@ -632,32 +633,7 @@ namespace qm_module
 
 	void RemoveLegacyZenModeLayoutConfig()
 	{
-		// 原地移除专属条目，其他卡片的顺序、附加字段与未知 key 均保持原样。
-		const auto RemoveEntries = [](char *pConfig, const char *pKey) {
-			const int KeyLength = str_length(pKey);
-			char *pRead = pConfig;
-			char *pWrite = pConfig;
-			while(*pRead != '\0')
-			{
-				char *pEnd = pRead;
-				while(*pEnd != '\0' && *pEnd != ';')
-					++pEnd;
-				char *pNext = *pEnd == ';' ? pEnd + 1 : pEnd;
-				const bool Matches = pEnd - pRead >= KeyLength && str_comp_num(pRead, pKey, KeyLength) == 0 &&
-						     (pEnd - pRead == KeyLength || pRead[KeyLength] == ':' || pRead[KeyLength] == '|');
-				if(!Matches)
-				{
-					const size_t Length = pNext - pRead;
-					mem_move(pWrite, pRead, Length);
-					pWrite += Length;
-				}
-				pRead = pNext;
-			}
-			*pWrite = '\0';
-		};
-		RemoveEntries(g_Config.m_QmGlobalCardOrder, "qm:focus_mode");
-		RemoveEntries(g_Config.m_QmSidebarCardOrder, "focus_mode");
-		RemoveEntries(g_Config.m_QmSidebarCardCollapsed, "focus_mode");
+		// 禅模式已恢复：布局中的 focus_mode / qm:focus_mode 条目合法保留，不再强制清除。
 	}
 
 	bool MigrateQmLayoutToGlobalCardOrder(const std::vector<SQmModuleEntry> &vDefaults)

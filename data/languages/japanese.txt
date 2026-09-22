@@ -3770,6 +3770,12 @@ Enable warlist
 Enable word filter list
 == フィルターワードリストを有効にする
 
+Enable Zen Mode
+== Zen モードを有効化
+
+Enable Zen mode
+== Zen モードを有効化
+
 Enable/disable infinite hook.
 == 無限フックの有効/無効
 
@@ -3799,6 +3805,9 @@ Endpoint
 
 Endpoint (optional)
 == エンドポイント（オプション）
+
+Enhanced rendering
+== 高度なレンダリング
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == /practice モードに入るか再起動してください。そうしないと 60 秒後にチーム全員が処刑されます
@@ -4646,6 +4655,9 @@ Has save
 Has unread news
 == 未読ニュースがあるかどうか
 
+HD icons (MSDF)
+== 高解像度アイコン (MSDF)
+
 HDF
 == HDF
 
@@ -4667,8 +4679,38 @@ Helpful for Gores: allow negative internal certainty for more conservative predi
 Hi!
 == やあ!
 
+Hide basic system info (join, version, rules) in Zen mode
+== Zen モードで基本システム情報（入室・バージョン・ルール）を隠す
+
 Hide chat messages from players marked as enemies
 == 敵としてマークしたプレイヤーのチャットメッセージを隠す
+
+Hide death/respawn effects
+== 死亡/リスポーンエフェクトを隠す
+
+Hide death/respawn effects in Zen Mode
+== Zen モードで死亡/リスポーン演出を隠す
+
+Hide direction in Zen mode
+== Zen モードで方向インジケータを隠す
+
+Hide direction indicators
+== 方向インジケータを隠す
+
+Hide Echo messages
+== Echo メッセージを隠す
+
+Hide Echo messages in Zen mode
+== Zen モードで Echo メッセージを隠す
+
+Hide explosion effects
+== 爆発エフェクトを隠す
+
+Hide freeze effects
+== 凍結エフェクトを隠す
+
+Hide freeze effects in Zen Mode
+== Zen モードで凍結演出を隠す
 
 Hide ghosts of frozen players
 == 凍結プレイヤーのゴーストを非表示
@@ -4676,14 +4718,56 @@ Hide ghosts of frozen players
 Hide guide lines
 == ガイドラインを非表示
 
+Hide hammer effects
+== ハンマーエフェクトを隠す
+
+Hide hammer effects in Zen Mode
+== Zen モードでハンマー演出を隠す
+
 Hide helper lines in Gores mode
 == Gores モードでガイドラインを非表示
+
+Hide helper lines in Zen mode
+== Zen モードで補助線を隠す
+
+Hide HUD
+== HUD を隠す
+
+Hide HUD in Zen mode
+== Zen モードで HUD を隠す
 
 Hide indicator for tees on your screen
 == 画面内の Tee のインジケーターを非表示
 
 Hide input emoticon
 == 入力絵文字を非表示
+
+Hide join/version prompts
+== 参加/バージョン通知を隠す
+
+Hide jump effects
+== ジャンプエフェクトを隠す
+
+Hide jump effects in Zen Mode
+== Zen モードでジャンプ演出を隠す
+
+Hide kill and finish messages in Zen mode
+== Zen モードでキル/完走メッセージを隠す
+
+Hide kill/finish messages
+== キル/フィニッシュメッセージを隠す
+
+Hide map progress
+== マップ進捗を隠す
+
+Hide map progress bar in Zen mode
+== Zen モードでマップ進捗バーを隠す
+
+Hide nameplates
+== 名札を隠す
+
+Hide names
+== 名前を隠す
 
 Hide non-friend names/clans and show client ID
 == フレンド以外の名前/クランを非表示にしてクライアント ID を表示
@@ -4697,11 +4781,35 @@ Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
 == プレイヤーメッセージを非表示
 
+Hide player messages in Zen mode
+== Zen モードでプレイヤーメッセージを隠す
+
+Hide player name plates in Zen Mode
+== Zen モードでプレートを隠す
+
+Hide player names in Zen Mode
+== Zen モードでプレイヤー名を隠す
+
+Hide projectile effects in Zen Mode
+== Zen モードで弾道演出を隠す
+
+Hide scoreboard
+== スコアボードを隠す
+
+Hide scoreboard in Zen mode
+== Zen モードでスコアボードを隠す
+
 Hide sensitive info like /save password
 == /save パスワードなどの機密情報を非表示
 
 Hide server information on join
 == 参加時にサーバー情報を非表示
+
+Hide server prompt notifications
+== サーバー通知を隠す
+
+Hide server tip notifications (including notification bar) in Zen mode
+== Zen モードでサーバー通知（通知バー含む）を隠す
 
 Hide Settings Tabs
 == 設定タブを非表示
@@ -4720,6 +4828,15 @@ Hide toast
 
 Hide typing emoji during input
 == 入力中はタイピング表情を表示しない
+
+Hide UI for focused gameplay
+== 集中プレイのために UI を隠す
+
+Hide weapon fire effects in Zen Mode
+== Zen モードで武器発射演出を隠す
+
+Hide weapon muzzle flashes
+== 武器のマズルフラッシュを隠す
 
 High Detail
 == 高精細
@@ -5098,6 +5215,9 @@ Insane
 
 Installing update. Please wait...
 == アップデートをインストールしています。お待ちください...
+
+Interface
+== インターフェース
 
 Interface accent color
 == インターフェースのアクセントカラー
@@ -6026,6 +6146,9 @@ Menu camera rotation time in seconds
 Menu camera speed
 == メニューカメラの速度
 
+Menu Gaussian blur pipeline
+== メニューガウスぼかしパイプライン
+
 Menu main panel background color
 == メニューメインパネルの背景色
 
@@ -6233,14 +6356,32 @@ Multi-View
 Mute
 == ミュート
 
+Mute death/respawn sound in Zen Mode
+== Zen モードで死亡/リスポーン音を消音
+
+Mute death/respawn sounds
+== 死亡/リスポーン音を消音
+
 Mute emoticons
 == 絵文字をミュート
 
 Mute flag sounds
 == フラグサウンドをミュート
 
+Mute hammer sound in Zen mode
+== Zen モードでハンマー音を消音
+
+Mute hammer sounds
+== ハンマー音を消音
+
 Mute hook sound
 == フックサウンドをミュート
+
+Mute jump sound in Zen Mode
+== Zen モードでジャンプ音を消音
+
+Mute jump sounds
+== ジャンプ音を消音
 
 Mute map sounds
 == マップサウンドをミュート
@@ -7736,6 +7877,9 @@ Pulse speed
 Pulse strength
 == パルス強度
 
+Pure Vulkan fallback
+== 現在：純粋 Vulkan フォールバック
+
 Push radius
 == プッシュ半径
 
@@ -7771,6 +7915,9 @@ Pyramid
 
 q = Connection quality
 == q = 接続品質
+
+Qm enhanced rendering: 0=Off pure Vulkan, 1=Auto fallback, 2=Force on
+== Qm 高度なレンダリング: 0=オフ（純粋 Vulkan）、1=自動フォールバック、2=強制オン
 
 Qm UI custom icon color
 == Qm UI アイコンのカスタム色
@@ -7813,6 +7960,9 @@ QmUi animation intensity: 0=Off, 1=Reduced, 2=Full
 
 QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
 == QmUi カラーアニメーション補間：0=sRGB 線形 1=OKLAB 知覚均一
+
+QmVulkan active
+== 現在：QmVulkan 有効
 
 QQ group: 1076765929 (click to copy)
 == QQ グループ：1076765929（クリックしてコピー）
@@ -10202,6 +10352,9 @@ Smooth Dynamic Camera
 Smooth fade
 == スムーズフェード
 
+Smooth island (SDF)
+== Dynamic Island スムーズ (SDF)
+
 Smooth other players' predicted movement
 == 他のプレイヤーの予測移動をスムーズにする
 
@@ -11858,6 +12011,9 @@ Use enemy color instead of frozen color
 Use enemy list to drive player indicators
 == 敵リストを使用してプレイヤーインジケーターを駆動
 
+Use Gaussian blur pipeline when enhanced rendering is active
+== 強化レンダリング有効時、ガウスぼかしパイプラインを使用
+
 Use high bandwidth mode (doubles server bandwidth, LAN only)
 == 高帯域モードを使用（サーバー帯域を 2 倍、LAN のみ）
 
@@ -11869,6 +12025,9 @@ Use large emote
 
 Use mouse sensitivity when dynamic camera is on
 == 動的カメラオン時にマウス感度を使用
+
+Use MSDF icon pipeline when enhanced rendering is active
+== 強化レンダリング有効時、MSDF アイコンパイプラインを使用
 
 Use multi-char replacement based on word length
 == 単語の長さに基づいて複数文字置換を使用
@@ -11902,6 +12061,9 @@ Use original style for Dynamic Island
 
 Use pre-input to predict other players for more accurate input prediction
 == プリ入力を使用して他のプレイヤーを予測し、より正確な入力予測を実現
+
+Use SDF pipelines for Dynamic Island / rounded rects when enhanced rendering is active
+== 強化レンダリング有効時、Dynamic Island と角丸に SDF パイプラインを使用
 
 Use skin color for frozen Tee's feet
 == フリーズ Tee の足にもスキン色を使用
@@ -12760,6 +12922,12 @@ Your timeout code has been set. 0.7 clients can not reclaim their tees on timeou
 
 z = Zoom
 == z = ズーム
+
+Zen Mode
+== Zen モード
+
+Zen mode key
+== Zen モードのキー
 
 Zhipu AI
 == Zhipu AI

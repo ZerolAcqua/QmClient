@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <cmath>
 
-// 视觉分类卡片入口（8 张）：皮肤卡委托独立模块，其他卡在此提供测量、输入和渲染。
+// 视觉分类卡片入口（9 张，含恢复的禅模式）：皮肤卡委托独立模块，其他卡在此提供测量、输入和渲染。
 // 页面（栖梦「视觉」页、搜索页）只声明"这一页有这些卡"。
 namespace qm_card_catalog
 {
@@ -28,6 +28,7 @@ namespace qm_card_catalog
 			case EQmModuleId::WeaponAnimation:
 				return ResolveQmVisualWeaponAnimationHeight(Metrics, g_Config.m_QmWeaponSwitchAnim != 0, g_Config.m_QmWeaponReloadAnim != 0);
 			case EQmModuleId::Streamer: return Rows(3.0f);
+			case EQmModuleId::FocusMode: return ResolveQmVisualFocusModeHeight(Metrics);
 			case EQmModuleId::EntityOverlay: return Rows(9.0f);
 			case EQmModuleId::CollisionHitbox:
 				return ResolveQmVisualCollisionHitboxHeight(Metrics, g_Config.m_QmHitboxMode || g_Config.m_QmShowCollisionHitbox);
@@ -158,6 +159,9 @@ namespace qm_card_catalog
 			return true;
 		case EQmModuleId::Streamer:
 			Add(Id, "qm:streamer", "Streamer Mode", "Protect names and skins while streaming", [pMenus, LineHeight, LineSpacing](CUIRect &Content) { qm_card_catalog::QmCardRenderHook::RenderQmVisualStreamerContent(pMenus, Content, LineHeight, LineSpacing); });
+			return true;
+		case EQmModuleId::FocusMode:
+			Add(Id, "qm:focus_mode", "Zen Mode", "Hide UI for focused gameplay", [pMenus, LineHeight, BodySize, LineSpacing, LabelWidth](CUIRect &Content) { qm_card_catalog::QmCardRenderHook::RenderQmVisualFocusModeContent(pMenus, Content, LineHeight, BodySize, LineSpacing, LineSpacing, LabelWidth); });
 			return true;
 		case EQmModuleId::EntityOverlay:
 			Add(Id, "qm:entity_overlay", "Entity Layer Colors", "Adjust opacity of entity layers", [pMenus, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly](CUIRect &Content) { qm_card_catalog::QmCardRenderHook::RenderQmVisualEntityOverlayContent(pMenus, Content, LineHeight, BodySize, LineSpacing, LabelWidth, ReadOnly); });

@@ -45,6 +45,18 @@ static constexpr std::array<ENameplateCoreRow, kNameplateCoreRowCount> s_aDefaul
 	ENameplateCoreRow::CLAN,
 	ENameplateCoreRow::NAME};
 
+// 禅模式：Hide player messages 时聊天气泡整块不渲染。
+static bool FocusModeHidesChat()
+{
+	return g_Config.m_QmFocusMode != 0 && g_Config.m_QmFocusModeHideChat != 0;
+}
+
+// 禅模式：Hide names 时玩家昵称文本隐藏（名牌其余行仍可显示）。
+static bool FocusModeHidesNames()
+{
+	return g_Config.m_QmFocusMode != 0 && g_Config.m_QmFocusModeHideNames != 0;
+}
+
 struct SChatBubbleAnimState
 {
 	bool m_Initialized = false;
@@ -1940,10 +1952,12 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	const bool HideIdentity = GameClient()->ShouldHideStreamerIdentity(ClientId);
 
 	// 「显示昵称」按六档判定：当前操控角色 / 本机其他角色 / 其他玩家 三类可见组合。
+	// 禅模式 Hide names 时强制关闭昵称行。
 	Data.m_ShowName = ShouldShowQmNameplateName(
-		g_Config.m_QmNameplateShowScope,
-		pPlayerInfo->m_Local,
-		IsAnyLocalClient);
+				  g_Config.m_QmNameplateShowScope,
+				  pPlayerInfo->m_Local,
+				  IsAnyLocalClient) &&
+			  !FocusModeHidesNames();
 	GameClient()->FormatStreamerName(ClientId, Data.m_aName, sizeof(Data.m_aName));
 	str_copy(Data.m_aQmTitle, Data.m_ShowName ? GameClient()->m_QmClient.PlayerTitle(ClientId) : "");
 	Data.m_TitleColorStyle = ResolveQmTitleColorStyle(
@@ -2548,6 +2562,8 @@ void CNamePlates::RenderChatBubble(vec2 Position, int ClientId, float Alpha)
 	// Check if chat bubbles are enabled
 	if(!g_Config.m_QmChatBubble)
 		return;
+	if(FocusModeHidesChat())
+		return;
 
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
 		return;
@@ -2905,7 +2921,7 @@ void CNamePlates::OnRender()
 	const bool RenderTClientExtras = g_Config.m_TcNameplatePingCircle || g_Config.m_TcNameplateCountry || g_Config.m_TcNameplateSkins || (g_Config.m_TcWarList && g_Config.m_TcWarListReason);
 	const bool RenderDirection = ShowDirection != 0;
 	const bool RenderNameplates = RenderNames || RenderClan || RenderClientIds || RenderStrongWeak || RenderTClientExtras || RenderDirection || ShowCoords || ShowCoordXAlignHint;
-	const bool RenderChatBubbles = g_Config.m_QmChatBubble != 0;
+	const bool RenderChatBubbles = g_Config.m_QmChatBubble != 0 && !FocusModeHidesChat();
 	const bool RenderFreezeWakeupPopups = GameClient()->HasFreezeWakeupPopups();
 	if(!RenderNameplates && !RenderChatBubbles && !RenderFreezeWakeupPopups)
 		return;

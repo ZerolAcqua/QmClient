@@ -101,42 +101,33 @@ TEST(Binds, MatchesDeepflyAuxiliaryCommandsByCommandName)
 	EXPECT_EQ(DetectDeepflyModeFromBindCommand("echofoo;+fire;+toggle cl_dummy_hammer 1 0"), DEEPFLY_MODE_CUSTOM);
 }
 
-TEST(QmRemovedConfig, RemovesOnlyLegacyModeCommands)
+// 意图：禅模式已恢复，qm_focus_mode 命令不再被视为「已删除配置」而被清洗。
+TEST(QmRemovedConfig, RestoredZenModeCommandsAreNotTreatedAsRemoved)
 {
-	EXPECT_TRUE(QmRemovedConfig::IsFocusCommand("qm_focus_mode 1"));
-	EXPECT_TRUE(QmRemovedConfig::IsFocusCommand("qm_focus_mode 1;cl_showhud 0"));
-	EXPECT_TRUE(QmRemovedConfig::IsFocusCommand("  QM_FOCUS_MODE_HIDE_HUD 1"));
-	EXPECT_TRUE(QmRemovedConfig::IsFocusCommand("toggle qm_focus_mode 0 1"));
-	EXPECT_TRUE(QmRemovedConfig::IsFocusCommand("+toggle \"qm_focus_mode\" 1 0"));
-	EXPECT_TRUE(QmRemovedConfig::IsFocusCommand("+toggle_restore qm_focus_mode 1"));
-	EXPECT_TRUE(QmRemovedConfig::IsFocusCommand("reset qm_focus_mode_hide_chat"));
+	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("qm_focus_mode 1"));
+	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("qm_focus_mode 1;cl_showhud 0"));
+	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("  QM_FOCUS_MODE_HIDE_HUD 1"));
+	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("toggle qm_focus_mode 0 1"));
+	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("+toggle \"qm_focus_mode\" 1 0"));
+	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("+toggle_restore qm_focus_mode 1"));
+	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("reset qm_focus_mode_hide_chat"));
 	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("qm_focus_model 1"));
 	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("say qm_focus_mode 1"));
 	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("echo \"toggle qm_focus_mode 0 1\""));
 	EXPECT_FALSE(QmRemovedConfig::IsFocusCommand("toggle cl_showhud 0 1"));
 }
 
-TEST(QmRemovedConfig, CleansMixedBindsWithoutChangingOtherCommands)
+TEST(QmRemovedConfig, RestoredZenModeBindsArePreserved)
 {
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("toggle qm_focus_mode 0 1"), "");
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("qm_focus_mode 1;qm_focus_mode_hide_chat 1"), "");
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("+fire;toggle qm_focus_mode 0 1;+jump"), "+fire;+jump");
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("toggle qm_focus_mode 0 1; echo \"a;  b\";qm_focus_mode_hide_hud 1"), " echo \"a;  b\"");
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("toggle qm_focus_mode 0 1 # obsolete"), "");
+	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("toggle qm_focus_mode 0 1"), "toggle qm_focus_mode 0 1");
+	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("qm_focus_mode 1;qm_focus_mode_hide_chat 1"), "qm_focus_mode 1;qm_focus_mode_hide_chat 1");
+	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("+fire;toggle qm_focus_mode 0 1;+jump"), "+fire;toggle qm_focus_mode 0 1;+jump");
+	const std::string Mixed = "toggle qm_focus_mode 0 1; echo \"a;  b\";qm_focus_mode_hide_hud 1";
+	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands(Mixed), Mixed);
 	const std::string Unrelated = "echo \"qm_focus_mode;  unchanged\"; toggle cl_showhud 0 1 # qm_focus_mode 1";
 	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands(Unrelated), Unrelated);
 	const std::string Escaped = "echo \"say \\\"hello; world\\\"\"";
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands(Escaped + ";toggle qm_focus_mode 0 1"), Escaped);
-	const std::string LongCommand = "say " + std::string(1500, 'x');
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands(LongCommand + ";qm_focus_mode 1"), LongCommand);
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("echo ready # ;qm_focus_mode 1"), "echo ready # ;qm_focus_mode 1");
-}
-
-TEST(QmRemovedConfig, PreservesMultiCommandPrefixOnlyWhenCommandsRemain)
-{
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("mc;toggle qm_focus_mode 0 1"), "");
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("mc;qm_focus_mode_hide_hud 1;qm_focus_mode 0"), "");
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("mc;toggle qm_focus_mode 0 1;+jump"), "mc;+jump");
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("mc;+fire;toggle qm_focus_mode 0 1"), "mc;+fire");
-	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands("mc;echo unchanged"), "mc;echo unchanged");
+	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands(Escaped + ";toggle qm_focus_mode 0 1"), Escaped + ";toggle qm_focus_mode 0 1");
+	const std::string McPrefixed = "mc;toggle qm_focus_mode 0 1;+jump";
+	EXPECT_EQ(QmRemovedConfig::CleanFocusCommands(McPrefixed), McPrefixed);
 }

@@ -3770,6 +3770,12 @@ Enable warlist
 Enable word filter list
 == 启用屏蔽词列表
 
+Enable Zen Mode
+== 启用禅模式
+
+Enable Zen mode
+== 启用禅模式
+
 Enable/disable infinite hook.
 == 启用/禁用无限钩索
 
@@ -3799,6 +3805,9 @@ Endpoint
 
 Endpoint (optional)
 == 端点（可选）
+
+Enhanced rendering
+== 增强渲染
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == 请输入 /practice 或重新开始，否则整队将在 60 秒后被处死
@@ -4646,6 +4655,9 @@ Has save
 Has unread news
 == 是否有未读新闻
 
+HD icons (MSDF)
+== 高清图标 (MSDF)
+
 HDF
 == HDF
 
@@ -4667,8 +4679,38 @@ Helpful for Gores: allow negative internal certainty for more conservative predi
 Hi!
 == 你好啊！
 
+Hide basic system info (join, version, rules) in Zen mode
+== 在禅模式中隐藏基础系统信息（进服、版本、规则）
+
 Hide chat messages from players marked as enemies
 == 隐藏被标记为敌人的玩家的聊天消息
+
+Hide death/respawn effects
+== 隐藏死亡/重生特效
+
+Hide death/respawn effects in Zen Mode
+== 在禅模式中隐藏死亡/重生特效
+
+Hide direction in Zen mode
+== 在禅模式中隐藏方向指示
+
+Hide direction indicators
+== 隐藏方向指示
+
+Hide Echo messages
+== 隐藏 Echo 消息
+
+Hide Echo messages in Zen mode
+== 在禅模式中隐藏 Echo 消息
+
+Hide explosion effects
+== 隐藏爆炸特效
+
+Hide freeze effects
+== 隐藏冻结特效
+
+Hide freeze effects in Zen Mode
+== 在禅模式中隐藏冻结特效
 
 Hide ghosts of frozen players
 == 隐藏冻结玩家的影子
@@ -4676,14 +4718,56 @@ Hide ghosts of frozen players
 Hide guide lines
 == 隐藏辅助线
 
+Hide hammer effects
+== 隐藏锤子特效
+
+Hide hammer effects in Zen Mode
+== 在禅模式中隐藏锤子特效
+
 Hide helper lines in Gores mode
 == Gores 模式下隐藏辅助线
+
+Hide helper lines in Zen mode
+== 在禅模式中隐藏辅助线
+
+Hide HUD
+== 隐藏 HUD
+
+Hide HUD in Zen mode
+== 在禅模式中隐藏 HUD
 
 Hide indicator for tees on your screen
 == 其他玩家在屏幕内时隐藏指示器
 
 Hide input emoticon
 == 隐藏输入表情
+
+Hide join/version prompts
+== 隐藏进服/版本提示
+
+Hide jump effects
+== 隐藏跳跃特效
+
+Hide jump effects in Zen Mode
+== 在禅模式中隐藏跳跃特效
+
+Hide kill and finish messages in Zen mode
+== 在禅模式中隐藏击杀与完成信息
+
+Hide kill/finish messages
+== 隐藏击杀/完成信息
+
+Hide map progress
+== 隐藏地图进度
+
+Hide map progress bar in Zen mode
+== 在禅模式中隐藏地图进度条
+
+Hide nameplates
+== 隐藏名牌
+
+Hide names
+== 隐藏名字
 
 Hide non-friend names/clans and show client ID
 == 隐藏非好友姓名/战队并显示客户端 ID
@@ -4697,11 +4781,35 @@ Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
 == 隐藏玩家消息
 
+Hide player messages in Zen mode
+== 在禅模式中隐藏玩家消息
+
+Hide player name plates in Zen Mode
+== 在禅模式中隐藏玩家名牌
+
+Hide player names in Zen Mode
+== 在禅模式中隐藏玩家名字
+
+Hide projectile effects in Zen Mode
+== 在禅模式中隐藏弹道特效
+
+Hide scoreboard
+== 隐藏计分板
+
+Hide scoreboard in Zen mode
+== 在禅模式中隐藏计分板
+
 Hide sensitive info like /save password
 == 隐藏敏感信息，如 /save 密码
 
 Hide server information on join
 == 进图时隐藏服务器信息
+
+Hide server prompt notifications
+== 隐藏服务器提示通知
+
+Hide server tip notifications (including notification bar) in Zen mode
+== 在禅模式中隐藏服务器提示通知（含通知栏）
 
 Hide Settings Tabs
 == 隐藏设置选项卡
@@ -4720,6 +4828,15 @@ Hide toast
 
 Hide typing emoji during input
 == 输入时不显示打字表情
+
+Hide UI for focused gameplay
+== 隐藏界面，专注游戏
+
+Hide weapon fire effects in Zen Mode
+== 在禅模式中隐藏武器开火特效
+
+Hide weapon muzzle flashes
+== 隐藏武器枪口闪光
 
 High Detail
 == 显示地图细节
@@ -5098,6 +5215,9 @@ Insane
 
 Installing update. Please wait...
 == 正在安装更新，请稍等……
+
+Interface
+== 界面
 
 Interface accent color
 == 界面强调色
@@ -6026,6 +6146,9 @@ Menu camera rotation time in seconds
 Menu camera speed
 == 菜单相机速度
 
+Menu Gaussian blur pipeline
+== 菜单高斯模糊管线
+
 Menu main panel background color
 == 菜单主面板底色
 
@@ -6233,14 +6356,32 @@ Multi-View
 Mute
 == 静音
 
+Mute death/respawn sound in Zen Mode
+== 在禅模式中静音死亡/重生音效
+
+Mute death/respawn sounds
+== 静音死亡/重生音效
+
 Mute emoticons
 == 屏蔽表情
 
 Mute flag sounds
 == 静音旗帜音效
 
+Mute hammer sound in Zen mode
+== 在禅模式中静音锤子音效
+
+Mute hammer sounds
+== 静音锤子音效
+
 Mute hook sound
 == 静音钩索音效
+
+Mute jump sound in Zen Mode
+== 在禅模式中静音跳跃音效
+
+Mute jump sounds
+== 静音跳跃音效
 
 Mute map sounds
 == 静音地图音效
@@ -7736,6 +7877,9 @@ Pulse speed
 Pulse strength
 == 脉冲强度
 
+Pure Vulkan fallback
+== 当前：纯净 Vulkan 回退
+
 Push radius
 == 推动半径
 
@@ -7771,6 +7915,9 @@ Pyramid
 
 q = Connection quality
 == q = 连接质量
+
+Qm enhanced rendering: 0=Off pure Vulkan, 1=Auto fallback, 2=Force on
+== Qm 增强渲染：0=关（纯净 Vulkan），1=自动回退，2=强制开启
 
 Qm UI custom icon color
 == Qm 界面图标自定义颜色
@@ -7813,6 +7960,9 @@ QmUi animation intensity: 0=Off, 1=Reduced, 2=Full
 
 QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
 == QmUi 颜色动画插值：0=sRGB 线性，1=OKLAB 感知均匀
+
+QmVulkan active
+== 当前：QmVulkan 已启用
 
 QQ group: 1076765929 (click to copy)
 == QQ 群：1076765929（点击复制）
@@ -10202,6 +10352,9 @@ Smooth Dynamic Camera
 Smooth fade
 == 柔和淡变
 
+Smooth island (SDF)
+== 灵动岛平滑 (SDF)
+
 Smooth other players' predicted movement
 == 平滑其他玩家的预测移动
 
@@ -11858,6 +12011,9 @@ Use enemy color instead of frozen color
 Use enemy list to drive player indicators
 == 用敌对列表驱动玩家指示器
 
+Use Gaussian blur pipeline when enhanced rendering is active
+== 增强渲染启用时，使用高斯模糊管线
+
 Use high bandwidth mode (doubles server bandwidth, LAN only)
 == 使用高带宽模式。服务器所需的带宽加倍。仅限局域网使用
 
@@ -11869,6 +12025,9 @@ Use large emote
 
 Use mouse sensitivity when dynamic camera is on
 == 启用动态摄像机时使用鼠标灵敏度
+
+Use MSDF icon pipeline when enhanced rendering is active
+== 增强渲染启用时，使用 MSDF 图标管线
 
 Use multi-char replacement based on word length
 == 根据词语长度使用多字符替换
@@ -11902,6 +12061,9 @@ Use original style for Dynamic Island
 
 Use pre-input to predict other players for more accurate input prediction
 == 使用预输入预测其他玩家以获得更精确的输入预测
+
+Use SDF pipelines for Dynamic Island / rounded rects when enhanced rendering is active
+== 增强渲染启用时，用 SDF 管线绘制灵动岛与圆角矩形
 
 Use skin color for frozen Tee's feet
 == 冻结 Tee 的脚部也使用皮肤颜色
@@ -12760,6 +12922,12 @@ Your timeout code has been set. 0.7 clients can not reclaim their tees on timeou
 
 z = Zoom
 == z = 缩放
+
+Zen Mode
+== 禅模式
+
+Zen mode key
+== 禅模式快捷键
 
 Zhipu AI
 == 智谱清言

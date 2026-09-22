@@ -26,14 +26,11 @@ namespace QmRemovedConfig
 		return Token;
 	}
 
+	// 禅模式已恢复：不再把 qm_focus_mode* 当作已删除命令清洗。
 	inline bool IsFocusCommand(std::string_view Command)
 	{
-		std::string Name = ReadToken(Command);
-		if(str_comp_nocase(Name.c_str(), "toggle") == 0 || str_comp_nocase(Name.c_str(), "+toggle") == 0 ||
-			str_comp_nocase(Name.c_str(), "+toggle_restore") == 0 || str_comp_nocase(Name.c_str(), "reset") == 0)
-			Name = ReadToken(Command);
-		const char *pSuffix = str_startswith_nocase(Name.c_str(), "qm_focus_mode");
-		return pSuffix != nullptr && (*pSuffix == '\0' || *pSuffix == '_');
+		(void)Command;
+		return false;
 	}
 
 	inline std::string CleanFocusCommands(std::string_view Commands)

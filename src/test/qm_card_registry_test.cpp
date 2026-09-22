@@ -7,6 +7,7 @@
 
 #include <game/client/QmUi/QmCardRegistry.h>
 #include <game/client/QmUi/QmModuleLayoutAdapter.h>
+#include <game/client/QmUi/cards/QmCardCatalog.h>
 #include <game/localization.h>
 
 #include <gtest/gtest.h>
@@ -61,17 +62,25 @@ TEST(QmCardRegistry, MapUploadHasFunctionPlacementAndSearchKeywords)
 	}
 }
 
-// 意图：删除后的禅模式卡片不能再被默认布局或全局搜索恢复。
-TEST(QmCardRegistry, RemovedZenModeIsAbsentFromRegistryAndSearch)
+// 意图：恢复后的禅模式卡片能从默认布局与全局搜索找到。
+TEST(QmCardRegistry, RestoredZenModeIsPresentInRegistryAndSearch)
 {
-	EXPECT_EQ(qm_card_registry::FindByStableId("qm:focus_mode"), nullptr);
+	const auto *pCard = qm_card_registry::FindByStableId("qm:focus_mode");
+	ASSERT_NE(pCard, nullptr);
+	EXPECT_STREQ(pCard->m_pDefaultTab, "visual");
+	EXPECT_EQ(pCard->m_DefaultColumn, qm_card_registry::ECardColumn::Left);
+	EXPECT_EQ(pCard->m_DefaultOrder, 2);
+	EXPECT_TRUE(qm_card_catalog::HasCardModule("qm:focus_mode"));
 	const auto Model = RegistryModelAfterRoundTrip();
-	EXPECT_LT(Model.FindByStableId("qm:focus_mode"), 0);
+	EXPECT_GE(Model.FindByStableId("qm:focus_mode"), 0);
 	for(const char *pQuery : {"禅模式", "Zen Mode", "focus mode"})
 	{
 		const auto Results = qm_card_registry::SearchCards(pQuery, Model);
-		for(const auto &Result : Results)
-			EXPECT_STRNE(Result.m_pStableId, "qm:focus_mode");
+		const auto It = std::find_if(Results.begin(), Results.end(), [](const auto &Result) {
+			return str_comp(Result.m_pStableId, "qm:focus_mode") == 0;
+		});
+		ASSERT_NE(It, Results.end()) << pQuery;
+		EXPECT_STREQ(It->m_Target.m_pTab, "visual");
 	}
 }
 
@@ -1096,6 +1105,7 @@ TEST(QmCardRegistry, MigratesLegacyKeyToNamespaced)
 {
 	EXPECT_EQ(std::string(qm_card_registry::MigrateLegacyKey("chat_bubble")), "qm:chat_bubble");
 	EXPECT_EQ(std::string(qm_card_registry::MigrateLegacyKey("qiafen")), "qm:qiafen");
+	EXPECT_EQ(std::string(qm_card_registry::MigrateLegacyKey("focus_mode")), "qm:focus_mode");
 	EXPECT_EQ(qm_card_registry::MigrateLegacyKey("keyword_reply"), nullptr); // UI 名不映射
 }
 

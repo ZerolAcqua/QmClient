@@ -21,6 +21,11 @@ void qm_card_catalog::QmCardRenderHook::RenderQmVisualStreamerContent(CMenus *pM
 	pMenus->RenderQmVisualStreamerContent(Content, LineHeight, LineSpacing);
 }
 
+void qm_card_catalog::QmCardRenderHook::RenderQmVisualFocusModeContent(CMenus *pMenus, CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float ColumnGap, float LabelWidth)
+{
+	pMenus->RenderQmVisualFocusModeContent(Content, LineHeight, BodySize, LineSpacing, ColumnGap, LabelWidth);
+}
+
 void qm_card_catalog::QmCardRenderHook::RenderQmVisualEntityOverlayContent(CMenus *pMenus, CUIRect &Content, float LineHeight, float BodySize, float LineSpacing, float LabelWidth, bool PrewarmOnly)
 {
 	pMenus->RenderQmVisualEntityOverlayContent(Content, LineHeight, BodySize, LineSpacing, LabelWidth, PrewarmOnly);

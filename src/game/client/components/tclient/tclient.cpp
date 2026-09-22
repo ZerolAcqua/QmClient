@@ -2024,6 +2024,7 @@ void CTClient::OnUpdate()
 	MaybeSaveMapCategoryCache();
 	MaybeSaveMapNotes();
 	ApplyGoresFastInputLink();
+	ApplyFocusModeEffects();
 }
 
 void CTClient::OnRender()
@@ -4416,6 +4417,58 @@ void CTClient::ResetGoresDummyHammerOverride()
 	if(m_GoresDummyHammerOverride.m_WasActive && m_GoresDummyHammerOverride.m_AutoChangedValue && g_Config.m_ClDummyHammer == 0)
 		g_Config.m_ClDummyHammer = m_GoresDummyHammerOverride.m_SavedValue;
 	m_GoresDummyHammerOverride = {};
+}
+
+void CTClient::ApplyFocusModeEffects()
+{
+	const bool FocusActive = g_Config.m_QmFocusMode != 0;
+	const auto ApplyFocusOverride = [](SQmConfigOverrideState &State, bool HideActive, int &ConfigValue, int HiddenValue) {
+		bool Changed = false;
+		const int NextValue = ApplyQmConfigOverride(State, HideActive, ConfigValue, HiddenValue, Changed);
+		if(Changed)
+			ConfigValue = NextValue;
+	};
+	const bool StateWasKnown = m_FocusModeStateKnown;
+	const bool HideFocusHud = ShouldHideFocusHud(FocusActive, g_Config.m_QmFocusModeHideHud != 0);
+	const bool HideFocusNameplates = ShouldHideFocusNameplates(FocusActive, g_Config.m_QmFocusModeHideNameplates != 0);
+	const bool HideFocusDirectionIndicators = ShouldHideFocusDirectionIndicators(FocusActive, g_Config.m_QmFocusModeHideDirectionIndicators != 0);
+	if(!m_FocusModeStateKnown)
+	{
+		m_FocusModeStateKnown = true;
+		if(!FocusActive)
+		{
+			m_PrevFocusModeActive = false;
+			return;
+		}
+		m_PrevFocusModeActive = false;
+	}
+
+	if(StateWasKnown && FocusActive != m_PrevFocusModeActive)
+	{
+		char aFocusMsg[128];
+		str_format(aFocusMsg, sizeof(aFocusMsg), "%s%s: %s",
+			FocusActive ? "[[$FF7F7F]]" : "[[$A5FFA5]]",
+			Localize("Zen Mode"),
+			Localize(FocusActive ? "On" : "Off"));
+		GameClient()->Echo(aFocusMsg);
+	}
+
+	ApplyFocusOverride(m_FocusHudOverrideState, HideFocusHud, g_Config.m_ClShowhud, 0);
+	// 昵称由六档范围 qm_nameplate_show_scope 统一决定，「无」即隐藏全部昵称。
+	{
+		int NamePlateShowScope = g_Config.m_QmNameplateShowScope;
+		ApplyFocusOverride(m_FocusNamePlatesOverrideState, HideFocusNameplates, NamePlateShowScope, QM_NAMEPLATE_SHOW_SCOPE_OFF);
+		ApplyFocusOverride(m_FocusNamePlatesOwnOverrideState, HideFocusNameplates, NamePlateShowScope, QM_NAMEPLATE_SHOW_SCOPE_OFF);
+		g_Config.m_QmNameplateShowScope = NamePlateShowScope;
+	}
+	ApplyFocusOverride(m_FocusNameplateCoordsOverrideState, HideFocusNameplates, g_Config.m_QmNameplateCoords, 0);
+	ApplyFocusOverride(m_FocusNameplateCoordsOwnOverrideState, HideFocusNameplates, g_Config.m_QmNameplateCoordsOwn, 0);
+	ApplyFocusOverride(m_FocusNameplateCoordXOverrideState, HideFocusNameplates, g_Config.m_QmNameplateCoordX, 0);
+	ApplyFocusOverride(m_FocusNameplateCoordYOverrideState, HideFocusNameplates, g_Config.m_QmNameplateCoordY, 0);
+	ApplyFocusOverride(m_FocusDirectionOverrideState, HideFocusDirectionIndicators, g_Config.m_ClShowDirection, 0);
+	ApplyFocusOverride(m_FocusVideoHudOverrideState, HideFocusHud, g_Config.m_ClVideoShowhud, 0);
+	ApplyFocusOverride(m_FocusVideoDirectionOverrideState, HideFocusDirectionIndicators, g_Config.m_ClVideoShowDirection, 0);
+	m_PrevFocusModeActive = FocusActive;
 }
 
 bool CTClient::BuildGoresDebugRoute(std::vector<vec2> &vRoutePoints, int Dummy) const

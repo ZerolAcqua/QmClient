@@ -22,6 +22,7 @@
 #include <game/client/components/flow.h>
 #include <game/client/components/qmclient/afk_presentation.h>
 #include <game/client/components/qmclient/jelly_tee.h>
+#include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_skin_outline.h>
 #include <game/client/components/qmclient/tee_hue_cycle.h>
 #include <game/client/components/skins.h>
@@ -287,6 +288,9 @@ void CPlayers::RenderHookCollLine(
 	const CNetObj_Character *pPlayerChar,
 	int ClientId)
 {
+	if(ShouldHideFocusGuideLines(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideGuideLines != 0))
+		return;
+
 	const bool ManualHookCollVisible = GameClient()->m_Controls.m_aShowHookColl[g_Config.m_ClDummy] != 0;
 	if(GameClient()->m_TClient.ShouldHideGoresGuides(ManualHookCollVisible))
 		return;
@@ -1103,7 +1107,8 @@ void CPlayers::RenderPlayer(
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
 
 				// HADOKEN
-				if(AttackTime <= 1.0f / 6.0f &&
+				if(!ShouldHideFocusMuzzleEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMuzzleEffects != 0) &&
+					AttackTime <= 1.0f / 6.0f &&
 					g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
 				{
 					int IteX = rand() % g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles;
@@ -1170,6 +1175,7 @@ void CPlayers::RenderPlayer(
 			}
 
 			if((Player.m_Weapon == WEAPON_GUN || Player.m_Weapon == WEAPON_SHOTGUN) &&
+				!ShouldHideFocusMuzzleEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMuzzleEffects != 0) &&
 				g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
 			{
 				float AlphaMuzzle = 0.0f;
@@ -1694,7 +1700,8 @@ void CPlayers::RenderPlayerGhost(
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
 
 				// HADOKEN
-				if(AttackTime <= 1.0f / 6.0f &&
+				if(!ShouldHideFocusMuzzleEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMuzzleEffects != 0) &&
+					AttackTime <= 1.0f / 6.0f &&
 					g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
 				{
 					int IteX = rand() % g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles;
@@ -1760,6 +1767,7 @@ void CPlayers::RenderPlayerGhost(
 			}
 
 			if((Player.m_Weapon == WEAPON_GUN || Player.m_Weapon == WEAPON_SHOTGUN) &&
+				!ShouldHideFocusMuzzleEffects(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideMuzzleEffects != 0) &&
 				g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
 			{
 				float AlphaMuzzle = 0.0f;

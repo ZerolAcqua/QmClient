@@ -20,6 +20,7 @@
 #include <game/client/components/player_points.h>
 #include <game/client/components/qmclient/axiom_scores.h>
 #include <game/client/components/qmclient/friend_heart_icon.h>
+#include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/scoreboard_footer.h>
 #include <game/client/components/qmclient/scoreboard_skin.h>
 #include <game/client/components/statboard.h>
@@ -1592,6 +1593,10 @@ void CScoreboard::OnRender()
 		return;
 	UpdateTeamModeCache();
 	UpdateQmAxiomScoreMode();
+
+	// 禅模式：隐藏计分板时不再打开/渲染。
+	if(ShouldHideFocusScoreboard(g_Config.m_QmFocusMode != 0, g_Config.m_QmFocusModeHideScoreboard != 0))
+		return;
 
 	// 当记分板可见时（骗你的,不可见也查），为所有活跃玩家触发查询点
 	if(HasQmAxiomScoreMode())

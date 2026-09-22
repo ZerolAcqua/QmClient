@@ -3770,6 +3770,12 @@ Enable warlist
 Enable word filter list
 == 단어 필터 목록 활성화
 
+Enable Zen Mode
+== 젠 모드 사용
+
+Enable Zen mode
+== 젠 모드 사용
+
 Enable/disable infinite hook.
 == 무한 갈고리 활성화/비활성화
 
@@ -3799,6 +3805,9 @@ Endpoint
 
 Endpoint (optional)
 == 엔드포인트 (선택 사항)
+
+Enhanced rendering
+== 향상된 렌더링
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == /practice 모드를 입력하거나 재시작하세요. 그렇지 않으면 60초 후에 팀 전체가 사망합니다
@@ -4646,6 +4655,9 @@ Has save
 Has unread news
 == 읽지 않은 뉴스 있음
 
+HD icons (MSDF)
+== 고해상도 아이콘 (MSDF)
+
 HDF
 == HDF
 
@@ -4667,8 +4679,38 @@ Helpful for Gores: allow negative internal certainty for more conservative predi
 Hi!
 == 안녕!
 
+Hide basic system info (join, version, rules) in Zen mode
+== 젠 모드에서 기본 시스템 정보(입장·버전·규칙) 숨기기
+
 Hide chat messages from players marked as enemies
 == 적으로 표시한 플레이어의 채팅 메시지 숨기기
+
+Hide death/respawn effects
+== 사망/리스폰 이펙트 숨기기
+
+Hide death/respawn effects in Zen Mode
+== 젠 모드에서 사망/리스폰 이펙트 숨기기
+
+Hide direction in Zen mode
+== 젠 모드에서 방향 표시 숨기기
+
+Hide direction indicators
+== 방향 표시 숨기기
+
+Hide Echo messages
+== Echo 메시지 숨기기
+
+Hide Echo messages in Zen mode
+== 젠 모드에서 Echo 메시지 숨기기
+
+Hide explosion effects
+== 폭발 이펙트 숨기기
+
+Hide freeze effects
+== 프리즈 이펙트 숨기기
+
+Hide freeze effects in Zen Mode
+== 젠 모드에서 동결 이펙트 숨기기
 
 Hide ghosts of frozen players
 == 얼어있는 플레이어의 유령 숨기기
@@ -4676,14 +4718,56 @@ Hide ghosts of frozen players
 Hide guide lines
 == 가이드 라인 숨기기
 
+Hide hammer effects
+== 해머 이펙트 숨기기
+
+Hide hammer effects in Zen Mode
+== 젠 모드에서 망치 이펙트 숨기기
+
 Hide helper lines in Gores mode
 == Gores 모드에서 보조선 숨기기
+
+Hide helper lines in Zen mode
+== 젠 모드에서 보조선 숨기기
+
+Hide HUD
+== HUD 숨기기
+
+Hide HUD in Zen mode
+== 젠 모드에서 HUD 숨기기
 
 Hide indicator for tees on your screen
 == 화면 내 티 표시기 숨기기
 
 Hide input emoticon
 == 입력 이모티콘 숨기기
+
+Hide join/version prompts
+== 입장/버전 알림 숨기기
+
+Hide jump effects
+== 점프 이펙트 숨기기
+
+Hide jump effects in Zen Mode
+== 젠 모드에서 점프 이펙트 숨기기
+
+Hide kill and finish messages in Zen mode
+== 젠 모드에서 킬/완주 메시지 숨기기
+
+Hide kill/finish messages
+== 킬/완주 메시지 숨기기
+
+Hide map progress
+== 지도 진행 숨기기
+
+Hide map progress bar in Zen mode
+== 젠 모드에서 맵 진행 표시줄 숨기기
+
+Hide nameplates
+== 명찰 숨기기
+
+Hide names
+== 이름 숨기기
 
 Hide non-friend names/clans and show client ID
 == 친구가 아닌 플레이어의 이름/클랜 숨기고 클라이언트 ID 표시
@@ -4697,11 +4781,35 @@ Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
 == 플레이어 메시지 숨기기
 
+Hide player messages in Zen mode
+== 젠 모드에서 플레이어 메시지 숨기기
+
+Hide player name plates in Zen Mode
+== 젠 모드에서 네임플레이트 숨기기
+
+Hide player names in Zen Mode
+== 젠 모드에서 플레이어 이름 숨기기
+
+Hide projectile effects in Zen Mode
+== 젠 모드에서 발사체 이펙트 숨기기
+
+Hide scoreboard
+== 스코어보드 숨기기
+
+Hide scoreboard in Zen mode
+== 젠 모드에서 점수판 숨기기
+
 Hide sensitive info like /save password
 == /save 비밀번호 등 민감 정보 숨기기
 
 Hide server information on join
 == 입장 시 서버 정보 숨기기
+
+Hide server prompt notifications
+== 서버 알림 숨기기
+
+Hide server tip notifications (including notification bar) in Zen mode
+== 젠 모드에서 서버 팁 알림(알림 표시줄 포함) 숨기기
 
 Hide Settings Tabs
 == 설정 탭 숨기기
@@ -4720,6 +4828,15 @@ Hide toast
 
 Hide typing emoji during input
 == 입력 중 타이핑 이모티콘 표시 안 함
+
+Hide UI for focused gameplay
+== 집중 플레이를 위해 UI 숨기기
+
+Hide weapon fire effects in Zen Mode
+== 젠 모드에서 무기 발사 이펙트 숨기기
+
+Hide weapon muzzle flashes
+== 무기 총구 섬광 숨기기
 
 High Detail
 == 높은 상세도
@@ -5098,6 +5215,9 @@ Insane
 
 Installing update. Please wait...
 == 업데이트 설치 중입니다. 잠시 기다려 주세요...
+
+Interface
+== 인터페이스
 
 Interface accent color
 == 인터페이스 강조 색상
@@ -6026,6 +6146,9 @@ Menu camera rotation time in seconds
 Menu camera speed
 == 메뉴 카메라 속도
 
+Menu Gaussian blur pipeline
+== 메뉴 가우시안 블러 파이프라인
+
 Menu main panel background color
 == 메뉴 메인 패널 배경색
 
@@ -6233,14 +6356,32 @@ Multi-View
 Mute
 == 음소거
 
+Mute death/respawn sound in Zen Mode
+== 젠 모드에서 사망/리스폰 소리 음소거
+
+Mute death/respawn sounds
+== 사망/리스폰 소리 음소거
+
 Mute emoticons
 == 이모티콘 음소거
 
 Mute flag sounds
 == 깃발 소리 음소거
 
+Mute hammer sound in Zen mode
+== 젠 모드에서 망치 소리 음소거
+
+Mute hammer sounds
+== 해머 소리 음소거
+
 Mute hook sound
 == 갈고리 소리 음소거
+
+Mute jump sound in Zen Mode
+== 젠 모드에서 점프 소리 음소거
+
+Mute jump sounds
+== 점프 소리 음소거
 
 Mute map sounds
 == 맵 소리 음소거
@@ -7736,6 +7877,9 @@ Pulse speed
 Pulse strength
 == 펄스 강도
 
+Pure Vulkan fallback
+== 현재: 순수 Vulkan 폴백
+
 Push radius
 == 밀기 반경
 
@@ -7771,6 +7915,9 @@ Pyramid
 
 q = Connection quality
 == q = 연결 품질
+
+Qm enhanced rendering: 0=Off pure Vulkan, 1=Auto fallback, 2=Force on
+== Qm 향상된 렌더링: 0=꺼짐(순수 Vulkan), 1=자동 폴백, 2=강제 켜짐
 
 Qm UI custom icon color
 == Qm UI 아이콘 사용자 지정 색상
@@ -7813,6 +7960,9 @@ QmUi animation intensity: 0=Off, 1=Reduced, 2=Full
 
 QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
 == QmUi 색상 애니메이션 보간：0=sRGB 선형 1=OKLAB 지각 균일
+
+QmVulkan active
+== 현재: QmVulkan 활성
 
 QQ group: 1076765929 (click to copy)
 == QQ 그룹: 1076765929 (클릭하여 복사)
@@ -10202,6 +10352,9 @@ Smooth Dynamic Camera
 Smooth fade
 == 부드러운 페이드
 
+Smooth island (SDF)
+== Dynamic Island 부드럽게 (SDF)
+
 Smooth other players' predicted movement
 == 다른 플레이어의 예측 이동을 부드럽게 처리
 
@@ -11858,6 +12011,9 @@ Use enemy color instead of frozen color
 Use enemy list to drive player indicators
 == 적 목록을 사용하여 플레이어 표시기 구동
 
+Use Gaussian blur pipeline when enhanced rendering is active
+== 향상된 렌더링 활성 시 가우시안 블러 파이프라인 사용
+
 Use high bandwidth mode (doubles server bandwidth, LAN only)
 == 높은 대역폭 모드 사용 (서버 대역폭 두 배, LAN 전용)
 
@@ -11869,6 +12025,9 @@ Use large emote
 
 Use mouse sensitivity when dynamic camera is on
 == 동적 카메라가 켜져 있을 때 마우스 감도 사용
+
+Use MSDF icon pipeline when enhanced rendering is active
+== 향상된 렌더링 활성 시 MSDF 아이콘 파이프라인 사용
 
 Use multi-char replacement based on word length
 == 단어 길이에 따른 다중 문자 대체 사용
@@ -11902,6 +12061,9 @@ Use original style for Dynamic Island
 
 Use pre-input to predict other players for more accurate input prediction
 == 사전 입력을 사용하여 다른 플레이어를 예측해 더 정확한 입력 예측
+
+Use SDF pipelines for Dynamic Island / rounded rects when enhanced rendering is active
+== 향상된 렌더링 활성 시 Dynamic Island/둥근 사각형에 SDF 파이프라인 사용
 
 Use skin color for frozen Tee's feet
 == 얼어붙은 Tee의 발에도 스킨 색상 사용
@@ -12760,6 +12922,12 @@ Your timeout code has been set. 0.7 clients can not reclaim their tees on timeou
 
 z = Zoom
 == z = 확대/축소
+
+Zen Mode
+== 젠 모드
+
+Zen mode key
+== 젠 모드 단축키
 
 Zhipu AI
 == 지푸 AI

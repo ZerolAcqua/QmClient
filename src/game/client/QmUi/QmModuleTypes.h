@@ -50,6 +50,7 @@ namespace qm_module
 		Emoticons,
 		MapUpload,
 		SkinAppearance,
+		FocusMode,
 	};
 
 	enum class EQmModuleColumn
@@ -67,7 +68,7 @@ namespace qm_module
 		const char *m_pKey;
 	};
 
-	constexpr size_t QmModuleCount = 39;
+	constexpr size_t QmModuleCount = 40;
 } // namespace qm_module
 
 #endif // GAME_CLIENT_QMUI_QMMODULETYPES_H

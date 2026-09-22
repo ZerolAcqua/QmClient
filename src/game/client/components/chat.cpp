@@ -25,6 +25,7 @@
 #include <game/client/components/message_gradient.h>
 #include <game/client/components/qmclient/colored_parts.h>
 #include <game/client/components/qmclient/demo_display.h>
+#include <game/client/components/qmclient/modes.h>
 #include <game/client/components/qmclient/qm_chat_avatar.h>
 #include <game/client/components/qmclient/qm_title_color.h>
 #include <game/client/components/qmclient/qm_title_render.h>
@@ -566,13 +567,22 @@ int CChat::CountInitializedLines() const
 
 int CChat::CountVisibleLinesFrom(int BacklogLine) const
 {
+	// 禅模式：被门控过滤的聊天行不计入可见行数。
+	const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
+	const bool FocusHideChat = FocusModeActive && g_Config.m_QmFocusModeHideChat;
+	const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
+	const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
+	const bool FocusHideEcho = FocusModeActive && g_Config.m_QmFocusModeHideEcho;
+
 	int Count = 0;
 	for(int i = BacklogLine; i < MAX_LINES; ++i)
 	{
 		const CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
 		if(!Line.m_Initialized)
 			break;
-		++Count;
+		const bool ServerMessageIsBasicInfo = Line.m_ServerMessageClass == QmHudNotifications::EServerMessageClass::BasicInfo;
+		if(ShouldRenderFocusFilteredChatLine(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, Line.m_ClientId, Line.m_ForceVisible, ServerMessageIsBasicInfo))
+			++Count;
 	}
 	return Count;
 }
@@ -808,8 +818,10 @@ void CChat::Echo(const char *pString)
 	// 合并判定放在最外层：被抑制的重复 echo 连 Console()->Print 都不会走到。
 	if(GateEchoRepeat(pString))
 		return;
+	// 禅模式隐藏 Echo 时跳过 QueueEcho 通知路径；行本身仍进聊天，由渲染门控过滤。
+	const bool FocusHideEcho = g_Config.m_QmFocusMode != 0 && g_Config.m_QmFocusModeHideEcho;
 	const unsigned EchoColor = g_Config.m_ClMessageClientColor;
-	if(GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
+	if(!FocusHideEcho && GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
 	{
 		char aBuf[1024];
 		str_format(aBuf, sizeof(aBuf), "— %s", pString);
@@ -823,8 +835,10 @@ void CChat::Echo(const char *pString, bool ForceVisible)
 {
 	if(GateEchoRepeat(pString))
 		return;
+	// ForceVisible 的 Echo 不被禅模式静音通知路径。
+	const bool FocusHideEcho = g_Config.m_QmFocusMode != 0 && g_Config.m_QmFocusModeHideEcho && !ForceVisible;
 	const unsigned EchoColor = g_Config.m_ClMessageClientColor;
-	if(GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
+	if(!FocusHideEcho && GameClient()->m_QmHudNotifications.QueueEcho(pString, EchoColor))
 	{
 		char aBuf[1024];
 		str_format(aBuf, sizeof(aBuf), "— %s", pString);
@@ -1342,9 +1356,17 @@ void CChat::OnMessage(int MsgType, void *pRawMsg, int SourceConnection)
 				str_copy(aBuf, pMsg->m_pMessage);
 				Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat/server", aBuf, color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageSystemColor)));
 			};
+			// 禅模式：当前 HandleServerChat / ShouldSuppressServerMessageChat 已不接收 focus 参数，
+			// 在本地按消息类别补一层 early return，行为对齐旧版 HideBasicInfo / HidePrompt。
+			const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
+			const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
+			const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
 			QmHudNotifications::SServerMessageAnalysis ServerMessageAnalysis;
 			const bool ServerMessageHandled = GameClient()->m_QmHudNotifications.HandleServerChat(pMsg->m_pMessage, g_Config.m_QmHudNotificationsSystem != 0, &ServerMessageAnalysis);
-			if(ServerMessageHandled && QmHudNotifications::ShouldSuppressServerMessageChat(ServerMessageAnalysis))
+			const bool FocusSuppressClass =
+				(ServerMessageAnalysis.m_Class == QmHudNotifications::EServerMessageClass::BasicInfo && FocusHideSystemInfoMessages) ||
+				(ServerMessageAnalysis.m_Class == QmHudNotifications::EServerMessageClass::Prompt && FocusHideSystemPromptMessages);
+			if((ServerMessageHandled && QmHudNotifications::ShouldSuppressServerMessageChat(ServerMessageAnalysis)) || FocusSuppressClass)
 			{
 				PrintSuppressedServerMessage();
 				return;
@@ -2147,6 +2169,12 @@ void CChat::OnPrepareLines(float y)
 {
 	float x = 5.0f;
 	float FontSize = this->FontSize();
+	// 禅模式：按玩家/系统/echo 类别跳过聊天行布局与文本容器构建。
+	const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
+	const bool FocusHideChat = FocusModeActive && g_Config.m_QmFocusModeHideChat;
+	const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
+	const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
+	const bool FocusHideEcho = FocusModeActive && g_Config.m_QmFocusModeHideEcho;
 
 	const bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive();
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;
@@ -2191,6 +2219,11 @@ void CChat::OnPrepareLines(float y)
 		CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
 		if(!Line.m_Initialized)
 			break;
+		const bool ServerMessageIsBasicInfo = Line.m_ServerMessageClass == QmHudNotifications::EServerMessageClass::BasicInfo;
+		if(!ShouldRenderFocusFilteredChatLine(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, Line.m_ClientId, Line.m_ForceVisible, ServerMessageIsBasicInfo))
+		{
+			continue;
+		}
 		if(!ShowLargeArea && !Line.m_ForceVisible && Line.m_Presentation.m_State == EPresentationState::COLLAPSED)
 		{
 			continue;
@@ -2694,6 +2727,16 @@ void CChat::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
+	// 禅模式：整块聊天区域在所有类别都被隐藏且没有 ForceVisible 行时直接不渲染。
+	const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
+	const bool FocusHideChat = FocusModeActive && g_Config.m_QmFocusModeHideChat;
+	const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
+	const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
+	const bool FocusHideEcho = FocusModeActive && g_Config.m_QmFocusModeHideEcho;
+	const bool HasForceVisibleLine = std::any_of(std::begin(m_aLines), std::end(m_aLines), [](const CLine &Line) { return Line.m_Initialized && Line.m_ForceVisible; });
+	if(!ShouldRenderAnyFocusFilteredChat(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, HasForceVisibleLine))
+		return;
+
 	const bool HudEditorPreview = GameClient()->m_HudEditor.IsActive();
 	const bool InputActive = m_Mode != MODE_NONE;
 	const bool ShowLargeArea =
@@ -3039,6 +3082,11 @@ void CChat::OnRender()
 		CLine &Line = m_aLines[LineIndex];
 		if(!Line.m_Initialized)
 			break;
+		const bool ServerMessageIsBasicInfo = Line.m_ServerMessageClass == QmHudNotifications::EServerMessageClass::BasicInfo;
+		if(!ShouldRenderFocusFilteredChatLine(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, Line.m_ClientId, Line.m_ForceVisible, ServerMessageIsBasicInfo))
+		{
+			continue;
+		}
 		if(!ShowLargeArea && !Line.m_ForceVisible && Line.m_Presentation.m_State == EPresentationState::COLLAPSED)
 		{
 			continue;
@@ -3489,6 +3537,12 @@ void CChat::RenderTranslateButton(const CUIRect &ButtonRect)
 
 bool CChat::TranslateVisibleChatLines()
 {
+	// 禅模式：与渲染一致，被过滤的聊天行不进入翻译。
+	const bool FocusModeActive = g_Config.m_QmFocusMode != 0;
+	const bool FocusHideChat = FocusModeActive && g_Config.m_QmFocusModeHideChat;
+	const bool FocusHideSystemInfoMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemInfoMessages;
+	const bool FocusHideSystemPromptMessages = FocusModeActive && g_Config.m_QmFocusModeHideSystemMessages;
+	const bool FocusHideEcho = FocusModeActive && g_Config.m_QmFocusModeHideEcho;
 	const bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive();
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;
 	const int OffsetType = IsScoreBoardOpen ? 1 : 0;
@@ -3501,6 +3555,9 @@ bool CChat::TranslateVisibleChatLines()
 		CLine &Line = m_aLines[LineIndex];
 		if(!Line.m_Initialized)
 			break;
+		const bool ServerMessageIsBasicInfo = Line.m_ServerMessageClass == QmHudNotifications::EServerMessageClass::BasicInfo;
+		if(!ShouldRenderFocusFilteredChatLine(FocusHideChat, FocusHideSystemInfoMessages, FocusHideSystemPromptMessages, FocusHideEcho, Line.m_ClientId, Line.m_ForceVisible, ServerMessageIsBasicInfo))
+			continue;
 		if(!ShowLargeArea && !Line.m_ForceVisible && Line.m_Presentation.m_State == EPresentationState::COLLAPSED)
 			continue;
 		if(!ShowLargeArea && Line.m_Presentation.m_LayoutVisibility <= 0.001f && Line.m_Presentation.m_RenderAlpha <= 0.001f)

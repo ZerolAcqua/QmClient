@@ -3770,6 +3770,12 @@ Enable warlist
 Enable word filter list
 == Kelime filtresi listesini etkinleştir
 
+Enable Zen Mode
+== Zen Modunu etkinleştir
+
+Enable Zen mode
+== Zen Modunu etkinleştir
+
 Enable/disable infinite hook.
 == Sınırsız kancayı etkinleştir/kapat
 
@@ -3799,6 +3805,9 @@ Endpoint
 
 Endpoint (optional)
 == Uç nokta (isteğe bağlı)
+
+Enhanced rendering
+== Gelişmiş işleme
 
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 == /practice yazın veya yeniden başlatın, aksi takdirde tüm takım 60 saniye içinde öldürülecek
@@ -4646,6 +4655,9 @@ Has save
 Has unread news
 == Okunmamış haber var
 
+HD icons (MSDF)
+== HD simgeler (MSDF)
+
 HDF
 == HDF
 
@@ -4667,8 +4679,38 @@ Helpful for Gores: allow negative internal certainty for more conservative predi
 Hi!
 == Merhaba!
 
+Hide basic system info (join, version, rules) in Zen mode
+== Zen Modunda temel sistem bilgisini gizle
+
 Hide chat messages from players marked as enemies
 == Düşman olarak işaretlenen oyuncuların sohbet mesajlarını gizle
+
+Hide death/respawn effects
+== Ölüm/yeniden doğuş efektlerini gizle
+
+Hide death/respawn effects in Zen Mode
+== Zen Modunda ölüm/yeniden doğuş efektlerini gizle
+
+Hide direction in Zen mode
+== Zen Modunda yön göstergesini gizle
+
+Hide direction indicators
+== Yön göstergelerini gizle
+
+Hide Echo messages
+== Echo mesajlarını gizle
+
+Hide Echo messages in Zen mode
+== Zen Modunda Echo mesajlarını gizle
+
+Hide explosion effects
+== Patlama efektlerini gizle
+
+Hide freeze effects
+== Dondurma efektlerini gizle
+
+Hide freeze effects in Zen Mode
+== Zen Modunda donma efektlerini gizle
 
 Hide ghosts of frozen players
 == Donmuş oyuncuların hayaletlerini gizle
@@ -4676,14 +4718,56 @@ Hide ghosts of frozen players
 Hide guide lines
 == Kılavuz çizgilerini gizle
 
+Hide hammer effects
+== Çekiç efektlerini gizle
+
+Hide hammer effects in Zen Mode
+== Zen Modunda çekiç efektlerini gizle
+
 Hide helper lines in Gores mode
 == Gores modunda yardımcı çizgileri gizle
+
+Hide helper lines in Zen mode
+== Zen Modunda yardım çizgilerini gizle
+
+Hide HUD
+== HUD'u gizle
+
+Hide HUD in Zen mode
+== Zen Modunda HUD'u gizle
 
 Hide indicator for tees on your screen
 == Ekranındaki teeler için göstergeyi gizle
 
 Hide input emoticon
 == Giriş ifadesini gizle
+
+Hide join/version prompts
+== Katılım/sürüm bildirimlerini gizle
+
+Hide jump effects
+== Zıplama efektlerini gizle
+
+Hide jump effects in Zen Mode
+== Zen Modunda zıplama efektlerini gizle
+
+Hide kill and finish messages in Zen mode
+== Zen Modunda bitiş/öldürme mesajlarını gizle
+
+Hide kill/finish messages
+== Ölüm/bitiriş mesajlarını gizle
+
+Hide map progress
+== Harita ilerlemesini gizle
+
+Hide map progress bar in Zen mode
+== Zen Modunda harita ilerleme çubuğunu gizle
+
+Hide nameplates
+== İsim plakalarını gizle
+
+Hide names
+== İsimleri gizle
 
 Hide non-friend names/clans and show client ID
 == Arkadaş olmayanların adını/klanını gizle ve istemci ID'sini göster
@@ -4697,11 +4781,35 @@ Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
 == Oyuncu mesajlarını gizle
 
+Hide player messages in Zen mode
+== Zen Modunda oyuncu mesajlarını gizle
+
+Hide player name plates in Zen Mode
+== Zen Modunda isim plakalarını gizle
+
+Hide player names in Zen Mode
+== Zen Modunda oyuncu adlarını gizle
+
+Hide projectile effects in Zen Mode
+== Zen Modunda mermi efektlerini gizle
+
+Hide scoreboard
+== Skor tablosunu gizle
+
+Hide scoreboard in Zen mode
+== Zen Modunda skor tablosunu gizle
+
 Hide sensitive info like /save password
 == /save şifresi gibi hassas bilgileri gizle
 
 Hide server information on join
 == Girerken sunucu bilgisini gizle
+
+Hide server prompt notifications
+== Sunucu bildirimlerini gizle
+
+Hide server tip notifications (including notification bar) in Zen mode
+== Zen Modunda sunucu ipucu bildirimlerini gizle
 
 Hide Settings Tabs
 == Ayarlar Sekmelerini Gizle
@@ -4720,6 +4828,15 @@ Hide toast
 
 Hide typing emoji during input
 == Yazarken Yazma İfadesini Gösterme
+
+Hide UI for focused gameplay
+== Odaklı oyun için arayüzü gizle
+
+Hide weapon fire effects in Zen Mode
+== Zen Modunda silah ateşleme efektlerini gizle
+
+Hide weapon muzzle flashes
+== Silah namlu parlamalarını gizle
 
 High Detail
 == Yüksek Detay
@@ -5098,6 +5215,9 @@ Insane
 
 Installing update. Please wait...
 == Güncelleme yükleniyor. Lütfen bekleyin...
+
+Interface
+== Arayüz
 
 Interface accent color
 == Arayüz vurgu rengi
@@ -6026,6 +6146,9 @@ Menu camera rotation time in seconds
 Menu camera speed
 == Menü kamera hızı
 
+Menu Gaussian blur pipeline
+== Menü gauss bulanıklık hattı
+
 Menu main panel background color
 == Menü ana panel arka plan rengi
 
@@ -6233,14 +6356,32 @@ Multi-View
 Mute
 == Sessize al
 
+Mute death/respawn sound in Zen Mode
+== Zen Modunda ölüm/yeniden doğuş sesini kapat
+
+Mute death/respawn sounds
+== Ölüm/yeniden doğuş seslerini sustur
+
 Mute emoticons
 == İfadeleri sessize al
 
 Mute flag sounds
 == Bayrak seslerini sustur
 
+Mute hammer sound in Zen mode
+== Zen Modunda çekiç sesini kapat
+
+Mute hammer sounds
+== Çekiç seslerini sustur
+
 Mute hook sound
 == Kanca sesini sustur
+
+Mute jump sound in Zen Mode
+== Zen Modunda zıplama sesini kapat
+
+Mute jump sounds
+== Zıplama seslerini sustur
 
 Mute map sounds
 == Harita seslerini sustur
@@ -7736,6 +7877,9 @@ Pulse speed
 Pulse strength
 == Atım gücü
 
+Pure Vulkan fallback
+== Şu an: sade Vulkan
+
 Push radius
 == İtme yarıçapı
 
@@ -7771,6 +7915,9 @@ Pyramid
 
 q = Connection quality
 == q = Bağlantı kalitesi
+
+Qm enhanced rendering: 0=Off pure Vulkan, 1=Auto fallback, 2=Force on
+== Qm işleme: 0=Kapalı (sade Vulkan), 1=Otomatik, 2=Zorla
 
 Qm UI custom icon color
 == Qm arayüzü simgesi özel rengi
@@ -7813,6 +7960,9 @@ QmUi animation intensity: 0=Off, 1=Reduced, 2=Full
 
 QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
 == QmUi Renk animasyonu interpolasyonu: 0=sRGB doğrusal 1=OKLAB algısal düzgün
+
+QmVulkan active
+== Şu an: QmVulkan etkin
 
 QQ group: 1076765929 (click to copy)
 == QQ grubu: 1076765929 (kopyalamak için tıklayın)
@@ -10202,6 +10352,9 @@ Smooth Dynamic Camera
 Smooth fade
 == Yumuşak geçiş
 
+Smooth island (SDF)
+== Dynamic Island pürüzsüz (SDF)
+
 Smooth other players' predicted movement
 == Diğer oyuncuların tahmini hareketini yumuşat
 
@@ -11858,6 +12011,9 @@ Use enemy color instead of frozen color
 Use enemy list to drive player indicators
 == Oyuncu göstergelerini yönlendirmek için düşman listesini kullan
 
+Use Gaussian blur pipeline when enhanced rendering is active
+== Gelişmiş işlemde gauss bulanıklık hattı kullan
+
 Use high bandwidth mode (doubles server bandwidth, LAN only)
 == Yüksek bant genişliği modunu kullan (sunucu bant genişliğini iki katına çıkarır, yalnızca LAN)
 
@@ -11869,6 +12025,9 @@ Use large emote
 
 Use mouse sensitivity when dynamic camera is on
 == Dinamik kamera açıkken fare hassasiyetini kullan
+
+Use MSDF icon pipeline when enhanced rendering is active
+== Gelişmiş işlemde MSDF simge hattı kullan
 
 Use multi-char replacement based on word length
 == Kelime uzunluğuna göre çok karakterli değiştirme kullan
@@ -11902,6 +12061,9 @@ Use original style for Dynamic Island
 
 Use pre-input to predict other players for more accurate input prediction
 == Daha doğru girdi tahmini için diğer oyuncuları tahmin etmek üzere ön girdi kullan
+
+Use SDF pipelines for Dynamic Island / rounded rects when enhanced rendering is active
+== Dynamic Island ve yuvarlatılmış dikdörtgenler için SDF hattı kullan
 
 Use skin color for frozen Tee's feet
 == Donmuş Tee'nin ayakları için skin rengi kullan
@@ -12760,6 +12922,12 @@ Your timeout code has been set. 0.7 clients can not reclaim their tees on timeou
 
 z = Zoom
 == z = Yakınlaştırma
+
+Zen Mode
+== Zen Modu
+
+Zen mode key
+== Zen modu tuşu
 
 Zhipu AI
 == Zhipu AI

@@ -9,6 +9,68 @@ struct SQmConfigOverrideState
 	bool m_AutoChangedValue = false;
 };
 
+// 禅模式（Focus / Zen Mode）决策输入与输出：主开关 + 各子开关推导出的渲染/静音结果。
+struct SQmAirJumpEffectDecision
+{
+	bool m_SpawnParticles = false;
+	bool m_PlaySound = false;
+};
+
+struct SQmFocusModeConfig
+{
+	bool m_FocusActive = false;
+	bool m_HideJumpEffects = false;
+	bool m_HideKillEffects = false;
+	bool m_HideExplosionEffects = false;
+	bool m_HideFreezeEffects = false;
+	bool m_HideHammerEffects = false;
+	bool m_HideMuzzleEffects = false;
+	bool m_MuteJumpSounds = false;
+	bool m_MuteDeathSounds = false;
+	bool m_MuteHammerSounds = false;
+	bool m_SoundEnabled = true;
+	bool m_HideMapProgress = false;
+	bool m_MapProgressEnabled = false;
+	int m_MapProgressStyle = 0;
+	bool m_PlayerStatsHudEnabled = false;
+	bool m_GoresMapProgressEnabled = false;
+	bool m_HideHud = false;
+	bool m_HideScoreboard = false;
+	bool m_HideNames = false;
+	bool m_HideNameplates = false;
+	bool m_HideInfoMessages = false;
+	bool m_HideDirectionIndicators = false;
+	bool m_HideGuideLines = false;
+	bool m_HidePlayerMessages = false;
+	bool m_HideSystemInfoMessages = false;
+	bool m_HideSystemPromptMessages = false;
+	bool m_HideEchoMessages = false;
+};
+
+struct SQmFocusModeDecisions
+{
+	SQmAirJumpEffectDecision m_AirJump;
+	bool m_HideKillEffects = false;
+	bool m_HideExplosionEffects = false;
+	bool m_HideFreezeEffects = false;
+	bool m_HideHammerEffects = false;
+	bool m_HideMuzzleEffects = false;
+	bool m_MuteDeathSounds = false;
+	bool m_MuteHammerSounds = false;
+	bool m_RenderMapProgressBar = false;
+	bool m_HideHud = false;
+	bool m_HideScoreboard = false;
+	bool m_HideNames = false;
+	bool m_HideNameplates = false;
+	bool m_HideInfoMessages = false;
+	bool m_HideDirectionIndicators = false;
+	bool m_HideGuideLines = false;
+	bool m_HidePlayerMessages = false;
+	bool m_HideSystemInfoMessages = false;
+	bool m_HideSystemPromptMessages = false;
+	bool m_HideEchoMessages = false;
+};
+
 enum EQmHookStrongWeakScope
 {
 	QM_HOOK_STRONG_WEAK_SCOPE_SELF = 0,
@@ -88,5 +150,31 @@ int ResolveLocalSkinConfigIndex(bool DemoPlayback, int ClientId, int MainClientI
 bool ConsumeQmBudgetedWork(int &Cursor, int Total, int Budget);
 
 bool ShouldRenderMapProgressBar(bool MapProgressEnabled, int MapProgressStyle, bool PlayerStatsHudEnabled, bool GoresMapProgressEnabled);
+
+// 禅模式：渲染/静音门控纯函数（主开关开启且对应子开关开启时才隐藏/静音）。
+bool ShouldHideFocusHud(bool FocusActive, bool HideHud);
+bool ShouldRenderFocusSpectatorHud(bool SpectatorActive, bool SpectatorHudEnabled, bool MainHudVisible, bool FocusActive, bool HideHud);
+bool ShouldHideFocusScoreboard(bool FocusActive, bool HideScoreboard);
+bool ShouldHideFocusNames(bool FocusActive, bool HideNames);
+bool ShouldHideFocusNameplates(bool FocusActive, bool HideNameplates);
+bool ShouldHideFocusJumpEffects(bool FocusActive, bool HideJumpEffects);
+bool ShouldHideFocusKillEffects(bool FocusActive, bool HideKillEffects);
+bool ShouldHideFocusExplosionEffects(bool FocusActive, bool HideExplosionEffects);
+bool ShouldHideFocusFreezeEffects(bool FocusActive, bool HideFreezeEffects);
+bool ShouldHideFocusHammerEffects(bool FocusActive, bool HideHammerEffects);
+bool ShouldHideFocusMuzzleEffects(bool FocusActive, bool HideMuzzleEffects);
+bool ShouldMuteFocusJumpSounds(bool FocusActive, bool MuteJumpSounds);
+bool ShouldMuteFocusDeathSounds(bool FocusActive, bool MuteDeathSounds);
+bool ShouldMuteFocusHammerSounds(bool FocusActive, bool MuteHammerSounds);
+bool ShouldPlayFocusJumpSound(bool FocusActive, bool MuteJumpSounds, bool SoundEnabled);
+bool ShouldPlayFocusDeathOrSpawnSound(bool FocusActive, bool MuteDeathSounds, bool SoundEnabled);
+SQmAirJumpEffectDecision GetQmAirJumpEffectDecision(bool FocusActive, bool HideJumpEffects, bool MuteJumpSounds, bool SoundEnabled);
+bool ShouldHideFocusMapProgress(bool FocusActive, bool HideMapProgress);
+bool ShouldHideFocusInfoMessages(bool FocusActive, bool HideInfoMessages);
+bool ShouldHideFocusDirectionIndicators(bool FocusActive, bool HideDirectionIndicators);
+bool ShouldHideFocusGuideLines(bool FocusActive, bool HideGuideLines);
+bool ShouldRenderFocusFilteredChatLine(bool FocusHidePlayerMessages, bool FocusHideSystemInfoMessages, bool FocusHideSystemPromptMessages, bool FocusHideEcho, int ClientId, bool ForceVisible, bool ServerMessageIsBasicInfo);
+bool ShouldRenderAnyFocusFilteredChat(bool FocusHidePlayerMessages, bool FocusHideSystemInfoMessages, bool FocusHideSystemPromptMessages, bool FocusHideEcho, bool HasForceVisibleLine);
+SQmFocusModeDecisions GetQmFocusModeDecisions(const SQmFocusModeConfig &Config);
 
 #endif

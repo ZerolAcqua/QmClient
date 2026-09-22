@@ -14,6 +14,7 @@ namespace qm_card_catalog
 		// 页面从这里取"该有哪些卡"，卡片实现则分派到对应的卡片模块文件。
 		const std::vector<const char *> s_vVisualCards = {
 			"qm:chat_bubble",
+			"qm:focus_mode",
 			"qm:camera_view",
 			"qm:skin_appearance",
 			"qm:skin_transition",

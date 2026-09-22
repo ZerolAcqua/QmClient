@@ -1255,6 +1255,8 @@ Enable voice chat
 Enable voice filtering (highpass/compressor/limiter)
 Enable warlist
 Enable word filter list
+Enable Zen Mode
+Enable Zen mode
 Enable/disable infinite hook.
 Enable/disable quad alignment. When enabled, red lines show how moving quads/points align and snap to others
 Enable/disable replays
@@ -1265,6 +1267,7 @@ Endless hook has been activated
 Endless hook has been deactivated
 Endpoint
 Endpoint (optional)
+Enhanced rendering
 Enter /practice mode or restart to avoid the entire team being killed in 60 seconds
 Enter a CP number from 1 to 255.
 Enter Password
@@ -1547,6 +1550,7 @@ Hammer: %s
 Has people playing
 Has save
 Has unread news
+HD icons (MSDF)
 HDF
 Heart
 Height
@@ -1554,24 +1558,59 @@ Hello from ui_widget::Modal
 Help: %s
 Helpful for Gores: allow negative internal certainty for more conservative prediction
 Hi!
+Hide basic system info (join, version, rules) in Zen mode
 Hide chat messages from players marked as enemies
+Hide death/respawn effects
+Hide death/respawn effects in Zen Mode
+Hide direction in Zen mode
+Hide direction indicators
+Hide Echo messages
+Hide Echo messages in Zen mode
+Hide explosion effects
+Hide freeze effects
+Hide freeze effects in Zen Mode
 Hide ghosts of frozen players
 Hide guide lines
+Hide hammer effects
+Hide hammer effects in Zen Mode
 Hide helper lines in Gores mode
+Hide helper lines in Zen mode
+Hide HUD
+Hide HUD in Zen mode
 Hide indicator for tees on your screen
 Hide input emoticon
+Hide join/version prompts
+Hide jump effects
+Hide jump effects in Zen Mode
+Hide kill and finish messages in Zen mode
+Hide kill/finish messages
+Hide map progress
+Hide map progress bar in Zen mode
+Hide nameplates
+Hide names
 Hide non-friend names/clans and show client ID
 Hide other players' ghosts when frozen
 Hide own chat bubble (only when authenticated in remote console)
 Hide player messages
+Hide player messages in Zen mode
+Hide player name plates in Zen Mode
+Hide player names in Zen Mode
+Hide projectile effects in Zen Mode
+Hide scoreboard
+Hide scoreboard in Zen mode
 Hide sensitive info like /save password
 Hide server information on join
+Hide server prompt notifications
+Hide server tip notifications (including notification bar) in Zen mode
 Hide Settings Tabs
 Hide sponsor QR code
 Hide system message prefix
 Hide the *** prefix before server chat messages
 Hide toast
 Hide typing emoji during input
+Hide UI for focused gameplay
+Hide weapon fire effects in Zen Mode
+Hide weapon muzzle flashes
 High Detail
 High process priority
 High to low
@@ -1698,6 +1737,7 @@ Input overlay Y position (percent)
 Input switch
 Insane
 Installing update. Please wait...
+Interface
 Interface accent color
 Interface animations
 Interface page
@@ -2007,6 +2047,7 @@ Menu background
 Menu camera rotation radius
 Menu camera rotation time in seconds
 Menu camera speed
+Menu Gaussian blur pipeline
 Menu main panel background color
 Menu main panel opacity
 Menu opacity (0-100)
@@ -2076,9 +2117,15 @@ Moves to the point with x/y-coordinates ii
 Moves to the tile with x/y-number ii
 Multi-View
 Mute
+Mute death/respawn sound in Zen Mode
+Mute death/respawn sounds
 Mute emoticons
 Mute flag sounds
+Mute hammer sound in Zen mode
+Mute hammer sounds
 Mute hook sound
+Mute jump sound in Zen Mode
+Mute jump sounds
 Mute map sounds
 Mute microphone
 Mute movement sound
@@ -2577,6 +2624,7 @@ Pulse Amplitude (0-100)
 Pulse animation speed (percentage, 100=normal)
 Pulse speed
 Pulse strength
+Pure Vulkan fallback
 Push radius
 Push strength
 Push-to-talk for voice chat
@@ -2589,6 +2637,7 @@ Puts you out of live freeze
 Puts you out of solo part
 Pyramid
 q = Connection quality
+Qm enhanced rendering: 0=Off pure Vulkan, 1=Auto fallback, 2=Force on
 Qm UI custom icon color
 Qm UI icon color: 1=White, 2=Black, 3=Custom, 4=Rainbow
 Qm UI icon weight: 0=Regular, 1=Bold, 2=Thin, 3=Fill
@@ -2603,6 +2652,7 @@ QmClient sidebar module collapse state
 QmClient sidebar module order
 QmUi animation intensity: 0=Off, 1=Reduced, 2=Full
 QmUi color animation interpolation: 0=sRGB linear, 1=OKLAB perceptually uniform
+QmVulkan active
 QQ group: 1076765929 (click to copy)
 QQ Music hook heartbeat timeout (milliseconds)
 QQ Music hook helper path (empty=beside QmClient)
@@ -3399,6 +3449,7 @@ Smart
 Smooth camera switch animation time when spectating (in ms, 0=off)
 Smooth Dynamic Camera
 Smooth fade
+Smooth island (SDF)
 Smooth other players' predicted movement
 Smooth prediction margin (weakens ping jitter correction, restores old behavior)
 Smooth scroll animation duration in menu/editor (ms, 0=off)
@@ -3951,10 +4002,12 @@ Use embedded HUD progress bar
 Use emote
 Use enemy color instead of frozen color
 Use enemy list to drive player indicators
+Use Gaussian blur pipeline when enhanced rendering is active
 Use high bandwidth mode (doubles server bandwidth, LAN only)
 Use k key to kill (restart), q to pause and watch other players. See settings for other key binds.
 Use large emote
 Use mouse sensitivity when dynamic camera is on
+Use MSDF icon pipeline when enhanced rendering is active
 Use multi-char replacement based on word length
 Use native UI for IME (may break IME in fullscreen mode, requires restart)
 Use new smoothing algorithm
@@ -3966,6 +4019,7 @@ Use old rainbow team colors (restores old behavior)
 Use original style
 Use original style for Dynamic Island
 Use pre-input to predict other players for more accurate input prediction
+Use SDF pipelines for Dynamic Island / rounded rects when enhanced rendering is active
 Use skin color for frozen Tee's feet
 Use skin color when Tee is frozen
 Use sounds
@@ -4252,6 +4306,8 @@ Your team was killed because it couldn't finish anymore and hasn't entered /prac
 Your team was unlocked by an unlock team tile
 Your timeout code has been set. 0.7 clients can not reclaim their tees on timeout; however, a 0.6 client can claim your tee
 z = Zoom
+Zen Mode
+Zen mode key
 Zhipu AI
 Zhipu API key
 ZhipuAI API Key

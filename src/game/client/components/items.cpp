@@ -600,33 +600,30 @@ void CItems::OnRender()
 	bool UsePredicted = !RenderingMini && GameClient()->Predict() && GameClient()->AntiPingGunfire();
 	auto &aSwitchers = GameClient()->Switchers();
 
-	// QmClient: 屏幕外实体裁剪（对齐上游 14fc1e9d1e；本地没有 CScreenRect，用 GetScreen 四边界实现）。
-	// 边距与上游一致：投射物 ±1 tile、激光 ±0.5 tile、拾取物 x ±1.75 tile / y ±0.75 tile，
-	// 保证跨屏幕边缘的半可见实体不被误裁。
-	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+	// QmClient: 屏幕外实体裁剪（对齐上游 14fc1e9d1e）。用上游 CScreenRect 形态书写，便于后续补丁直接合并。
+	// 边距与上游一致：投射物 ±1 tile、激光 ±0.5 tile、拾取物 x ±1.75 tile / y ±0.75 tile。
+	CScreenRect ScreenRectLaser = Graphics()->GetScreen();
+	CScreenRect ScreenRectProjectile = ScreenRectLaser;
+	CScreenRect ScreenRectPickup = ScreenRectLaser;
+
 	constexpr float TileSize = 64.0f;
-	const float ProjectileMargin = TileSize;
-	const float LaserMargin = TileSize / 2.0f;
-	const float PickupMarginX = 1.75f * TileSize;
-	const float PickupMarginY = 0.75f * TileSize;
+	ScreenRectProjectile.Expand(TileSize);
+	ScreenRectLaser.Expand(TileSize / 2.0f);
+	ScreenRectPickup.Expand(1.75f * TileSize, 0.75f * TileSize);
+
 	auto IsProjectileInside = [&](const CProjectileData &Data) -> bool {
-		return Data.m_StartPos.x >= ScreenX0 - ProjectileMargin && Data.m_StartPos.x <= ScreenX1 + ProjectileMargin &&
-		       Data.m_StartPos.y >= ScreenY0 - ProjectileMargin && Data.m_StartPos.y <= ScreenY1 + ProjectileMargin;
+		return ScreenRectProjectile.Inside(Data.m_StartPos);
 	};
 	auto IsPickupInside = [&](const CPickupData &Data) -> bool {
-		return Data.m_Pos.x >= ScreenX0 - PickupMarginX && Data.m_Pos.x <= ScreenX1 + PickupMarginX &&
-		       Data.m_Pos.y >= ScreenY0 - PickupMarginY && Data.m_Pos.y <= ScreenY1 + PickupMarginY;
+		return ScreenRectPickup.Inside(Data.m_Pos);
 	};
-	auto IsLaserInside = [&](const CLaserData &Data) -> bool {
-		const vec2 &From = Data.m_From;
-		const vec2 &To = Data.m_To;
-		const float X0 = ScreenX0 - LaserMargin;
-		const float X1 = ScreenX1 + LaserMargin;
-		const float Y0 = ScreenY0 - LaserMargin;
-		const float Y1 = ScreenY1 + LaserMargin;
-		return !((From.x < X0 && To.x < X0) || (From.x > X1 && To.x > X1) ||
-			 (From.y < Y0 && To.y < Y0) || (From.y > Y1 && To.y > Y1));
+	auto IsLaserInside = [&](const CLaserData &LaserData) -> bool {
+		const vec2 &From = LaserData.m_From;
+		const vec2 &To = LaserData.m_To;
+		return !((From.x < ScreenRectLaser.m_TopLeft.x && To.x < ScreenRectLaser.m_TopLeft.x) ||
+			 (From.x > ScreenRectLaser.m_BottomRight.x && To.x > ScreenRectLaser.m_BottomRight.x) ||
+			 (From.y < ScreenRectLaser.m_TopLeft.y && To.y < ScreenRectLaser.m_TopLeft.y) ||
+			 (From.y > ScreenRectLaser.m_BottomRight.y && To.y > ScreenRectLaser.m_BottomRight.y));
 	};
 	if(UsePredicted)
 	{

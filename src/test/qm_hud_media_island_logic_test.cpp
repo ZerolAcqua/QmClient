@@ -67,6 +67,19 @@ namespace
 			Runtime.Advance(Dt);
 	}
 
+	// 入场两阶段的「展开等掉落落定」门控在 Resolve 内部按本帧掉落值评估，
+	// 所以推进时必须逐帧 Resolve；只批量 Advance 的话展开弹簧根本不会被请求。
+	void AdvanceIslandRuntimeResolving(CUiV2AnimationRuntime &Runtime, uint64_t DropNode, uint64_t ExpandNode, float Seconds)
+	{
+		const float Dt = 1.0f / 60.0f;
+		const int Steps = static_cast<int>(Seconds / Dt + 0.5f);
+		for(int i = 0; i < Steps; ++i)
+		{
+			QmHudMediaIslandResolveEntranceSprings(Runtime, DropNode, ExpandNode, true);
+			Runtime.Advance(Dt);
+		}
+	}
+
 	// 以固定帧步推进分离弹簧；FrameSeconds 可用来验证帧率无关性。
 	// 步数向上取整，保证请求的时长一定被走完（否则会差一帧、落在窗口之前）；
 	// Seconds == 0 时只切换目标，不推进时间。
@@ -166,8 +179,9 @@ TEST(QmHudMediaIslandSource, RecordingDotUsesTheIslandSdfWithGeometryFallback)
 	EXPECT_NE(IslandBody.find("DrawHudRecordingStatusDot("), std::string::npos);
 	EXPECT_EQ(GameTimerBody.find("DrawSmoothCircle("), std::string::npos);
 	EXPECT_EQ(IslandBody.find("DrawSmoothCircle(Graphics(), DotCenter"), std::string::npos);
-	// 几何圆只作为入口内兜底出现一次，两条调用路径不再各自直接画圆。
-	EXPECT_EQ(Source.find("DrawSmoothCircle("), Source.rfind("DrawSmoothCircle("));
+	// 几何圆只作为入口内兜底出现一次：两条录制红点调用路径不再各自直接画圆。
+	// HUD 其它部位（媒体岛占位图标、封面占位、进度条 Tee 底衬）仍可用几何圆，与红点无关。
+	EXPECT_EQ(DotBody.find("DrawSmoothCircle("), DotBody.rfind("DrawSmoothCircle("));
 
 	// 羽化比例与岛共用同一份实现，且必须在 HUD 编辑器改写屏幕映射之前取。
 	EXPECT_NE(GameTimerBody.find("CurrentScreenPixelSize(Graphics())"), std::string::npos);
@@ -572,14 +586,14 @@ TEST(QmHudMediaIslandEntranceSpring, DropRunsFirstAndExpandWaitsForSettle)
 	EXPECT_FALSE(Runtime.HasActiveAnimation(102, EUiAnimProperty::ALPHA));
 
 	// 掉落阶段进行中：展开不启动（阶段语义：掉落先完成，展开才开始）。
-	AdvanceIslandRuntime(Runtime, 0.10f);
+	AdvanceIslandRuntimeResolving(Runtime, 101, 102, 0.10f);
 	const SHudMediaIslandEntranceSpringResult Mid = QmHudMediaIslandResolveEntranceSprings(Runtime, 101, 102, true);
 	EXPECT_GT(Mid.m_DropProgress, 0.0f);
 	EXPECT_LT(Mid.m_DropProgress, 1.0f);
 	EXPECT_NEAR(Mid.m_ExpandProgress, 0.0f, 1e-6f);
 
-	// 落定后展开才推进，两阶段最终都到位。
-	AdvanceIslandRuntime(Runtime, 1.0f);
+	// 落定后展开才推进（展开自身 1e-3 收敛约 0.94s），两阶段最终都到位。
+	AdvanceIslandRuntimeResolving(Runtime, 101, 102, 1.5f);
 	const SHudMediaIslandEntranceSpringResult Done = QmHudMediaIslandResolveEntranceSprings(Runtime, 101, 102, true);
 	EXPECT_NEAR(Done.m_DropProgress, 1.0f, 1e-3f);
 	EXPECT_NEAR(Done.m_ExpandProgress, 1.0f, 1e-3f);
@@ -633,13 +647,14 @@ TEST(QmHudMediaIslandEntranceSpring, ReducedMotionStillAnimatesAndSettles)
 	CUiV2AnimationRuntime Runtime;
 
 	QmHudMediaIslandResolveEntranceSprings(Runtime, 401, 402, true);
-	AdvanceIslandRuntime(Runtime, 0.10f);
+	AdvanceIslandRuntimeResolving(Runtime, 401, 402, 0.10f);
 	const SHudMediaIslandEntranceSpringResult Mid = QmHudMediaIslandResolveEntranceSprings(Runtime, 401, 402, true);
 	EXPECT_GT(Mid.m_DropProgress, 0.0f);
 	EXPECT_LT(Mid.m_DropProgress, 1.0f);
 	EXPECT_NEAR(Mid.m_ExpandProgress, 0.0f, 1e-6f);
 
-	AdvanceIslandRuntime(Runtime, 1.5f);
+	// 减弱动效下落定更慢（门控约 0.45s 打开、两通道全部落定约 1.63s）。
+	AdvanceIslandRuntimeResolving(Runtime, 401, 402, 2.0f);
 	const SHudMediaIslandEntranceSpringResult Done = QmHudMediaIslandResolveEntranceSprings(Runtime, 401, 402, true);
 	EXPECT_NEAR(Done.m_DropProgress, 1.0f, 1e-3f);
 	EXPECT_NEAR(Done.m_ExpandProgress, 1.0f, 1e-3f);
@@ -2051,7 +2066,8 @@ TEST(QmMediaIslandGpuSdfContract, BackendsPublishActualShaderCapability)
 	const std::string OpenGlSource = ReadTestSourceFile("src/engine/client/backend/opengl/backend_opengl3.cpp");
 	const std::string VulkanSource = ReadTestSourceFile("src/engine/client/backend/vulkan/backend_vulkan.cpp");
 	EXPECT_NE(OpenGlSource.find("m_MediaIslandSdf = m_MediaIslandSdfProgramValid"), std::string::npos);
-	EXPECT_NE(VulkanSource.find("m_MediaIslandSdf = true"), std::string::npos);
+	// Vulkan 能力跟随真实管线有效性，与 OpenGL 侧对称（不再无条件 true）。
+	EXPECT_NE(VulkanSource.find("m_pCapabilities->m_MediaIslandSdf = m_QmMediaIslandSdfPipelineValid"), std::string::npos);
 }
 
 TEST(QmMediaIslandGpuSdfContract, ShapePassAvoidsPerFragmentDistanceArrayAndInactiveItemIterations)
@@ -2460,7 +2476,8 @@ TEST(QmIslandNotice, PerimeterPointWalksTheCapsuleClockwiseFromTheTop)
 	EXPECT_FLOAT_EQ(Wrapped.y, Top.y);
 
 	// 端部圆弧中点：上边右半段走完 137 后进入右端圆弧，再走半段弧长即最右点。
-	const float CapHalf = (Pi * Radius) / Perimeter;
+	// 半圆弧长 = πr，半段即 πr/2。
+	const float CapHalf = (Pi * Radius * 0.5f) / Perimeter;
 	const vec2 Rightmost = qm_island::RoundedRectPerimeterPoint(Capsule, Radius, 137.0f / Perimeter + CapHalf);
 	EXPECT_NEAR(Rightmost.x, 400.0f, 0.001f);
 	EXPECT_NEAR(Rightmost.y, 63.0f, 0.001f);
@@ -2495,6 +2512,9 @@ TEST(QmIslandNotice, OutlineRingFieldsReachTheGpuParamsAndGrowTheQuad)
 	State.m_OutlineRingThickness = 2.0f;
 	State.m_OutlineRingOffset = 2.5f;
 	const CUIRect WithRing = QmHudMediaIslandSdfOuterRect(State);
+	// GPU 参数要求外接矩形有效，与生产路径一致：先由状态算出覆盖环外沿的外接矩形。
+	State.m_Rect = QmHudMediaIslandSdfOuterRect(State);
+	ASSERT_GT(State.m_Rect.w, 0.0f);
 
 	// 环外沿 = 中心线外扩 + 半厚，外接矩形必须为此留出余量（再加一圈羽化），否则环被裁掉。
 	EXPECT_FLOAT_EQ(State.m_MainRect.y - WithoutRing.y, 1.5f);
@@ -2505,6 +2525,8 @@ TEST(QmIslandNotice, OutlineRingFieldsReachTheGpuParamsAndGrowTheQuad)
 	ASSERT_TRUE(QmHudMediaIslandBuildGpuSdfParams(State, Params));
 	EXPECT_FLOAT_EQ(Params.m_aData[IGraphics::SMediaIslandSdfParams::DATA_RESERVED].z, 2.0f);
 	EXPECT_FLOAT_EQ(Params.m_aData[IGraphics::SMediaIslandSdfParams::DATA_RESERVED].w, 2.5f);
+	// 带环的外接矩形必须真的进了 GPU quad（DATA_RECT 就是 shader 的 quad）。
+	EXPECT_FLOAT_EQ(Params.m_aData[IGraphics::SMediaIslandSdfParams::DATA_RECT].z, WithRing.w);
 
 	// 关闭轮廓环时回到原来的语义（HUD 卫星环那条路径读到 0 就照旧画圆环）。
 	State.m_OutlineRingThickness = 0.0f;

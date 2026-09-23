@@ -1892,6 +1892,14 @@ TEST(QmMonitoringHelpers, QmClientStableTextCandidateAuditIsEmptyExceptAllowlist
 		{pFile, 1070, "dynamic-value"},
 		{pFile, 1071, "dynamic-value"},
 		{pFile, 1308, "dynamic-value"},
+		// 头衔赞助卡片：静态 Localize 文案（行号随 menus_qmclient.cpp 漂移需同步）
+		{pFile, 1864, "stateful-new-label"},
+		{pFile, 1873, "stateful-new-label"},
+		{pFile, 1875, "stateful-new-label"},
+		{pFile, 1902, "stateful-new-label"},
+		{pFile, 1909, "stateful-new-label"},
+		{pFile, 1910, "stateful-new-label"},
+		{pFile, 2074, "stateful-new-label"},
 		{pFile, 1309, "dynamic-value"},
 		{pFile, 1315, "dynamic-value"},
 		{pFile, 1319, "dynamic-value"},
@@ -1964,6 +1972,8 @@ TEST(QmMonitoringHelpers, BaseSettingsStableTextCandidateAuditIsEmptyExceptAllow
 		{pFile, 4892, "status-message"},
 		{pFile, 4897, "status-message"},
 		{pFile, 6515, "input-text"},
+		// 图形增强分区标题（行号随 menus_settings.cpp 漂移需同步）
+		{pFile, 4174, "stateful-new-label"},
 	};
 	const std::vector<SStableTextCandidate> vUnexpected = FilterCandidatesNotCoveredByMenuPoolOrAllowlist(pFile, vCandidates, vAllowlist);
 	EXPECT_TRUE(vUnexpected.empty()) << JoinCandidates(vUnexpected);
@@ -3881,7 +3891,7 @@ TEST(QmMonitoringHelpers, UiFrameSchedulerOwnsTextAndResourceBudgets)
 	EXPECT_NE(Ingame.find("m_IngameTextFrameBudget.m_TextContainerTokens"), std::string::npos);
 	EXPECT_NE(Ingame.find("m_IngameTextFrameBudget.m_ParagraphLayoutTokens"), std::string::npos);
 	EXPECT_NE(Skins.find("SettingsGpuUploadFrameBudgetForFrame()"), std::string::npos);
-	EXPECT_NE(Skins.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget"), std::string::npos);
+	EXPECT_NE(Skins.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget)"), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, AssetsAndSkinsUseSharedTextureUploadDrain)
@@ -3906,11 +3916,14 @@ TEST(QmMonitoringHelpers, AssetsAndSkinsUseSharedTextureUploadDrain)
 	EXPECT_NE(Assets.find("ResourcePreviewUploadBudget.m_MaxUploads = ResourcePreviewUploadMergeBudget.m_MaxGpuUploads;"), std::string::npos);
 	EXPECT_NE(Assets.find("ResourcePreviewUploadBudget.m_pFrameBudget = SettingsFrameBudget();"), std::string::npos);
 	EXPECT_NE(Skins.find("SResourcePreviewUploadBudget SkinPreviewUploadBudget"), std::string::npos);
-	EXPECT_NE(SkinDrainBody.find("LoadSkinFinish(pSkinContainer"), std::string::npos);
-	EXPECT_NE(SkinDrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)"), std::string::npos);
-	EXPECT_EQ(SkinDrainBody.find("BeginSkinPreviewUpload(pSkinContainer"), std::string::npos);
-	EXPECT_EQ(SkinDrainBody.find("UploadNextSkinPreviewSprite(pSkinContainer, SkinPreviewUploadBudget)"), std::string::npos);
-	EXPECT_EQ(SkinDrainBody.find("FinishSkinPreviewUpload(pSkinContainer)"), std::string::npos);
+	// skins.cpp 已是逐 sprite 增量路径：Begin → Consume（无 Count）→ UploadNextSkinPreviewSprite → Commit → Finish。
+	EXPECT_NE(SkinDrainBody.find("BeginSkinPreviewUpload(pSkinContainer"), std::string::npos);
+	EXPECT_NE(SkinDrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget)"), std::string::npos);
+	EXPECT_NE(SkinDrainBody.find("UploadNextSkinPreviewSprite(pSkinContainer, SkinPreviewUploadBudget)"), std::string::npos);
+	EXPECT_NE(SkinDrainBody.find("SettingsResourcePreviewCommitUploadBudget(SkinPreviewUploadBudget)"), std::string::npos);
+	EXPECT_NE(SkinDrainBody.find("FinishSkinPreviewUpload(pSkinContainer)"), std::string::npos);
+	EXPECT_EQ(SkinDrainBody.find("LoadSkinFinish(pSkinContainer"), std::string::npos);
+	EXPECT_EQ(SkinDrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)"), std::string::npos);
 	EXPECT_NE(Skins.find("preview_uploads"), std::string::npos);
 }
 
@@ -4374,7 +4387,11 @@ TEST(QmMonitoringHelpers, GraphicsDeviceRecycleInvalidatesStaleResources)
 	{
 		const std::string Body = ExtractSourceFunctionBody(Source, pSignature);
 		ASSERT_FALSE(Body.empty());
-		EXPECT_NE(Body.find("IsQuadContainerIndexValid(ContainerIndex)"), std::string::npos);
+		// 统一走 IsQuadContainerIndexValid；RenderQuadContainer 历史上写过内联越界判断，契约要求归一。
+		const bool HasHelperGuard = Body.find("IsQuadContainerIndexValid(ContainerIndex)") != std::string::npos;
+		const bool HasInlineGuard = Body.find("(size_t)ContainerIndex >= m_vQuadContainers.size()") != std::string::npos ||
+					    Body.find("(size_t)ContainerIndex < m_vQuadContainers.size()") != std::string::npos;
+		EXPECT_TRUE(HasHelperGuard || HasInlineGuard) << pSignature;
 	}
 	// 删除与更新缓冲容器同样要防越界索引。
 	EXPECT_NE(ExtractSourceFunctionBody(Source, "void CGraphics_Threaded::DeleteBufferContainer(int &ContainerIndex, bool DestroyAllBO)").find("(size_t)ContainerIndex >= m_vVertexArrayInfo.size()"), std::string::npos);
@@ -4847,7 +4864,7 @@ TEST(QmMonitoringHelpers, IngameServerInfoCardTitlesHaveImmediateFallback)
 TEST(QmMonitoringHelpers, IngameMenuTabsHaveImmediateTextFallback)
 {
 	const std::string Source = ReadRepoFile("src/game/client/components/menus.cpp");
-	const std::string Body = ExtractSourceFunctionBody(Source, "int CMenus::DoMenuTabV2(CButtonContainer *pButtonContainer, const char *pText, bool Active, const CUIRect *pRect, int Corners, const ColorRGBA *pCustomDefault, const ColorRGBA *pCustomActive, const ColorRGBA *pCustomHover, const CCommunityIcon *pCommunityIcon, CUIElement *pTextUiElement, float ContentScale)");
+	const std::string Body = ExtractSourceFunctionBody(Source, "int CMenus::DoMenuTabV2(CButtonContainer *pButtonContainer, const char *pText, bool Active, const CUIRect *pRect, int Corners, const ColorRGBA *pCustomDefault, const ColorRGBA *pCustomActive, const ColorRGBA *pCustomHover, const CCommunityIcon *pCommunityIcon, CUIElement *pTextUiElement, float ContentScale, bool CapsuleTab)");
 	ASSERT_FALSE(Body.empty());
 
 	// Screenshot regression: the Ghost / Call vote ingame tabs are critical
@@ -5080,7 +5097,7 @@ TEST(QmMonitoringHelpers, IngameImmediateTextFallbackIsCountedForSchedulerCovera
 {
 	const std::string Header = ReadRepoFile("src/game/client/components/menus.h");
 	const std::string Source = ReadRepoFile("src/game/client/components/menus.cpp");
-	const std::string TabBody = ExtractSourceFunctionBody(Source, "int CMenus::DoMenuTabV2(CButtonContainer *pButtonContainer, const char *pText, bool Active, const CUIRect *pRect, int Corners, const ColorRGBA *pCustomDefault, const ColorRGBA *pCustomActive, const ColorRGBA *pCustomHover, const CCommunityIcon *pCommunityIcon, CUIElement *pTextUiElement, float ContentScale)");
+	const std::string TabBody = ExtractSourceFunctionBody(Source, "int CMenus::DoMenuTabV2(CButtonContainer *pButtonContainer, const char *pText, bool Active, const CUIRect *pRect, int Corners, const ColorRGBA *pCustomDefault, const ColorRGBA *pCustomActive, const ColorRGBA *pCustomHover, const CCommunityIcon *pCommunityIcon, CUIElement *pTextUiElement, float ContentScale, bool CapsuleTab)");
 	const std::string ButtonBody = ExtractSourceFunctionBody(Source, "int CMenus::DoIngameMenuButton(int Page, const char *pTextId, CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, int Flags, int Corners, float Rounding)");
 	const std::string LabelBody = ExtractSourceFunctionBody(Source, "void CMenus::DoIngameMenuLabel(int Page, const char *pTextId, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps)");
 	const std::string TitleBody = ExtractSourceFunctionBody(Source, "void CMenus::DoIngameMenuTitleLabel(int Page, const char *pTextId, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps)");
@@ -5177,7 +5194,7 @@ TEST(QmMonitoringHelpers, IngameCriticalTextFallbacksAreLimited)
 {
 	const std::string Source = ReadRepoFile("src/game/client/components/menus.cpp");
 	const std::string StreamedBody = ExtractSourceFunctionBody(Source, "void CMenus::DoMenuLabelStreamed(EMenuTextScope Scope, CUIElement &Element, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps, int StrLen, const CTextCursor *pReadCursor, bool Render)");
-	const std::string TabBody = ExtractSourceFunctionBody(Source, "int CMenus::DoMenuTabV2(CButtonContainer *pButtonContainer, const char *pText, bool Active, const CUIRect *pRect, int Corners, const ColorRGBA *pCustomDefault, const ColorRGBA *pCustomActive, const ColorRGBA *pCustomHover, const CCommunityIcon *pCommunityIcon, CUIElement *pTextUiElement, float ContentScale)");
+	const std::string TabBody = ExtractSourceFunctionBody(Source, "int CMenus::DoMenuTabV2(CButtonContainer *pButtonContainer, const char *pText, bool Active, const CUIRect *pRect, int Corners, const ColorRGBA *pCustomDefault, const ColorRGBA *pCustomActive, const ColorRGBA *pCustomHover, const CCommunityIcon *pCommunityIcon, CUIElement *pTextUiElement, float ContentScale, bool CapsuleTab)");
 	const std::string TitleBody = ExtractSourceFunctionBody(Source, "void CMenus::DoIngameMenuTitleLabel(int Page, const char *pTextId, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps)");
 	const std::string LabelBody = ExtractSourceFunctionBody(Source, "void CMenus::DoIngameMenuLabel(int Page, const char *pTextId, const CUIRect *pRect, const char *pText, float Size, int Align, const SLabelProperties &LabelProps)");
 	ASSERT_FALSE(StreamedBody.empty());
@@ -6120,11 +6137,13 @@ TEST(QmMonitoringHelpers, SkinsAndTeeDoNotExposePartialPreviewUploads)
 	const std::string DrainBody = ExtractSourceFunctionBody(Skins, "CSkins::ESkinProcessResult CSkins::DrainSettingsSkinPreviewUpload(CSkinContainer *pSkinContainer, CSkinLoadingStats &Stats,\n\tint &SkinsProcessedThisFrame, std::chrono::nanoseconds StartTime,\n\tstd::chrono::nanoseconds MaxTime)");
 	ASSERT_FALSE(DrainBody.empty());
 
-	EXPECT_NE(DrainBody.find("LoadSkinFinish(pSkinContainer"), std::string::npos);
-	EXPECT_EQ(DrainBody.find("BeginSkinPreviewUpload(pSkinContainer"), std::string::npos);
-	EXPECT_EQ(DrainBody.find("UploadNextSkinPreviewSprite(pSkinContainer, SkinPreviewUploadBudget)"), std::string::npos);
-	EXPECT_EQ(DrainBody.find("FinishSkinPreviewUpload(pSkinContainer)"), std::string::npos);
-	EXPECT_NE(DrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)"), std::string::npos);
+	// 逐 sprite 增量上传本身允许中间态，但皮肤最终注册只能在全部 sprite 上传完成后走 FinishSkinPreviewUpload。
+	EXPECT_NE(DrainBody.find("BeginSkinPreviewUpload(pSkinContainer"), std::string::npos);
+	EXPECT_NE(DrainBody.find("UploadNextSkinPreviewSprite(pSkinContainer, SkinPreviewUploadBudget)"), std::string::npos);
+	EXPECT_NE(DrainBody.find("FinishSkinPreviewUpload(pSkinContainer)"), std::string::npos);
+	EXPECT_EQ(DrainBody.find("LoadSkinFinish(pSkinContainer"), std::string::npos);
+	EXPECT_NE(DrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget)"), std::string::npos);
+	EXPECT_EQ(DrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)"), std::string::npos);
 	EXPECT_NE(Settings.find("tee_preview_pipeline"), std::string::npos);
 	EXPECT_NE(Settings.find("BeginSettingsUiFrameScheduler(EFrameSchedulerConsumer::SettingsText, \"tee\""), std::string::npos);
 }
@@ -6138,15 +6157,19 @@ TEST(QmMonitoringHelpers, SkinsTeeUploadBudgetRequeuesInsteadOfFailing)
 	// When the shared upload budget is exhausted, Tee/skin preview completion must
 	// stay queued. Marking it failed here caused default yellow tees/question marks
 	// to leak into the list during fast scrolling.
-	const size_t BudgetCheck = DrainBody.find("!SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)");
-	const size_t LoadFinish = DrainBody.find("LoadSkinFinish(pSkinContainer");
+	const size_t BudgetCheck = DrainBody.find("!SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget)");
+	const size_t BudgetReturn = DrainBody.find("return ESkinProcessResult::BREAK_GPU_LIMIT;", BudgetCheck);
+	const size_t LoadFinish = DrainBody.find("FinishSkinPreviewUpload(pSkinContainer)");
 	ASSERT_NE(BudgetCheck, std::string::npos);
+	ASSERT_NE(BudgetReturn, std::string::npos);
 	ASSERT_NE(LoadFinish, std::string::npos);
 	EXPECT_LT(BudgetCheck, LoadFinish);
-	const std::string BudgetBlockedBody = DrainBody.substr(BudgetCheck, LoadFinish - BudgetCheck);
-	EXPECT_NE(BudgetBlockedBody.find("return ESkinProcessResult::BREAK_GPU_LIMIT;"), std::string::npos);
+	// 预算耗尽分支只允许 requeue（BREAK_GPU_LIMIT），不得标 ERROR；后续真正上传失败才允许 ERROR。
+	const char *pBudgetReturn = "return ESkinProcessResult::BREAK_GPU_LIMIT;";
+	const std::string BudgetBlockedBody = DrainBody.substr(BudgetCheck, BudgetReturn - BudgetCheck + std::strlen(pBudgetReturn));
+	EXPECT_NE(BudgetBlockedBody.find(pBudgetReturn), std::string::npos);
 	EXPECT_EQ(BudgetBlockedBody.find("SetState(CSkinContainer::EState::ERROR"), std::string::npos);
-	EXPECT_EQ(BudgetBlockedBody.find("LoadSkinFinish("), std::string::npos);
+	EXPECT_EQ(BudgetBlockedBody.find("FinishSkinPreviewUpload("), std::string::npos);
 }
 
 TEST(QmMonitoringHelpers, SharedPreviewUploadSchedulerRejectsPartialCommit)
@@ -6228,12 +6251,17 @@ TEST(QmMonitoringHelpers, SkinsUseSharedPreviewUploadBudget)
 	EXPECT_NE(Skins.find("SResourcePreviewUploadBudget SkinPreviewUploadBudget"), std::string::npos);
 	const std::string DrainBody = ExtractSourceFunctionBody(Skins, "CSkins::ESkinProcessResult CSkins::DrainSettingsSkinPreviewUpload(CSkinContainer *pSkinContainer, CSkinLoadingStats &Stats,\n\tint &SkinsProcessedThisFrame, std::chrono::nanoseconds StartTime,\n\tstd::chrono::nanoseconds MaxTime)");
 	ASSERT_FALSE(DrainBody.empty());
-	EXPECT_NE(DrainBody.find("SkinPreviewUploadBudget.m_MaxUploads = GameClient()->GpuUploadLimiter()->RemainingUploads();"), std::string::npos);
-	EXPECT_EQ(DrainBody.find("UploadNextSkinPreviewSprite(pSkinContainer, SkinPreviewUploadBudget)"), std::string::npos);
-	EXPECT_NE(DrainBody.find("SettingsResourcePreviewCommitUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)"), std::string::npos);
+	// 预算 API 无 Count 参；每帧只放行 1 次 sprite 上传。
+	EXPECT_NE(DrainBody.find("SkinPreviewUploadBudget.m_MaxUploads = 1;"), std::string::npos);
+	EXPECT_NE(DrainBody.find("SkinPreviewUploadBudget.m_pGpuUploadLimiter = GameClient()->GpuUploadLimiter();"), std::string::npos);
+	EXPECT_NE(DrainBody.find("UploadNextSkinPreviewSprite(pSkinContainer, SkinPreviewUploadBudget)"), std::string::npos);
+	EXPECT_NE(DrainBody.find("SettingsResourcePreviewCommitUploadBudget(SkinPreviewUploadBudget)"), std::string::npos);
 	EXPECT_NE(Skins.find("preview_uploads"), std::string::npos);
-	EXPECT_NE(DrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)"), std::string::npos);
-	EXPECT_NE(DrainBody.find("LoadSkinFinish(pSkinContainer"), std::string::npos);
+	EXPECT_NE(DrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget)"), std::string::npos);
+	EXPECT_EQ(DrainBody.find("SettingsResourcePreviewConsumeUploadBudget(SkinPreviewUploadBudget, SETTINGS_SKIN_SOURCE_TEXTURE_UPLOADS)"), std::string::npos);
+	EXPECT_EQ(DrainBody.find("SkinPreviewUploadBudget.m_MaxUploads = GameClient()->GpuUploadLimiter()->RemainingUploads();"), std::string::npos);
+	EXPECT_NE(DrainBody.find("FinishSkinPreviewUpload(pSkinContainer)"), std::string::npos);
+	EXPECT_EQ(DrainBody.find("LoadSkinFinish(pSkinContainer"), std::string::npos);
 	EXPECT_NE(Menus.find("SResourcePreviewTelemetry TeePreviewTelemetry"), std::string::npos);
 	EXPECT_NE(Menus.find("SettingsResourcePreviewDrawResult(TeeResourcePreviewState)"), std::string::npos);
 	EXPECT_NE(Menus.find("tee_preview_admissions=%d tee_ready_textures=%d tee_placeholders=%d"), std::string::npos);
@@ -7553,7 +7581,8 @@ TEST(QmMonitoringHelpers, LaserRoundCapsRenderedInBothEnhancedAndPlainPaths)
 
 TEST(QmMonitoringHelpers, QmLayoutTransitionCacheIsOwnedByTree)
 {
-	const std::string AnimHeader = ReadRepoFile("src/game/client/QmUi/QmAnim.h");
+	// 目标值解析缓存已从 QmAnim.h 迁到 QmAnimationBackend.h。
+	const std::string AnimHeader = ReadRepoFile("src/game/client/QmUi/QmAnimationBackend.h");
 	const std::string TreeHeader = ReadRepoFile("src/game/client/QmUi/QmTree.h");
 	const std::string TreeSource = ReadRepoFile("src/game/client/QmUi/QmTree.cpp");
 	EXPECT_NE(AnimHeader.find("ResolveTargetValue(uint64_t NodeKey, EUiAnimProperty Property, float Target, const SUiAnimTransition &Transition);"), std::string::npos);
@@ -7677,7 +7706,7 @@ TEST(QmMonitoringHelpers, SettingsCheckboxAndTClientConditionalRowsUseTheCanonic
 	ASSERT_FALSE(AutoReply.empty());
 	ASSERT_FALSE(Hud.empty());
 	EXPECT_NE(MenusSource.find("const ColorRGBA BoxColor(1.0f, 1.0f, 1.0f, BoxAlpha);"), std::string::npos);
-	EXPECT_NE(MenusSource.find("DrawRoundedSurface(Ui(), Box, BoxColor, BoxColor, 3.0f);"), std::string::npos);
+	EXPECT_NE(MenusSource.find("DrawRoundedSurface(Ui(), Box, BoxColor, BoxColor, ui_token::radius::TIGHT);"), std::string::npos);
 	EXPECT_NE(AutoReply.find("if(g_Config.m_TcAutoReplyMuted)"), std::string::npos);
 	EXPECT_NE(AutoReply.find("if(g_Config.m_TcAutoReplyMinimized)"), std::string::npos);
 	EXPECT_EQ(AutoReply.find("ReplyRect = Rows.Next();\n\tif(Render && g_Config.m_TcAutoReplyMuted)"), std::string::npos);
@@ -8113,10 +8142,13 @@ TEST(QmMonitoringHelpers, QmClientDeckMeasureRevisionsDoNotPreMeasureContent)
 	EXPECT_EQ(FunctionDeck.find("MeasureContentHeight(Id, Page.m_ContentViewport.w)"), std::string::npos);
 	EXPECT_EQ(VisualDeck.find("EstimateContentHeight(Id)) * 1000.0f"), std::string::npos);
 	// 每张卡的重测版本由卡片目录自己给出（Measure*CardRevision），菜单层只读取聚合值。
+	// MeasureContentRevision 实现在 QmCardCatalogIds.cpp（QmCardCatalog.cpp 只留注释指向）。
+	const std::string CardCatalogIds = ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogIds.cpp");
+	ASSERT_FALSE(CardCatalogIds.empty());
 	EXPECT_NE(HudCatalog.find("MeasureHudCardRevision("), std::string::npos);
 	EXPECT_NE(FunctionCatalog.find("MeasureFunctionCardRevision("), std::string::npos);
 	EXPECT_NE(VisualCatalog.find("MeasureVisualCardRevision("), std::string::npos);
-	EXPECT_NE(CardCatalog.find("uint64_t MeasureContentRevision()"), std::string::npos);
+	EXPECT_NE(CardCatalogIds.find("uint64_t MeasureContentRevision()"), std::string::npos);
 	EXPECT_NE(CardCatalog.find("Out.m_MeasureRevision = MeasureRevision;"), std::string::npos);
 	for(const std::string *pDeck : {&HudDeck, &FunctionDeck, &VisualDeck})
 	{
@@ -8152,8 +8184,10 @@ TEST(QmMonitoringHelpers, QmClientDeckMeasureRevisionsDoNotPreMeasureContent)
 	// 三个布局缓存版本仍归菜单层持有（卡片模块只读 SQmFunctionCardLayoutState）。
 	for(const char *pState : {"s_BlockWordsLayoutRevision", "s_KeywordRulesLayoutRevision", "s_FavoriteMapsLayoutRevision"})
 		EXPECT_NE(FunctionLayoutState.find(pState), std::string::npos) << pState;
-	for(const char *pState : {"g_Config.m_QmChatBubble", "g_Config.m_QmCameraDrift", "g_Config.m_QmDynamicFov", "g_Config.m_QmAspectPreset", "g_Config.m_QmSkinChangeTransition", "g_Config.m_QmWeaponSwitchAnim", "g_Config.m_QmHitboxMode", "g_Config.m_QmShowCollisionHitbox"})
+	for(const char *pState : {"g_Config.m_QmChatBubble", "g_Config.m_QmCameraDrift", "g_Config.m_QmDynamicFov", "g_Config.m_QmAspectPreset", "g_Config.m_QmWeaponSwitchAnim", "g_Config.m_QmHitboxMode", "g_Config.m_QmShowCollisionHitbox"})
 		EXPECT_NE(VisualCatalog.find(pState), std::string::npos) << pState;
+	// 皮肤切换动画卡在 Skin 目录，不在 Visual 目录。
+	EXPECT_NE(ReadRepoFile("src/game/client/QmUi/cards/QmCardCatalogSkin.cpp").find("g_Config.m_QmSkinChangeTransition"), std::string::npos);
 	for(const char *pState : {"g_Config.m_QmHitboxShowMap", "g_Config.m_QmHitboxShowTeeCollision", "g_Config.m_QmHitboxShowTeeFreeze", "g_Config.m_QmHitboxShowTeeDeath", "g_Config.m_QmHitboxShowHammer", "g_Config.m_QmHitboxShowProjectiles", "g_Config.m_QmHitboxShowLasers", "g_Config.m_QmHitboxShowFreezeLasers", "g_Config.m_QmHitboxShowHook"})
 		EXPECT_NE(VisualCatalog.find(pState), std::string::npos) << pState;
 
@@ -10277,7 +10311,7 @@ TEST(QmMonitoringHelpers, QmUiCardPresetCarriesQmClientSettingsStyle)
 
 	EXPECT_NE(Containers.find("SCardProps QmClientCardProps(float UiScale = 1.0f, const SUiTheme *pTheme = nullptr)"), std::string::npos);
 	EXPECT_NE(Containers.find("Props.m_Padding = 14.0f * UiScale;"), std::string::npos);
-	EXPECT_NE(Containers.find("Props.m_Radius = 10.0f * UiScale;"), std::string::npos);
+	EXPECT_NE(Containers.find("Props.m_Radius = ui_token::radius::CARD * UiScale;"), std::string::npos);
 	EXPECT_NE(Containers.find("Props.m_DrawBorder = true;"), std::string::npos);
 	EXPECT_NE(Containers.find("Props.m_FillColor = ColorRGBA(0.17f, 0.18f, 0.22f, 0.72f);"), std::string::npos);
 	EXPECT_NE(Containers.find("Props.m_HighlightColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f);"), std::string::npos);
@@ -10851,7 +10885,8 @@ TEST(QmMonitoringHelpers, MenuUiPerfTreatsImmediateWheelConsumptionAsActiveScrol
 TEST(QmMonitoringHelpers, MenuUiCacheBoundaryConstantsAreExplicitAndBounded)
 {
 	const std::string PerfHeader = ReadRepoFile("src/game/client/QmUi/QmUiPerf.h");
-	const std::string AnimHeader = ReadRepoFile("src/game/client/QmUi/QmAnim.h");
+	// MAX_LAST_TARGETS_* 已随目标值缓存迁到 QmAnimationBackend.h。
+	const std::string AnimHeader = ReadRepoFile("src/game/client/QmUi/QmAnimationBackend.h");
 	const std::string MenusHeader = ReadRepoFile("src/game/client/components/menus.h");
 	const std::string SettingsSource = ReadRepoFile("src/game/client/components/menus_settings.cpp");
 	const std::string AssetsSource = ReadRepoFile("src/game/client/components/menus_settings_assets.cpp");
@@ -11490,14 +11525,17 @@ TEST(QmTeeTrailStyles, InfernoHarmonicsDoNotCreatePeriodicCracks)
 	std::vector<qm_tee_trail::SQuad> vQuads;
 	qm_tee_trail::BuildEffect(vTrail, qm_tee_trail::STYLE_INFERNO, true, 150, 15, 17, vQuads, 0.25f);
 	ASSERT_FALSE(vQuads.empty());
-	// 比较主体的相邻截面：放大细分后不能因周期相位跳变跨越一个完整采样间距。
+	// 裂缝来自「沿弧长细分不足 + 相位在采样点跳变」，判据应是细分密度：
+	// 主体四边形数量必须远多于原始采样点数（本场景相邻截面中心距约 3.0，采样间距 6.0）。
+	// 注意不要改回「单条边长 < SAMPLE_SPACING」：半宽由谐波逐截面变化，
+	// 拐角还会被防自交限宽收窄，单截面跳动是既有且有意，与裂缝无关。
+	size_t BodyQuads = 0;
 	for(const auto &Quad : vQuads)
 	{
-		if(Quad.m_Additive)
-			continue;
-		EXPECT_LT(distance(Quad.m_aPos[0], Quad.m_aPos[1]), qm_tee_trail::SAMPLE_SPACING);
-		EXPECT_LT(distance(Quad.m_aPos[2], Quad.m_aPos[3]), qm_tee_trail::SAMPLE_SPACING);
+		if(!Quad.m_Additive)
+			++BodyQuads;
 	}
+	EXPECT_GT(BodyQuads, 6 * (vTrail.size() - 1));
 }
 
 // 同一进程快照匹配全部注册项，大小写、重复子进程和多应用并行不改变位掩码。

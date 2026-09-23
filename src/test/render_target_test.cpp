@@ -645,8 +645,10 @@ TEST(GraphicsRenderTargetBackbufferCapture, VulkanBlitsCurrentSwapImageAndRestor
 	EXPECT_NE(CaptureBody.find("HasMultiSampling()"), std::string::npos);
 	EXPECT_NE(SupportBody.find("m_OptimalSwapChainImageBlitting"), std::string::npos);
 	EXPECT_NE(SupportBody.find("m_OptimalRGBAImageBlitting"), std::string::npos);
-	EXPECT_NE(SupportBody.find("VK_FORMAT_B8G8R8A8_UNORM"), std::string::npos);
-	EXPECT_NE(SupportBody.find("VK_FORMAT_R8G8B8A8_UNORM"), std::string::npos);
+	// 格式白名单在 IsBackbufferCaptureFormatSupported；SupportsBackbufferCapture 只做组合判定。
+	EXPECT_NE(Source.find("IsBackbufferCaptureFormatSupported"), std::string::npos);
+	EXPECT_NE(Source.find("VK_FORMAT_B8G8R8A8_UNORM"), std::string::npos);
+	EXPECT_NE(Source.find("VK_FORMAT_R8G8B8A8_UNORM"), std::string::npos);
 	EXPECT_NE(Source.find("VK_IMAGE_USAGE_TRANSFER_DST_BIT"), std::string::npos);
 	EXPECT_NE(CaptureBody.find("EndSwapRenderPassForExternalWork();"), std::string::npos);
 	EXPECT_NE(CaptureBody.find("VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL"), std::string::npos);

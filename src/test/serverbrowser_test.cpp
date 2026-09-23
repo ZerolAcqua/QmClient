@@ -56,10 +56,11 @@ namespace
 	{
 	public:
 		mutable int m_Queries = 0;
+		mutable uint64_t m_Revision = 0;
 		mutable std::function<void()> m_NextQuery;
 		void Init(bool) override {}
 		int NumFriends() const override { return 0; }
-		uint64_t Revision() const override { return 0; }
+		uint64_t Revision() const override { return m_Revision; }
 		const CFriendInfo *GetFriend(int) const override { return nullptr; }
 		int GetFriendState(const char *, const char *) const override
 		{
@@ -221,9 +222,13 @@ TEST_F(CServerBrowserFilterTest, RequestRaisedWhileSortingRemainsPendingForTheNe
 	FinishHttp();
 	m_Browser.RequestResort();
 	m_Friends.m_NextQuery = [this] { m_Browser.RequestResort(); };
+	// 友状态缓存（d297a1eb0）按 Revision 失效：递增版本号才能让下一次 Sort 重新查询好友，
+	// 从而在排序过程中真的产生新的 resort 请求。
+	m_Friends.m_Revision = 1;
 	m_Browser.Update();
 	EXPECT_EQ(m_Friends.m_Queries, 2);
 	EXPECT_TRUE(CServerBrowserTestAccess::NeedsResort(m_Browser));
+	m_Friends.m_Revision = 2;
 	m_Browser.Update();
 	EXPECT_EQ(m_Friends.m_Queries, 3);
 	EXPECT_FALSE(CServerBrowserTestAccess::NeedsResort(m_Browser));

@@ -1557,7 +1557,8 @@ TEST(QmNewUiMenuBranches, BrowserUsesExplicitQmNewUiShellBranch)
 	// 服务器列表只保留外层卡片框：New UI 分支不再额外内缩。
 	EXPECT_NE(Source.find("ServerListBase.Margin(2.0f, &ServerListBase);"), std::string::npos);
 	EXPECT_EQ(Source.find("ServerListBase.Margin(10.0f, &ServerListBase);"), std::string::npos);
-	EXPECT_NE(TopOldUiBlock.find("View.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, ui_token::radius::CARD);"), std::string::npos);
+	// 老 UI 顶栏圆角是 10.0f 的既有观感，不要为了 token 化改成 ui_token::radius::CARD(14.0f)。
+	EXPECT_NE(TopOldUiBlock.find("View.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);"), std::string::npos);
 	EXPECT_NE(TopOldUiBlock.find("View.Margin(10.0f, &View);"), std::string::npos);
 	EXPECT_EQ(TopOldUiBlock.find("View.Margin(std::clamp(View.w * 0.008f, 4.0f, 8.0f), &View);"), std::string::npos);
 }
@@ -1738,7 +1739,7 @@ TEST(QmNewUiMenuBranches, BrowserFavoriteMapsEarlyReturnAvoidsLegacyDoubleInset)
 	const std::string RenderServerbrowser = FunctionBody(Source, "void CMenus::RenderServerbrowser(");
 	const size_t FavoriteMapsPos = RenderServerbrowser.find("if(g_Config.m_UiPage == PAGE_FAVORITE_MAPS)");
 	ASSERT_NE(FavoriteMapsPos, std::string::npos);
-	const size_t DrawPos = RenderServerbrowser.find("View.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, ui_token::radius::CARD);");
+	const size_t DrawPos = RenderServerbrowser.find("View.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);");
 	ASSERT_NE(DrawPos, std::string::npos);
 	EXPECT_LT(FavoriteMapsPos, DrawPos);
 	EXPECT_NE(RenderServerbrowser.find("RenderServerbrowserFavoriteMaps(MainView);"), std::string::npos);
@@ -6494,27 +6495,32 @@ TEST(QmNewUiMenuBranches, TeeRestoresCardContentsAndKeepsDoubleClickActions)
 	EXPECT_EQ(Tee.find("const SSettingsTeeCustomColorsLayout TeeCustomColors"), std::string::npos);
 	// 双击功能保留，布局恢复不能移除本体与分身的快捷应用入口。
 	EXPECT_EQ(Tee.find("MouseDoubleClick"), std::string::npos);
-	const size_t ItemButton = Tee.find("const int ItemButton = Ui()->DoButtonLogic(SkinListEntry.ListItemId(), 0, &Item.m_Rect, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);");
-	ASSERT_NE(ItemButton, std::string::npos);
-	EXPECT_NE(Tee.find("if(ItemButton != 0 && Ui()->DoDoubleClickLogic(SkinListEntry.ListItemId()))", ItemButton), std::string::npos);
-	EXPECT_NE(Tee.find("QmTeeSkinApplyTargetForButton(ItemButton)"), std::string::npos);
-	EXPECT_NE(Tee.find("ApplySkinListEntry(SkinListEntry, Target, QmTeeSkinApplyTargetDummy(Target) != (m_Dummy ? 1 : 0));"), std::string::npos);
-	const size_t DoubleClick = Tee.find("Ui()->DoDoubleClickLogic(", ItemButton);
-	ASSERT_NE(DoubleClick, std::string::npos);
-	EXPECT_EQ(Tee.find("Ui()->DoDoubleClickLogic(", DoubleClick + 1), std::string::npos);
-	// 命中顺序：整项按钮必须早于右上角的队列/收藏图标注册，否则它会成为本帧最后一次
-	// SetHotItem，微型图标拿不到 HotItem，队列与收藏点击全部失效。
-	const size_t QueueIcon = Tee.find("DoButtonSkinQueue(&s_vQueueButtonIds[i]", ItemButton);
-	const size_t FavoriteIcon = Tee.find("DoButton_Favorite(SkinListEntry.FavoriteButtonId()", ItemButton);
-	ASSERT_NE(QueueIcon, std::string::npos);
-	ASSERT_NE(FavoriteIcon, std::string::npos);
-	EXPECT_LT(ItemButton, QueueIcon);
-	EXPECT_LT(ItemButton, FavoriteIcon);
+	// 左键双击消费列表框激活结果（门控在本帧左键释放，避免回车确认走入双击路径）；
+	// 右键双击由页面按「悬停本项 + 右键释放」自行判定，双击状态用每项独立的 id。
+	EXPECT_NE(Tee.find("const bool LeftButtonReleased = Ui()->LastMouseButton(0) && !Ui()->MouseButton(0);"), std::string::npos);
+	EXPECT_NE(Tee.find("if(LeftButtonReleased && s_ListBox.WasItemActivated() && NewSelected >= 0 && NewSelected < (int)vSkinList.size())"), std::string::npos);
+	EXPECT_NE(Tee.find("ApplySkinListEntry(vSkinList[NewSelected], ETeeSkinApplyTarget::MAIN, QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::MAIN) != (m_Dummy ? 1 : 0));"), std::string::npos);
+	const size_t RightDoubleClick = Tee.find("if(!Ui()->RenderOnly() && Ui()->MouseHovered(&Item.m_Rect) && Ui()->LastMouseButton(1) && !Ui()->MouseButton(1) &&");
+	ASSERT_NE(RightDoubleClick, std::string::npos);
+	EXPECT_NE(Tee.find("Ui()->DoDoubleClickLogic(SkinListEntry.RightDoubleClickId())", RightDoubleClick), std::string::npos);
+	EXPECT_NE(Tee.find("RightDoubleClickIndex = (int)i;", RightDoubleClick), std::string::npos);
+	EXPECT_NE(Tee.find("if(RightDoubleClickIndex >= 0 && RightDoubleClickIndex < (int)vSkinList.size())"), std::string::npos);
+	EXPECT_NE(Tee.find("ApplySkinListEntry(vSkinList[RightDoubleClickIndex], ETeeSkinApplyTarget::DUMMY, QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::DUMMY) != (m_Dummy ? 1 : 0));"), std::string::npos);
+	EXPECT_NE(Tee.find("int RightDoubleClickIndex = -1;"), std::string::npos);
+	// 命中来源：网格项内不得再对 Item.m_Rect 注册整项按钮。整项按钮覆盖右上角的
+	// 队列/收藏图标，会成为本帧最后一次 SetHotItem，微型图标拿不到 HotItem，
+	// 队列与收藏点击全部失效（图标按钮必须由列表框自身按 ListItemId 处理）。
+	EXPECT_EQ(Tee.find("&Item.m_Rect, BUTTONFLAG"), std::string::npos);
+	EXPECT_NE(Tee.find("DoButtonSkinQueue(&s_vQueueButtonIds[i]", RightDoubleClick), std::string::npos);
+	EXPECT_NE(Tee.find("DoButton_Favorite(SkinListEntry.FavoriteButtonId()", RightDoubleClick), std::string::npos);
 	// 单击与双击共用同一份赋值路径。
 	EXPECT_NE(Tee.find("ApplySkinListEntry(vSkinList[NewSelected], m_Dummy ? ETeeSkinApplyTarget::DUMMY : ETeeSkinApplyTarget::MAIN, false);"), std::string::npos);
 	EXPECT_NE(Tee.find("QmApplyTeeSkinToTarget(g_Config, Target, Entry.SkinContainer()->Name(), HasColorKey, EntryUseCustomColor, EntryColorBody, EntryColorFeet);"), std::string::npos);
 	EXPECT_NE(Source.find("#include <game/client/components/qmclient/tee_skin_apply.h>"), std::string::npos);
 	EXPECT_NE(Tee.find("Localize(\"Double-click: left applies to main, right applies to dummy\")"), std::string::npos);
+	// 右键双击状态 id 必须与列表框左键双击使用的 ListItemId 区分开。
+	const std::string SkinsHeader = ReadTextFile("src/game/client/components/skins.h");
+	EXPECT_NE(SkinsHeader.find("const void *RightDoubleClickId() const { return &m_RightDoubleClickId; }"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, TeeOriginalLayoutRestoresSavedVersionEightPositions)
@@ -7325,8 +7331,9 @@ TEST(QmNewUiMenuBranches, NameplateTextRasterizesAtStandardZoom)
 	// 不会再出现"部分玩家清晰、部分玩家发虚"。
 	const std::string Source = ReadTextFile("src/game/client/components/nameplates.cpp");
 	EXPECT_NE(Source.find("This.Graphics()->MapScreenToGameInterface(This.m_Camera.m_Center.x, This.m_Camera.m_Center.y);"), std::string::npos);
-	// 文本重建改由 CQmNameplateTextCache 判定：容器失效必须伴随 Reset()（否则会永久跳过重建）。
-	EXPECT_NE(Source.find("if(!m_TextCache.NeedsUpdate(m_Visible, NeedsTextUpdate))"), std::string::npos);
+	// 文本重建改由 CQmNameplateTextCache 判定，但缓存只能跳过「内容没变」的重建：
+	// 容器失效时仍必须重建（官方行为），否则会永久停在隐藏态。
+	EXPECT_NE(Source.find("if(!m_TextCache.NeedsUpdate(m_Visible, NeedsTextUpdate) && m_TextContainerIndex.Valid())"), std::string::npos);
 	EXPECT_NE(Source.find("m_TextCache.Reset();"), std::string::npos);
 	EXPECT_NE(ReadTextFile("src/game/client/components/qmclient/nameplate_text_cache.h").find("bool NeedsUpdate(bool Visible, bool Changed) const { return Visible && (Changed || !m_Updated); }"), std::string::npos);
 

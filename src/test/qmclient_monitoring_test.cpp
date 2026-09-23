@@ -1973,7 +1973,7 @@ TEST(QmMonitoringHelpers, BaseSettingsStableTextCandidateAuditIsEmptyExceptAllow
 		{pFile, 4897, "status-message"},
 		{pFile, 6515, "input-text"},
 		// 图形增强分区标题（行号随 menus_settings.cpp 漂移需同步）
-		{pFile, 4174, "stateful-new-label"},
+		{pFile, 4181, "stateful-new-label"},
 	};
 	const std::vector<SStableTextCandidate> vUnexpected = FilterCandidatesNotCoveredByMenuPoolOrAllowlist(pFile, vCandidates, vAllowlist);
 	EXPECT_TRUE(vUnexpected.empty()) << JoinCandidates(vUnexpected);

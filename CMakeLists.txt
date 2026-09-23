@@ -3982,7 +3982,8 @@ qm_item_culling_logic_test.cpp
     color_test.cpp
     compression_test.cpp
     csv_test.cpp
-    datafile_test.cpp
+    db_connection_test.cpp
+datafile_test.cpp
     dbg_test.cpp
     ddnet_19_9_sync_test.cpp
     editor_test.cpp

@@ -5534,7 +5534,12 @@ void CClient::DemoRecorder_UpdateReplayRecorder()
 
 bool CClient::DemoRecorder_AddDemoMarker(int Recorder)
 {
-	return DemoRecorders()[Recorder].AddDemoMarker();
+	auto &DemoRecorder = DemoRecorders()[Recorder];
+	if(!DemoRecorder.IsRecording())
+	{
+		return false;
+	}
+	return DemoRecorder.AddDemoMarker();
 }
 
 // clang-format off

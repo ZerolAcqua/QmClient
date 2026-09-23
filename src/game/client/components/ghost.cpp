@@ -11,6 +11,7 @@
 
 #include <game/client/components/menus.h>
 #include <game/client/components/players.h>
+#include <game/client/components/qmclient/qm_item_culling_logic.h>
 #include <game/client/components/skins.h>
 #include <game/client/gameclient.h>
 #include <game/client/race.h>
@@ -317,7 +318,7 @@ void CGhost::OnRender()
 	// QmClient: 上游 ada53c8cb3 —— ghost 也做屏外裁剪（200x200 盒）。
 	// 本地的玩家/钩子裁剪在 CPlayers 调用层完成，ghost 走不到那条路径，所以在这里补。
 	CScreenRect GhostScreenRect = Graphics()->GetScreen();
-	GhostScreenRect.Expand(100.0f);
+	GhostScreenRect.Expand(qm_item_culling::GHOST_MARGIN);
 
 	for(auto &Ghost : m_aActiveGhosts)
 	{

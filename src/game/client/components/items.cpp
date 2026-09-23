@@ -13,6 +13,7 @@
 
 #include <game/client/components/effects.h>
 #include <game/client/components/qmclient/modes.h>
+#include <game/client/components/qmclient/qm_item_culling_logic.h>
 #include <game/client/gameclient.h>
 #include <game/client/laser_data.h>
 #include <game/client/pickup_data.h>
@@ -600,30 +601,18 @@ void CItems::OnRender()
 	bool UsePredicted = !RenderingMini && GameClient()->Predict() && GameClient()->AntiPingGunfire();
 	auto &aSwitchers = GameClient()->Switchers();
 
-	// QmClient: 屏幕外实体裁剪（对齐上游 14fc1e9d1e）。用上游 CScreenRect 形态书写，便于后续补丁直接合并。
-	// 边距与上游一致：投射物 ±1 tile、激光 ±0.5 tile、拾取物 x ±1.75 tile / y ±0.75 tile。
-	CScreenRect ScreenRectLaser = Graphics()->GetScreen();
-	CScreenRect ScreenRectProjectile = ScreenRectLaser;
-	CScreenRect ScreenRectPickup = ScreenRectLaser;
-
-	constexpr float TileSize = 64.0f;
-	ScreenRectProjectile.Expand(TileSize);
-	ScreenRectLaser.Expand(TileSize / 2.0f);
-	ScreenRectPickup.Expand(1.75f * TileSize, 0.75f * TileSize);
+	// QmClient: 屏幕外实体裁剪（对齐上游 14fc1e9d1e）。边距与判定集中在 qm_item_culling_logic.h，便于单测。
+	const CScreenRect ScreenRect = Graphics()->GetScreen();
+	const qm_item_culling::SRect ScreenCullingRect{ScreenRect.m_TopLeft.x, ScreenRect.m_TopLeft.y, ScreenRect.m_BottomRight.x, ScreenRect.m_BottomRight.y};
 
 	auto IsProjectileInside = [&](const CProjectileData &Data) -> bool {
-		return ScreenRectProjectile.Inside(Data.m_StartPos);
+		return qm_item_culling::IsProjectileInside(ScreenCullingRect, Data.m_StartPos);
 	};
 	auto IsPickupInside = [&](const CPickupData &Data) -> bool {
-		return ScreenRectPickup.Inside(Data.m_Pos);
+		return qm_item_culling::IsPickupInside(ScreenCullingRect, Data.m_Pos);
 	};
 	auto IsLaserInside = [&](const CLaserData &LaserData) -> bool {
-		const vec2 &From = LaserData.m_From;
-		const vec2 &To = LaserData.m_To;
-		return !((From.x < ScreenRectLaser.m_TopLeft.x && To.x < ScreenRectLaser.m_TopLeft.x) ||
-			 (From.x > ScreenRectLaser.m_BottomRight.x && To.x > ScreenRectLaser.m_BottomRight.x) ||
-			 (From.y < ScreenRectLaser.m_TopLeft.y && To.y < ScreenRectLaser.m_TopLeft.y) ||
-			 (From.y > ScreenRectLaser.m_BottomRight.y && To.y > ScreenRectLaser.m_BottomRight.y));
+		return qm_item_culling::IsLaserInside(ScreenCullingRect, LaserData.m_From, LaserData.m_To);
 	};
 	if(UsePredicted)
 	{

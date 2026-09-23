@@ -3965,6 +3965,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     QmUiTokensTest.cpp
     qm_card_order_model_test.cpp
     qm_card_registry_test.cpp
+qm_item_culling_logic_test.cpp
     qm_module_layout_adapter_test.cpp
     aio_test.cpp
     assets_editor_layout_test.cpp

@@ -599,6 +599,35 @@ void CItems::OnRender()
 
 	bool UsePredicted = !RenderingMini && GameClient()->Predict() && GameClient()->AntiPingGunfire();
 	auto &aSwitchers = GameClient()->Switchers();
+
+	// QmClient: 屏幕外实体裁剪（对齐上游 14fc1e9d1e；本地没有 CScreenRect，用 GetScreen 四边界实现）。
+	// 边距与上游一致：投射物 ±1 tile、激光 ±0.5 tile、拾取物 x ±1.75 tile / y ±0.75 tile，
+	// 保证跨屏幕边缘的半可见实体不被误裁。
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+	constexpr float TileSize = 64.0f;
+	const float ProjectileMargin = TileSize;
+	const float LaserMargin = TileSize / 2.0f;
+	const float PickupMarginX = 1.75f * TileSize;
+	const float PickupMarginY = 0.75f * TileSize;
+	auto IsProjectileInside = [&](const CProjectileData &Data) -> bool {
+		return Data.m_StartPos.x >= ScreenX0 - ProjectileMargin && Data.m_StartPos.x <= ScreenX1 + ProjectileMargin &&
+		       Data.m_StartPos.y >= ScreenY0 - ProjectileMargin && Data.m_StartPos.y <= ScreenY1 + ProjectileMargin;
+	};
+	auto IsPickupInside = [&](const CPickupData &Data) -> bool {
+		return Data.m_Pos.x >= ScreenX0 - PickupMarginX && Data.m_Pos.x <= ScreenX1 + PickupMarginX &&
+		       Data.m_Pos.y >= ScreenY0 - PickupMarginY && Data.m_Pos.y <= ScreenY1 + PickupMarginY;
+	};
+	auto IsLaserInside = [&](const CLaserData &Data) -> bool {
+		const vec2 &From = Data.m_From;
+		const vec2 &To = Data.m_To;
+		const float X0 = ScreenX0 - LaserMargin;
+		const float X1 = ScreenX1 + LaserMargin;
+		const float Y0 = ScreenY0 - LaserMargin;
+		const float Y1 = ScreenY1 + LaserMargin;
+		return !((From.x < X0 && To.x < X0) || (From.x > X1 && To.x > X1) ||
+			 (From.y < Y0 && To.y < Y0) || (From.y > Y1 && To.y > Y1));
+	};
 	if(UsePredicted)
 	{
 		for(auto *pProj = (CProjectile *)GameClient()->m_PrevPredictedWorld.FindFirst(CGameWorld::ENTTYPE_PROJECTILE); pProj; pProj = (CProjectile *)pProj->NextEntity())
@@ -607,6 +636,8 @@ void CItems::OnRender()
 				continue;
 
 			CProjectileData Data = pProj->GetData();
+			if(!IsProjectileInside(Data))
+				continue;
 			RenderProjectile(&Data, pProj->GetId());
 		}
 		for(CEntity *pEnt = GameClient()->m_PrevPredictedWorld.FindFirst(CGameWorld::ENTTYPE_LASER); pEnt; pEnt = pEnt->NextEntity())
@@ -615,6 +646,8 @@ void CItems::OnRender()
 			if(!pLaser || pLaser->GetOwner() < 0 || !GameClient()->m_aClients[pLaser->GetOwner()].m_IsPredictedLocal)
 				continue;
 			CLaserData Data = pLaser->GetData();
+			if(!IsLaserInside(Data))
+				continue;
 			RenderLaser(&Data, true);
 		}
 		for(auto *pPickup = (CPickup *)GameClient()->m_PrevPredictedWorld.FindFirst(CGameWorld::ENTTYPE_PICKUP); pPickup; pPickup = (CPickup *)pPickup->NextEntity())
@@ -644,6 +677,8 @@ void CItems::OnRender()
 		if(Item.m_Type == NETOBJTYPE_PROJECTILE || Item.m_Type == NETOBJTYPE_DDRACEPROJECTILE || Item.m_Type == NETOBJTYPE_DDNETPROJECTILE)
 		{
 			CProjectileData Data = ExtractProjectileInfo(Item.m_Type, pData, &GameClient()->m_GameWorld, pEntEx);
+			if(!IsProjectileInside(Data))
+				continue;
 			bool Inactive = !IsSuper && Data.m_SwitchNumber > 0 && Data.m_SwitchNumber < (int)aSwitchers.size() && !aSwitchers[Data.m_SwitchNumber].m_aStatus[SwitcherTeam];
 			if(Inactive && (Data.m_Explosive ? BlinkingProjEx : BlinkingProj))
 				continue;
@@ -670,6 +705,8 @@ void CItems::OnRender()
 		else if(Item.m_Type == NETOBJTYPE_PICKUP || Item.m_Type == NETOBJTYPE_DDNETPICKUP)
 		{
 			CPickupData Data = ExtractPickupInfo(Item.m_Type, pData, pEntEx);
+			if(!IsPickupInside(Data))
+				continue;
 			bool Inactive = !IsSuper && Data.m_SwitchNumber > 0 && Data.m_SwitchNumber < (int)aSwitchers.size() && !aSwitchers[Data.m_SwitchNumber].m_aStatus[SwitcherTeam];
 
 			if(Inactive && BlinkingPickup)
@@ -694,6 +731,8 @@ void CItems::OnRender()
 			}
 
 			CLaserData Data = ExtractLaserInfo(Item.m_Type, pData, &GameClient()->m_GameWorld, pEntEx);
+			if(!IsLaserInside(Data))
+				continue;
 			bool Inactive = !IsSuper && Data.m_SwitchNumber > 0 && Data.m_SwitchNumber < (int)aSwitchers.size() && !aSwitchers[Data.m_SwitchNumber].m_aStatus[SwitcherTeam];
 
 			bool IsEntBlink = false;

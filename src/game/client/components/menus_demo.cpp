@@ -300,8 +300,14 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 			break;
 		NumDurationLabels = i + 1;
 	}
-	if(NumDurationLabels > 0 && m_SkipDurationIndex >= NumDurationLabels)
-		m_SkipDurationIndex = maximum(0, NumDurationLabels - 1);
+	if(NumDurationLabels < 2)
+	{
+		m_SkipDurationIndex = 0;
+	}
+	else if(m_SkipDurationIndex >= NumDurationLabels)
+	{
+		m_SkipDurationIndex = NumDurationLabels - 1;
+	}
 
 	const auto &&NormalizePendingSlice = [&]() {
 		SDemoCutSegment Range;

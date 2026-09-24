@@ -468,7 +468,7 @@ TEST(QmChatPresentation, SmoothYApproachesTargetWithoutOvershoot)
 	}
 }
 
-TEST(QmWindowModes, WindowedFullscreenRemainsABorderlessNonResizableWindow)
+TEST(QmWindowModes, WindowedFullscreenIsBorderedAndNonResizable)
 {
 	const std::string Backend = ReadTestSourceFile("src/engine/client/backend_sdl.cpp");
 	const std::string SetWindowParams = SourceFunctionBody(Backend, "void CGraphicsBackend_SDL_GL::SetWindowParams(");
@@ -479,26 +479,25 @@ TEST(QmWindowModes, WindowedFullscreenRemainsABorderlessNonResizableWindow)
 	const std::string WindowedFullscreen = SetWindowParams.substr(WindowedFullscreenStart, WindowedStart - WindowedFullscreenStart);
 
 	EXPECT_NE(WindowedFullscreen.find("SDL_SetWindowFullscreen(m_pWindow, 0);"), std::string::npos);
-	EXPECT_NE(WindowedFullscreen.find("SDL_SetWindowBordered(m_pWindow, SDL_FALSE);"), std::string::npos);
+	// 采用上游 478781ad65 后：windowed fullscreen 改回有边框，截图工具才能工作。
+	EXPECT_NE(WindowedFullscreen.find("SDL_SetWindowBordered(m_pWindow, SDL_TRUE);"), std::string::npos);
 	EXPECT_NE(WindowedFullscreen.find("SDL_SetWindowResizable(m_pWindow, SDL_FALSE);"), std::string::npos);
 }
 
-TEST(QmWindowModes, StartupMarksWindowedFullscreenAsBorderless)
+TEST(QmWindowModes, StartupDoesNotMarkWindowedFullscreenAsBorderless)
 {
 	const std::string Backend = ReadTestSourceFile("src/engine/client/backend_sdl.cpp");
 	const std::string Graphics = ReadTestSourceFile("src/engine/client/graphics_threaded.cpp");
 	const std::string IssueInit = SourceFunctionBody(Graphics, "int CGraphics_Threaded::IssueInit()");
 
-	const size_t WindowedFullscreenStart = IssueInit.find("else // Windowed fullscreen");
-	const size_t VSyncStart = IssueInit.find("if(g_Config.m_GfxVsync)", WindowedFullscreenStart + 1);
-	ASSERT_NE(WindowedFullscreenStart, std::string::npos);
-	ASSERT_NE(VSyncStart, std::string::npos);
-	const std::string WindowedFullscreen = IssueInit.substr(WindowedFullscreenStart, VSyncStart - WindowedFullscreenStart);
-
 	EXPECT_NE(IssueInit.find("if(IsExclusiveFullscreen)"), std::string::npos);
 	EXPECT_NE(IssueInit.find("else if(IsDesktopFullscreen)"), std::string::npos);
 	EXPECT_NE(IssueInit.find("else if(IsPurelyWindowed)"), std::string::npos);
-	EXPECT_NE(WindowedFullscreen.find("Flags |= IGraphicsBackend::INITFLAG_BORDERLESS;"), std::string::npos);
+	// 采用上游 478781ad65 后：启动时不再把 windowed fullscreen 标记为无边框，
+	// 也就没有「else // Windowed fullscreen」分支；有边框由 SetWindowParams 运行时负责。
+	EXPECT_EQ(IssueInit.find("else // Windowed fullscreen"), std::string::npos);
+	// 纯窗口模式下的 qm 无边框开关不受影响（这是另一条独立分支）。
+	EXPECT_NE(IssueInit.find("if(g_Config.m_GfxBorderless)"), std::string::npos);
 	EXPECT_NE(Backend.find("const bool IsWindowedFullscreen = g_Config.m_GfxFullscreen == 3;"), std::string::npos);
 	EXPECT_NE(Backend.find("if(IsWindowedFullscreen || (IsFullscreen && !SupportedResolution)"), std::string::npos);
 }

@@ -245,6 +245,60 @@ typedef std::function<bool(uint32_t &Width, uint32_t &Height, CImageInfo::EImage
 
 struct CDataSprite;
 
+class CScreenRect
+{
+public:
+	CScreenRect(float Left, float Top, float Width, float Height) :
+		m_TopLeft(Left, Top), m_BottomRight(Left + Width, Top + Height) {}
+
+	CScreenRect(const vec2 &TopLeft, const vec2 &BottomRight) :
+		m_TopLeft(TopLeft), m_BottomRight(BottomRight) {}
+
+	CScreenRect Move(const vec2 &Position) const
+	{
+		CScreenRect Rect(*this);
+		Rect.m_TopLeft += Position;
+		Rect.m_BottomRight += Position;
+		return Rect;
+	}
+
+	constexpr vec2 Size() const
+	{
+		return m_BottomRight - m_TopLeft;
+	}
+
+	constexpr float Width() const
+	{
+		return m_BottomRight.x - m_TopLeft.x;
+	}
+
+	constexpr float Height() const
+	{
+		return m_BottomRight.y - m_TopLeft.y;
+	}
+
+	constexpr bool Inside(const vec2 &Position) const
+	{
+		return !(!in_range(Position.x, m_TopLeft.x, m_BottomRight.x) || !in_range(Position.y, m_TopLeft.y, m_BottomRight.y));
+	}
+
+	void Expand(float Width, float Height)
+	{
+		m_TopLeft.x -= Width;
+		m_BottomRight.x += Width;
+		m_TopLeft.y -= Height;
+		m_BottomRight.y += Height;
+	}
+
+	void Expand(float Size)
+	{
+		Expand(Size, Size);
+	}
+
+	vec2 m_TopLeft;
+	vec2 m_BottomRight;
+};
+
 class IGraphics : public IInterface
 {
 	MACRO_INTERFACE("graphics")
@@ -484,6 +538,14 @@ public:
 	void MapScreenToGameInterface(float CenterX, float CenterY, float Zoom = 1.0f);
 
 	virtual void GetScreen(float *pTopLeftX, float *pTopLeftY, float *pBottomRightX, float *pBottomRightY) const = 0;
+
+	// QmClient: 对齐上游 CScreenRect（569edee60b）。原四浮点接口保留，后端无需改动。
+	CScreenRect GetScreen() const
+	{
+		float TopLeftX, TopLeftY, BottomRightX, BottomRightY;
+		GetScreen(&TopLeftX, &TopLeftY, &BottomRightX, &BottomRightY);
+		return CScreenRect(vec2(TopLeftX, TopLeftY), vec2(BottomRightX, BottomRightY));
+	}
 
 	// TODO: These should perhaps not be virtuals
 	virtual void BlendNone() = 0;

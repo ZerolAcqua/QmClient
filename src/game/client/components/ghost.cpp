@@ -5,6 +5,7 @@
 #include <base/log.h>
 
 #include <engine/ghost.h>
+#include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/storage.h>
 
@@ -313,6 +314,11 @@ void CGhost::OnRender()
 
 	int PlaybackTick = Client()->PredGameTick(g_Config.m_ClDummy) - m_StartRenderTick;
 
+	// QmClient: 上游 ada53c8cb3 —— ghost 也做屏外裁剪（200x200 盒）。
+	// 本地的玩家/钩子裁剪在 CPlayers 调用层完成，ghost 走不到那条路径，所以在这里补。
+	CScreenRect GhostScreenRect = Graphics()->GetScreen();
+	GhostScreenRect.Expand(100.0f);
+
 	for(auto &Ghost : m_aActiveGhosts)
 	{
 		if(Ghost.Empty())
@@ -345,6 +351,11 @@ void CGhost::OnRender()
 			IntraTick = (GhostTick - Prev.m_Tick - 1 + Client()->PredIntraGameTick(g_Config.m_ClDummy)) / TickDiff;
 
 		Player.m_AttackTick += Client()->GameTick(g_Config.m_ClDummy) - GhostTick;
+
+		// 屏外 ghost 不进入后面的皮肤/忍者渲染信息准备，避免无谓开销。
+		const vec2 GhostPos = mix(vec2(Prev.m_X, Prev.m_Y), vec2(Player.m_X, Player.m_Y), IntraTick);
+		if(!GhostScreenRect.Inside(GhostPos))
+			continue;
 
 		const CTeeRenderInfo *pRenderInfo = &Ghost.m_pManagedTeeRenderInfo->TeeRenderInfo();
 		CTeeRenderInfo GhostNinjaRenderInfo;

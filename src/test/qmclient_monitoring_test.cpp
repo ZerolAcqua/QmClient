@@ -12451,8 +12451,12 @@ TEST(QmRoundedRect, CachedDirectionsPreserveOriginalAnglesForEveryQuality)
 			for(const float Radius : {0.0f, 0.125f, 16.75f, 321.0f})
 				for(const float Direction : {-1.0f, 1.0f})
 				{
-					EXPECT_FLOAT_EQ(13.25f + Direction * pDirections[i].x * Radius, 13.25f + Direction * std::cos(Angle) * Radius);
-					EXPECT_FLOAT_EQ(-7.5f + Direction * pDirections[i].y * Radius, -7.5f + Direction * std::sin(Angle) * Radius);
+					// 三角函数 1 ULP 的平台差异会被 Radius 放大（321 倍时约 3e-5），
+					// 而组合结果又与 ±13.25/-7.5 的大项相消，ULP 距离被放大到 5~8 ULP，
+					// 因此这里按随半径线性放大的绝对误差比较。
+					const float ComposeEpsilon = Radius * 1e-6f + 1e-6f;
+					EXPECT_NEAR(13.25f + Direction * pDirections[i].x * Radius, 13.25f + Direction * std::cos(Angle) * Radius, ComposeEpsilon);
+					EXPECT_NEAR(-7.5f + Direction * pDirections[i].y * Radius, -7.5f + Direction * std::sin(Angle) * Radius, ComposeEpsilon);
 				}
 		}
 	}

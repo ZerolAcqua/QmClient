@@ -2604,6 +2604,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 			1);
 		int RowsIterated = 0;
 		int RowsRendered = 0;
+		int RightDoubleClickIndex = -1;
 		const bool ShowSkinMetadata = g_Config.m_QmSkinShowMetadata != 0;
 		// 单击与双击共用同一份「应用皮肤」赋值路径：先写当前子标签的编辑对象，再按目标角色决定是否改写另一侧。
 		const auto ApplySkinListEntry = [&](const CSkins::CSkinListEntry &Entry, const ETeeSkinApplyTarget Target, const bool ScrollToSelected) {
@@ -2822,6 +2823,20 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 				Graphics()->QuadsEnd();
 			}
 
+			// 双击应用的右键分支：列表框只把左键交给它自己的双击检测（见循环后的
+			// WasItemActivated 消费），右键必须由页面判定。命中条件＝鼠标悬停本项 +
+			// 右键在本帧释放；双击状态用每项独立的 id，不会与列表框左键双击的状态互相污染。
+			// 命中只记录索引，实际赋值留到循环后统一落地，避免渲染本帧其它条目时改写配置。
+			// 这里刻意不再对 Item.m_Rect 注册整项 DoButtonLogic：它覆盖右上角的队列/收藏
+			// 图标，会成为本帧最后一次 SetHotItem，让微型图标永远拿不到 HotItem 而点不动。
+			if(!Ui()->RenderOnly() && Ui()->MouseHovered(&Item.m_Rect) && Ui()->LastMouseButton(1) && !Ui()->MouseButton(1) &&
+				Ui()->DoDoubleClickLogic(SkinListEntry.RightDoubleClickId()))
+			{
+				RightDoubleClickIndex = (int)i;
+			}
+			if(Ui()->MouseHovered(&Item.m_Rect))
+				GameClient()->m_Tooltips.DoToolTip(SkinListEntry.ListItemId(), &Item.m_Rect, Localize("Double-click: left applies to main, right applies to dummy"));
+
 			// render skin favorite icon + queue icon
 			{
 				CUIRect IconRow, FavIcon, QueueIcon;
@@ -2858,19 +2873,6 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 			}
 
 			RenderSkinStatus(Item.m_Rect, pSkinContainer, SkinListEntry.ErrorTooltipId(), PreviewCacheReady);
-			// 双击应用：DoButtonLogic 用左|右键一次拿到按键序号（1=左键，2=右键），
-			// DoDoubleClickLogic 是有状态的双击检测，必须点击门控且每帧每项只调用一次。
-			const int ItemButton = Ui()->DoButtonLogic(SkinListEntry.ListItemId(), 0, &Item.m_Rect, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
-			if(ItemButton != 0 && Ui()->DoDoubleClickLogic(SkinListEntry.ListItemId()))
-			{
-				const ETeeSkinApplyTarget Target = QmTeeSkinApplyTargetForButton(ItemButton);
-				ApplySkinListEntry(SkinListEntry, Target, QmTeeSkinApplyTargetDummy(Target) != (m_Dummy ? 1 : 0));
-			}
-			if(ItemButton != 0)
-			{
-				Ui()->RegisterPassiveHotItem(SkinListEntry.ListItemId(), &Item.m_Rect);
-				GameClient()->m_Tooltips.DoToolTip(SkinListEntry.ListItemId(), &Item.m_Rect, Localize("Double-click: left applies to main, right applies to dummy"));
-			}
 		}
 		const int TailItems = (int)vSkinList.size() - VisibleRange.m_EndItem;
 		if(TailItems > 0)
@@ -3272,6 +3274,14 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 				ApplySkinListEntry(vSkinList[NewSelected], m_Dummy ? ETeeSkinApplyTarget::DUMMY : ETeeSkinApplyTarget::MAIN, false);
 			}
 		}
+		// 双击应用：左键双击由列表框内部判定（DoNextItem 的 DoDoubleClickLogic），这里只在
+		// 「本帧左键释放」时消费它的激活标记——回车确认同样会置位激活，但不属于双击语义；
+		// 右键双击由上面的悬停 + 右键释放判定记录索引。两者都在循环后落地，不改变当前子标签。
+		const bool LeftButtonReleased = Ui()->LastMouseButton(0) && !Ui()->MouseButton(0);
+		if(LeftButtonReleased && s_ListBox.WasItemActivated() && NewSelected >= 0 && NewSelected < (int)vSkinList.size())
+			ApplySkinListEntry(vSkinList[NewSelected], ETeeSkinApplyTarget::MAIN, QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::MAIN) != (m_Dummy ? 1 : 0));
+		if(RightDoubleClickIndex >= 0 && RightDoubleClickIndex < (int)vSkinList.size())
+			ApplySkinListEntry(vSkinList[RightDoubleClickIndex], ETeeSkinApplyTarget::DUMMY, QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::DUMMY) != (m_Dummy ? 1 : 0));
 
 		if(SkinList.UnfilteredCount() > 0 && vSkinList.empty())
 		{

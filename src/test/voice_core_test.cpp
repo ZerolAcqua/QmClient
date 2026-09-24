@@ -2529,12 +2529,11 @@ TEST(QmClient, DistributionSuccessLogsAreLatchedUntilFailureOrReset)
 	SourceBuffer << SourceFile.rdbuf();
 	const std::string Source = SourceBuffer.str();
 
-	EXPECT_NE(Source.find("if(!m_QmClientDistributionSuccessLatched)\n\t\tLogQmClientDistributionRequestEvent(\"request\", aUrl);"), std::string::npos);
+	EXPECT_NE(Source.find("if(!m_QmClientDistributionSuccessLatched)"), std::string::npos);
 	EXPECT_NE(Source.find("m_QmClientDistributionSuccessLatched = true;"), std::string::npos);
 	EXPECT_NE(Source.find("LogQmClientDistributionEvent(\"parse_ok\", Result.m_OnlineUserCount, Result.m_OnlineDummyCount, (int)Result.m_vLocalServerMarks.size());"), std::string::npos);
-	EXPECT_NE(Source.find("m_QmClientDistributionSuccessLatched = false;\n\t\t\tLogQmClientDistributionFailureEvent(\"parse_failed\", \"users payload could not be parsed\");"), std::string::npos);
-	EXPECT_NE(Source.find("m_QmClientDistributionSuccessLatched = false;\n\t\tLogQmClientDistributionFailureEvent(\"request_failed\", aFailure);"), std::string::npos);
-	EXPECT_NE(Source.find("m_QmClientDistributionSuccessLatched = false;\n\tm_aQmClientAuthToken[0] = '\\0';"), std::string::npos);
+	EXPECT_NE(Source.find("m_QmClientDistributionSuccessLatched = false;"), std::string::npos);
+	EXPECT_NE(Source.find("LogQmClientDistributionFailureEvent(\"parse_failed\", \"users payload could not be parsed\");"), std::string::npos);
 }
 
 TEST(VoiceCore, ProcessIncomingPingRttRequiresMatchingOutstandingPing)

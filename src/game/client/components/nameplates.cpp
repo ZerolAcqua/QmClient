@@ -456,15 +456,11 @@ public:
 	void Update(CGameClient &This, const CNamePlateData &Data) override
 	{
 		const bool NeedsTextUpdate = UpdateNeeded(This, Data);
-		if(!m_TextCache.NeedsUpdate(m_Visible, NeedsTextUpdate))
+		// 缓存只跳过「内容没变」的重建；容器一旦失效仍必须重建，否则会永久停在隐藏态。
+		if(!m_TextCache.NeedsUpdate(m_Visible, NeedsTextUpdate) && m_TextContainerIndex.Valid())
 		{
 			if(!m_Visible)
 				return;
-			if(!m_TextContainerIndex.Valid())
-			{
-				m_Visible = false;
-				return;
-			}
 			const float EffectPadding = m_UseTextEffects ? QmNameplateTextEffectPadding(g_Config.m_QmNameplateTextEffects, g_Config.m_QmNameplateTextBorderRange, g_Config.m_QmNameplateTextGlowRange) : 0.0f;
 			const float ExtraPadding = ExtraVerticalPadding();
 			m_Size = m_RenderSize + vec2(EffectPadding * 2.0f, EffectPadding * 2.0f + ExtraPadding * 2.0f);

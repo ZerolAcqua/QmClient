@@ -295,19 +295,21 @@ SQmAxiomLookupResult CQmAxiomScores::GetLookup(const char *pPlayerName) const
 
 	const SCacheEntry &Entry = It->second;
 	Result.m_Points = Entry.m_Points;
-	// 搜索未就绪：FETCHING 表示「已发起查询」（记分板可据此区分未查/查询中），
-	// 其余原样暴露失败态。
+	// 搜索未就绪：FETCHING 表示「已发起查询」。
+	// 缓存里已有条目但搜索仍是 NOT_REQUESTED（限流排队）时，对外按查询中，
+	// 否则与「已淘汰/未查询」无法区分。
 	if(Entry.m_SearchStatus != EQmAxiomScoreStatus::READY)
 	{
-		Result.m_Status = Entry.m_SearchStatus;
+		Result.m_Status = Entry.m_SearchStatus == EQmAxiomScoreStatus::NOT_REQUESTED ?
+					  EQmAxiomScoreStatus::FETCHING :
+					  Entry.m_SearchStatus;
 		return Result;
 	}
-	// 搜索已命中但分数未就绪：对外统一为 NOT_REQUESTED，避免半截状态露出分数列。
+	// 搜索已命中但分数未就绪：原样暴露分数态。
+	// FETCHING 表示「已发起分数查询」，不能抹成 NOT_REQUESTED，否则淘汰/缓存语义测试无法区分已查询与未查询。
 	if(Entry.m_PointsStatus != EQmAxiomScoreStatus::READY)
 	{
-		Result.m_Status = Entry.m_PointsStatus == EQmAxiomScoreStatus::FETCHING ?
-					  EQmAxiomScoreStatus::NOT_REQUESTED :
-					  Entry.m_PointsStatus;
+		Result.m_Status = Entry.m_PointsStatus;
 		return Result;
 	}
 	Result.m_Status = EQmAxiomScoreStatus::READY;
@@ -426,6 +428,9 @@ void CQmAxiomScores::OnUpdate()
 void CQmAxiomScores::OnReset()
 {
 	AbortActiveRequests(true);
+	// 复位后丢弃查询登记：GetLookup 对缺失键返回 NOT_REQUESTED，
+	// 与「已在缓存但尚未起步」的 FETCHING 区分开。
+	m_Cache.clear();
 }
 
 void CQmAxiomScores::OnShutdown()

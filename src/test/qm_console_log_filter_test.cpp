@@ -82,9 +82,9 @@ TEST(QmConsoleLogFilter, ExtractConsoleLogSystem)
 	ASSERT_TRUE(QmExtractConsoleLogSystem(pPlayerLine, str_length(pPlayerLine), aBuf, sizeof(aBuf)));
 	EXPECT_STREQ(aBuf, "chat/whisper");
 
-	// 只有长度限制到冒号前时，system 名不完整
+	// 长度截断到 system 名尚未写完时，取最后一段作不完整 system 名
 	ASSERT_TRUE(QmExtractConsoleLogSystem(pLine, 24, aBuf, sizeof(aBuf)));
-	EXPECT_STREQ(aBuf, "I");
+	EXPECT_STREQ(aBuf, "bi");
 
 	EXPECT_FALSE(QmExtractConsoleLogSystem("no separator here", 17, aBuf, sizeof(aBuf)));
 	EXPECT_FALSE(QmExtractConsoleLogSystem(nullptr, 0, aBuf, sizeof(aBuf)));

@@ -1288,6 +1288,9 @@ void CHud::RenderGameTimer()
 		TimerInfo.m_IsCritical = false;
 	}
 
+	// 录制红点羽化比例与岛共用同一份实现，必须在 HUD 编辑器改写屏幕映射之前取值。
+	const float RecordingDotScreenPixelSize = CurrentScreenPixelSize(Graphics());
+
 	if(g_Config.m_QmHudIslandUseOriginalStyle)
 	{
 		m_RecordingStatusAnimState.Reset();
@@ -1309,8 +1312,6 @@ void CHud::RenderGameTimer()
 	const SHudTopTimerCapsuleInfo TimerCapsule = BuildHudTopTimerCapsuleInfo(TimerInfo);
 	if(!TimerCapsule.m_Visible)
 		return;
-
-	const float RecordingDotScreenPixelSize = CurrentScreenPixelSize(Graphics());
 
 	constexpr float TimerRadius = QmHudMediaIslandScaled(8.0f);
 	constexpr float StatusSectionGap = QmHudMediaIslandScaled(3.0f);

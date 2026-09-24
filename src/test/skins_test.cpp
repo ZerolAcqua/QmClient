@@ -1048,7 +1048,7 @@ TEST(Skins, SkinTransitionUsesDefaultKeyWhenInitialDescriptorIsNotReady)
 
 	EXPECT_NE(UpdateRenderInfoBody.find("CSkinDescriptor RenderSkinDescriptor = SkinDescriptor;"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("const bool DescriptorRenderInfoReady = m_pSkinInfo->DescriptorRenderInfoReady();"), std::string::npos);
-	EXPECT_NE(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousSixSkinResident)"), std::string::npos);
+	EXPECT_NE(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousRenderInfoAlive && PreviousSixSkinResident)"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("CSkins::CanReusePreviousSixSkin("), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("else if(!DescriptorRenderInfoReady)"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("const float OriginalSize = NewRenderInfo.m_Size;"), std::string::npos);
@@ -1188,7 +1188,7 @@ TEST(Skins, DefaultFallbackNeverAppliesTheUntexturedPlaceholder)
 	ASSERT_FALSE(RenderTeeBody.empty());
 	EXPECT_NE(RenderTeeBody.find("const bool SixupBodyValid"), std::string::npos);
 	EXPECT_NE(RenderTeeBody.find("const bool SixBodyValid"), std::string::npos);
-	EXPECT_NE(RenderTeeBody.find("CTeeRenderInfo::IsLiveDrawableTexture"), std::string::npos);
+	EXPECT_NE(RenderTeeBody.find("IsDrawableTextureAlive"), std::string::npos);
 	EXPECT_NE(RenderTeeBody.find("else if(SixBodyValid)"), std::string::npos);
 	EXPECT_EQ(RenderTeeBody.find("else\n\t\treturn;"), std::string::npos);
 	EXPECT_LT(RenderTeeBody.find("else if(SixBodyValid)"), RenderTeeBody.find("Graphics()->SetColor(1.f, 1.f, 1.f, 1.f);"));
@@ -1285,10 +1285,10 @@ TEST(Skins, SkinTransitionKeepsPreviousSkinBaseWhileDescriptorIsPending)
 	const std::string UpdateRenderInfoBody = Source.substr(UpdateRenderInfoPos, UpdateTransitionPos - UpdateRenderInfoPos);
 
 	EXPECT_NE(UpdateRenderInfoBody.find("const bool DescriptorRenderInfoReady = m_pSkinInfo->DescriptorRenderInfoReady();"), std::string::npos);
-	EXPECT_NE(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousSixSkinResident)"), std::string::npos);
+	EXPECT_NE(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousRenderInfoAlive && PreviousSixSkinResident)"), std::string::npos);
 	EXPECT_NE(UpdateRenderInfoBody.find("NewRenderInfo = m_RenderInfo;"), std::string::npos);
 	EXPECT_EQ(UpdateRenderInfoBody.find("return;\n\t\t}"), std::string::npos);
-	EXPECT_LT(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousSixSkinResident)"), UpdateRenderInfoBody.find("// force team colors"));
+	EXPECT_LT(UpdateRenderInfoBody.find("if(!DescriptorRenderInfoReady && m_RenderInfo.Valid() && PreviousRenderInfoAlive && PreviousSixSkinResident)"), UpdateRenderInfoBody.find("// force team colors"));
 	EXPECT_LT(UpdateRenderInfoBody.find("// force team colors"), UpdateRenderInfoBody.find("UpdateSkinChangeTransition(NewRenderInfo, RenderSkinDescriptor);"));
 }
 
@@ -1943,10 +1943,10 @@ TEST(Skins, AsyncSkinListKeepsQueuedColorVariantsSelectable)
 	EXPECT_NE(Source.find("Entry.m_ColorKey.has_value() ? std::make_optional(MakeSkinListColorKey(Entry.m_ColorKey.value())) : std::nullopt"), std::string::npos);
 	EXPECT_NE(Source.find("MakeSkinListEntry(SkinIt->second.get(), ColorKey)"), std::string::npos);
 
-	EXPECT_NE(MenuSource.find("SelectedSkinEntry.ColorKey().has_value()"), std::string::npos);
-	EXPECT_NE(MenuSource.find("*pUseCustomColor = SelectedColorKey.m_UseCustomColor ? 1 : 0;"), std::string::npos);
-	EXPECT_NE(MenuSource.find("*pColorBody = SelectedColorKey.m_ColorBody;"), std::string::npos);
-	EXPECT_NE(MenuSource.find("*pColorFeet = SelectedColorKey.m_ColorFeet;"), std::string::npos);
+	EXPECT_NE(MenuSource.find("Entry.ColorKey().has_value()"), std::string::npos);
+	EXPECT_NE(MenuSource.find("Entry.ColorKey()->m_UseCustomColor"), std::string::npos);
+	EXPECT_NE(MenuSource.find("Entry.ColorKey()->m_ColorBody"), std::string::npos);
+	EXPECT_NE(MenuSource.find("Entry.ColorKey()->m_ColorFeet"), std::string::npos);
 }
 
 TEST(Skins, DirectoryScanMergesLocalAndDownloadedSkinsWithLocalPriority)

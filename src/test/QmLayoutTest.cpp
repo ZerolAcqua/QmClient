@@ -499,13 +499,9 @@ TEST(QmScoreboardSkin, SixupDoesNotChangeEitherRole)
 	}
 }
 
-// 意图：皮肤列表双击左键改本体、双击右键改分身；DoButtonLogic 返回 1=左键 / 2=右键。
-TEST(QmTeeSkinApply, ButtonResultSelectsTheTargetRole)
+// 意图：双击的目标角色与「分身」判定的映射保持 本体=0 / 分身=1。
+TEST(QmTeeSkinApply, TargetRoleMappingKeepsMainAndDummyDistinct)
 {
-	EXPECT_EQ(QmTeeSkinApplyTargetForButton(1), ETeeSkinApplyTarget::MAIN);
-	EXPECT_EQ(QmTeeSkinApplyTargetForButton(2), ETeeSkinApplyTarget::DUMMY);
-	// 0 只作为防御性输入；真实调用点已用 ItemButton != 0 门控。
-	EXPECT_EQ(QmTeeSkinApplyTargetForButton(0), ETeeSkinApplyTarget::MAIN);
 	EXPECT_EQ(QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::MAIN), 0);
 	EXPECT_EQ(QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::DUMMY), 1);
 }

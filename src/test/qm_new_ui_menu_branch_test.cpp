@@ -1335,7 +1335,10 @@ TEST(QmUiScaleSource, BlockingPopupsAndDemoRowsFitScaledScreen)
 	EXPECT_NE(Menus.find("QmUiCenteredMargin(Box, 150.0f, 300.0f, 300.0f)"), std::string::npos);
 	EXPECT_NE(Menus.find("QmUiCenteredMargin(Screen, 150.0f, 300.0f, 300.0f)"), std::string::npos);
 	EXPECT_NE(DemoMenus.find("QmUiVisibleRows(SegmentsArea.h"), std::string::npos);
-	EXPECT_NE(DemoMenus.find("VerticalExpansion = std::min(60.0f, PopupMargin)"), std::string::npos);
+	// 导出弹窗改走 qm_demo_ui::PopupRect（宽高都夹到屏幕内），
+	// 旧的 PopupMargin/VerticalExpansion 就地夹取已不存在；
+	// 夹取行为由 QmDemoUi.ExportContentGrowsOnlyForVisibleOptionsAndSegments 直接断言。
+	EXPECT_NE(DemoMenus.find("CUIRect Box = qm_demo_ui::PopupRect(MainView, ContentHeight + 86.0f);"), std::string::npos);
 }
 
 TEST(QmDemoCutRender, UsesExportedCutAsRenderSource)
@@ -1554,6 +1557,7 @@ TEST(QmNewUiMenuBranches, BrowserUsesExplicitQmNewUiShellBranch)
 	// 服务器列表只保留外层卡片框：New UI 分支不再额外内缩。
 	EXPECT_NE(Source.find("ServerListBase.Margin(2.0f, &ServerListBase);"), std::string::npos);
 	EXPECT_EQ(Source.find("ServerListBase.Margin(10.0f, &ServerListBase);"), std::string::npos);
+	// 老 UI 顶栏圆角是 10.0f 的既有观感，不要为了 token 化改成 ui_token::radius::CARD(14.0f)。
 	EXPECT_NE(TopOldUiBlock.find("View.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);"), std::string::npos);
 	EXPECT_NE(TopOldUiBlock.find("View.Margin(10.0f, &View);"), std::string::npos);
 	EXPECT_EQ(TopOldUiBlock.find("View.Margin(std::clamp(View.w * 0.008f, 4.0f, 8.0f), &View);"), std::string::npos);
@@ -1828,11 +1832,14 @@ TEST(QmNewUiMenuBranches, QmClientUpdateFlowUsesQmClientNamingAndComparisonHelpe
 	EXPECT_NE(TClientSource.find("Force && m_UpdateShutdownRequested"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("MACRO_CONFIG_INT(QmAutoUpdate, qm_auto_update, 0"), std::string::npos);
 	EXPECT_NE(ConfigSource.find("QmShowOutdatedVersionWarning"), std::string::npos);
-	EXPECT_NE(QmMenusSource.find("Show outdated version warning"), std::string::npos);
 	const std::string FunctionMetrics = ReadTextFile("src/game/client/QmUi/cards/QmCardCatalogFunctionMetrics.h");
 	EXPECT_NE(FunctionMetrics.find("Localizable(\"Automatic updates\")"), std::string::npos);
 	EXPECT_NE(FunctionMetrics.find("Localizable(\"Show outdated version warning\")"), std::string::npos);
 	EXPECT_NE(FunctionMetrics.find("{&g_Config.m_QmAutoUpdate,"), std::string::npos);
+	// 卡片目录重构后该行迁到 metrics 表，标签与配置绑定的双重强度在这里继续钉住。
+	EXPECT_NE(FunctionMetrics.find("{&g_Config.m_QmShowOutdatedVersionWarning, Localizable(\"Show outdated version warning\")"), std::string::npos);
+	// 菜单页骨架里不该再有这条文案的生产者。
+	EXPECT_EQ(QmMenusSource.find("Show outdated version warning"), std::string::npos);
 
 	EXPECT_NE(TClientHeader.find("m_pQmClientUpdateInfoTask"), std::string::npos);
 	EXPECT_NE(TClientHeader.find("m_FetchedQmClientUpdateInfo"), std::string::npos);
@@ -2459,6 +2466,30 @@ TEST(QmNewUiMenuBranches, QmFeatureDefaultsAreDisabledExceptRequiredDefaults)
 		"QmAutoUpdate",
 		"QmSwitchCountdown",
 		"QmMessageMerge",
+		// 增强渲染三条管线开关：仅当增强渲染启用时才决定用不用 SDF/模糊/MSDF。
+		"QmEnhancedSdf",
+		"QmEnhancedBlur",
+		"QmEnhancedMsdf",
+		// 赞助提醒：默认展示，属产品决定的提醒项。
+		"QmSponsorNudge",
+		// 碰撞盒总开关默认关，这些是它内部的子元素复选框；既有的「总开关」断言在下面。
+		"QmHitboxShowTeeCollision",
+		"QmHitboxShowTeeFreeze",
+		"QmHitboxShowTeeDeath",
+		"QmHitboxShowHammer",
+		"QmHitboxShowProjectiles",
+		"QmHitboxShowLasers",
+		"QmHitboxShowFreezeLasers",
+		"QmHitboxShowHook",
+		// 表情可见性过滤与演示聊天显示：保持既有观感，默认开。
+		"QmShowOtherSuperEmotes",
+		"QmShowOtherLaunchEmotes",
+		"QmDemoShowChat",
+		// 名牌特效自动 LOD 默认开，拥挤时自动降级。
+		"QmNameplateEffectAutoLod",
+		// 歌词集成开关默认开，与 QmNeteaseHookEnable 同族。
+		"QmLyrics",
+		"QmLyricsInMediaIsland",
 	};
 	std::istringstream Lines(ConfigSource);
 	std::string Line;
@@ -2845,6 +2876,7 @@ TEST(QmNewUiMenuBranches, NameplateStrongHookRowReservesLayoutWithoutContentWidt
 	const std::string RangeSize = FunctionBody(Source, "vec2 RangeSize(");
 	const std::string AddHookRow = FunctionBody(Source, "void AddHookRow(");
 	const std::string RenderNamePlateGame = FunctionBody(Source, "void CNamePlates::RenderNamePlateGame");
+	const std::string BuildPreviewData = FunctionBody(Source, "static void BuildNamePlatePreviewData");
 
 	EXPECT_NE(Source.find("bool m_ReserveHookStrongWeakRow;"), std::string::npos);
 	EXPECT_NE(Source.find("bool m_ReserveLineHeight = false;"), std::string::npos);
@@ -2854,9 +2886,12 @@ TEST(QmNewUiMenuBranches, NameplateStrongHookRowReservesLayoutWithoutContentWidt
 	EXPECT_NE(RangeSize.find("LineSize.y = std::max(LineSize.y, Part.Size().y + Part.Padding().y);"), std::string::npos);
 	EXPECT_NE(AddHookRow.find("AddPart<CNamePlatePartHookStrongWeakRowReserve>(This);"), std::string::npos);
 	EXPECT_LT(AddHookRow.find("AddPart<CNamePlatePartHookStrongWeakRowReserve>(This);"), AddHookRow.find("AddPart<CNamePlatePartHookStrongWeak>(This);"));
-	EXPECT_NE(RenderNamePlateGame.find("Data.m_ReserveHookStrongWeakRow = g_Config.m_Debug || g_Config.m_ClNamePlatesStrong > 0;"), std::string::npos);
+	// 运行期走解析后的 DisplaySettings；预览路径仍直接读 g_Config，两条都要钉住。
+	EXPECT_NE(RenderNamePlateGame.find("Data.m_ReserveHookStrongWeakRow = (g_Config.m_Debug && !DemoPlayback) || DisplaySettings.m_StrongWeak > 0;"), std::string::npos);
 	EXPECT_NE(RenderNamePlateGame.find("Data.m_ShowHookStrongWeak = false;"), std::string::npos);
-	EXPECT_NE(RenderNamePlateGame.find("Data.m_ShowHookStrongWeak = g_Config.m_Debug || (g_Config.m_ClNamePlatesStrong > 0 && ShouldShowQmHookStrongWeakScope(g_Config.m_QmNameplateHookStrongWeakScope, false, Strong, Weak));"), std::string::npos);
+	EXPECT_NE(RenderNamePlateGame.find("Data.m_ShowHookStrongWeak = (g_Config.m_Debug && !DemoPlayback) || (DisplaySettings.m_StrongWeak > 0 && ShouldShowQmHookStrongWeakScope(DisplaySettings.m_StrongWeakScope, false, Strong, Weak));"), std::string::npos);
+	EXPECT_NE(BuildPreviewData.find("Data.m_ReserveHookStrongWeakRow = g_Config.m_Debug || g_Config.m_ClNamePlatesStrong > 0;"), std::string::npos);
+	EXPECT_NE(BuildPreviewData.find("Data.m_ShowHookStrongWeak = NameplateScopeAllowsPreview && g_Config.m_ClNamePlatesStrong > 0 && ShouldShowQmHookStrongWeakScope(g_Config.m_QmNameplateHookStrongWeakScope, false, Strong, Weak);"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, NameplatePreviewNameScopeGatesPlateExceptDirectionKeys)
@@ -2938,13 +2973,16 @@ TEST(QmNewUiMenuBranches, NameplateGameUsesFullScopeReferenceFrame)
 
 TEST(QmNewUiMenuBranches, MediaIslandLyricsUsesNeteaseIntegration)
 {
+	// 岛内歌词改由逐帧快照缓存分发：网易云优先，汽水/酷狗/QQ 兜底，Spotify 再后备。
 	const std::string HudSource = ReadTextFile("src/game/client/components/hud.cpp");
-	const std::string RenderMediaIsland = FunctionBody(HudSource, "void CHud::RenderMediaIsland()");
+	const std::string FrameCache = FunctionBody(HudSource, "void CHud::EnsureMediaIslandFrameCache() const");
+	ASSERT_FALSE(FrameCache.empty());
 	const std::string IntegrationSource = ReadTextFile("src/game/client/components/qmclient/netease/netease_integration.cpp");
-	EXPECT_NE(RenderMediaIsland.find("GameClient()->m_NeteaseIntegration.GetCurrentLyric"), std::string::npos);
-	EXPECT_EQ(RenderMediaIsland.find("m_QmLyrics"), std::string::npos);
-	EXPECT_NE(IntegrationSource.find("qm_lyrics"), std::string::npos);
-	EXPECT_NE(IntegrationSource.find("qm_lyrics_in_media_island"), std::string::npos);
+	EXPECT_NE(FrameCache.find("GameClient()->m_NeteaseIntegration.GetCurrentLyric"), std::string::npos);
+	EXPECT_NE(FrameCache.find("GameClient()->m_MusicLyricsIntegration.GetCurrentLyric"), std::string::npos);
+	EXPECT_NE(FrameCache.find("GameClient()->m_SpotifyIntegration.GetCurrentLyric"), std::string::npos);
+	EXPECT_NE(IntegrationSource.find("g_Config.m_QmLyrics"), std::string::npos);
+	EXPECT_NE(IntegrationSource.find("g_Config.m_QmLyricsInMediaIsland"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, HudNotificationsKeepEdgeGeometryStableDuringSlide)
@@ -3828,13 +3866,18 @@ TEST(QmNewUiMenuBranches, ServerBrowserQmClientColumnUsesDistributionCount)
 	const std::string BrowserServerList = FunctionBody(Source, "void CMenus::RenderServerbrowserServerList(");
 	ASSERT_FALSE(BrowserServerList.empty());
 
-	// 「梦」列直接显示中心服下发的在线分布总数（Qm + Arg），并按服务器地址匹配。
+	// 「梦」列直接显示中心服下发的在线分布总数（Qm + Arg）：
+	// 分布推送到引擎物化成 m_QmClientCount，列只读计数，不再直接问中心服。
 	// 列定义与宽度配置的断言在 ServerBrowserColumnsStayVisibleAndSizedToContent 里。
-	EXPECT_NE(Source.find("MACRO_CONFIG_INT(BrColWidthQmClients, br_col_width_qm_clients"), std::string::npos);
+	EXPECT_NE(ReadTextFile("src/engine/shared/config_variables.h").find("MACRO_CONFIG_INT(BrColWidthQmClients, br_col_width_qm_clients, 24, 20, 120"), std::string::npos);
 	EXPECT_NE(Source.find("g_Config.m_BrColWidthQmClients = 24;"), std::string::npos);
-	EXPECT_NE(BrowserServerList.find("GameClient()->m_QmClient.QmClientServerDistribution()"), std::string::npos);
-	EXPECT_NE(BrowserServerList.find("const int Count = Distribution.m_UserCount + Distribution.m_DummyCount;"), std::string::npos);
-	EXPECT_NE(BrowserServerList.find("net_addr_str(&pInfo->m_aAddresses[0], aAddress, sizeof(aAddress), true);"), std::string::npos);
+	// 推送侧：分布 → 每服计数。
+	EXPECT_NE(ReadTextFile("src/game/client/components/qmclient/qmclient.cpp").find("const int Count = Distribution.m_UserCount + Distribution.m_DummyCount;"), std::string::npos);
+	EXPECT_NE(ReadTextFile("src/game/client/components/qmclient/qmclient.cpp").find("pServerBrowser->SetQmClientServerCounts(Counts);"), std::string::npos);
+	// 引擎侧：按服务器地址匹配并把计数物化进 server info。
+	EXPECT_NE(ReadTextFile("src/engine/client/serverbrowser.cpp").find("net_addr_str(&Info.m_aAddresses[0], aAddress, sizeof(aAddress), true);"), std::string::npos);
+	// 列侧：只读物化后的计数。
+	EXPECT_NE(BrowserServerList.find("const int QmClients = pItem->m_QmClientCount;"), std::string::npos);
 	// 没有梦客户端的服务器留空，不写 0。
 	EXPECT_NE(BrowserServerList.find("if(QmClients > 0)"), std::string::npos);
 	// 排序键由 CQmClient 推给引擎（SORT_QM_CLIENTS），表头可点出正/倒序；列头是品牌字，直接显示不走 Localize。
@@ -4507,7 +4550,8 @@ TEST(QmNewUiMenuBranches, QmSettingsCardsUseSharedStyleHelpers)
 	EXPECT_NE(NamePlateBranch.find("ResolveSettingsRadioRowLayout"), std::string::npos);
 	EXPECT_NE(NamePlateBranch.find("if(NamePlateStrongEnabled())"), std::string::npos);
 	EXPECT_NE(NamePlateBranch.find("vCards.back().m_MeasureRevision ="), std::string::npos);
-	EXPECT_NE(NamePlateBranch.find("m_PreLayoutInput = [this, LineSize, MarginSmall, AppearanceMetrics, NamePlateSectionHeaderHeight, NamePlateColorPickerHeight, NamePlateStrongEnabled]"), std::string::npos);
+	// 捕获列表随后续卡片功能扩展；这里只钉住「预布局闭包按值捕获本页测量量」的开头，避免跟随漂移。
+	EXPECT_NE(NamePlateBranch.find("m_PreLayoutInput = [this, LineSize, MarginSmall,"), std::string::npos);
 	EXPECT_EQ(NamePlateBranch.find("LeftView.HSplitTop(NamePlateContentPaddingY"), std::string::npos);
 	EXPECT_EQ(NamePlateBranch.find("RightView.HSplitTop(NamePlateContentPaddingY"), std::string::npos);
 	EXPECT_EQ(NamePlateBranch.find("NamePlateSettingsShadow.Draw"), std::string::npos);
@@ -5917,7 +5961,8 @@ TEST(QmNewUiMenuBranches, VulkanApiSelectionDefaultsTo11AndTreats14AsStrict)
 	EXPECT_NE(SelectGpu.find("m_RequiredVulkanVersionUnavailable = !HasRequiredVersionDevice;"), std::string::npos);
 	EXPECT_NE(SelectGpu.find("m_EffectiveApiVersion"), std::string::npos);
 	EXPECT_NE(InitVulkanSdl.find("g_Config.m_QmVulkanApiVersion = 11;"), std::string::npos);
-	EXPECT_NE(InitVulkanSdl.find("falling back to Vulkan 1.1"), std::string::npos);
+	// 回退逻辑抽成 InitVulkanSDL 内的 FallbackToVulkan11 lambda：同函数体内仍能看到 1.1 回退。
+	EXPECT_NE(InitVulkanSdl.find("Falling back to Vulkan 1.1"), std::string::npos);
 	EXPECT_EQ(InitVulkanSdl.find("m_LastVulkanInstanceCreateResult != VK_ERROR_INCOMPATIBLE_DRIVER"), std::string::npos);
 	EXPECT_NE(InitVulkanSdl.find("The selected Vulkan 1.4 instance could not be created"), std::string::npos);
 	EXPECT_NE(InitVulkanSdl.find("FallbackToVulkan11"), std::string::npos);
@@ -6450,19 +6495,32 @@ TEST(QmNewUiMenuBranches, TeeRestoresCardContentsAndKeepsDoubleClickActions)
 	EXPECT_EQ(Tee.find("const SSettingsTeeCustomColorsLayout TeeCustomColors"), std::string::npos);
 	// 双击功能保留，布局恢复不能移除本体与分身的快捷应用入口。
 	EXPECT_EQ(Tee.find("MouseDoubleClick"), std::string::npos);
-	const size_t ItemButton = Tee.find("const int ItemButton = Ui()->DoButtonLogic(SkinListEntry.ListItemId(), 0, &Item.m_Rect, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);");
-	ASSERT_NE(ItemButton, std::string::npos);
-	EXPECT_NE(Tee.find("if(ItemButton != 0 && Ui()->DoDoubleClickLogic(SkinListEntry.ListItemId()))", ItemButton), std::string::npos);
-	EXPECT_NE(Tee.find("QmTeeSkinApplyTargetForButton(ItemButton)"), std::string::npos);
-	EXPECT_NE(Tee.find("ApplySkinListEntry(SkinListEntry, Target, QmTeeSkinApplyTargetDummy(Target) != (m_Dummy ? 1 : 0));"), std::string::npos);
-	const size_t DoubleClick = Tee.find("Ui()->DoDoubleClickLogic(", ItemButton);
-	ASSERT_NE(DoubleClick, std::string::npos);
-	EXPECT_EQ(Tee.find("Ui()->DoDoubleClickLogic(", DoubleClick + 1), std::string::npos);
+	// 左键双击消费列表框激活结果（门控在本帧左键释放，避免回车确认走入双击路径）；
+	// 右键双击由页面按「悬停本项 + 右键释放」自行判定，双击状态用每项独立的 id。
+	EXPECT_NE(Tee.find("const bool LeftButtonReleased = Ui()->LastMouseButton(0) && !Ui()->MouseButton(0);"), std::string::npos);
+	EXPECT_NE(Tee.find("if(LeftButtonReleased && s_ListBox.WasItemActivated() && NewSelected >= 0 && NewSelected < (int)vSkinList.size())"), std::string::npos);
+	EXPECT_NE(Tee.find("ApplySkinListEntry(vSkinList[NewSelected], ETeeSkinApplyTarget::MAIN, QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::MAIN) != (m_Dummy ? 1 : 0));"), std::string::npos);
+	const size_t RightDoubleClick = Tee.find("if(!Ui()->RenderOnly() && Ui()->MouseHovered(&Item.m_Rect) && Ui()->LastMouseButton(1) && !Ui()->MouseButton(1) &&");
+	ASSERT_NE(RightDoubleClick, std::string::npos);
+	EXPECT_NE(Tee.find("Ui()->DoDoubleClickLogic(SkinListEntry.RightDoubleClickId())", RightDoubleClick), std::string::npos);
+	EXPECT_NE(Tee.find("RightDoubleClickIndex = (int)i;", RightDoubleClick), std::string::npos);
+	EXPECT_NE(Tee.find("if(RightDoubleClickIndex >= 0 && RightDoubleClickIndex < (int)vSkinList.size())"), std::string::npos);
+	EXPECT_NE(Tee.find("ApplySkinListEntry(vSkinList[RightDoubleClickIndex], ETeeSkinApplyTarget::DUMMY, QmTeeSkinApplyTargetDummy(ETeeSkinApplyTarget::DUMMY) != (m_Dummy ? 1 : 0));"), std::string::npos);
+	EXPECT_NE(Tee.find("int RightDoubleClickIndex = -1;"), std::string::npos);
+	// 命中来源：网格项内不得再对 Item.m_Rect 注册整项按钮。整项按钮覆盖右上角的
+	// 队列/收藏图标，会成为本帧最后一次 SetHotItem，微型图标拿不到 HotItem，
+	// 队列与收藏点击全部失效（图标按钮必须由列表框自身按 ListItemId 处理）。
+	EXPECT_EQ(Tee.find("&Item.m_Rect, BUTTONFLAG"), std::string::npos);
+	EXPECT_NE(Tee.find("DoButtonSkinQueue(&s_vQueueButtonIds[i]", RightDoubleClick), std::string::npos);
+	EXPECT_NE(Tee.find("DoButton_Favorite(SkinListEntry.FavoriteButtonId()", RightDoubleClick), std::string::npos);
 	// 单击与双击共用同一份赋值路径。
 	EXPECT_NE(Tee.find("ApplySkinListEntry(vSkinList[NewSelected], m_Dummy ? ETeeSkinApplyTarget::DUMMY : ETeeSkinApplyTarget::MAIN, false);"), std::string::npos);
 	EXPECT_NE(Tee.find("QmApplyTeeSkinToTarget(g_Config, Target, Entry.SkinContainer()->Name(), HasColorKey, EntryUseCustomColor, EntryColorBody, EntryColorFeet);"), std::string::npos);
 	EXPECT_NE(Source.find("#include <game/client/components/qmclient/tee_skin_apply.h>"), std::string::npos);
 	EXPECT_NE(Tee.find("Localize(\"Double-click: left applies to main, right applies to dummy\")"), std::string::npos);
+	// 右键双击状态 id 必须与列表框左键双击使用的 ListItemId 区分开。
+	const std::string SkinsHeader = ReadTextFile("src/game/client/components/skins.h");
+	EXPECT_NE(SkinsHeader.find("const void *RightDoubleClickId() const { return &m_RightDoubleClickId; }"), std::string::npos);
 }
 
 TEST(QmNewUiMenuBranches, TeeOriginalLayoutRestoresSavedVersionEightPositions)
@@ -7034,7 +7092,9 @@ TEST(QmNewUiMenuBranches, RoundedUiSurfacesUseClampedGeometryAndSharedPaths)
 	EXPECT_NE(FunctionBody(ScrollRegion, "void CScrollRegion::DoSlider()").find("DrawRoundedSurface(Ui(), Slider"), std::string::npos);
 	EXPECT_NE(QmClientMenus.find("DrawRoundedSurface(Ui(), Frame.m_Frame.m_ScrollbarTrackRect"), std::string::npos);
 	EXPECT_NE(QmClientMenus.find("DrawRoundedSurface(Ui(), QrRect"), std::string::npos);
-	EXPECT_NE(QmClientMenus.find("DrawRoundedSurface(Ui(), Preview, PreviewBg"), std::string::npos);
+	// 头衔成品预览走共享圆角表面路径（歌词预览已随歌词 API 移除，改钉存留的预览面）。
+	EXPECT_NE(QmClientMenus.find("DrawRoundedSurface(Ui(), Preview, ColorRGBA(0.0f, 0.0f, 0.0f, 0.3f), ColorRGBA(1.0f, 1.0f, 1.0f, 0.14f), ui_token::radius::BASE);"), std::string::npos);
+	EXPECT_EQ(QmClientMenus.find("Preview.Draw("), std::string::npos);
 	EXPECT_NE(TClientMenus.find("DrawRoundedSurface(Ui(), PlayerRect, NameButtonColor"), std::string::npos);
 	EXPECT_NE(TClientMenus.find("DrawRoundedSurface(Ui(), ClanRect, ClanButtonColor"), std::string::npos);
 	EXPECT_NE(TClientMenus.find("if(!ReadOnly && NameButtonColor.a > 0.0f)"), std::string::npos);
@@ -7271,8 +7331,11 @@ TEST(QmNewUiMenuBranches, NameplateTextRasterizesAtStandardZoom)
 	// 不会再出现"部分玩家清晰、部分玩家发虚"。
 	const std::string Source = ReadTextFile("src/game/client/components/nameplates.cpp");
 	EXPECT_NE(Source.find("This.Graphics()->MapScreenToGameInterface(This.m_Camera.m_Center.x, This.m_Camera.m_Center.y);"), std::string::npos);
-	// 文本容器失效时不得因为 UpdateNeeded() 为假而跳过重建（官方行为）。
-	EXPECT_NE(Source.find("if(!NeedsTextUpdate && m_TextContainerIndex.Valid())"), std::string::npos);
+	// 文本重建改由 CQmNameplateTextCache 判定，但缓存只能跳过「内容没变」的重建：
+	// 容器失效时仍必须重建（官方行为），否则会永久停在隐藏态。
+	EXPECT_NE(Source.find("if(!m_TextCache.NeedsUpdate(m_Visible, NeedsTextUpdate) && m_TextContainerIndex.Valid())"), std::string::npos);
+	EXPECT_NE(Source.find("m_TextCache.Reset();"), std::string::npos);
+	EXPECT_NE(ReadTextFile("src/game/client/components/qmclient/nameplate_text_cache.h").find("bool NeedsUpdate(bool Visible, bool Changed) const { return Visible && (Changed || !m_Updated); }"), std::string::npos);
 
 	// 旧的"按真实屏幕映射密度栅格化 + 缩放停稳判定 + 每帧重建预算"机制必须整体移除：
 	// 它只在"刚停稳那一帧"放行重建，且每帧只允许 64 个文本部件重建，

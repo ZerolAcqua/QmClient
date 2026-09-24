@@ -275,42 +275,47 @@ int CConsole::ParseArgs(CResult *pResult, const char *pFormat)
 				pStr[0] = '\0';
 				pStr++;
 			}
-
-			// validate arguments
-			if(Command == 'v')
-			{
-				pResult->SetVictim(pResult->GetString(pResult->NumArguments() - 1));
-			}
-			else if(Command == 'i')
-			{
-				int Value;
-				if(!str_toint(pResult->GetString(pResult->NumArguments() - 1), &Value) ||
-					Value == std::numeric_limits<int>::max() ||
-					Value == std::numeric_limits<int>::min())
-				{
-					return PARSEARGS_INVALID_INTEGER;
-				}
-			}
-			else if(Command == 'c')
-			{
-				auto Color = ColorParse(pResult->GetString(pResult->NumArguments() - 1), 0.0f);
-				if(!Color.has_value())
-				{
-					return PARSEARGS_INVALID_COLOR;
-				}
-			}
-			else if(Command == 'f')
-			{
-				float Value;
-				if(!str_tofloat(pResult->GetString(pResult->NumArguments() - 1), &Value) ||
-					Value == std::numeric_limits<float>::max() ||
-					Value == std::numeric_limits<float>::min())
-				{
-					return PARSEARGS_INVALID_FLOAT;
-				}
-			}
-			// 's' and unknown commands are handled as strings
 		}
+
+		// validate arguments
+		if(Command == 'v')
+		{
+			const char *pVictim = pResult->GetString(pResult->NumArguments() - 1);
+			if(pVictim[0] == '\0')
+			{
+				return PARSEARGS_MISSING_VALUE;
+			}
+			pResult->SetVictim(pVictim);
+		}
+		else if(Command == 'i')
+		{
+			int Value;
+			if(!str_toint(pResult->GetString(pResult->NumArguments() - 1), &Value) ||
+				Value == std::numeric_limits<int>::max() ||
+				Value == std::numeric_limits<int>::min())
+			{
+				return PARSEARGS_INVALID_INTEGER;
+			}
+		}
+		else if(Command == 'c')
+		{
+			auto Color = ColorParse(pResult->GetString(pResult->NumArguments() - 1), 0.0f);
+			if(!Color.has_value())
+			{
+				return PARSEARGS_INVALID_COLOR;
+			}
+		}
+		else if(Command == 'f')
+		{
+			float Value;
+			if(!str_tofloat(pResult->GetString(pResult->NumArguments() - 1), &Value) ||
+				Value == std::numeric_limits<float>::max() ||
+				Value == std::numeric_limits<float>::min())
+			{
+				return PARSEARGS_INVALID_FLOAT;
+			}
+		}
+		// 's' and unknown commands are handled as strings
 	}
 
 	return PARSEARGS_OK;
@@ -1101,18 +1106,10 @@ void CConsole::Con_Chain(IResult *pResult, void *pUserData)
 void CConsole::Chain(const char *pName, FChainCommandCallback pfnChainFunc, void *pUser)
 {
 	CCommand *pCommand = FindCommand(pName, m_FlagMask);
-
-	if(!pCommand)
-	{
-		char aBuf[256];
-		str_format(aBuf, sizeof(aBuf), "failed to chain '%s'", pName);
-		Print(IConsole::OUTPUT_LEVEL_DEBUG, "console", aBuf);
-		return;
-	}
-
-	CChain *pChainInfo = new CChain();
+	dbg_assert(pCommand != nullptr, "Invalid command to chain: '%s'", pName);
 
 	// store info
+	CChain *pChainInfo = new CChain();
 	pChainInfo->m_pfnChainCallback = pfnChainFunc;
 	pChainInfo->m_pUserData = pUser;
 	pChainInfo->m_pfnCallback = pCommand->m_pfnCallback;

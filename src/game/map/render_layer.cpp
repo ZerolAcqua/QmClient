@@ -1082,11 +1082,10 @@ void CRenderLayerQuads::RenderQuadLayer(float Alpha, const CRenderLayerParams &P
 				if(Color.a < 0.0f)
 					Color.a = 0.0f;
 				QInfo.m_Color = Color;
-				const bool IsVisible = Color.a >= 0.0f;
-				AnyVisible |= IsVisible;
 
-				if(IsVisible)
+				if(Color.a > 0.0f)
 				{
+					AnyVisible = true;
 					ColorRGBA Position = ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f);
 					m_pEnvelopeManager->EnvelopeEval()->EnvelopeEval(pQuad->m_PosEnvOffset, pQuad->m_PosEnv, Position, 3);
 					QInfo.m_Offsets.x = Position.r;
@@ -1369,7 +1368,7 @@ bool CRenderLayerQuads::CalculateQuadClipping(const CQuadCluster &QuadCluster, f
 	for(int Channel = 0; Channel < 2; ++Channel)
 	{
 		aQuadOffsetMin[Channel] = std::numeric_limits<float>::max(); // minimum of channel
-		aQuadOffsetMax[Channel] = std::numeric_limits<float>::min(); // maximum of channel
+		aQuadOffsetMax[Channel] = std::numeric_limits<float>::lowest(); // maximum of channel
 	}
 
 	for(int QuadId = QuadCluster.m_StartIndex; QuadId < QuadCluster.m_StartIndex + QuadCluster.m_NumQuads; ++QuadId)

@@ -3965,6 +3965,8 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     QmUiTokensTest.cpp
     qm_card_order_model_test.cpp
     qm_card_registry_test.cpp
+qm_hook_coll_visibility_test.cpp
+qm_item_culling_logic_test.cpp
     qm_module_layout_adapter_test.cpp
     aio_test.cpp
     assets_editor_layout_test.cpp
@@ -3980,7 +3982,8 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     color_test.cpp
     compression_test.cpp
     csv_test.cpp
-    datafile_test.cpp
+    db_connection_test.cpp
+datafile_test.cpp
     dbg_test.cpp
     ddnet_19_9_sync_test.cpp
     editor_test.cpp

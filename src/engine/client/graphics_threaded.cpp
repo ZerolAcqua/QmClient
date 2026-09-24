@@ -1653,6 +1653,10 @@ void CGraphics_Threaded::ScreenshotDirect(bool *pSwapped)
 			m_pfnScreenshotCallback(Image.DeepCopy());
 		m_pEngine->AddJob(std::make_shared<CScreenshotSaveJob>(m_pStorage, m_aScreenshotName, std::move(Image)));
 	}
+	else
+	{
+		log_error("graphics", "Failed to create screenshot");
+	}
 	m_pfnScreenshotCallback = nullptr;
 }
 
@@ -3653,10 +3657,6 @@ int CGraphics_Threaded::IssueInit()
 		{
 			Flags |= IGraphicsBackend::INITFLAG_BORDERLESS;
 		}
-	}
-	else // Windowed fullscreen
-	{
-		Flags |= IGraphicsBackend::INITFLAG_BORDERLESS;
 	}
 	if(g_Config.m_GfxVsync)
 	{

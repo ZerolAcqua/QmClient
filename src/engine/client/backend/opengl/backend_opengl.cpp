@@ -1256,7 +1256,8 @@ void CCommandProcessorFragment_OpenGL::Cmd_Screenshot(const CCommandBuffer::SCom
 	glPixelStorei(GL_PACK_ALIGNMENT, Alignment);
 
 	// flip the pixel because opengl works from bottom left corner
-	for(int y = 0; y < h / 2; y++)
+	// with an odd height also flip the middle row (with itself) so it forces alpha = 255
+	for(int y = 0; y < (h + 1) / 2; y++)
 	{
 		mem_copy(pTempRow, pPixelData + y * w * 4, w * 4);
 		mem_copy(pPixelData + y * w * 4, pPixelData + (h - y - 1) * w * 4, w * 4);
@@ -1968,8 +1969,8 @@ bool CCommandProcessorFragment_OpenGL2::Cmd_Init(const SCommand_Init *pCommand)
 				m_pTileProgramTextured->AddShader(&VertexShader);
 				m_pTileProgramTextured->AddShader(&FragmentShader);
 
-				glBindAttribLocation(m_pTileProgram->GetProgramId(), 0, "inVertex");
-				glBindAttribLocation(m_pTileProgram->GetProgramId(), 1, "inVertexTexCoord");
+				glBindAttribLocation(m_pTileProgramTextured->GetProgramId(), 0, "inVertex");
+				glBindAttribLocation(m_pTileProgramTextured->GetProgramId(), 1, "inVertexTexCoord");
 
 				m_pTileProgramTextured->LinkProgram();
 

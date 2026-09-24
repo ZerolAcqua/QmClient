@@ -3880,7 +3880,7 @@ void CGameClient::OnNewSnapshot()
 				//       once https://github.com/ddnet/ddnet/pull/11232 is resolved
 				int Team = std::clamp(Item.m_Id, (int)TEAM_FLOCK, 63);
 
-				int HighestSwitchNumber = std::clamp(pSwitchStateData->m_HighestSwitchNumber, 0, 255);
+				int HighestSwitchNumber = std::clamp(std::max(pSwitchStateData->m_HighestSwitchNumber, Collision()->m_HighestSwitchNumber), 0, 255);
 				if(HighestSwitchNumber != maximum(0, (int)Switchers().size() - 1))
 				{
 					m_GameWorld.m_Core.InitSwitchers(HighestSwitchNumber);
@@ -3899,7 +3899,7 @@ void CGameClient::OnNewSnapshot()
 					{
 						int SwitchNumber = pSwitchStateData->m_aSwitchNumbers[j];
 						int EndTick = pSwitchStateData->m_aEndTicks[j];
-						if(EndTick > 0 && in_range(SwitchNumber, 0, (int)Switchers().size()))
+						if(EndTick > 0 && SwitchNumber >= 0 && SwitchNumber < (int)Switchers().size())
 						{
 							Switchers()[SwitchNumber].m_aEndTick[Team] = EndTick;
 						}
@@ -4104,9 +4104,12 @@ void CGameClient::OnNewSnapshot()
 
 	if(ServerInfo.m_aGameType[0] != '0')
 	{
+		// Vanilla servers send laser_bounce_num 1, DDNet has laser_bounce_num 1000 since ~2014
+		CTuningParams VanillaTuning;
+		VanillaTuning.m_LaserBounceNum = 1;
 		if(str_comp(ServerInfo.m_aGameType, "DM") != 0 && str_comp(ServerInfo.m_aGameType, "TDM") != 0 && str_comp(ServerInfo.m_aGameType, "CTF") != 0)
 			m_ServerMode = SERVERMODE_MOD;
-		else if(mem_comp(&CTuningParams::DEFAULT, &m_aTuning[g_Config.m_ClDummy], 33) == 0)
+		else if(mem_comp(&VanillaTuning, &m_aTuning[g_Config.m_ClDummy], 33 * sizeof(CTuneParam)) == 0)
 			m_ServerMode = SERVERMODE_PURE;
 		else
 			m_ServerMode = SERVERMODE_PUREMOD;

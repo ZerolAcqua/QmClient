@@ -52,7 +52,6 @@ namespace
 	class CUserErrorStruct
 	{
 	public:
-		CByteBufferReader *m_pReader;
 		const char *m_pContextName;
 		std::jmp_buf m_JmpBuf;
 	};
@@ -168,7 +167,7 @@ static int PngliteIncompatibility(png_structp pPngStruct, png_infop pPngInfo)
 
 bool CImageLoader::LoadPng(CByteBufferReader &Reader, const char *pContextName, CImageInfo &Image, int &PngliteIncompatible)
 {
-	CUserErrorStruct UserErrorStruct = {&Reader, pContextName, {}};
+	CUserErrorStruct UserErrorStruct = {pContextName, {}};
 
 	if(setjmp(UserErrorStruct.m_JmpBuf))
 	{

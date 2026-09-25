@@ -36,8 +36,13 @@ namespace qm_sponsors
 			// 字节上限落在行内时舍弃整行，避免把 UTF-8 姓名截成残缺内容。
 			if(Position == Length && Truncated)
 				break;
-			if(Position < Length && pMarkdown[Position++] == '\r' && Position < Length && pMarkdown[Position] == '\n')
+			if(Position < Length)
+			{
+				const bool CarriageReturn = pMarkdown[Position] == '\r';
 				++Position;
+				if(CarriageReturn && Position < Length && pMarkdown[Position] == '\n')
+					++Position;
+			}
 
 			while(Begin < End && IsBlank(pMarkdown[Begin]))
 				++Begin;

@@ -193,11 +193,12 @@ struct CEmoticonProjectile
 		if(!Mask.Overlaps(m_Pos, Size(), m_Angle, Solid))
 			return true;
 		// 贴墙出生时优先就近移出墙体，飞行中不调用，避免跨到墙的另一侧。
-		for(float Radius = 2; Radius <= Size() + 32; Radius += 2)
+		const int MaxRadius = (int)(Size() + 32);
+		for(int Radius = 2; Radius <= MaxRadius; Radius += 2)
 		{
 			for(int I = 0; I < 16; ++I)
 			{
-				const vec2 Candidate = m_Pos + direction(-pi / 2 + I * pi / 8) * Radius;
+				const vec2 Candidate = m_Pos + direction(-pi / 2 + I * pi / 8) * (float)Radius;
 				if(!Mask.Overlaps(Candidate, Size(), m_Angle, Solid))
 				{
 					m_Pos = m_PreviousPos = Candidate;

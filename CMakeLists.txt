@@ -1876,6 +1876,7 @@ set(EXPECTED_DATA
   menuimages/play_game.png
   menuimages/settings.png
   particles.png
+  qmclient/LICENSE.txt
   qmclient/builtinscripts/sayemoticon.chai
   qmclient/chat_emojis/agree.png
   qmclient/chat_emojis/angry.png
@@ -4482,6 +4483,7 @@ set(CPACK_ARCHIVE_PORTABLE_FILE_NAME ${CPACK_PACKAGE_FILE_NAME})
 set(CPACK_SOURCE_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-src)
 set(CPACK_SOURCE_FILES
   CMakeLists.txt
+  LICENSE-QMCLIENT.md
   README.md
   cmake/
   data/
@@ -4559,6 +4561,7 @@ set(CPACK_DIRS
   ${COPY_DIRS}
 )
 set(CPACK_FILES
+  LICENSE-QMCLIENT.md
   license.txt
   storage.cfg
   steam_appid.txt

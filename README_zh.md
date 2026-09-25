@@ -8,6 +8,14 @@
   基于 DDNet / TaterClient 构建的定制客户端项目
 </p>
 
+<p align="center">
+  <a href="https://github.com/wxj881027/QmClient/actions/workflows/build.yml"><img src="https://github.com/wxj881027/QmClient/actions/workflows/build.yml/badge.svg" alt="构建与发布" /></a>
+  <a href="https://github.com/wxj881027/QmClient/actions/workflows/nightly.yml"><img src="https://github.com/wxj881027/QmClient/actions/workflows/nightly.yml/badge.svg" alt="每夜构建" /></a>
+  <a href="https://github.com/wxj881027/QmClient/releases/latest"><img src="https://img.shields.io/github/v/release/wxj881027/QmClient?label=release&sort=semver" alt="最新版本" /></a>
+  <a href="https://github.com/wxj881027/QmClient/stargazers"><img src="https://img.shields.io/github/stars/wxj881027/QmClient?label=stars" alt="Star 数" /></a>
+  <a href="LICENSE-QMCLIENT.md"><img src="https://img.shields.io/badge/license-layered-blue" alt="分层许可" /></a>
+</p>
+
 > 📄 本文档另有 <a href="README.md">English</a> 版本</p>
 
 ## 📝 项目概述
@@ -15,7 +23,20 @@
 QmClient客户端是基于 DDNet 和 TaterClient 构建的定制版本。  
 项目旨在提供更现代的 UI 体验、更丰富的视觉效果配置选项，同时保持与核心游戏玩法的兼容性。
 
-> 🤖 **AI agent / 贡献者**：工作流规则（commit、PR、release、构建）在 [`AGENTS.md`](AGENTS.md) 与 [`docs/ai-workflow/`](docs/ai-workflow/meta.md)，请从这里开始。
+> 🤖 **AI agent / 贡献者**：工作流规则（commit、PR、release、构建）在 [`AGENTS.md`](AGENTS.md)，请从这里开始。
+
+## 📥 下载
+
+预编译包发布在 [Releases](https://github.com/wxj881027/QmClient/releases/latest) 页面。
+
+| 平台 | 包名 |
+| --- | --- |
+| Windows | `QmClient-windows.zip` |
+| Linux | `QmClient-ubuntu.tar.xz` |
+| macOS | `QmClient-macOS.dmg` |
+| Android | Release 页面上的 APK |
+
+四个平台均由 [`build.yml`](https://github.com/wxj881027/QmClient/actions/workflows/build.yml) 构建；每夜构建来自 [`nightly.yml`](https://github.com/wxj881027/QmClient/actions/workflows/nightly.yml)。若要自行从源码构建，见[构建](#-构建)。
 
 ## ✨ 功能特性
 
@@ -66,6 +87,16 @@ cmake --build cmake-build-release --target run_rust_tests
 cmake --build cmake-build-release --target run_tests
 ```
 
+## 📊 项目动态
+
+两张图表由 [`readme-charts.yml`](.github/workflows/readme-charts.yml) 每日生成，并直接存放在本仓库，不依赖任何第三方图表服务。
+
+> 提交量只统计 QmClient 的贡献者。本仓库 fork 自 DDNet，Git 历史包含两万余条上游提交（最早可追到 2007 年），不加过滤的活动图反映的会是上游的工作而非本项目。
+
+![Star 增长](.github/assets/star-history.svg)
+
+![每月提交量](.github/assets/commit-activity.svg)
+
 ## 🙏 特别感谢
 
 - DDNet、Teeworlds、DDRace、TaterClient、RClient、Best Client和 CactusClient 的所有贡献者
@@ -87,14 +118,19 @@ cmake --build cmake-build-release --target run_tests
 - [qq-music-api](https://github.com/Rain120/qq-music-api)
 - [QQMusicApi](https://github.com/jsososo/QQMusicApi)
 - [LyricCapture](https://github.com/ElliottSilence/LyricCapture)
-- [QRCD](https://github.com/xmcp/QRCD)
 - [ntextcat](https://github.com/ivanakcheurov/ntextcat)
 - [LyricParser](https://github.com/HyPlayer/LyricParser)
 
 ## 📜 许可证
 
-本项目基于 DDNet 和 TaterClient。上游代码仍遵循 zlib/libpng 许可证。
-修改版本必须明确标注来源，不得歪曲原作者身份。
+本项目基于 DDNet 和 TaterClient，采用**分层许可**：
+
+- **继承自上游的部分** —— 来自 Teeworlds、DDRace、DDNet 与 TaterClient 的代码及 `data/` 内容（含本项目对这些文件的修改），仍分别遵循 zlib/libpng 许可证与 CC BY-SA 3.0。修改版本必须明确标注来源，不得歪曲原作者身份。
+- **QmClient 自有代码** —— 保留所有权利。
+- **QmClient 自制素材**（`data/qmclient` 下的聊天表情与标志图）—— [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/)：署名、非商业性使用、禁止演绎。
+- **第三方内容** —— 字体、图标图集（Phosphor Icons，MIT）、音乐平台互操作的移植代码与依赖库保留各自的原始许可。
+
+每一层的准确范围见 [`LICENSE-QMCLIENT.md`](LICENSE-QMCLIENT.md)，其中同时载明音乐平台互操作代码的使用意图；上游声明与第三方归属集中在 [`license.txt`](license.txt)。
 
 ## 📮 说明
 

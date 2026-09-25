@@ -237,7 +237,7 @@ void CQmAxiomScores::EvictCacheEntryIfNeeded()
 
 void CQmAxiomScores::EnsureQueried(const char *pPlayerName)
 {
-	if(!pPlayerName || pPlayerName[0] == '\0' || str_length(pPlayerName) > AXIOM_MAX_QUERY_NAME_BYTES || !str_utf8_check(pPlayerName))
+	if(!pPlayerName || pPlayerName[0] == '\0' || (size_t)str_length(pPlayerName) > AXIOM_MAX_QUERY_NAME_BYTES || !str_utf8_check(pPlayerName))
 		return;
 	if(m_Mode == EQmAxiomMode::NONE)
 		return;

@@ -2668,7 +2668,7 @@ void CMenus::RenderQmFunctionKeywordReplyContent(CUIRect &Content, float UiScale
 		{
 			s_vKeywordRuleRows.erase(s_vKeywordRuleRows.begin() + i);
 			s_vKeywordRemoveRuleButtons.erase(s_vKeywordRemoveRuleButtons.begin() + i);
-			const bool HalfFilled = std::any_of(s_vKeywordRuleRows.begin(), s_vKeywordRuleRows.end(), [](const auto &pRule) { return IsAutoReplyRuleRowHalfFilled(*pRule); });
+			const bool HalfFilled = std::any_of(s_vKeywordRuleRows.begin(), s_vKeywordRuleRows.end(), [](const auto &pRow) { return IsAutoReplyRuleRowHalfFilled(*pRow); });
 			UpdateKeywordRulesLayoutState(s_vKeywordRuleRows.size(), HalfFilled);
 			Changes.m_Removed = true;
 			continue;
@@ -2959,7 +2959,7 @@ void CMenus::RenderQmFunctionTranslateContent(CUIRect &Content, float LineHeight
 		Row.VSplitLeft(LabelWidth, &LabelCol, &ControlCol);
 
 		CLineInput *pActiveKeyInput = nullptr;
-		const char *pKeyLabel = Localize("API key");
+		const char *pKeyLabel;
 		switch(g_Config.m_QmTranslateLlmProvider)
 		{
 		case 0: // Zhipu AI
@@ -3468,7 +3468,7 @@ void CMenus::RenderQmFunctionFavoriteMapsContent(CUIRect &Content, float UiScale
 			return "Event";
 		return nullptr;
 	};
-	auto MapTypeDisplayName = [this](const char *pType) -> const char * {
+	auto MapTypeDisplayName = [](const char *pType) -> const char * {
 		if(!pType || pType[0] == '\0')
 			return Localize("Unknown");
 		if(str_comp_nocase(pType, "DDmaX Easy") == 0)
@@ -5267,7 +5267,6 @@ void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnl
 	s_GlobalSearchCardBuild.m_pOnCardExpanded = BumpQiaFenCardMeasureRevision;
 	s_GlobalSearchFunctionCardLayout = ResolveFunctionCardLayoutState();
 	s_GlobalSearchCardBuild.m_pFunctionLayout = &s_GlobalSearchFunctionCardLayout;
-	const qm_card_catalog::SQmCardBuildContext &SearchCardBuild = s_GlobalSearchCardBuild;
 
 	// 页面只声明"这一页有哪些卡片"：搜索输入卡 + 空结果卡 + 命中的全部卡片，
 	// 命中的卡片在这里就是完整可交互的卡片本体（就地可改，不是跳转链接）。
@@ -5310,15 +5309,16 @@ void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnl
 		},
 	};
 
-	const auto BuildDefinitions = [this, SmallSize, ReadOnly, &SearchCardBuild, &SearchVisibleGlobalCards, &aBaseCards](std::vector<SSettingsCardDefinition> &vCards) {
+	const auto BuildDefinitions = [this, SmallSize, ReadOnly, &aBaseCards](std::vector<SSettingsCardDefinition> &vCards) {
 		vCards.clear();
 		for(const FGlobalSearchBaseCard &BuildBaseCard : aBaseCards)
 			BuildBaseCard(vCards);
 
-		for(const SQmGlobalSearchCard &MatchedCard : SearchVisibleGlobalCards)
+		// 直接引用函数内静态对象，lambda 无需捕获局部引用（避免未使用捕获告警）。
+		for(const SQmGlobalSearchCard &MatchedCard : s_GlobalSearchCache.m_vResults)
 		{
 			SSettingsCardDefinition Definition;
-			if(!qm_card_catalog::BuildCard(SearchCardBuild, MatchedCard.m_pStableId, Definition))
+			if(!qm_card_catalog::BuildCard(s_GlobalSearchCardBuild, MatchedCard.m_pStableId, Definition))
 				continue;
 			// 结果卡片标题下方给一个"定位"入口，其余交互与卡片本体完全一致。
 			Definition.m_HeaderAction = BuildGlobalSearchLocateHeaderAction(MatchedCard, ReadOnly, SmallSize);
@@ -5349,7 +5349,6 @@ void CMenus::RenderSettingsGlobalSearchContent(CUIRect MainView, bool PrewarmOnl
 void CMenus::RenderSettingsQmClientContent(CUIRect MainView, bool ContributorsPage, bool PrewarmOnly)
 {
 	using namespace qm_module;
-	const bool UseNewUi = g_Config.m_QmNewUi != 0;
 
 	// feat-003 dogfood: when dbg_qm_ui_dogfood is on, take over the QmClient
 	// settings panel and render the widget gallery. First visible verification
@@ -5390,7 +5389,7 @@ void CMenus::RenderSettingsQmClientContent(CUIRect MainView, bool ContributorsPa
 		const SSettingsSubTabLayoutFrame QmClientSubTabs = ResolveSettingsSubTabLayout(MainView, QmClientUiScale);
 		TabBar = QmClientSubTabs.m_TabBarRect;
 		MainView = QmClientSubTabs.m_ContentRect;
-		const float TabWidth = TabBar.w / NUMBER_OF_QMCLIENT_SETTINGS_TABS;
+		const float TabWidth = TabBar.w / (float)NUMBER_OF_QMCLIENT_SETTINGS_TABS;
 		static CButtonContainer s_aPageTabs[NUMBER_OF_QMCLIENT_SETTINGS_TABS] = {};
 		const char *apQmTabNames[NUMBER_OF_QMCLIENT_SETTINGS_TABS] = {};
 		apQmTabNames[QMCLIENT_SETTINGS_TAB_VISUAL] = Localize("Visuals");
@@ -5503,7 +5502,6 @@ void CMenus::RenderSettingsQmClientContent(CUIRect MainView, bool ContributorsPa
 	}
 	static bool s_SponsorQrTextureTried = false;
 	static bool s_SponsorQrTextureReady = false;
-	static bool s_SponsorQrDecodeFailed = false;
 	static IGraphics::CTextureHandle s_SponsorQrTexture;
 	static const char *const s_apSponsorQrPngBase64[] = {
 		"data:image/png;base64,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",
@@ -5619,22 +5617,15 @@ void CMenus::RenderSettingsQmClientContent(CUIRect MainView, bool ContributorsPa
 		std::vector<uint8_t> vDecoded(MaxDecodedSize);
 		const int DecodedSize = str_base64_decode(vDecoded.data(), MaxDecodedSize, CleanBase64.c_str());
 		if(DecodedSize <= 0)
-		{
-			s_SponsorQrDecodeFailed = true;
 			return false;
-		}
 		vDecoded.resize(DecodedSize);
 
 		CImageInfo QrImage;
 		if(!Graphics()->LoadPng(QrImage, vDecoded.data(), vDecoded.size(), "qmclient_sponsor_qr_base64"))
-		{
-			s_SponsorQrDecodeFailed = true;
 			return false;
-		}
 
 		s_SponsorQrTexture = Graphics()->LoadTextureRawMove(QrImage, 0, "qmclient_sponsor_qr");
 		s_SponsorQrTextureReady = s_SponsorQrTexture.IsValid();
-		s_SponsorQrDecodeFailed = !s_SponsorQrTextureReady;
 		return s_SponsorQrTextureReady;
 	};
 	if(m_QmClientSettingsTab == QMCLIENT_SETTINGS_TAB_CONTRIBUTORS)
@@ -5689,7 +5680,6 @@ void CMenus::RenderSponsorNudge(CUIRect Screen)
 		return;
 	}
 
-	const IUiContext Ctx = SettingsUiContext("menu_sponsor_nudge");
 	const float DeltaSeconds = GameClient()->UiRuntimeV2()->FrameDt();
 	const float UiScale = g_Config.m_QmUiScale / 100.0f;
 
@@ -5854,7 +5844,6 @@ void CMenus::RenderQmNewFeaturesPopup(CUIRect Screen)
 	const float Padding = ui_token::spacing::LG * UiScale;
 	const float Gap = ui_token::spacing::MD * UiScale;
 	const float ButtonH = 26.0f * UiScale;
-	const float JumpButtonW = 110.0f * UiScale;
 
 	// 遮罩：弹窗期间抢占启动菜单的绘制，先压暗整屏再画面板。
 	Screen.Draw(ui_token::color::SURFACE_OVERLAY, IGraphics::CORNER_NONE, 0.0f);

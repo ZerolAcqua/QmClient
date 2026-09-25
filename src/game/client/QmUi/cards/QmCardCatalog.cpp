@@ -45,8 +45,7 @@ namespace qm_card_catalog
 			void (*pOnCardExpanded)(void *, qm_module::EQmModuleId) = Ctx.m_pOnCardExpanded;
 			void *pExpandedUser = Ctx.m_pOnCardExpandedUser;
 			const bool ReadOnly = Ctx.m_ReadOnly;
-			CMenus *pMenus = Ctx.m_pMenus;
-			Out.m_PreLayoutHeaderInput = [Ctx, pMenus, pCollapseButtons, Index, pToggleCollapsed, pToggleUser, pOnCardExpanded, pExpandedUser, ReadOnly, Id](const SSettingsCardFrame &Frame, const bool IsCollapsed) {
+			Out.m_PreLayoutHeaderInput = [Ctx, pCollapseButtons, Index, pToggleCollapsed, pToggleUser, pOnCardExpanded, pExpandedUser, ReadOnly, Id](const SSettingsCardFrame &Frame, const bool IsCollapsed) {
 				if(ReadOnly || !QmCardRenderHook::DoButtonLogic(Ctx.m_pMenus, &pCollapseButtons[Index], IsCollapsed, &Frame.m_HandleRect, BUTTONFLAG_LEFT))
 					return false;
 				pToggleCollapsed(pToggleUser, Id);

@@ -98789,7 +98789,7 @@
     {
       "file": "src/game/client/components/tclient/tclient.cpp",
       "line": 1677,
-      "text": "tc_allow_any_resolution",
+      "text": "tc_allow_any_res",
       "category": "business_data",
       "reason": "command, config, or machine token"
     },

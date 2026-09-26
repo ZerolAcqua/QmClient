@@ -487,8 +487,8 @@ void CMenuBackground::LoadMenuBackground(bool HasDayHint, bool HasNightHint)
 		};
 
 		auto TryLoadTheme = [&](const char *pBasePath) -> bool {
-			str_format(aBuf, sizeof(aBuf), "%s.map", pBasePath);
-			if(Storage()->FileExists(aBuf, IStorage::TYPE_ALL) && m_pMap->Load(aBuf, IStorage::TYPE_ALL))
+			std::string CandidatePath = BuildThemeCandidatePath(pBasePath, ".map");
+			if(Storage()->FileExists(CandidatePath.c_str(), IStorage::TYPE_ALL) && m_pMap->Load(CandidatePath.c_str(), IStorage::TYPE_ALL))
 			{
 				m_Loaded = true;
 				return true;
@@ -501,8 +501,8 @@ void CMenuBackground::LoadMenuBackground(bool HasDayHint, bool HasNightHint)
 			}
 			for(const char *pExtension : BACKGROUND_IMAGE_EXTENSIONS)
 			{
-				str_format(aBuf, sizeof(aBuf), "%s%s", pBasePath, pExtension);
-				if(Storage()->FileExists(aBuf, IStorage::TYPE_ALL) && LoadImageBackground(aBuf))
+				CandidatePath = BuildThemeCandidatePath(pBasePath, pExtension);
+				if(Storage()->FileExists(CandidatePath.c_str(), IStorage::TYPE_ALL) && LoadImageBackground(CandidatePath.c_str()))
 				{
 					return true;
 				}
@@ -513,8 +513,8 @@ void CMenuBackground::LoadMenuBackground(bool HasDayHint, bool HasNightHint)
 			}
 			for(const char *pExtension : BACKGROUND_VIDEO_EXTENSIONS)
 			{
-				str_format(aBuf, sizeof(aBuf), "%s%s", pBasePath, pExtension);
-				if(Storage()->FileExists(aBuf, IStorage::TYPE_ALL) && LoadVideoBackground(aBuf))
+				CandidatePath = BuildThemeCandidatePath(pBasePath, pExtension);
+				if(Storage()->FileExists(CandidatePath.c_str(), IStorage::TYPE_ALL) && LoadVideoBackground(CandidatePath.c_str()))
 				{
 					return true;
 				}
